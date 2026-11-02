@@ -1,0 +1,273 @@
+package app.overfit.i18n
+
+import androidx.compose.runtime.staticCompositionLocalOf
+import app.overfit.domain.Language
+import kotlinx.datetime.LocalDate
+
+/**
+ * All UI texts. Kept in Kotlin (instead of platform resources) so the language can be switched
+ * inside the app on Android and iOS alike, and a missing translation is a compile error.
+ */
+data class Strings(
+    val appName: String = "Overfit",
+    val next: String,
+    val back: String,
+    val comingSoon: String,
+
+    // Onboarding
+    val nameTitle: String,
+    val namePlaceholder: String,
+    val ageTitle: String,
+    val ageUnit: String,
+    val ageError: String,
+    val weightTitle: String,
+    val weightError: String,
+    val aiTitle: String,
+    val aiSubtitle: String,
+    val aiKeyPlaceholder: String,
+    val aiHowTo: String,
+    val aiConnect: String,
+    val aiConnected: String,
+    val aiInvalid: String,
+    val aiNetwork: String,
+    val aiPrivacy: String,
+    val aiLater: String,
+
+    // Tabs
+    val navStart: String,
+    val navHistory: String,
+    val navExercises: String,
+    val navPhotos: String,
+    val navProfile: String,
+
+    // Start
+    val greeting: (String) -> String,
+    val asOf: (String) -> String,
+    /** Formats an ISO date like "2026-11-02" for display. */
+    val date: (LocalDate) -> String,
+    val noWeight: String,
+    val startWorkout: String,
+    val templates: String,
+    val templatesEmpty: String,
+    val coachTips: String,
+    val coachTipsEmpty: String,
+
+    // Other tabs
+    val historyTitle: String,
+    val historyEmpty: String,
+    val exercisesTitle: String,
+    val exercisesEmpty: String,
+    val photosTitle: String,
+    val photosEmpty: String,
+
+    // Settings
+    val settingsTitle: String,
+    val general: String,
+    val language: String,
+    val theme: String,
+    val themeSystem: String,
+    val themeDark: String,
+    val themeLight: String,
+    val profile: String,
+    val name: String,
+    val age: String,
+    val unit: String,
+    val ai: String,
+    val connected: String,
+    val notConnected: String,
+    val connect: String,
+    val change: String,
+    val disconnect: String,
+    val coach: String,
+    val coachMemory: String,
+    val data: String,
+    val reset: String,
+    val resetConfirm: String,
+    val app: String,
+    val about: String,
+
+    // Coach memory & about
+    val coachMemoryEmpty: String,
+    val aboutVersion: (String) -> String,
+    val aboutTagline: String,
+    val aboutAttribution: String,
+    val aboutWorkoutGuide: String,
+    val aboutFreeExerciseDb: String,
+    val aboutFont: String,
+    val aboutLibraries: String,
+    val aboutLibrariesText: String,
+)
+
+private val GERMAN_MONTHS = listOf("Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez.")
+private val ENGLISH_MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+val German = Strings(
+    next = "Weiter",
+    back = "Zurück",
+    comingSoon = "Folgt in einer späteren Version",
+
+    nameTitle = "Wie sollen wir\ndich nennen?",
+    namePlaceholder = "Dein Name",
+    ageTitle = "Wie alt\nbist du?",
+    ageUnit = "Jahre",
+    ageError = "Bitte gib ein Alter zwischen 13 und 110 ein.",
+    weightTitle = "Wie viel\nwiegst du?",
+    weightError = "Das sieht nicht nach einem realistischen Gewicht aus.",
+    aiTitle = "Verbinde\ndeine KI",
+    aiSubtitle = "Overfit nutzt deinen eigenen API-Key. Keine Werbung, kein Abo.",
+    aiKeyPlaceholder = "API-Key einfügen",
+    aiHowTo = "Wie bekomme ich einen Key?",
+    aiConnect = "Verbinden",
+    aiConnected = "Verbunden",
+    aiInvalid = "Dieser Key funktioniert nicht.",
+    aiNetwork = "Keine Verbindung zum Anbieter. Versuch es gleich nochmal.",
+    aiPrivacy = "Dein Key bleibt auf diesem Gerät. Nachrichten an den Coach gehen direkt an den gewählten Anbieter.",
+    aiLater = "Später einrichten",
+
+    navStart = "Start",
+    navHistory = "Verlauf",
+    navExercises = "Übungen",
+    navPhotos = "Fotos",
+    navProfile = "Profil",
+
+    greeting = { "Hallo, $it" },
+    asOf = { "Stand $it" },
+    date = { "${it.day}. ${GERMAN_MONTHS[it.month.ordinal]} ${it.year}" },
+    noWeight = "Noch kein Gewicht",
+    startWorkout = "Training starten",
+    templates = "Vorlagen",
+    templatesEmpty = "Noch keine Vorlagen. Lege im Übungsbereich deine erste Vorlage an.",
+    coachTips = "Letzte Coach-Tipps",
+    coachTipsEmpty = "Nach deinem ersten Training bekommst du hier Tipps vom Coach.",
+
+    historyTitle = "Verlauf",
+    historyEmpty = "Noch keine Trainings. Starte dein erstes Training auf dem Startbildschirm.",
+    exercisesTitle = "Übungen",
+    exercisesEmpty = "Übungskatalog, eigene Übungen und Vorlagen folgen in Kürze.",
+    photosTitle = "Foto-Tagebuch",
+    photosEmpty = "Noch keine Fotos. Nach einem Training kannst du ein Fortschrittsfoto aufnehmen.",
+
+    settingsTitle = "Einstellungen",
+    general = "Allgemein",
+    language = "Sprache",
+    theme = "Darstellung",
+    themeSystem = "System",
+    themeDark = "Dunkel",
+    themeLight = "Hell",
+    profile = "Profil",
+    name = "Name",
+    age = "Alter",
+    unit = "Einheit",
+    ai = "KI-Zugang",
+    connected = "Verbunden",
+    notConnected = "Nicht verbunden",
+    connect = "Verbinden",
+    change = "Ändern",
+    disconnect = "Key entfernen",
+    coach = "Coach",
+    coachMemory = "Coach-Gedächtnis",
+    data = "Daten",
+    reset = "Alle Daten löschen",
+    resetConfirm = "Wirklich alles löschen?",
+    app = "App",
+    about = "Über Overfit",
+
+    coachMemoryEmpty = "Der Coach hat noch nichts gespeichert. Das Gedächtnis entsteht nach dem ersten bewerteten Training.",
+    aboutVersion = { "Version $it" },
+    aboutTagline = "Minimalistischer Trainings-Tracker mit KI-Coach.",
+    aboutAttribution = "Übungsgrafiken",
+    aboutWorkoutGuide = "Workout Guide von Bryl Lim, basierend auf Grafiken von Everkinetic. Lizenz: CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). Die Grafiken werden unverändert mitgeliefert und nur beim Anzeigen eingefärbt.",
+    aboutFreeExerciseDb = "free-exercise-db von yuhonas. Lizenz: Unlicense (gemeinfrei).",
+    aboutFont = "Schrift: Inter von Rasmus Andersson. Lizenz: SIL Open Font License 1.1.",
+    aboutLibraries = "Open-Source-Bibliotheken",
+    aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor – jeweils Apache License 2.0.",
+)
+
+val English = Strings(
+    next = "Continue",
+    back = "Back",
+    comingSoon = "Coming in a later version",
+
+    nameTitle = "What should we\ncall you?",
+    namePlaceholder = "Your name",
+    ageTitle = "How old\nare you?",
+    ageUnit = "years",
+    ageError = "Please enter an age between 13 and 110.",
+    weightTitle = "How much do\nyou weigh?",
+    weightError = "That doesn't look like a realistic weight.",
+    aiTitle = "Connect\nyour AI",
+    aiSubtitle = "Overfit uses your own API key. No ads, no subscription.",
+    aiKeyPlaceholder = "Paste API key",
+    aiHowTo = "How do I get a key?",
+    aiConnect = "Connect",
+    aiConnected = "Connected",
+    aiInvalid = "This key doesn't work.",
+    aiNetwork = "Couldn't reach the provider. Try again in a moment.",
+    aiPrivacy = "Your key stays on this device. Messages to the coach go directly to the provider you choose.",
+    aiLater = "Set up later",
+
+    navStart = "Start",
+    navHistory = "History",
+    navExercises = "Exercises",
+    navPhotos = "Photos",
+    navProfile = "Profile",
+
+    greeting = { "Hi, $it" },
+    asOf = { "As of $it" },
+    date = { "${ENGLISH_MONTHS[it.month.ordinal]} ${it.day}, ${it.year}" },
+    noWeight = "No weight yet",
+    startWorkout = "Start workout",
+    templates = "Templates",
+    templatesEmpty = "No templates yet. Create your first one in the exercises tab.",
+    coachTips = "Latest coach tips",
+    coachTipsEmpty = "After your first workout, the coach's tips show up here.",
+
+    historyTitle = "History",
+    historyEmpty = "No workouts yet. Start your first one from the start screen.",
+    exercisesTitle = "Exercises",
+    exercisesEmpty = "Exercise catalogue, custom exercises and templates are coming soon.",
+    photosTitle = "Photo diary",
+    photosEmpty = "No photos yet. After a workout you can take a progress photo.",
+
+    settingsTitle = "Settings",
+    general = "General",
+    language = "Language",
+    theme = "Appearance",
+    themeSystem = "System",
+    themeDark = "Dark",
+    themeLight = "Light",
+    profile = "Profile",
+    name = "Name",
+    age = "Age",
+    unit = "Unit",
+    ai = "AI access",
+    connected = "Connected",
+    notConnected = "Not connected",
+    connect = "Connect",
+    change = "Change",
+    disconnect = "Remove key",
+    coach = "Coach",
+    coachMemory = "Coach memory",
+    data = "Data",
+    reset = "Delete all data",
+    resetConfirm = "Really delete everything?",
+    app = "App",
+    about = "About Overfit",
+
+    coachMemoryEmpty = "The coach hasn't saved anything yet. Its memory starts after your first reviewed workout.",
+    aboutVersion = { "Version $it" },
+    aboutTagline = "Minimalist workout tracker with an AI coach.",
+    aboutAttribution = "Exercise illustrations",
+    aboutWorkoutGuide = "Workout Guide by Bryl Lim, based on illustrations by Everkinetic. License: CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). The illustrations ship unmodified and are only tinted when displayed.",
+    aboutFreeExerciseDb = "free-exercise-db by yuhonas. License: Unlicense (public domain).",
+    aboutFont = "Typeface: Inter by Rasmus Andersson. License: SIL Open Font License 1.1.",
+    aboutLibraries = "Open-source libraries",
+    aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor – all Apache License 2.0.",
+)
+
+fun stringsFor(language: Language): Strings = when (language) {
+    Language.DE -> German
+    Language.EN -> English
+}
+
+val LocalStrings = staticCompositionLocalOf { German }

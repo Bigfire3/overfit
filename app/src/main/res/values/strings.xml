@@ -1,54 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Alle UI-Texte liegen mehrsprachig in :shared (app.overfit.i18n). Hier nur der Launcher-Name. -->
     <string name="app_name">Overfit</string>
-
-    <string name="nav_start">Start</string>
-    <string name="nav_history">Verlauf</string>
-    <string name="nav_exercises">Übungen</string>
-    <string name="nav_photos">Fotos</string>
-    <string name="nav_settings">Einstellungen</string>
-    <string name="back">Zurück</string>
-
-    <string name="start_title">Overfit</string>
-    <string name="start_button_workout">Training starten</string>
-    <string name="start_templates">Vorlagen</string>
-    <string name="start_templates_empty">Noch keine Vorlagen. Lege im Übungsbereich deine erste Vorlage an.</string>
-    <string name="start_coach_tips">Letzte Coach-Tipps</string>
-    <string name="start_coach_tips_empty">Nach deinem ersten Training bekommst du hier Tipps vom Coach.</string>
-
-    <string name="history_title">Verlauf</string>
-    <string name="history_empty">Noch keine Trainings. Starte dein erstes Training auf dem Startbildschirm.</string>
-
-    <string name="exercises_title">Übungen</string>
-    <string name="exercises_empty">Übungskatalog, eigene Übungen und Vorlagen folgen in Kürze.</string>
-
-    <string name="photos_title">Foto-Tagebuch</string>
-    <string name="photos_empty">Noch keine Fotos. Nach einem Training kannst du ein Fortschrittsfoto aufnehmen.</string>
-
-    <string name="settings_title">Einstellungen</string>
-    <string name="settings_section_coach">Coach</string>
-    <string name="settings_coach_memory">Coach-Gedächtnis</string>
-    <string name="settings_coach_memory_desc">Lesen, bearbeiten, Versionen</string>
-    <string name="settings_api_key">API-Key &amp; Modell</string>
-    <string name="settings_section_workout">Training</string>
-    <string name="settings_rest_default">Standard-Pause, Ton, Bildschirm an, RPE</string>
-    <string name="settings_section_data">Daten</string>
-    <string name="settings_offline_images">Alle Bilder offline laden</string>
-    <string name="settings_backup">Backup exportieren / importieren</string>
-    <string name="settings_section_app">App</string>
-    <string name="settings_about">Über Overfit</string>
-    <string name="settings_about_desc">Version, Lizenzen, Namensnennungen</string>
-    <string name="coming_soon">Folgt in einer späteren Version</string>
-
-    <string name="coach_memory_title">Coach-Gedächtnis</string>
-    <string name="coach_memory_empty">Der Coach hat noch nichts gespeichert. Das Gedächtnis entsteht nach dem ersten bewerteten Training.</string>
-
-    <string name="about_title">Über</string>
-    <string name="about_version">Version %1$s (Build %2$d)</string>
-    <string name="about_tagline">Persönlicher Trainings-Tracker mit KI-Coach.</string>
-    <string name="about_section_attribution">Übungsgrafiken</string>
-    <string name="about_workout_guide">Workout Guide von Bryl Lim, basierend auf Grafiken von Everkinetic. Lizenz: CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). Die Grafiken werden unverändert mitgeliefert und nur beim Anzeigen eingefärbt.</string>
-    <string name="about_free_exercise_db">free-exercise-db von yuhonas. Lizenz: Unlicense (gemeinfrei).</string>
-    <string name="about_section_libraries">Open-Source-Bibliotheken</string>
-    <string name="about_libraries">Android Jetpack (Compose, Navigation, Lifecycle, Room, WorkManager, DataStore), Kotlin und kotlinx.serialization, OkHttp, Coil – jeweils Apache License 2.0.</string>
 </resources>

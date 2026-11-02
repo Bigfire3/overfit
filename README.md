@@ -1,6 +1,7 @@
 # Overfit
 
-Persönliche Android-App zum Loggen von Krafttraining und Calisthenics – mit Pausentimer und KI-Coach.
+Minimalistische App für Android und iOS zum Loggen von Krafttraining und Calisthenics – mit Pausentimer und KI-Coach.
+Schwarz-weiß, Deutsch und Englisch, ohne Werbung, mit deinem eigenen API-Key. Gebaut mit Kotlin Multiplatform und Compose Multiplatform.
 Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRESS.md) · Entscheidungen: [docs/DECISIONS.md](docs/DECISIONS.md)
 
 ## App aufs Handy laden und installieren
@@ -25,17 +26,35 @@ Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRE
 - Achtung: Ein **älteres** APK lässt sich nicht über ein neueres installieren (Android verbietet Downgrades).
 - Feste Versionen: Ein Git-Tag `v*` (z. B. `v1.0`) erzeugt zusätzlich ein eigenes Release mit `overfit-v1.0.apk`.
 
+## Projektaufbau
+
+| Ordner | Inhalt |
+|---|---|
+| `shared/` | Kotlin Multiplatform: komplette UI (Compose Multiplatform) und Logik für Android und iOS |
+| `app/` | Android-Hülle: Activity, Signatur, Release-APK |
+| `iosApp/` | iOS-Hülle: XcodeGen-Spec und SwiftUI-Host für die gemeinsame UI |
+
 ## Selbst bauen
 
 Voraussetzungen: JDK 21, Android SDK (Plattform 37). `local.properties` mit `sdk.dir=…` oder `ANDROID_HOME` setzen.
 
 ```bash
-./gradlew :app:testDebugUnitTest :app:assembleRelease
+./gradlew :shared:testAndroidHostTest :app:testDebugUnitTest :app:assembleRelease
 ```
 
 Das signierte APK liegt danach unter `app/build/outputs/apk/release/app-release.apk`.
 
+### iOS (nur auf dem Mac)
+
+Voraussetzungen: Xcode, JDK 21, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+
+```bash
+cd iosApp && xcodegen && open Overfit.xcodeproj
+```
+
+In Xcode einen iPhone-Simulator wählen und starten. Der Kotlin-Teil wird beim Build automatisch über Gradle gebaut.
+
 ## Lizenzen
 
 Übungsgrafiken: Workout Guide (Bryl Lim, Everkinetic), CC BY-SA 4.0. Ergänzend free-exercise-db (Unlicense).
-Details im „Über"-Screen der App.
+Schrift: Inter (SIL Open Font License 1.1, siehe `licenses/Inter-OFL.txt`). Details im „Über"-Screen der App.
