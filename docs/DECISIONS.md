@@ -22,9 +22,11 @@ Kurzprotokoll von Annahmen und Architekturentscheidungen. Neueste unten.
   **Dieser Keystore darf nie ersetzt werden**, sonst sind Updates ohne Deinstallation (= Datenverlust) unmöglich.
 - **Versionierung:** `versionCode = GITHUB_RUN_NUMBER` (lokal 1), `versionName = 0.1.<run>`. Die Run-Nummer zählt pro
   Workflow über alle Branches hoch, daher ist jedes neue CI-APK ein gültiges Update.
-- **Release „latest":** Jeder erfolgreiche Build auf `main` oder `claude/**` verschiebt den Tag `latest` per Force-Push
-  auf seinen Commit und ersetzt das Asset `overfit.apk` (fester Dateiname → feste Download-URL). Der zuletzt gebaute
-  Push gewinnt, egal von welchem Branch. Release-Updates laufen serialisiert (Concurrency-Gruppe `release-latest`).
+- **Release „latest":** Nur ein erfolgreicher Build auf `main` (oder einem Tag `v*`) verschiebt den Tag `latest` per
+  Force-Push auf seinen Commit und ersetzt das Asset `overfit.apk` (fester Dateiname → feste Download-URL).
+  Arbeits-Branches (`claude/**`, `ccr-*`) bauen und testen nur und legen das APK als Actions-Artefakt ab. Grund:
+  Parallele Sessions haben „latest" gegenseitig mit Versuchsständen überschrieben. Release-Updates laufen serialisiert
+  (Concurrency-Gruppe `release-latest`).
   Tags `v*` erzeugen zusätzlich ein versioniertes Release.
 - **Debug-Build:** `applicationIdSuffix = ".debug"`, damit ein Debug-Build nie die echte App (und ihre Daten) überschreibt.
   CI baut nur Release.
@@ -81,4 +83,4 @@ Kurzprotokoll von Annahmen und Architekturentscheidungen. Neueste unten.
   ist im Manifest entfernt. Robuster und in Robolectric-Tests nutzbar.
 - **Room-Schemata in Tests:** AGP 9 übernimmt Assets des `test`-Source-Sets nicht in Unit-Tests. Daher hängt
   `app/schemas` an den **debug**-Assets (nur Debug-APK, nicht Release), damit `MigrationTestHelper` sie findet.
-- **CI-Branches:** Claude-Sessions laufen hier auf Branches `ccr-*`, deshalb baut der Workflow zusätzlich darauf.
+- **CI-Branches:** Claude-Sessions laufen hier auf Branches `ccr-*`, deshalb baut und testet der Workflow auch dort (Release „latest“ nur von `main`).

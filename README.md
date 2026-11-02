@@ -16,8 +16,10 @@ Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRE
 
 ## Updates
 
-- Jeder Push auf `main` oder einen Claude-Branch (`claude/**`, `ccr-*`) baut in GitHub Actions ein neues APK und ersetzt
+- Jeder Push auf `main` (also jeder gemergte Pull Request) baut in GitHub Actions ein neues APK und ersetzt
   `overfit.apk` im Release „latest". Die Release-Beschreibung zeigt Version, Branch und Commit.
+- Pushes auf Arbeits-Branches (`claude/**`, `ccr-*`) bauen und testen nur. Ihr APK verändert „latest" nicht,
+  liegt aber im jeweiligen Actions-Lauf unter **Artifacts** (`overfit-<Nummer>`, als ZIP) zum Vorab-Testen bereit.
 - Zum Aktualisieren einfach wieder `overfit.apk` aus „latest" laden und installieren – Android meldet
   „Update installieren". **Keine Deinstallation nötig, alle Daten bleiben erhalten.**
 - Das funktioniert, weil jedes APK mit demselben Schlüssel signiert ist (`signing/`) und der `versionCode`
