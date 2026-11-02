@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [main, 'claude/**']
+    branches: [main, 'claude/**', 'ccr-*']
     tags: ['v*']
   workflow_dispatch:
 
@@ -65,6 +65,9 @@ jobs:
 
   release:
     needs: build
+    # Nur main und Versions-Tags veröffentlichen. Andere Branches bauen und testen nur,
+    # ihr APK liegt als Actions-Artefakt bereit, "latest" bleibt unberührt.
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     # Immer nur ein Release-Update gleichzeitig, damit "latest" konsistent bleibt.
     concurrency:
