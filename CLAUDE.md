@@ -21,7 +21,8 @@ Minimalistischer KI-Fitness-Coach. Expo (React Native + TypeScript) für iOS, An
 | Design | Schwarz-weiß, angelehnt an den Stil von Trade Republic (Inspiration, keine Kopie von Logo/Name/Hausschrift/Screens). Dark als Standard, Light optional. |
 | Monetarisierung | Keine Werbung, kein Tracking, keine Analytics-SDKs. |
 | KI | Zuerst nur eigener API-Key (BYOK). Anbieter noch nicht final → Provider-Abstraktion (`src/ai`). Start: OpenRouter, Anthropic, OpenAI. |
-| Credits | Später, über eigenes Backend als zweite Provider-Implementierung (Issue #13). |
+| Plattformen | **iOS ist Release-Ziel** (App Store, Issue #16), Android und Web laufen mit. Zum Start nur iPhone, kein iPad. Bundle-ID `com.bigfire3.overfit`. Builds über EAS (`eas.json`). |
+| Credits | Später, über eigenes Backend als zweite Provider-Implementierung (Issue #13). Auf iOS ist **In-App-Purchase Pflicht** (Guideline 3.1.1). |
 | Daten | Lokal auf dem Gerät. API-Key in Keychain/Keystore (`expo-secure-store`), nie auf eigenem Server. Gewicht ist ein Gesundheitsdatum (DSGVO Art. 9). |
 | Datenmodell | Alter als Geburtsjahr, Gewicht als Zeitreihe `{date, kg}` (intern immer kg). |
 | Fehlende Infos | Ziel, Größe usw. fragt der Coach im Gespräch nach und merkt sie sich (Issue #11). |
@@ -52,4 +53,6 @@ src/theme/        Design-Tokens
 ## Technische Hinweise
 
 - `metro.config.js` zwingt `@anthropic-ai/sdk` auf den CommonJS-Build – der ESM-Build crasht unter Metro (zirkuläre Imports).
+- iOS-Privacy-Manifest steht in `app.json` (`ios.privacyManifests`). Wenn ein neues natives Paket dazukommt, dessen `ios/PrivacyInfo.xcprivacy` prüfen und die Required-Reason-APIs übernehmen.
+- `ios/` und `android/` werden generiert (`npx expo prebuild`) und nie eingecheckt.
 - Im Web gibt es keinen Keychain; dort liegt der Key in `localStorage` (`secureKey.web.ts`) – nur für Entwicklung/Vorschau.
