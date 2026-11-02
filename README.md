@@ -16,7 +16,7 @@ Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRE
 
 ## Updates
 
-- Jeder Push auf `main` oder einen `claude/**`-Branch baut in GitHub Actions ein neues APK und ersetzt
+- Jeder Push auf `main` oder einen Claude-Branch (`claude/**`, `ccr-*`) baut in GitHub Actions ein neues APK und ersetzt
   `overfit.apk` im Release „latest". Die Release-Beschreibung zeigt Version, Branch und Commit.
 - Zum Aktualisieren einfach wieder `overfit.apk` aus „latest" laden und installieren – Android meldet
   „Update installieren". **Keine Deinstallation nötig, alle Daten bleiben erhalten.**
@@ -34,6 +34,19 @@ Voraussetzungen: JDK 21, Android SDK (Plattform 37). `local.properties` mit `sdk
 ```
 
 Das signierte APK liegt danach unter `app/build/outputs/apk/release/app-release.apk`.
+
+## Übungskatalog neu erzeugen
+
+Der Katalog (`app/src/main/assets/catalog/`) wird mit einem Skript aus zwei fest gepinnten Quellen gebaut
+(Workout Guide und free-exercise-db, Commit-SHAs oben im Skript):
+
+```bash
+python3 tools/catalog/import_catalog.py
+```
+
+Das Skript braucht nur Python 3, lädt die Quellen (Cache unter `tools/catalog/.cache/`), führt Dubletten
+zusammen (Workout Guide hat Vorrang) und schreibt `exercises.json` plus die Workout-Guide-SVGs. Beim nächsten
+App-Start spielt die App einen geänderten Katalog automatisch ein; eigene Einstellungen an Übungen bleiben erhalten.
 
 ## Lizenzen
 

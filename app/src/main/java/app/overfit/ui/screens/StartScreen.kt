@@ -8,7 +8,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import app.overfit.ui.templates.TemplateCard
+import app.overfit.ui.templates.TemplateListViewModel
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -23,7 +30,12 @@ import app.overfit.ui.components.OverfitScreen
 import app.overfit.ui.components.ScreenContentSpacing
 
 @Composable
-fun StartScreen() {
+fun StartScreen(
+    onOpenTemplate: (Long) -> Unit,
+    onNewTemplate: () -> Unit,
+    templatesViewModel: TemplateListViewModel = viewModel(factory = TemplateListViewModel.Factory),
+) {
+    val templates by templatesViewModel.templates.collectAsStateWithLifecycle()
     OverfitScreen(title = stringResource(R.string.start_title)) { padding ->
         Column(
             modifier = Modifier
@@ -46,10 +58,21 @@ fun StartScreen() {
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
-            SectionCard(
-                title = stringResource(R.string.start_templates),
-                body = stringResource(R.string.start_templates_empty),
-            )
+            Text(stringResource(R.string.start_templates), style = MaterialTheme.typography.titleMedium)
+            val list = templates
+            if (list != null && list.isEmpty()) {
+                SectionCard(
+                    title = stringResource(R.string.start_templates_none_title),
+                    body = stringResource(R.string.start_templates_empty),
+                )
+            }
+            list?.forEach { TemplateCard(it, onClick = { onOpenTemplate(it.id) }) }
+            if (list != null) {
+                OutlinedButton(onClick = onNewTemplate, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Text(stringResource(R.string.start_new_template), modifier = Modifier.padding(start = 8.dp))
+                }
+            }
             SectionCard(
                 title = stringResource(R.string.start_coach_tips),
                 body = stringResource(R.string.start_coach_tips_empty),

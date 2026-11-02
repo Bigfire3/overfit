@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 // versionCode kommt in CI aus der Run-Nummer, damit jedes APK als Update installierbar ist.
@@ -61,9 +63,20 @@ android {
         }
     }
 
+    sourceSets {
+        // Exportierte Room-Schemata für MigrationTestHelper in Unit-Tests verfügbar machen.
+        // "test" wird von AGP für Unit-Tests nicht in die Assets gemergt; debug-Assets sehen auch Robolectric-Tests.
+        getByName("debug").assets.directories.add("$projectDir/schemas")
+    }
+
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+}
+
+room {
+    // Exportiertes Schema: Grundlage für Migrationen und Migrationstests (nie destruktiv migrieren).
+    schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
@@ -82,8 +95,21 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.okhttp)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
+    implementation(libs.coil.network.okhttp)
+
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.work.testing)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

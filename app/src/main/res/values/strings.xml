@@ -12,15 +12,15 @@
     <string name="start_title">Overfit</string>
     <string name="start_button_workout">Training starten</string>
     <string name="start_templates">Vorlagen</string>
-    <string name="start_templates_empty">Noch keine Vorlagen. Lege im Übungsbereich deine erste Vorlage an.</string>
+    <string name="start_templates_none_title">Noch keine Vorlagen</string>
+    <string name="start_templates_empty">Lege deine erste Vorlage an, z. B. „Push“ oder „Ganzkörper A“. Vorlagen findest du auch im Tab Übungen.</string>
+    <string name="start_new_template">Neue Vorlage</string>
     <string name="start_coach_tips">Letzte Coach-Tipps</string>
     <string name="start_coach_tips_empty">Nach deinem ersten Training bekommst du hier Tipps vom Coach.</string>
 
     <string name="history_title">Verlauf</string>
     <string name="history_empty">Noch keine Trainings. Starte dein erstes Training auf dem Startbildschirm.</string>
 
-    <string name="exercises_title">Übungen</string>
-    <string name="exercises_empty">Übungskatalog, eigene Übungen und Vorlagen folgen in Kürze.</string>
 
     <string name="photos_title">Foto-Tagebuch</string>
     <string name="photos_empty">Noch keine Fotos. Nach einem Training kannst du ein Fortschrittsfoto aufnehmen.</string>
@@ -34,6 +34,11 @@
     <string name="settings_rest_default">Standard-Pause, Ton, Bildschirm an, RPE</string>
     <string name="settings_section_data">Daten</string>
     <string name="settings_offline_images">Alle Bilder offline laden</string>
+    <string name="settings_offline_images_idle">Fotos der Zusatzübungen (free-exercise-db, ca. 50 MB) dauerhaft speichern. Workout-Guide-Grafiken sind schon offline. Gespeichert: %1$d</string>
+    <string name="settings_offline_images_running">Lädt … %1$d von %2$d</string>
+    <string name="settings_offline_images_waiting">Wartet auf Internetverbindung …</string>
+    <string name="settings_offline_images_done">%1$d Bilder offline gespeichert</string>
+    <string name="settings_offline_images_failed">%1$d von %2$d gespeichert, %3$d fehlgeschlagen. Tippen zum Wiederholen.</string>
     <string name="settings_backup">Backup exportieren / importieren</string>
     <string name="settings_section_app">App</string>
     <string name="settings_about">Über Overfit</string>

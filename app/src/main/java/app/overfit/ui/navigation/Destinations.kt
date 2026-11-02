@@ -21,6 +21,15 @@ import kotlin.reflect.KClass
 @Serializable data object CoachMemoryRoute
 @Serializable data object AboutRoute
 
+/** Vorlagen-Editor; [templateId] = 0 legt eine neue Vorlage an. */
+@Serializable data class TemplateEditorRoute(val templateId: Long = 0)
+
+/** Übungsauswahl; [single] = Ersetzen-Modus. Ergebnis über [PICKED_EXERCISES_KEY]. */
+@Serializable data class ExercisePickerRoute(val single: Boolean = false)
+
+/** SavedStateHandle-Schlüssel, unter dem der Picker die gewählten Übungs-IDs zurückgibt. */
+const val PICKED_EXERCISES_KEY = "picked_exercises"
+
 /** Ziele der unteren Navigationsleiste. */
 enum class TopLevelDestination(
     val route: Any,
