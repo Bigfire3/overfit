@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stilisierte Hantel im sicheren Bereich (66dp) des adaptiven Icons. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Stange -->
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M38,51h32v6h-32z" />
+    <!-- Innere Scheiben -->
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M33,37h7a2,2 0,0 1,2 2v30a2,2 0,0 1,-2 2h-7a2,2 0,0 1,-2 -2v-30a2,2 0,0 1,2 -2z" />
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M68,37h7a2,2 0,0 1,2 2v30a2,2 0,0 1,-2 2h-7a2,2 0,0 1,-2 -2v-30a2,2 0,0 1,2 -2z" />
+    <!-- Äußere Scheiben -->
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M25,43h4a2,2 0,0 1,2 2v18a2,2 0,0 1,-2 2h-4a2,2 0,0 1,-2 -2v-18a2,2 0,0 1,2 -2z" />
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M79,43h4a2,2 0,0 1,2 2v18a2,2 0,0 1,-2 2h-4a2,2 0,0 1,-2 -2v-18a2,2 0,0 1,2 -2z" />
+</vector>

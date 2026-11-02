@@ -1,0 +1,104 @@
+name: Android CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: build-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Android SDK-Pakete installieren
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;36.0.0" > /dev/null
+
+      - name: Robolectric-Cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
+
+      - name: Tests und signiertes Release-APK
+        run: ./gradlew :app:testDebugUnitTest :app:assembleRelease --console=plain
+
+      - name: APK vorbereiten
+        id: apk
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk overfit.apk
+          echo "version_name=$(grep -oP '"versionName": "\K[^"]+' app/build/outputs/apk/release/output-metadata.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: overfit-${{ github.run_number }}
+          path: |
+            overfit.apk
+            app/build/outputs/mapping/release/mapping.txt
+            app/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Testberichte bei Fehler
+        if: failure()
+        run: find app/build/test-results -name '*.xml' -exec grep -l '<failure' {} + | xargs -r head -c 4000
+
+    outputs:
+      version_name: ${{ steps.apk.outputs.version_name }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    # Immer nur ein Release-Update gleichzeitig, damit "latest" konsistent bleibt.
+    concurrency:
+      group: release-latest
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION_NAME: ${{ needs.build.outputs.version_name }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: overfit-${{ github.run_number }}
+
+      - name: Pre-Release "latest" aktualisieren
+        run: |
+          NOTES="Automatischer Build ${VERSION_NAME} (versionCode ${GITHUB_RUN_NUMBER})
+          Branch: ${GITHUB_REF_NAME} · Commit: ${GITHUB_SHA::7} · $(date -u '+%Y-%m-%d %H:%M UTC')
+
+          Installation: overfit.apk unten unter Assets antippen und öffnen. Details im README."
+          git tag -f latest "$GITHUB_SHA"
+          git push -f origin refs/tags/latest
+          if gh release view latest > /dev/null 2>&1; then
+            gh release edit latest --prerelease --title "Overfit latest (${VERSION_NAME})" --notes "$NOTES"
+            gh release upload latest overfit.apk --clobber
+          else
+            gh release create latest overfit.apk --prerelease --verify-tag \
+              --title "Overfit latest (${VERSION_NAME})" --notes "$NOTES"
+          fi
+
+      - name: Versioniertes Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cp overfit.apk "overfit-${GITHUB_REF_NAME}.apk"
+          gh release create "$GITHUB_REF_NAME" "overfit-${GITHUB_REF_NAME}.apk" \
+            --title "Overfit ${GITHUB_REF_NAME}" --generate-notes --verify-tag
