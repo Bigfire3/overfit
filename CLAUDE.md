@@ -6,7 +6,7 @@
 
 ## Phasen-Regel (spart Tokens)
 - Pro Session genau eine Phase: die nächste offene laut PROGRESS.md, außer ich sage ausdrücklich etwas anderes.
-- Phase fertig heißt: Build und Tests grün (lokal oder in CI), PROGRESS.md aktualisiert (erledigt, offen, was ich auf dem Handy testen soll), committet, gepusht, Pull Request nach main erstellt. Dann STOPP und auf mich warten.
+- Phase fertig heißt: Build und Tests grün (lokal oder in CI), PROGRESS.md aktualisiert (erledigt, offen, was ich auf dem Handy testen soll), committet, gepusht, Pull Request nach main erstellt und selbst gemergt (siehe Git & CI). Dann STOPP und auf mich warten.
 
 ## Modelle & Effort
 - Hauptsession: Opus 5.5, Effort high. Kein Ultracode, keine automatischen Workflows.
@@ -24,4 +24,7 @@
 
 ## Git & CI
 - Du kannst nur auf deinen Session-Branch pushen. CI baut auch dort. Am Phasenende PR nach main.
+- Eigene PRs nach main merge selbstständig, ohne zu fragen, sobald: CI auf dem aktuellen Head grün, kein Merge-Konflikt, keine offenen Review-Kommentare. Merge-Methode: Merge-Commit. PRs anderer Sessions nicht mergen, sondern mir melden.
+- Nur Merges nach main aktualisieren das Release „latest“ (neue APK fürs Handy). Nach dem Merge sag mir, was ich testen soll.
+- Nach einem Merge Folgearbeit nicht auf dem alten Stand stapeln: Session-Branch neu von main starten.
 - Wird das Pushen der Workflow-Datei abgelehnt (fehlende Berechtigung), sag mir genau, was ich wo freigeben muss.
