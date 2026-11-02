@@ -1,20 +1,14 @@
 package app.overfit
 
 import android.app.Application
+import app.overfit.ui.AppDependencies
 
 /**
- * Application-Klasse. Hält den schlanken manuellen DI-Container ([AppContainer]),
- * siehe docs/DECISIONS.md.
+ * Application-Klasse. Hält die App-Abhängigkeiten (schlanke manuelle DI, siehe docs/DECISIONS.md).
+ * UI und Logik liegen plattformübergreifend in :shared.
  */
 class OverfitApp : Application() {
-    lateinit var container: AppContainer
-        private set
-
-    override fun onCreate() {
-        super.onCreate()
-        container = AppContainer(this)
+    val dependencies: AppDependencies by lazy {
+        androidDependencies(this, "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
     }
 }
-
-/** Manueller DI-Container. Repositories, Datenbank usw. kommen in späteren Phasen hinzu. */
-class AppContainer(@Suppress("unused") private val app: Application)

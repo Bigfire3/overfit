@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background">#FF0F1115</color>
-    <color name="launcher_background">#FF0F1115</color>
-    <color name="launcher_foreground">#FF4C8DFF</color>
+    <!-- Schwarz-Weiß-Design, keine Akzentfarbe (siehe docs/DECISIONS.md). -->
+    <color name="background">#FF000000</color>
+    <color name="launcher_background">#FF000000</color>
+    <color name="launcher_foreground">#FFFFFFFF</color>
 </resources>

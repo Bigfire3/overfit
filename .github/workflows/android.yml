@@ -38,7 +38,7 @@ jobs:
           key: robolectric-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
 
       - name: Tests und signiertes Release-APK
-        run: ./gradlew :app:testDebugUnitTest :app:assembleRelease --console=plain
+        run: ./gradlew :shared:testAndroidHostTest :app:testDebugUnitTest :app:assembleRelease --console=plain
 
       - name: APK vorbereiten
         id: apk
@@ -54,6 +54,7 @@ jobs:
             overfit.apk
             app/build/outputs/mapping/release/mapping.txt
             app/build/reports/tests/
+            shared/build/reports/tests/
           if-no-files-found: ignore
 
       - name: Testberichte bei Fehler

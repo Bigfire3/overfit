@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Overfit"
 include(":app")
+include(":shared")
