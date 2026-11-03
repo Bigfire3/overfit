@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -550,6 +552,45 @@ fun ListRow(label: String, value: String, tone: Tone = Tone.Default, onClick: ((
             Text(value, tone = Tone.Muted)
             if (onClick != null) { Spacer(Modifier.width(Space.xs)); LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted) }
         }
+    }
+}
+
+/**
+ * A list row with a square checkbox at the end (e.g. "Sauna" after the workout). Unchecked = hairline outline,
+ * checked = filled (inverted) with a check mark. The whole row toggles.
+ */
+@Composable
+fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Column(
+        Modifier.toggleable(
+            value = checked,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            role = Role.Checkbox,
+            onValueChange = onCheckedChange,
+        ),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, Modifier.weight(1f, fill = false))
+            Spacer(Modifier.width(Space.m))
+            val shape = RoundedCornerShape(4.dp)
+            Box(
+                Modifier
+                    .size(22.dp)
+                    .then(
+                        if (checked) Modifier.background(Theme.colors.inverseBackground, shape)
+                        else Modifier.border(1.dp, Theme.colors.muted, shape),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (checked) LineIcon(Icon.Check, size = 18.dp, color = Theme.colors.inverseForeground)
+            }
+        }
+        Hairline()
     }
 }
 

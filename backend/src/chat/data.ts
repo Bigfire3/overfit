@@ -38,6 +38,8 @@ export interface WorkoutSummary {
   endedAt: number | null;
   durationMin: number | null;
   feeling: number | null;
+  /** Sauna right after the workout (app ≥ v8 sends `sauna: true`, missing = no). */
+  sauna: boolean;
   setsDone: number;
   setsPlanned: number;
   volumeKg: number;
@@ -109,6 +111,7 @@ export function summarizeWorkout(id: string, d: J): WorkoutSummary {
     endedAt,
     durationMin: endedAt ? Math.round((endedAt - startedAt) / 60000) : null,
     feeling: num(d.feeling) ?? null,
+    sauna: d.sauna === true,
     setsDone,
     setsPlanned,
     volumeKg: round1(volume),

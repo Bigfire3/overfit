@@ -13,6 +13,9 @@ internal fun dateOf(epochMs: Long): LocalDate =
 /** One calendar day of the diary: its photos (oldest first) and finished workouts. */
 internal data class DiaryDay(val date: LocalDate, val photos: List<DiaryPhoto>, val workouts: List<HistoryRow>) {
     val hasPhoto get() = photos.isNotEmpty()
+
+    /** Sauna after one of the day's workouts. */
+    val sauna get() = workouts.any { it.sauna }
 }
 
 /** Days with a photo or a workout. A photo belongs to the day it was taken. */

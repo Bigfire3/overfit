@@ -118,6 +118,7 @@ function summaryOut(s: WorkoutSummary, tz: string, detail = false) {
     setsPlanned: s.setsPlanned,
     volumeKg: s.volumeKg,
     feeling: s.feeling,
+    sauna: s.sauna,
     coachRating: s.rating,
     hasPhoto: s.hasPhoto,
     exercises: detail
@@ -301,7 +302,7 @@ export const TOOLS: ToolDef[] = [
     name: 'list_workouts',
     title: 'Vergangene Trainings auflisten',
     description:
-      'Lists past (and a currently running) workouts, newest first, with date, duration, completed/planned sets, total volume (kg × reps), feeling (1–5), coach rating and per-exercise top sets. Filter by date range or template. Use get_workout for every set of one session, get_exercise_progress for long-term trends of one exercise.',
+      'Lists past (and a currently running) workouts, newest first, with date, duration, completed/planned sets, total volume (kg × reps), feeling (1–5), sauna afterwards (true/false), coach rating and per-exercise top sets. Filter by date range or template. Use get_workout for every set of one session, get_exercise_progress for long-term trends of one exercise.',
     inputSchema: obj({
       limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
       from: { type: 'string', description: DATE_DESC },
@@ -324,7 +325,7 @@ export const TOOLS: ToolDef[] = [
     name: 'get_workout',
     title: 'Training im Detail',
     description:
-      'Returns one workout completely: every exercise and set (planned vs. actual kg/reps/seconds, completed or not, RPE), substitutions, notes, feeling, duration, photo ids and the in-app coach review if present, plus computed stats (volume, top set, estimated 1RM per exercise).',
+      'Returns one workout completely: every exercise and set (planned vs. actual kg/reps/seconds, completed or not, RPE), substitutions, notes, feeling, sauna afterwards, duration, photo ids and the in-app coach review if present, plus computed stats (volume, top set, estimated 1RM per exercise).',
     inputSchema: obj({ workout_id: { type: 'string', description: 'workoutId aus list_workouts' } }, ['workout_id']),
     annotations: READ,
     async run(a, ctx) {

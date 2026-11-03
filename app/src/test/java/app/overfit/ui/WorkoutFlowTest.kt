@@ -2,6 +2,9 @@ package app.overfit.ui
 
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -112,9 +115,13 @@ class WorkoutFlowTest {
         // The name field comes first, the note field second.
         compose.waitUntil(5_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
+        // "Sauna" checkbox: off by default, checked here.
+        compose.onNodeWithText("Sauna").performScrollTo().assertIsOff().performClick()
+        compose.onNodeWithText("Sauna").assertIsOn()
         compose.onNodeWithText("Speichern").performClick()
         compose.waitForTrainingTab()
         compose.waitUntilState(5_000) { runBlocking { data.workouts.getFinished(id)?.note } == "Stark heute" }
+        compose.waitUntilState(5_000) { runBlocking { data.workouts.getFinished(id)?.sauna } == true }
         val saved = requireNotNull(runBlocking { data.workouts.get(id) })
         assertEquals(2, saved.completedSets)
         assertEquals(60.0, saved.exercises.single().sets.first().actual.weightKg)
@@ -124,6 +131,10 @@ class WorkoutFlowTest {
         waitFor("Push")
         compose.onAllNodes(hasText("Push")).onFirst().performClick()
         waitFor("Stark heute")
+        // Sauna can be changed afterwards in the detail.
+        compose.onNodeWithText("Sauna").performScrollTo().assertIsOn().performClick()
+        compose.waitUntilState(5_000) { runBlocking { data.workouts.getFinished(id)?.sauna } == false }
+        compose.onNodeWithText("Sauna").assertIsOff()
     }
 
     private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(20_000) {

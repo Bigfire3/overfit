@@ -29,6 +29,8 @@ data class SessionRecord(
     val feeling: Int?,
     val photoPath: String?,
     val exercises: List<WorkoutExercise>,
+    /** Sauna right after the workout. */
+    val sauna: Boolean = false,
 ) {
     val durationMin: Int? get() = endedAt?.let { ((it - startedAt) / 60_000).toInt() }
 }
