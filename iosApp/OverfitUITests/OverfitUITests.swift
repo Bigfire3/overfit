@@ -45,23 +45,34 @@ class OverfitUITestCase: XCTestCase {
 
     func exists(_ label: String) -> Bool { elements(label).firstMatch.exists }
 
-    /** Element labelled exactly [label], else one whose label starts with it (merged rows, mini bar). */
-    func find(_ label: String) -> XCUIElement {
-        let exact = elements(label).firstMatch
-        if exact.exists { return exact }
-        return app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch
+    /** Hittable element labelled exactly [label], else one whose label starts with it (merged rows, mini bar). */
+    func find(_ label: String) -> XCUIElement? {
+        for query in [elements(label), app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", label))] {
+            // During a screen transition the old screen's element can still be in the tree, but not hittable.
+            if let e = query.allElementsBoundByIndex.first(where: { $0.exists && $0.isHittable }) { return e }
+        }
+        return nil
     }
 
     /** Taps the element labelled [label]; scrolls up to four screens down if it is not visible. */
     func tap(_ label: String, file: StaticString = #filePath, line: UInt = #line) {
         _ = elements(label).firstMatch.waitForExistence(timeout: 3)
-        for _ in 0..<4 {
-            let e = find(label)
-            if e.exists && e.isHittable { e.tap(); return }
-            app.swipeUp()
-            sleep(1)
+        for attempt in 0..<6 {
+            if let e = find(label) { e.tap(); return }
+            if attempt < 2 { sleep(1) } else { app.swipeUp(); sleep(1) } // first wait for animations, then scroll
         }
-        waitFor(label, timeout: 5, file: file, line: line).tap()
+        waitFor(label, timeout: 5, file: file, line: line)
+        failShot("tap-\(label)")
+        XCTFail("Nicht antippbar: \"\(label)\"", file: file, line: line)
+    }
+
+    /** Confirms the system notification prompt that appears on the first workout start. */
+    func allowNotificationsIfAsked() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        for title in ["Allow", "Erlauben"] {
+            let button = springboard.alerts.buttons[title]
+            if button.waitForExistence(timeout: 2) { button.tap(); return }
+        }
     }
 
     /** Taps a tab bar entry by its test tag (`tab:START`, `tab:HISTORY`, `tab:COACH`, `tab:PHOTOS`, `tab:PROFILE`). */
@@ -163,6 +174,7 @@ final class ScreenshotTests: OverfitUITestCase {
         tap("Zurück")
 
         tap("Starten")
+        allowNotificationsIfAsked()
         waitFor("Nächsten Satz loggen")
         shot("05-training-laufend")
         waitFor("Satz 1 abhaken").tap()
@@ -184,8 +196,8 @@ final class ScreenshotTests: OverfitUITestCase {
         tab("HISTORY")
         waitFor("Push")
         shot("09-verlauf")
-        elements("Push").firstMatch.tap()
-        waitFor("Teilen")
+        tap("Push")
+        waitFor("Dauer")
         shot("10-verlauf-detail")
         tap("Zurück")
         tab("COACH")
@@ -226,6 +238,7 @@ final class SmokeTests: OverfitUITestCase {
         launch(theme: "light")
         waitFor("Push").tap()
         tap("Starten")
+        allowNotificationsIfAsked()
         waitFor("Satz 1 abhaken").tap()
         waitFor("Überspringen")
         tap("Minimieren")
@@ -245,6 +258,7 @@ final class SmokeTests: OverfitUITestCase {
         launch(theme: "light")
         waitFor("Push").tap()
         tap("Starten")
+        allowNotificationsIfAsked()
         waitFor("Nächsten Satz loggen")
         swipeFromLeftEdge()
         waitFor("Zum laufenden Training")
@@ -265,6 +279,7 @@ final class SmokeTests: OverfitUITestCase {
         launch(theme: "light")
         waitFor("Push").tap()
         tap("Starten")
+        allowNotificationsIfAsked()
         waitFor("Satz 1 abhaken").tap()
         app.terminate()
         launch(theme: "light", keepData: true)
