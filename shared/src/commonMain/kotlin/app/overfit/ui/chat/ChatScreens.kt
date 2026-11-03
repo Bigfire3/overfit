@@ -252,7 +252,7 @@ fun ChatProviderScreen(
             scope.launch { platform.copyText(chat.contextText(c, today)); copied = "ctx" }
         })
         Text(c.contextHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        ListRow(if (copied == "gem") c.gemCopied else c.gemCopy, onClick = { platform.copyText(chat.gemText(c)); copied = "gem" })
+        ListRow(if (copied == "gem") c.gemCopied else c.gemCopy, onClick = { platform.copyText(chat.gemText(c, today)); copied = "gem" })
         Text(c.gemHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
 
         if (chat.configured && sync.enabled) {

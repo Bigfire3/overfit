@@ -8,7 +8,7 @@ import app.overfit.domain.TrackingType
 import app.overfit.domain.WeightEntry
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.WorkoutSet
-import app.overfit.domain.ageFromBirthYear
+import app.overfit.domain.aiProfileFacts
 import app.overfit.domain.latestWeight
 import app.overfit.i18n.ChatStrings
 import kotlinx.datetime.LocalDate
@@ -44,12 +44,7 @@ object ChatContext {
         out.appendLine(t.ctxIntro).appendLine()
 
         out.appendLine("## ${t.ctxProfile}")
-        val facts = buildList {
-            input.profile.name.takeIf { it.isNotBlank() }?.let { add(it) }
-            input.profile.birthYear?.let { add(t.ctxAge(ageFromBirthYear(it, input.today))) }
-            latestWeight(input.weights)?.let { add(t.ctxWeight("${Numbers.formatWeight(it.kg, unit, input.language)} ${unit.symbol}", it.date)) }
-        }
-        if (facts.isNotEmpty()) out.appendLine(facts.joinToString(" · "))
+        aiProfileFacts(input.profile, input.weights, input.today, input.language)?.let { out.appendLine(it) }
         out.appendLine("${t.ctxUnits}: ${if (unit == WeightUnit.KG) "kg" else "lb"} · ${t.ctxToday(input.today.toString())}")
         out.appendLine()
 

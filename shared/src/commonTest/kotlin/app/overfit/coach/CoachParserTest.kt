@@ -1,5 +1,8 @@
 package app.overfit.coach
 
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -137,5 +140,78 @@ class CoachParserTest {
         val extracted = assertNotNull(CoachParser.extractJsonObject(text))
         assertEquals("""{"summary":"a } b { c \" } d","tips":["x"]}""", extracted)
         assertEquals("a } b { c \" } d", ok(text).summary)
+    }
+
+    // ---- exercise_reviews ----
+
+    private fun reviews(json: String) = ok("""{"summary":"s","exercise_reviews":$json}""").exerciseReviews
+
+    @Test
+    fun exerciseReviewsParse() {
+        val r = reviews(
+            """[{"exercise_id":"wg:bench","verdict":"better","comment":"More weight","next":{"weight_kg":82.5,"reps":8,"duration_sec":null}},
+            {"exercise_id":"wg:row","verdict":"same","comment":"","next":null},
+            {"exercise_id":"wg:plank","verdict":"worse","comment":"c","next":{"duration_sec":50}}]""",
+        )
+        assertEquals(listOf("wg:bench", "wg:row", "wg:plank"), r.map { it.exerciseId })
+        assertEquals(listOf(Verdict.BETTER, Verdict.SAME, Verdict.WORSE), r.map { it.verdict })
+        assertEquals("More weight", r[0].comment)
+        assertEquals(SuggestedSet(82.5, 8, null), r[0].next)
+        assertNull(r[1].comment)
+        assertNull(r[1].next)
+        assertEquals(SuggestedSet(null, null, 50), r[2].next)
+    }
+
+    @Test
+    fun exerciseReviewVerdictVariantsAndUnknown() {
+        val r = reviews(
+            """[{"exercise_id":"a","verdict":"besser"},{"exercise_id":"b","verdict":"Gleich"},{"exercise_id":"c","verdict":"SCHLECHTER"},
+            {"exercise_id":"d","verdict":"great"},{"exercise_id":"e"}]""",
+        )
+        assertEquals(listOf(Verdict.BETTER, Verdict.SAME, Verdict.WORSE, null, null), r.map { it.verdict })
+    }
+
+    @Test
+    fun exerciseReviewNextWithoutValuesIsNull() {
+        val r = reviews("""[{"exercise_id":"a","verdict":"same","next":{"weight_kg":null,"reps":null,"duration_sec":null}}]""")
+        assertNull(r.single().next)
+    }
+
+    @Test
+    fun exerciseReviewWithoutIdIsDroppedAndDuplicatesCollapse() {
+        val r = reviews(
+            """[{"verdict":"better"},{"exercise_id":"","verdict":"better"},{"exercise_id":"a","verdict":"better"},
+            {"exercise_id":"a","verdict":"worse"},{"id":"b","verdict":"same"},"junk"]""",
+        )
+        assertEquals(listOf("a", "b"), r.map { it.exerciseId })
+        assertEquals(Verdict.BETTER, r[0].verdict) // first one wins
+    }
+
+    @Test
+    fun oldAnswerWithoutExerciseReviews() {
+        assertEquals(emptyList(), ok(exact).exerciseReviews)
+        assertEquals(emptyList(), ok("""{"summary":"s","exercise_reviews":null}""").exerciseReviews)
+        assertEquals(emptyList(), ok("""{"summary":"s","exercise_reviews":"x"}""").exerciseReviews)
+    }
+
+    @Test
+    fun reviewWithOnlyExerciseReviewsIsValid() {
+        val r = ok("""{"exercise_reviews":[{"exercise_id":"a","verdict":"better"}]}""")
+        assertEquals("", r.summary)
+        assertEquals(1, r.exerciseReviews.size)
+        assertIs<ParseResult.Invalid>(CoachParser.parse("""{"exercise_reviews":[{"verdict":"better"}]}"""))
+    }
+
+    @Test
+    fun schemaRequiresExerciseReviewsWithVerdictEnum() {
+        val schema = CoachSchema.schema
+        val required = schema["required"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertTrue("exercise_reviews" in required)
+        val items = schema["properties"]!!.jsonObject["exercise_reviews"]!!.jsonObject["items"]!!.jsonObject
+        val verdict = items["properties"]!!.jsonObject["verdict"]!!.jsonObject
+        assertEquals(listOf("better", "same", "worse"), verdict["enum"]!!.jsonArray.map { it.jsonPrimitive.content })
+        assertTrue("next" in items["required"]!!.jsonArray.map { it.jsonPrimitive.content })
+        // the example in the prompt is valid for the parser and contains the field
+        assertEquals("wg:bench-press", ok(CoachSchema.example).exerciseReviews.single().exerciseId)
     }
 }

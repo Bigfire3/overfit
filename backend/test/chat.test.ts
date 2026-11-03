@@ -355,6 +355,9 @@ describe('KI-Chat: MCP-Server', () => {
     const { access_token: t } = await connect(e, c);
     const p = (await tool(e, t, 'get_profile')).structuredContent;
     expect(p.profile.name).toBe('Fabian');
+    // Name, Alter und aktuelles Gewicht stehen in jeder Tool-Antwort.
+    expect(p.user).toBe(`Name: Fabian · Age: ${new Date().getUTCFullYear() - 1995} · Body weight: 80 kg (as of 2026-09-01)`);
+    expect((await tool(e, t, 'list_workouts', { limit: 1 })).structuredContent.user).toBe(p.user);
     expect(p.coachMemory).toBe('Mag Grundübungen.');
     expect(p.counts.workout).toBe(3);
     const list = (await tool(e, t, 'list_workouts', { limit: 10 })).structuredContent;
@@ -455,5 +458,16 @@ describe('KI-Chat: MCP-Server', () => {
     await c.call('POST', '/v1/chat/enable', { photos: false });
     expect((await tool(e, t, 'get_photo', { photo_id: 'p1' })).isError).toBe(true);
     expect((await e.DB.prepare("SELECT COUNT(*) AS c FROM chat_docs WHERE kind = 'photo'").first<{ c: number }>())!.c).toBe(0);
+  });
+});
+
+describe('profileSummary', () => {
+  it('nimmt die Zeile der App und lässt fehlende Werte weg', async () => {
+    const { profileSummary } = await import('../src/chat/tools');
+    expect(profileSummary({ summary: 'Name: Fabian · Alter: 31' })).toBe('Name: Fabian · Alter: 31');
+    expect(profileSummary({ name: 'Sam', unit: 'lb', bodyweight: [{ date: '2026-10-01', kg: 100 }, { date: '2026-09-01', kg: 90 }] }, Date.UTC(2026, 10, 3)))
+      .toBe('Name: Sam · Body weight: 220.5 lb (as of 2026-10-01)');
+    expect(profileSummary({ name: ' ', bodyweight: [] })).toBeNull();
+    expect(profileSummary(null)).toBeNull();
   });
 });

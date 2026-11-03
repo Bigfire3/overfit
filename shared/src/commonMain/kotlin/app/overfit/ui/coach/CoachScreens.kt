@@ -36,6 +36,7 @@ import app.overfit.coach.CoachDemo
 import app.overfit.coach.CoachErrorKind
 import app.overfit.coach.CoachReview
 import app.overfit.coach.CoachService
+import app.overfit.coach.ExerciseComparison
 import app.overfit.coach.PlanChange
 import app.overfit.coach.PlanDiff
 import app.overfit.coach.PlanDiffs
@@ -143,6 +144,8 @@ fun CoachSessionScreen(coach: CoachService, sessionId: String, unit: WeightUnit,
     val current = item
     if (current == null && !requested) {
         val c = LocalCoachStrings.current
+        var comparisons by remember(sessionId) { mutableStateOf<List<ExerciseComparison>>(emptyList()) }
+        LaunchedEffect(sessionId) { comparisons = coach.comparisons(sessionId) }
         val access = coach.access()
         Screen(
             header = { BackHeader(LocalStrings.current.back, nav.back) },
@@ -153,6 +156,7 @@ fun CoachSessionScreen(coach: CoachService, sessionId: String, unit: WeightUnit,
             Title(c.reviewTitle)
             Spacer(Modifier.height(Space.l))
             if (access !is CoachAccess.Ready) NoAccess(nav, onDemo = { nav.demo(sessionId) })
+            LocalNumbers(comparisons, unit, language)
         }
         return
     }
@@ -185,9 +189,15 @@ private fun ReviewScreen(
         }
     }
     var message by remember(item?.id) { mutableStateOf<String?>(null) }
+    val sessionId = item?.sessionId?.takeIf { item.kind == ReviewKind.SESSION }
+    var comparisons by remember(sessionId, item?.review) { mutableStateOf<List<ExerciseComparison>>(emptyList()) }
+    LaunchedEffect(sessionId, item?.review) {
+        if (sessionId != null) comparisons = coach.comparisons(sessionId, item?.review?.exerciseReviews.orEmpty())
+    }
     ReviewContent(
         item = item,
         plan = plan,
+        comparisons = comparisons,
         unit = unit,
         language = language,
         nav = nav,
@@ -215,9 +225,12 @@ private fun ReviewScreen(
 fun CoachDemoScreen(coach: CoachService, sessionId: String, unit: WeightUnit, language: Language, nav: CoachNav) {
     val c = LocalCoachStrings.current
     var state by remember(sessionId) { mutableStateOf<Pair<CoachReview, PlanState>?>(null) }
+    var comparisons by remember(sessionId) { mutableStateOf<List<ExerciseComparison>>(emptyList()) }
     LaunchedEffect(sessionId, c) {
         val (name, template) = coach.sessionAndTemplate(sessionId)
-        val review = CoachDemo.review(name, template, c)
+        val list = coach.comparisons(sessionId)
+        val review = CoachDemo.review(name, template, c, list)
+        comparisons = app.overfit.coach.ExerciseReviews.withFeedback(list, review.exerciseReviews)
         val diff = if (template != null && review.nextSession != null) {
             val byId = template.exercises.associate { it.exercise.id to it.exercise }
             PlanDiffs.diff(template, review.nextSession) { byId[it] }
@@ -236,6 +249,7 @@ fun CoachDemoScreen(coach: CoachService, sessionId: String, unit: WeightUnit, la
             )
         },
         plan = s?.second,
+        comparisons = comparisons,
         unit = unit,
         language = language,
         nav = nav,
@@ -252,6 +266,7 @@ fun CoachDemoScreen(coach: CoachService, sessionId: String, unit: WeightUnit, la
 private fun ReviewContent(
     item: ReviewItem?,
     plan: PlanState?,
+    comparisons: List<ExerciseComparison>,
     unit: WeightUnit,
     language: Language,
     nav: CoachNav,
@@ -296,16 +311,31 @@ private fun ReviewContent(
         Spacer(Modifier.height(Space.l))
         when {
             item == null || item.status == ReviewStatus.SENDING ||
-                (item.status == ReviewStatus.QUEUED && item.errorKind == null) -> Text(c.thinking, tone = Tone.Muted)
+                (item.status == ReviewStatus.QUEUED && item.errorKind == null) -> {
+                Text(c.thinking, tone = Tone.Muted)
+                if (item != null) LocalNumbers(comparisons, unit, language)
+            }
             item.status == ReviewStatus.QUEUED -> {
                 Text(c.waitingForNetwork, style = Theme.type.label)
                 Spacer(Modifier.height(Space.s))
                 Text(c.queuedHint, tone = Tone.Muted)
+                LocalNumbers(comparisons, unit, language)
             }
-            item.status == ReviewStatus.FAILED -> Failure(item, nav, onDemo)
-            review != null -> Result(item, review, plan, unit, language, selected, { selected = it }, onReject, planOpen, message)
+            item.status == ReviewStatus.FAILED -> {
+                Failure(item, nav, onDemo)
+                LocalNumbers(comparisons, unit, language)
+            }
+            review != null -> Result(item, review, plan, comparisons, unit, language, selected, { selected = it }, onReject, planOpen, message)
         }
     }
+}
+
+/** "Per exercise" with the local numbers only (no coach text): while waiting, on errors and without AI. */
+@Composable
+private fun LocalNumbers(list: List<ExerciseComparison>, unit: WeightUnit, language: Language) {
+    if (list.isEmpty()) return
+    SectionTitle(LocalCoachStrings.current.perExercise)
+    ExerciseBreakdown(list, unit, language)
 }
 
 @Composable
@@ -364,6 +394,7 @@ private fun Result(
     item: ReviewItem,
     review: CoachReview,
     plan: PlanState?,
+    comparisons: List<ExerciseComparison>,
     unit: WeightUnit,
     language: Language,
     selected: Set<String>,
@@ -376,6 +407,10 @@ private fun Result(
     review.rating?.let { Text(c.rating(it), Modifier.testTag("coach-rating"), style = Theme.type.hero) }
     Spacer(Modifier.height(Space.m))
     if (review.summary.isNotBlank()) Text(review.summary)
+    if (comparisons.isNotEmpty() && item.kind == ReviewKind.SESSION) {
+        SectionTitle(c.perExercise)
+        ExerciseBreakdown(comparisons, unit, language)
+    }
     Bullets(c.positives, review.positives)
     Bullets(c.improvements, review.improvements)
     Bullets(c.tips, review.tips)
@@ -596,5 +631,6 @@ private fun providerLabel(id: app.overfit.ai.ProviderId) = when (id) {
     app.overfit.ai.ProviderId.ANTHROPIC -> "Anthropic"
     app.overfit.ai.ProviderId.OPENAI -> "OpenAI"
     app.overfit.ai.ProviderId.OPENROUTER -> "OpenRouter"
+    app.overfit.ai.ProviderId.GEMINI -> "Gemini"
     app.overfit.ai.ProviderId.FUEL -> "Fuel"
 }

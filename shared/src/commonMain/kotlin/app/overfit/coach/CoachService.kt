@@ -264,6 +264,20 @@ class CoachService(
         dao.upsert(row.copy(status = ReviewStatus.FAILED, errorKind = kind.name, errorMessage = message, rawResponse = raw, updatedAt = clock()))
     }
 
+    // --- Per exercise ---------------------------------------------------------------------------
+
+    /**
+     * Today vs. last time for every exercise of [sessionId], computed locally (works without AI). [feedback] (the
+     * coach's part) is merged in by exercise ID.
+     */
+    suspend fun comparisons(sessionId: String, feedback: List<ExerciseFeedback> = emptyList()): List<ExerciseComparison> {
+        val current = dao.finishedOrAny(sessionId) ?: return emptyList()
+        val list = ExerciseReviews.compare(current, ::dateOf) { id ->
+            dao.lastFinishedWith(id, current.startedAt, current.id)?.toRecord()
+        }
+        return ExerciseReviews.withFeedback(list, feedback)
+    }
+
     // --- Request building ----------------------------------------------------------------------
 
     suspend fun buildContext(kind: ReviewKind, sessionId: String?): CoachContext {
@@ -291,6 +305,7 @@ class CoachService(
             sameTemplate = same,
             lastOverall = lastOverall,
             recent = if (kind == ReviewKind.PROGRESS) recent else recent.filter { it.id != current?.id },
+            comparisons = if (kind == ReviewKind.SESSION && current != null) comparisons(current.id) else emptyList(),
             timeZone = timeZone(),
         )
     }

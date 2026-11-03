@@ -133,7 +133,7 @@ fun FinishScreen(
 
             if (d.summary.records.isNotEmpty()) {
                 SectionTitle(h.newRecords)
-                d.summary.records.forEach { r -> ListRow(recordText(r, unit, language, t)) }
+                d.summary.records.forEach { r -> RecordRow(r, unit, language, t) }
             }
         }
 
@@ -177,6 +177,21 @@ internal fun SummaryRows(s: WorkoutSummary, unit: WeightUnit, language: Language
     if (s.skippedSets > 0 || s.addedExercises > 0 || s.replacedExercises > 0) {
         Spacer(Modifier.height(Space.s))
         Text(h.deviations(s.skippedSets, s.addedExercises, s.replacedExercises), style = Theme.type.caption, tone = Tone.Muted)
+    }
+}
+
+@Composable
+private fun RecordRow(r: PersonalRecord, unit: WeightUnit, language: Language, t: Strings) {
+    val delta = r.value - r.previous
+    ListRow(recordText(r, unit, language, t)) {
+        if (delta > 0) {
+            val text = when (r.kind) {
+                RecordKind.WEIGHT, RecordKind.E1RM -> "+" + formatKg(delta, unit, language)
+                RecordKind.REPS -> "+${delta.toInt()} ${t.repsUnit}"
+                RecordKind.DURATION -> "+${delta.toInt()} s"
+            }
+            androidx.compose.foundation.text.BasicText(text, style = Theme.type.caption.copy(color = Theme.colors.positive))
+        }
     }
 }
 
