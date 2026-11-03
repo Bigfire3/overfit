@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import app.overfit.ui.coach.DeltaText
+import app.overfit.ui.coach.signPrefix
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -181,8 +184,17 @@ private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepositor
 
     Spacer(Modifier.height(Space.l))
     Text(h.recentWorkouts, style = Theme.type.caption, tone = Tone.Muted)
-    val sessions = list.groupBy { it.sessionId }.values.take(10)
-    sessions.forEach { sets ->
+    val allSessions = list.groupBy { it.sessionId }.values.take(11)
+    fun metric(sets: List<app.overfit.data.db.ExerciseSetRow>): Double? {
+        val b = WorkoutStats.bests(sets.map { SetValues(it.weightKg, it.reps, it.durationSec) }, type)
+        return when (type) {
+            TrackingType.WEIGHT_REPS -> b.bestE1rmKg
+            TrackingType.REPS -> b.maxReps?.toDouble()
+            TrackingType.TIME, TrackingType.WEIGHT_TIME -> b.maxDurationSec?.toDouble()
+        }
+    }
+    allSessions.take(10).forEachIndexed { index, sets ->
+        val delta = metric(sets)?.let { cur -> allSessions.getOrNull(index + 1)?.let(::metric)?.let { cur - it } }
         val ordered = sets.sortedBy { it.position }
         val values = ordered.map { SetValues(it.weightKg, it.reps, it.durationSec) }
         val e1rm = if (type == TrackingType.WEIGHT_REPS) WorkoutStats.bests(values, type).bestE1rmKg else null
@@ -193,6 +205,15 @@ private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepositor
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(date, Modifier.weight(1f), tone = Tone.Muted)
                     if (e1rm != null) Text(h.e1rmShort(kg(e1rm)), style = Theme.type.caption, tone = Tone.Muted)
+                    if (delta != null) {
+                        val text = signPrefix(delta) + when (type) {
+                            TrackingType.WEIGHT_REPS -> "${Numbers.formatWeight(kotlin.math.abs(delta), unit, language)} ${unit.symbol}"
+                            TrackingType.REPS -> "${kotlin.math.abs(delta).toInt()} ${t.repsUnit}"
+                            else -> "${kotlin.math.abs(delta).toInt()} s"
+                        }
+                        Spacer(Modifier.width(Space.s))
+                        DeltaText(text, delta)
+                    }
                 }
                 Text(text)
             }
