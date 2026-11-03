@@ -45,7 +45,9 @@ jobs:
       # Worker-Secrets (mindestens GEMINI_API_KEY oder ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      SPOT_SIGNING_KEY: ${{ secrets.SPOT_SIGNING_KEY }}
+      INVITE_SIGNING_KEY: ${{ secrets.INVITE_SIGNING_KEY }}
+      # Früherer Name (vor Session AD); wird übernommen, falls INVITE_SIGNING_KEY fehlt.
+      LEGACY_INVITE_SIGNING_KEY: ${{ secrets.SPOT_SIGNING_KEY }}
       SYNC_ENCRYPTION_KEY: ${{ secrets.SYNC_ENCRYPTION_KEY }}
       ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
       GOOGLE_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
@@ -245,6 +247,8 @@ jobs:
           npx wrangler secret list --format json -c wrangler.generated.jsonc > "$RUNNER_TEMP/existing.json" 2>/dev/null || echo '[]' > "$RUNNER_TEMP/existing.json"
           node scripts/deploy-secrets.mjs "$MODE" "$RUNNER_TEMP/existing.json" "$RUNNER_TEMP/secrets.json" "$GITHUB_STEP_SUMMARY"
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json" -c wrangler.generated.jsonc
+          # Alten Secret-Namen im Worker aufräumen (seit Session AD heißt er INVITE_SIGNING_KEY).
+          if grep -q '"SPOT_SIGNING_KEY"' "$RUNNER_TEMP/existing.json"; then npx wrangler secret delete SPOT_SIGNING_KEY --force -c wrangler.generated.jsonc || true; fi
           if [ -f "$RUNNER_TEMP/secrets.json.admin" ]; then echo "ADMIN_SECRET_FILE=$RUNNER_TEMP/secrets.json.admin" >> "$GITHUB_ENV"; fi
           rm -f "$RUNNER_TEMP/secrets.json"
 

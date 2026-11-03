@@ -6,8 +6,8 @@
 //
 // - KI-Schlüssel: GEMINI_API_KEY (Stufe standard) und ANTHROPIC_API_KEY (Stufe pro), je aus GitHub oder schon im Worker.
 //   Mindestens einer ist Pflicht, sonst Exit 1 mit Anleitung. Fehlt einer, ist die Stufe aus /v1/config nicht verfügbar.
-// - SPOT_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
-//   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
+// - INVITE_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
+//   ein Zufallswert erzeugt. Fehlt INVITE_SIGNING_KEY, wird das alte GitHub-Secret (LEGACY_INVITE_SIGNING_KEY) übernommen. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
 // - ADMIN_SECRET (nur Testbetrieb): wird bei jedem Lauf neu erzeugt, außer ein GitHub-Secret ist gesetzt; der Workflow nutzt ihn sofort.
 // - Web-Kauf (Stripe): STRIPE_SECRET_KEY (sk_test_… im Testbetrieb, sk_live_… in Produktion), STRIPE_WEBHOOK_SECRET (whsec_…).
 //   In Produktion haben STRIPE_LIVE_SECRET_KEY / STRIPE_LIVE_WEBHOOK_SECRET Vorrang (Test- und Live-Werte parallel in GitHub).
@@ -26,7 +26,7 @@ export const OPTIONAL = [
 
 const b64u = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 export const generators = {
-  SPOT_SIGNING_KEY: () => randomBytes(48).toString('base64'),
+  INVITE_SIGNING_KEY: () => randomBytes(48).toString('base64'),
   SYNC_ENCRYPTION_KEY: () => b64u(randomBytes(32)),
   ADMIN_SECRET: () => randomBytes(32).toString('hex'),
 };
@@ -50,8 +50,13 @@ export function plan(mode, env, existing) {
   if (missingAi.length === 2) errors.push('AI_KEY');
   else for (const [n, tier] of missingAi) notes.push(`\`${n}\` fehlt: Stufe ${tier} ist nicht verfügbar (die App blendet sie aus).`);
 
-  for (const n of ['SPOT_SIGNING_KEY', 'SYNC_ENCRYPTION_KEY']) {
+  for (const n of ['INVITE_SIGNING_KEY', 'SYNC_ENCRYPTION_KEY']) {
     if (given(n)) secrets[n] = given(n);
+    // Früherer GitHub-Secret-Name (vor Session AD), vom Workflow als LEGACY_INVITE_SIGNING_KEY durchgereicht.
+    else if (n === 'INVITE_SIGNING_KEY' && given('LEGACY_INVITE_SIGNING_KEY')) {
+      secrets[n] = given('LEGACY_INVITE_SIGNING_KEY');
+      notes.push('`INVITE_SIGNING_KEY`: aus dem alten GitHub-Secret übernommen (darf gelöscht werden, sobald `INVITE_SIGNING_KEY` gesetzt ist).');
+    }
     else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
     else {
       secrets[n] = generators[n]();

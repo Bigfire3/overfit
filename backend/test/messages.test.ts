@@ -125,8 +125,8 @@ describe('POST /v1/messages', () => {
     const acc = (await c.call('GET', '/v1/account')).body.accountId;
     const t = Math.floor(Date.now() / 1000);
     await e.DB.batch([
-      e.DB.prepare("INSERT INTO lots VALUES ('old', ?, 'spot_bonus', 1000000, 1000000, ?, ?, 'x')").bind(acc, t - 10, t - 1000),
-      e.DB.prepare("INSERT INTO lots VALUES ('bonus', ?, 'spot_bonus', 1000000, 1000000, ?, ?, 'x')").bind(acc, t + 1000, t),
+      e.DB.prepare("INSERT INTO lots VALUES ('old', ?, 'invite_bonus', 1000000, 1000000, ?, ?, 'x')").bind(acc, t - 10, t - 1000),
+      e.DB.prepare("INSERT INTO lots VALUES ('bonus', ?, 'invite_bonus', 1000000, 1000000, ?, ?, 'x')").bind(acc, t + 1000, t),
       e.DB.prepare("INSERT INTO lots VALUES ('paid', ?, 'purchase', 1000000, 1000000, NULL, ?, 'x')").bind(acc, t),
     ]);
     expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(2_000_000);

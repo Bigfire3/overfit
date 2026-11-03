@@ -8,7 +8,7 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   /** Google-AI-Studio-Key (Gemini, Stufe `standard`). */
   GEMINI_API_KEY?: string;
-  SPOT_SIGNING_KEY?: string;
+  INVITE_SIGNING_KEY?: string;
   /** Hauptschlüssel für die Verschlüsselung der KI-Chat-Daten (≥ 32 zufällige Bytes, Base64url). */
   SYNC_ENCRYPTION_KEY?: string;
   GOOGLE_PLAY_SERVICE_ACCOUNT?: string;
@@ -67,13 +67,14 @@ export interface Env {
   TEST_STARTER_MICRO?: string;
   TEST_CREDIT_CAP_MICRO?: string;
   MARKUP_BP?: string;
-  SPOT_STARTER_MICRO?: string;
-  SPOT_REWARD_MICRO?: string;
-  SPOT_TOKEN_TTL_SEC?: string;
-  SPOT_MONTHLY_LIMIT_PER_INVITER?: string;
-  SPOT_GLOBAL_MONTHLY_BUDGET_MICRO?: string;
-  SPOT_EXPIRY_DAYS?: string;
-  REWARD_EXPIRY_DAYS?: string;
+  INVITE_STARTER_REVIEWS?: string;
+  INVITE_REWARD_REVIEWS?: string;
+  INVITE_TOKEN_TTL_SEC?: string;
+  INVITE_MONTHLY_LIMIT_PER_INVITER?: string;
+  INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS?: string;
+  INVITE_GIFT_MONTHLY_COST_CAP_MICRO?: string;
+  INVITE_GIFT_MAX_COST_MICRO?: string;
+  INVITE_EXPIRY_DAYS?: string;
   MAX_TOKENS_CAP?: string;
   MAX_BODY_BYTES?: string;
   IMAGE_TOKENS_RESERVE?: string;
@@ -113,13 +114,18 @@ export interface Config {
   upstreamTimeoutMs: number;
   upstreamBudgetMs: number;
   markupBp: number;
-  spotStarterMicro: number;
-  spotRewardMicro: number;
-  spotTokenTtlSec: number;
-  spotMonthlyLimitPerInviter: number;
-  spotGlobalMonthlyBudgetMicro: number;
-  spotExpiryDays: number;
-  rewardExpiryDays: number;
+  /** Geschenkte Auswertungen für den Eingeladenen / den Einladenden. */
+  inviteStarterReviews: number;
+  inviteRewardReviews: number;
+  inviteTokenTtlSec: number;
+  inviteMonthlyLimitPerInviter: number;
+  /** Höchstens so viele geschenkte Auswertungen werden je Monat vergeben (Einlösung zählt Start + Belohnung). */
+  inviteGlobalMonthlyBudgetReviews: number;
+  /** Harte Grenze: echte KI-Kosten (µ€) aller geschenkten Auswertungen im Monat; darüber zahlt das Guthaben. */
+  inviteGiftMonthlyCostCapMicro: number;
+  /** Eine Anfrage, deren reservierte Höchstkosten (Anbieterpreis) darüber liegen, zählt nicht als geschenkte Auswertung. */
+  inviteGiftMaxCostMicro: number;
+  inviteExpiryDays: number;
   maxTokensCap: number;
   maxBodyBytes: number;
   imageTokensReserve: number;

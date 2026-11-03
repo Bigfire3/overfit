@@ -4,7 +4,7 @@ import { Client, baseEnv, rawFetch } from './helpers';
 const ADMIN = 'admin-secret-0123456789';
 // Echter Testbetrieb: kein Dev-Modus, keine Mocks, nur DEPLOY_MODE=test.
 const testEnv = (extra = {}) =>
-  baseEnv({ DEV_MODE: 'false', ATTESTATION_MODE: 'required', PURCHASE_MODE: 'required', DEPLOY_MODE: 'test', ADMIN_SECRET: ADMIN, SPOT_SIGNING_KEY: 'k'.repeat(40), ...extra });
+  baseEnv({ DEV_MODE: 'false', ATTESTATION_MODE: 'required', PURCHASE_MODE: 'required', DEPLOY_MODE: 'test', ADMIN_SECRET: ADMIN, INVITE_SIGNING_KEY: 'k'.repeat(40), ...extra });
 
 const credit = (e: ReturnType<typeof baseEnv>, body: unknown, secret: string | null = ADMIN) =>
   rawFetch('/v1/admin/credit', e, {
@@ -62,27 +62,27 @@ describe('Testbetrieb (DEPLOY_MODE=test)', () => {
     const inviter = await Client.create(e);
     const friend = await Client.create(e);
     const go = async (who: Client, token?: string) => {
-      const t = (await inviter.call('POST', '/v1/spot/token')).body.token;
-      const ch = (await who.call('POST', '/v1/spot/challenge')).body.challenge;
-      return who.call('POST', '/v1/spot/redeem', {
+      const t = (await inviter.call('POST', '/v1/invite/token')).body.token;
+      const ch = (await who.call('POST', '/v1/invite/challenge')).body.challenge;
+      return who.call('POST', '/v1/invite/redeem', {
         token: t,
         attestation: { platform: 'google', token: token ?? `test:${who.deviceId}`, challenge: ch },
       });
     };
     const ok = await go(friend);
     expect(ok.status).toBe(200);
-    expect(ok.body.grantedMicro).toBe(1_000_000);
-    expect((await go(await Client.create(e), `test:${friend.deviceId}`)).body.error.code).toBe('spot_device_used');
+    expect(ok.body.grantedReviews).toBe(5);
+    expect((await go(await Client.create(e), `test:${friend.deviceId}`)).body.error.code).toBe('invite_device_used');
     expect((await go(await Client.create(e), 'mock:x')).body.error.code).toBe('attestation_failed');
   });
 
   it('Produktion akzeptiert keine Test-Token', async () => {
-    const e = baseEnv({ DEV_MODE: 'false', SPOT_SIGNING_KEY: 'k'.repeat(40) });
+    const e = baseEnv({ DEV_MODE: 'false', INVITE_SIGNING_KEY: 'k'.repeat(40) });
     const inviter = await Client.create(e);
     const friend = await Client.create(e);
-    const t = (await inviter.call('POST', '/v1/spot/token')).body.token;
-    const ch = (await friend.call('POST', '/v1/spot/challenge')).body.challenge;
-    const r = await friend.call('POST', '/v1/spot/redeem', { token: t, attestation: { platform: 'google', token: `test:${friend.deviceId}`, challenge: ch } });
+    const t = (await inviter.call('POST', '/v1/invite/token')).body.token;
+    const ch = (await friend.call('POST', '/v1/invite/challenge')).body.challenge;
+    const r = await friend.call('POST', '/v1/invite/redeem', { token: t, attestation: { platform: 'google', token: `test:${friend.deviceId}`, challenge: ch } });
     expect(r.body.error.code).toBe('attestation_unavailable');
   });
 });
