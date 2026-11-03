@@ -132,17 +132,12 @@ fun SettingsScreen(
             Text(t.exactAlarmHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         }
 
+        // Everything about the coach and AI access lives in the Coach tab; here only the link (and Fuel, the wallet).
         SectionTitle(t.ai)
-        ListRow(app.overfit.i18n.LocalChatStrings.current.aiCoach, onClick = onAiCoach)
+        val hub = app.overfit.i18n.LocalCoachStrings.current.hub
+        ListRow(hub.profileLink, onClick = onCoach)
+        Text(hub.profileLinkHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         FuelRow(fuelSession, onFuel)
-        ListRow(providers.get(state.providerId).label, if (state.hasApiKey || state.providerId == ProviderId.FUEL) t.connected else t.notConnected)
-        ListRow(if (state.hasApiKey) t.change else t.connect, onClick = onConnect)
-        if (state.hasApiKey) ListRow(t.disconnect, tone = Tone.Muted, onClick = store::disconnectAi)
-
-        SectionTitle(t.coach)
-        ListRow(t.coach, onClick = onCoach)
-        ListRow(t.coachMemory, onClick = onCoachMemory)
-        ListRow(app.overfit.i18n.LocalChatStrings.current.notesTitle, onClick = onChatNotes)
 
         SectionTitle(t.app)
         ListRow(t.about, onClick = onAbout)

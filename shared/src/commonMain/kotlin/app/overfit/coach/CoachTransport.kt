@@ -97,6 +97,9 @@ fun anthropicBody(prompt: CoachPrompt, model: String, structured: Boolean): Json
         add(buildJsonObject { put("type", "text"); put("text", prompt.dynamicSystem) })
     }
     putJsonArray("messages") {
+        prompt.history.forEach { turn ->
+            add(buildJsonObject { put("role", if (turn.fromUser) "user" else "assistant"); put("content", turn.text) })
+        }
         add(buildJsonObject {
             put("role", "user")
             putJsonArray("content") {
@@ -220,6 +223,9 @@ open class ChatCompletionsCoach(
                     add(buildJsonObject { put("type", "text"); put("text", prompt.dynamicSystem) })
                 }
             })
+            prompt.history.forEach { turn ->
+                add(buildJsonObject { put("role", if (turn.fromUser) "user" else "assistant"); put("content", turn.text) })
+            }
             add(buildJsonObject {
                 put("role", "user")
                 putJsonArray("content") {

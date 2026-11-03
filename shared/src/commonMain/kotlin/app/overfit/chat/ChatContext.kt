@@ -24,6 +24,8 @@ data class ContextInput(
     val language: Language,
     val today: LocalDate,
     val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    /** The saved workouts (name and exercises), so the AI can refer to them. */
+    val templates: List<app.overfit.domain.Template> = emptyList(),
 )
 
 /**
@@ -36,8 +38,12 @@ object ChatContext {
     const val PROGRESS_POINTS = 8
     /** The text stays small enough to paste into any chat. */
     const val MAX_CHARS = 12_000
+    const val MAX_TEMPLATES = 15
 
-    fun build(input: ContextInput, t: ChatStrings, example: String): String {
+    /** [task] null = only the status, without the answer instructions (coach chat, prompts with their own ask). */
+    fun build(input: ContextInput, t: ChatStrings, example: String): String = status(input, t, t.ctxTask(example))
+
+    fun status(input: ContextInput, t: ChatStrings, task: String?): String {
         val unit = input.profile.unit
         val finished = input.workouts.filter { it.endedAt != null }.sortedByDescending { it.workout.startedAt }
         val out = StringBuilder()
@@ -52,6 +58,14 @@ object ChatContext {
             out.appendLine("## ${t.ctxMemory}").appendLine(it.trim()).appendLine()
         }
 
+        if (input.templates.isNotEmpty()) {
+            out.appendLine("## ${t.ctxWorkouts}")
+            input.templates.take(MAX_TEMPLATES).forEach { tpl ->
+                out.appendLine("- ${tpl.name}: " + tpl.exercises.joinToString(", ") { "${it.exercise.name} ${it.sets.size}×" })
+            }
+            out.appendLine()
+        }
+
         out.appendLine("## ${t.ctxRecent}")
         if (finished.isEmpty()) out.appendLine(t.ctxNoWorkouts)
         finished.take(RECENT_WORKOUTS).forEach { r -> out.append(workoutBlock(r, t, input)) }
@@ -63,9 +77,9 @@ object ChatContext {
             progress.forEach { out.appendLine(it) }
             out.appendLine()
         }
-        out.append(t.ctxTask(example))
-        val text = out.toString()
-        return if (text.length <= MAX_CHARS) text else trim(text, t.ctxTask(example))
+        if (task != null) out.append(task)
+        val text = if (task != null) out.toString() else out.toString().trimEnd() + "\n"
+        return if (text.length <= MAX_CHARS) text else trim(text, task.orEmpty())
     }
 
     /** Over the limit: the oldest of the listed workouts are cut first, the task at the end always stays. */

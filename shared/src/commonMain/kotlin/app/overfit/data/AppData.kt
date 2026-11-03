@@ -49,6 +49,7 @@ class AppData(
         database.transaction {
             database.coachDao().deleteAll()
             database.coachDao().deleteMemory()
+            database.coachChatDao().deleteAllChats()
             database.workoutDao().deleteAll()
             database.templateDao().deleteAll()
             database.exerciseDao().deleteAll()
