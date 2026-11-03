@@ -14,14 +14,19 @@ class IosHaptics : Haptics {
     override fun play(pattern: HapticPattern) {
         when (pattern) {
             HapticPattern.Tick -> impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleLight)
-            HapticPattern.RestEnd ->
-                UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
-            HapticPattern.Reveal -> {
-                // Three rising steps, like the Android waveform.
-                impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleLight)
-                later(100) { impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleMedium) }
-                later(210) { impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleHeavy) }
+            HapticPattern.RestEnd -> {
+                // Three short pulses, like the Android waveform.
+                impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleHeavy)
+                later(220) { impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleHeavy) }
+                later(440) { impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleHeavy) }
             }
+            HapticPattern.Reveal -> {
+                // Heartbeat: lighter, then stronger beat.
+                impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleMedium)
+                later(170) { impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleHeavy) }
+            }
+            HapticPattern.RevealFinish ->
+                UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
         }
     }
 

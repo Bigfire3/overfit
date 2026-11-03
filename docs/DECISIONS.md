@@ -233,11 +233,11 @@ Zuerst als native Android-Version gebaut (PR #17), dann nach der KMP-Entscheidun
   sie). Im Vordergrund zeigt iOS sie ohne Delegate nicht an, die App vibriert selbst. Mit Vibration an hat die
   Benachrichtigung den Standardton, weil iOS sonst nicht vibriert (im Lautlos-Modus nur Vibration). Live Activity
   später.
-- **Haptik** als Interface `Haptics` mit drei Mustern (in der SPEC nicht festgelegt, daher hier): **Tick** = kurzer
-  Klick beim Abhaken (Android `EFFECT_CLICK`, iOS leichter Impact), **RestEnd** = zwei kräftige Pulse
-  (Android Waveform 180/120/180 ms, iOS Notification „success“), **Reveal** = drei ansteigende Stufen
-  (Android Amplituden 70/150/255, iOS light → medium → heavy), angelegt für die spätere Fuel/Spot-Session. Schalter
-  „Vibration“ im Profil gilt für App-Haptik und Benachrichtigungen.
+- **Haptik** als Interface `Haptics` nach den Produktentscheidungen der Koordination: **Tick** = leichter Klick beim
+  Abhaken (Android `EFFECT_CLICK`, iOS leichter Impact), **RestEnd** = drei kurze Pulse (Android Waveform
+  3 × 120 ms, iOS 3 × heavy Impact), **Reveal** = Herzschlag aus zwei Pulsen und **RevealFinish** = ein kräftiger
+  Puls, angelegt für den späteren Spot-Reveal (noch ungenutzt). Schalter „Vibration“ im Profil (Standard an) gilt
+  für App-Haptik und Benachrichtigungen.
 - **Training beenden** legt das Training vorerst nur als abgeschlossen ab (Beenden-Flow folgt in Phase 3). Beenden
   und Abbrechen brauchen wie Löschen einen zweiten Tipp. Abbrechen löscht das Training mit allen Sätzen.
 - **Drag & Drop** ohne Fremdbibliothek (`ui/components/Reorder.kt`): langes Drücken auf den Griff, Tausch, sobald die

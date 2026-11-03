@@ -3,11 +3,12 @@ package app.overfit.platform
 /**
  * Vibration patterns of the app. Kept few and distinct so each one means one thing:
  * - [Tick]: short, light confirmation (set checked off).
- * - [RestEnd]: two firm pulses (rest is over).
- * - [Reveal]: rising three-step pattern for a moment of reveal (prepared for the later
- *   Fuel/Spot session, not used yet).
+ * - [RestEnd]: three short pulses (rest is over).
+ * - [Reveal]: two short pulses like a heartbeat, when a Spot reveal starts (screen goes black).
+ * - [RevealFinish]: one strong pulse when the counted-up Fuel amount lands.
+ * Reveal and RevealFinish are prepared for the later Fuel/Spot work and not used yet.
  */
-enum class HapticPattern { Tick, RestEnd, Reveal }
+enum class HapticPattern { Tick, RestEnd, Reveal, RevealFinish }
 
 /** Platform vibration: Android Vibrator/VibrationEffect, iOS UIFeedbackGenerator. */
 interface Haptics {
