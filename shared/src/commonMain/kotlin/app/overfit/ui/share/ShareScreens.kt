@@ -480,26 +480,9 @@ fun DuoScreen(onBack: () -> Unit) {
 // ---------------------------------------------------------------------------------------------
 // Entry points in other screens
 
-/** "Add sample templates" (idempotent) with the result shown as the row's second line. */
+/** Rows under the template list: import and copy AI prompt. */
 @Composable
-fun SamplesRow(share: ShareDependencies) {
-    val s = LocalStrings.current.share
-    var message by remember { mutableStateOf<String?>(null) }
-    ListRow(s.addSamples, onClick = {
-        // App scope, not the composable's: the first saved template makes the list non-empty, the row leaves
-        // the composition, and a composition scope would cancel the import half-way (only Push would arrive).
-        share.scope.launch {
-            val n = share.importer.addSamples()
-            message = if (n == 0) s.samplesAlready else s.samplesAdded(n)
-        }
-    }) {
-        message?.let { Text(it, style = Theme.type.caption, tone = Tone.Muted) }
-    }
-}
-
-/** Rows under the template list: import, copy AI prompt, sample templates. */
-@Composable
-fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit, showSamples: Boolean = true) {
+fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit) {
     val s = LocalStrings.current.share
     var aiCopied by remember { mutableStateOf(false) }
     ListRow(s.importTitle, onClick = onImport)
@@ -509,5 +492,4 @@ fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit, showSampl
         text = remember { aiTemplateText(s, share.aiProfile()) },
         onCopy = { share.platform.copyText(it); aiCopied = true },
     )
-    if (showSamples) SamplesRow(share)
 }

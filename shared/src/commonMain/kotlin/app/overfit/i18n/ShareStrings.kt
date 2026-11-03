@@ -47,10 +47,6 @@ data class ShareStrings(
     val aiTemplateCopied: String,
     val aiTemplatePrompt: (example: String) -> String,
 
-    val addSamples: String,
-    val samplesHint: String,
-    val samplesAdded: (Int) -> String,
-    val samplesAlready: String,
 
     val duoSoon: String,
     val duoTitle: String,
@@ -122,10 +118,6 @@ Regeln:
 - Höchstens zwei Sätze Erklärung außerhalb des Blocks."""
     },
 
-    addSamples = "Beispiel-Workouts hinzufügen",
-    samplesHint = "Push, Pull und Legs als Startpunkt.",
-    samplesAdded = { if (it == 1) "1 Beispiel-Workout hinzugefügt" else "$it Beispiel-Workouts hinzugefügt" },
-    samplesAlready = "Die Beispiel-Workouts sind schon da.",
 
     duoSoon = "Duo · bald",
     duoTitle = "Duo",
@@ -197,10 +189,6 @@ Rules:
 - At most two sentences of explanation outside the block."""
     },
 
-    addSamples = "Add sample workouts",
-    samplesHint = "Push, Pull and Legs as a starting point.",
-    samplesAdded = { if (it == 1) "1 sample workout added" else "$it sample workouts added" },
-    samplesAlready = "The sample workouts are already there.",
 
     duoSoon = "Duo · soon",
     duoTitle = "Duo",

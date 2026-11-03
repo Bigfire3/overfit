@@ -40,7 +40,6 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
-import app.overfit.ui.share.SamplesRow
 import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
@@ -106,8 +105,6 @@ fun StartScreen(
 
         if (templates != null && templates.isEmpty()) {
             Text(t.templatesEmpty, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.s))
-            SamplesRow(share)
         }
         if (templates != null && templates.isNotEmpty()) Hairline()
         templates?.forEach { w -> WorkoutRow(w, lastDoneText(t, lastDone[w.id], today)) { onOpenWorkout(w.id) } }

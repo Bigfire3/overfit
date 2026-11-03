@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -131,17 +132,17 @@ class ShareFlowTest {
     }
 
     @Test
-    fun samplesAddedFromStartAndProfileIdempotently() {
+    fun samplesAreThereFromTheStartWithoutAnAddRow() {
+        // Fresh install: the first start adds Push/Pull/Legs, there is no "add samples" row anywhere.
+        kv.remove(AppData.KEY_SAMPLES_SEEDED)
         launchOnboarded()
-        waitFor("Beispiel-Workouts hinzufügen")
-        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
-        // The row disappears after the first template is saved; all three must still arrive.
         waitFor("Legs")
         waitFor("Pull")
         waitFor("Push")
+        compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
         compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
-        waitFor("schon da")
+        waitFor("Über overfit")
+        compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
         assertEquals(3, runBlocking { data.templates.templates.first() }.size)
     }
 

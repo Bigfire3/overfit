@@ -7,7 +7,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.platform.RestAlerts
 import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.Hairline
-import app.overfit.ui.share.SamplesRow
 import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.components.pressableRow
 
@@ -142,9 +141,6 @@ fun SettingsScreen(
 
         SectionTitle(t.app)
         ListRow(t.about, onClick = onAbout)
-
-        SectionTitle(t.templates)
-        SamplesRow(share)
 
         SectionTitle(t.photos.backupSection)
         ListRow(if (exportingBackup) t.photos.backupExporting else t.photos.backupExport, onClick = { if (!exportingBackup) onExportBackup() })

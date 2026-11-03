@@ -46,7 +46,7 @@ class AppData(
 
     /**
      * Adds Push/Pull/Legs once: at the first start and, once, on existing installs (flag in the key-value store).
-     * Afterwards they are normal workouts: deleting them keeps them gone; "Add sample workouts" brings them back on request.
+     * Afterwards they are normal workouts: deleting them keeps them gone (they can be re-imported like any shared workout).
      */
     suspend fun seedSamplesOnce(): Result<Int> = runCatching {
         if (kv.get(KEY_SAMPLES_SEEDED) != null) return@runCatching 0
