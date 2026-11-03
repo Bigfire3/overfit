@@ -1,10 +1,12 @@
 name: iOS CI
 
-# Pausiert (3.11.): macOS-Minuten kosten 10x und haben die meisten Actions-Kosten verursacht.
-# Läuft nur noch von Hand (Actions → iOS CI → Run workflow), z. B. vor einem Release oder
-# nach größeren Änderungen an iosMain/iosApp. Kotlin/Native-Code prüft weiterhin
-# :shared:compileKotlinIosSimulatorArm64 in der Android-CI bzw. lokal.
+# Repo ist öffentlich, macOS-Runner sind damit kostenlos. iOS baut für PRs nach main,
+# Pushes auf main und auf Anforderung – nicht bei jedem Push auf einen Session-Branch.
 on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:

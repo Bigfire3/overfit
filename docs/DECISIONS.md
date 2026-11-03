@@ -498,3 +498,6 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
   Inter OFL, Bibliotheken). Backend `package.json`: `"license": "UNLICENSED"` (npm-Konvention für „nicht lizenziert“).
   Was vor dem Wechsel unter Apache-2.0 veröffentlicht wurde, bleibt unter Apache-2.0 nutzbar. Das Repo war bis dahin
   privat, deshalb spielt das praktisch keine Rolle.
+- **iOS-CI wieder an (3.11., Fabian):** Seit das Repo öffentlich ist, sind auch macOS-Runner kostenlos. `ios.yml` läuft
+  wieder für PRs nach main, Pushes auf main und per Hand; Merge-Bedingung ist wieder Android- und iOS-CI grün.
+  Der zusätzliche iOS-Kompilierschritt in der Android-CI bleibt als schnelle Vorprüfung.
