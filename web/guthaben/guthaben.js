@@ -102,7 +102,7 @@
       $('linkNote').textContent = status === 'expired' ? T.linkExpired : status === 'used' ? T.linkUsed : T.linkInvalid;
       $('linkNote').hidden = false;
     }
-    selected = (s.packages[1] || s.packages[0] || {}).id || null;
+    selected = (s.packages[0] || {}).id || null;
     renderShop();
     show('shop');
   }).catch(function () { fail(T.errNet); });
