@@ -17,6 +17,7 @@ fun SessionWithExercises.toRecord(): SessionRecord = SessionRecord(
     note = session.note,
     feeling = session.feeling,
     photoPath = session.photoPath,
+    sauna = session.sauna,
     exercises = exercises.sortedBy { it.entry.position }.map { e ->
         WorkoutExercise(
             id = e.entry.id,

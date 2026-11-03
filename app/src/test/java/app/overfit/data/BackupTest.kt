@@ -70,6 +70,7 @@ class BackupTest {
         data.workouts.save(done)
         data.workouts.finish(done, 20_000)
         data.workouts.updateDetails("w1", "Stark", 4)
+        data.workouts.setSauna("w1", true)
         data.workouts.addPhoto("w1", byteArrayOf(9, 8, 7), takenAt = 21_000)
         store.setName("Fabian")
         store.completeOnboarding()
@@ -96,6 +97,7 @@ class BackupTest {
         backup.restore(preview)
 
         assertEquals(before, snapshot())
+        assertTrue("sauna survives export and restore", data.workouts.getFinished("w1")!!.sauna)
         assertEquals("Fabian", store.state.value.profile.name)
         assertTrue(store.state.value.onboardingDone)
         // A second export is identical apart from nothing (same clock): stable format.
@@ -105,7 +107,7 @@ class BackupTest {
     private suspend fun snapshot(): List<Any?> {
         val finished = data.workouts.getFinished("w1")
         return listOf(
-            finished?.workout, finished?.note, finished?.feeling, finished?.endedAt,
+            finished?.workout, finished?.note, finished?.feeling, finished?.sauna, finished?.endedAt,
             finished?.photos?.map { it.id to it.takenAt }, finished?.photos?.map { photos.read(it.fileName)?.toList() },
             data.templates.templates.first(), data.templates.templates.first().map { data.templates.get(it.id) },
             data.exercises.get("wg:bench-press")?.defaultRestSec,
@@ -140,6 +142,7 @@ class BackupTest {
         backup.restore(backup.preview(minimal).getOrThrow())
         val w = data.workouts.getFinished("x")!!
         assertEquals(20.0, w.workout.exercises.single().sets.single().actual.weightKg)
+        assertEquals(false, w.sauna) // older backups have no sauna field
     }
     @Test
     fun legacyFreeDbExerciseUsedByTemplateBecomesCustomWithoutImage() = runTest {

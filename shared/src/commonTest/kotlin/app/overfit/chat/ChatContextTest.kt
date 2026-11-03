@@ -54,6 +54,17 @@ class ChatContextTest {
     }
 
     @Test
+    fun saunaIsMarkedInTheWorkoutLine() {
+        val sauna = record("ws", base, sets = listOf(SetValues(60.0, 8, null))).copy(sauna = true)
+        val de = ChatContext.build(input(listOf(sauna)), ChatGerman, AiPrompt.EXAMPLE)
+        assertTrue(de.lines().any { it.startsWith("- ") && it.endsWith("Gefühl 4/5 · danach Sauna") }, de)
+        val en = ChatContext.build(input(listOf(sauna), Language.EN), ChatEnglish, AiPrompt.EXAMPLE)
+        assertTrue(en.contains("Feeling 4/5 · sauna afterwards"))
+        val none = ChatContext.build(input(listOf(record("wn", base))), ChatGerman, AiPrompt.EXAMPLE)
+        assertFalse(none.contains("Sauna"))
+    }
+
+    @Test
     fun exampleInTheContextImportsAgain() {
         val text = ChatContext.build(input(emptyList(), Language.EN, memory = null), ChatEnglish, AiPrompt.EXAMPLE)
         assertTrue(text.contains("No finished workouts yet."))

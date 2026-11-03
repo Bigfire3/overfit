@@ -93,6 +93,8 @@ data class BWorkout(
     val endedAt: Long? = null,
     val note: String? = null,
     val feeling: Int? = null,
+    /** Missing in older backups = no sauna. */
+    val sauna: Boolean = false,
     val aiStatus: String = "NONE",
     val updatedAt: Long = 0,
     val exercises: List<BWorkoutExercise> = emptyList(),
@@ -198,7 +200,7 @@ class BackupService(
                 val s = w.session
                 BWorkout(
                     id = s.id, name = s.name, templateId = s.templateId, startedAt = s.startedAt, endedAt = s.endedAt,
-                    note = s.note, feeling = s.feeling, aiStatus = s.aiStatus.name, updatedAt = s.updatedAt,
+                    note = s.note, feeling = s.feeling, sauna = s.sauna, aiStatus = s.aiStatus.name, updatedAt = s.updatedAt,
                     exercises = w.exercises.sortedBy { it.entry.position }.map { e ->
                         BWorkoutExercise(
                             id = e.entry.id, exerciseId = e.entry.exerciseId, restSec = e.entry.restSec, note = e.entry.note,
@@ -299,7 +301,7 @@ class BackupService(
                         id = w.id, name = w.name, templateId = w.templateId, status = SessionStatus.FINISHED,
                         startedAt = w.startedAt, endedAt = w.endedAt ?: w.startedAt, note = w.note, feeling = w.feeling,
                         photoPath = null, aiStatus = enumOr(w.aiStatus, AiStatus.NONE), restStartedAt = null, restEndsAt = null,
-                        restAfterSetId = null, updatedAt = w.updatedAt,
+                        restAfterSetId = null, updatedAt = w.updatedAt, sauna = w.sauna,
                     ),
                 )
                 wDao.insertExercises(

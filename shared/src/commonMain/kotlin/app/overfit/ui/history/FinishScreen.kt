@@ -30,6 +30,7 @@ import app.overfit.i18n.Strings
 import app.overfit.platform.prepareJpeg
 import app.overfit.platform.rememberPhotoPicker
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.CheckRow
 import app.overfit.ui.components.BigInput
 import app.overfit.domain.Workout
 import app.overfit.ui.components.ListRow
@@ -83,6 +84,7 @@ fun FinishScreen(
     val photos by remember(workoutId) { workouts.observePhotosOf(workoutId) }.collectAsStateWithLifecycle(emptyList())
 
     var feeling by rememberSaveable { mutableStateOf<Int?>(null) }
+    var sauna by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var note by rememberSaveable { mutableStateOf("") }
     // The name is set here (an empty start got a default name like "Workout vom 3. Nov.").
     var name by rememberSaveable { mutableStateOf<String?>(null) }
@@ -93,6 +95,7 @@ fun FinishScreen(
             // Only fill what the user has not touched yet: the screen is usable before the data has loaded.
             seeded = true
             if (feeling == null) feeling = d.finished.feeling
+            if (sauna == null) sauna = d.finished.sauna
             if (note.isEmpty()) note = d.finished.note.orEmpty()
             if (name == null) name = d.finished.workout.name
         }
@@ -111,10 +114,15 @@ fun FinishScreen(
             saving = true
             val noteText = note
             val feelingValue = feeling
+            val saunaValue = sauna
             val newName = name?.trim().orEmpty()
             val finishedWorkout = data?.finished?.workout
             appScope.launch {
-                if (data != null) workouts.updateDetails(workoutId, noteText, feelingValue)
+                if (data != null) {
+                    workouts.updateDetails(workoutId, noteText, feelingValue)
+                    // Saved before onSaved, so the coach review that starts there already sees it.
+                    if (saunaValue != null && saunaValue != data?.finished?.sauna) workouts.setSauna(workoutId, saunaValue)
+                }
                 if (finishedWorkout != null && newName.isNotEmpty() && newName != finishedWorkout.name) {
                     runCatching { rename(finishedWorkout, newName) }
                 }
@@ -155,6 +163,8 @@ fun FinishScreen(
 
         SectionTitle(h.feeling)
         FeelingPicker(feeling, h.feelingValue) { feeling = it }
+        Spacer(Modifier.height(Space.m))
+        CheckRow(h.sauna, sauna == true) { sauna = it }
 
         SectionTitle(h.note)
         MultilineInput(note, { note = it.take(2000) }, h.notePlaceholder)

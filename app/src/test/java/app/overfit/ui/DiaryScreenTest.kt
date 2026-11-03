@@ -21,6 +21,13 @@ import app.overfit.i18n.stringsFor
 import app.overfit.share.NoopPlatformShare
 import app.overfit.ui.photos.PhotoViewerScreen
 import app.overfit.ui.photos.PhotosScreen
+import app.overfit.ui.photos.SAUNA_MARKER_TAG
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import app.overfit.ui.theme.OverfitTheme
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -95,6 +102,28 @@ class DiaryScreenTest {
         show { PhotosScreen(emptyList(), listOf(session("s1", LocalDate(2026, 11, 2), "Push")), Language.DE, today, {}, {}, { _, _ -> }) }
         compose.onNodeWithText("November 2026").assertIsDisplayed()
         compose.onNodeWithContentDescription("Tag 2, Training").assertIsDisplayed()
+    }
+
+    @Test fun saunaDaysGetARingAndALegend() {
+        val sauna = listOf(
+            session("s1", LocalDate(2026, 11, 2), "Push").copy(sauna = true), // with photo
+            session("s0", LocalDate(2026, 10, 30), "Legs").copy(sauna = true), // training only
+            session("s9", LocalDate(2026, 11, 1), "Pull"), // no sauna
+        )
+        show { PhotosScreen(photos.take(2), sauna, Language.DE, today, {}, {}, { _, _ -> }) }
+        val ring = hasAnyDescendant(hasTestTag(SAUNA_MARKER_TAG))
+        // Legend: filled dot = workout, ring = sauna.
+        compose.onNodeWithText("Sauna").assertIsDisplayed()
+        // Photo day: ring next to the workout dot; training-only day: ring below the dot; no sauna: no ring.
+        compose.onNode(hasContentDescription("Tag 2, 2 Fotos, Sauna") and ring, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasContentDescription("Tag 1, Training") and !ring, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasContentDescription("Tag 30, Training, Sauna") and ring, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun noLegendWithoutSauna() {
+        show { PhotosScreen(emptyList(), listOf(session("s1", LocalDate(2026, 11, 2), "Push")), Language.DE, today, {}, {}, { _, _ -> }) }
+        compose.onAllNodesWithTag(SAUNA_MARKER_TAG, useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodesWithText("Sauna").assertCountEquals(0)
     }
 
     @Test fun viewerSwipesBetweenPhotoDaysAndDeletesWithConfirmation() {
