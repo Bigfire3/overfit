@@ -196,3 +196,40 @@ Zuerst als native Android-Version gebaut (PR #17), dann nach der KMP-Entscheidun
   iOS-Simulator). Datenbank, Seeding, Migration und UI-Durchlauf laufen als Robolectric-Tests in `:app`
   (In-Memory-Room mit Android-Treiber, Katalog direkt aus dem Quellbaum). `MigrationTestHelper` liest die Schemas
   aus den Assets, daher hängt `shared/schemas` an den **debug**-Assets von `:app` (nur Debug-APK, nicht Release).
+
+## Phase 8: Trainings teilen (Session B)
+- **Deflate selbst geschrieben:** Die Kotlin-Standardbibliothek hat kein Deflate, und eine KMP-Bibliothek nur dafür wäre
+  zusätzliche Abhängigkeit auf beiden Plattformen. `Deflate.kt` (Raw Deflate, RFC 1951) schreibt einen Fixed-Huffman-Block
+  mit LZ77, liest aber alle Blocktypen (Test mit dynamischem Block von Python zlib). Die Web-Seite liest es mit
+  `DecompressionStream('deflate-raw')`. Ausgabegrenze 200 KB gegen Zip-Bomben.
+- **Format:** Zusätzlich zur SPEC `name` statt `id` pro Übung (für KI-Vorlagen), `note`, `restSec`, Sätze als
+  `{kg, reps, sec}`. `kind` ist ein String (`template` jetzt, `workout` später); unbekannte `kind` und höhere `v` werden
+  mit eigener Fehlermeldung abgelehnt. Der Leser ist tolerant bei Werten ("8-12", "82,5 kg") und streng bei der Struktur.
+  Details: `docs/share-format.md`.
+- **Auflösung:** `ref` → eigene Übung gleichen Namens, sonst neu; `id` → Katalog; `name` → exakter Treffer, sonst bester
+  Treffer der unscharfen Suche (DE/EN); sonst neue eigene Übung. Nicht zur Erfassungsart passende Satzwerte werden
+  verworfen (z. B. Gewicht bei Klimmzug mit „Wdh.“).
+- **QR-Code selbst geschrieben:** Reiner Kotlin-Generator (Byte-Modus, Fehlerkorrektur M, Version 1–30) in commonMain,
+  damit Android und iOS denselben Code zeichnen, ohne ZXing auf iOS. Gegen ZXing-Decoder getestet (Versionen 1–30,
+  inkl. Umlaute). QR nur bis 1.000 Zeichen Link, sonst Hinweis und Datei/Link.
+- **Scannen:** Android in der App mit CameraX + ZXing core (Apache-2.0, keine Play-Dienste). **iOS: kein In-App-Scanner,
+  die Kamera-App reicht**, weil der QR ein Link ist (`overfit://`-Link öffnet die App direkt, der https-Link den
+  Browser/die Web-Seite mit „In Overfit öffnen“). Grund: AVFoundation-Scanner lässt sich unter Linux nicht testen, und der
+  Nutzen gegenüber der Kamera-App ist klein. Die Import-Seite zeigt auf iOS einen Hinweis statt des Scan-Knopfs.
+- **Android-Links:** Intent-Filter für `https://bigfire3.github.io/overfit/t` **ohne** `autoVerify` (die Domain gehört
+  nicht der App; ohne Verifizierung fragt Android bzw. der Browser) sowie `overfit://`, `.overfit`-Dateien
+  (`application/x-overfit`, `content`/`file`). `launchMode=singleTop`, damit ein zweiter Link in der laufenden App
+  ankommt. iOS: URL-Schema `overfit` und Dokumenttyp `.overfit`; Universal Links bräuchten eine Domain, die Overfit
+  gehört (siehe PROGRESS).
+- **Eingang von außen:** `ImportInbox` (ein Text wartet auf den Import-Bildschirm). Die Plattform-Hüllen legen dort ab,
+  die UI öffnet den Import (nicht während des Onboardings).
+- **`PlatformShare`-Interface** statt expect/actual-Funktionen: Share-Sheet, Zwischenablage und Datei brauchen auf
+  Android einen `Context`, und Tests ersetzen es durch `NoopPlatformShare`.
+- **KI-Prompt:** Liegt in `ShareStrings` (DE/EN, App-Sprache), enthält ein Beispiel (`AiPrompt.EXAMPLE`), das in Tests
+  importiert wird. Übungen verlangt der Prompt per Name (englischer Alltagsname), weil Chat-Assistenten die
+  Katalog-IDs nicht kennen.
+- **Strings:** Die Teilen-Texte stehen in `i18n/ShareStrings.kt` (eigene Datei, DE+EN, fehlende Übersetzung = Compile-Fehler)
+  und hängen als `Strings.share` ein, um Merge-Konflikte in der großen `Strings.kt` klein zu halten.
+- **Beispielvorlagen:** `files/samples/{push,pull,legs}.json` in der gleichen Datei-Form wie der Export. „Hinzufügen“
+  ist idempotent über den Namen (Push/Pull/Legs), wer eine löscht, kann sie neu holen.
+- **Duo:** Nur ein Teaser-Eintrag „Duo · bald“ auf dem Startbildschirm und ein Text-Screen, keine Datenerhebung.
