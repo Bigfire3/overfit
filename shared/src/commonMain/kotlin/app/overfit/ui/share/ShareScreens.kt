@@ -71,6 +71,8 @@ class ShareDependencies(
     val importer: TemplateImporter,
     val templates: TemplateRepository,
     val inbox: ImportInbox,
+    /** Lives as long as the app: work that must finish even when its screen leaves the composition. */
+    val scope: kotlinx.coroutines.CoroutineScope,
 )
 
 fun ShareFailure.message(t: ShareStrings): String = when (this) {
@@ -350,10 +352,11 @@ fun DuoScreen(onBack: () -> Unit) {
 @Composable
 fun SamplesRow(share: ShareDependencies) {
     val s = LocalStrings.current.share
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var message by remember { mutableStateOf<String?>(null) }
     ListRow(s.addSamples, onClick = {
-        scope.launch {
+        // App scope, not the composable's: the first saved template makes the list non-empty, the row leaves
+        // the composition, and a composition scope would cancel the import half-way (only Push would arrive).
+        share.scope.launch {
             val n = share.importer.addSamples()
             message = if (n == 0) s.samplesAlready else s.samplesAdded(n)
         }
