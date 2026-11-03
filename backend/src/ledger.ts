@@ -81,7 +81,7 @@ export async function settle(
 export function grantStatements(
   env: Env,
   accountId: string,
-  kind: 'purchase' | 'spot_bonus' | 'spot_reward',
+  kind: 'purchase' | 'spot_bonus' | 'spot_reward' | 'test_credit',
   amountMicro: number,
   expiresAt: number | null,
   ref: string,

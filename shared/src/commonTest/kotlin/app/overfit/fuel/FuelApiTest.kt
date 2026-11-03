@@ -156,6 +156,22 @@ class FuelApiTest {
     }
 
     @Test
+    fun spotRedeemOnTheTestServerUsesATestTokenBoundToTheDevice() = runTest {
+        val log = mutableListOf<HttpRequestData>()
+        val api = api(log = log) { req ->
+            when (req.url.encodedPath) {
+                "/v1/spot/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1"}"""
+                "/v1/config" -> HttpStatusCode.OK to """{"mode":"test"}"""
+                "/v1/spot/redeem" -> HttpStatusCode.OK to """{"grantedMicro":1000000,"expiresAt":5,"inviter":{"displayName":null},"balanceMicro":1000000}"""
+                else -> HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
+            }
+        }
+        api.redeemSpot("tokenvalue123")
+        val body = log.last().body.toByteArray().decodeToString()
+        assertTrue(body, body.contains("\"token\":\"test:"))
+    }
+
+    @Test
     fun networkFailureBecomesNetworkError() = runTest {
         val engine = MockEngine { throw RuntimeException("offline") }
         val api = FuelApi(HttpClient(engine), "https://fuel.test", RequestSigner(FakeKey()))

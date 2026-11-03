@@ -173,7 +173,10 @@ class FuelApi(
 
     override suspend fun redeemSpot(token: String): SpotRedeemResult {
         val challenge = parse(call(HttpMethod.Post, "/v1/spot/challenge")) { decode<SpotChallenge>(it) }
-        val attestation = attestor.attest(challenge.challenge) ?: throw FuelException("attestation_unavailable", 503)
+        // Test server (DEPLOY_MODE=test): no device check, a test token bound to this device instead. Production never accepts it.
+        val attestation = attestor.attest(challenge.challenge)
+            ?: if (config().mode == "test") Attestation("google", "test:${signer.deviceId}") else null
+            ?: throw FuelException("attestation_unavailable", 503)
         val body = buildJsonObject {
             put("token", token)
             put("attestation", buildJsonObject {
