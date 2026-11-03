@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -123,7 +124,17 @@ class DayWithOverfitTest {
         try { node.performScrollTo() } catch (_: AssertionError) {}
         node.performClick()
     }
-    private fun tab(name: String) { compose.onNode(hasText(name, substring = false) and hasClickAction()).performClick() }
+    private fun tab(name: String) {
+        val tabNode = hasText(name, substring = false) and hasClickAction()
+        // Sub-screens hide the tab bar: step back until it is there (screens settle asynchronously).
+        repeat(4) {
+            if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
+            if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) back()
+            compose.waitForIdle()
+        }
+        compose.waitUntil(10_000) { compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(tabNode).performClick()
+    }
     private fun back() { compose.onNodeWithContentDescription("Zurück").performClick() }
     private fun templates() = runBlocking { data.templates.templates.first() }
 
@@ -324,7 +335,6 @@ class DayWithOverfitTest {
         waitFor("Tippen zum Schließen")
         click("Tippen zum Schließen")
         waitFor("Fuel · 4,20 €", substring = true)
-        back()
 
         // KI-Coach → Gemini → copy context: contains the profile and the finished workout
         tab("Profil")
