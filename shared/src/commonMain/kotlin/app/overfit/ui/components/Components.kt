@@ -1,7 +1,6 @@
 package app.overfit.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -54,7 +54,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Space
@@ -138,13 +137,51 @@ fun Screen(
     }
 }
 
-/** Header row with a back button. */
+/**
+ * Header row with a back button. Detail screens put their icon actions (share, delete, edit) into
+ * [actions]: always top right, as [HeaderIconButton] / [HeaderDeleteButton]. Edit modes show none.
+ */
 @Composable
-fun BackHeader(label: String, onBack: () -> Unit) {
-    Box(Modifier.height(44.dp).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+fun BackHeader(label: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit = {}) {
+    Row(Modifier.height(44.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(Icon.Back, label, onBack)
+        Spacer(Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.xs), content = actions)
     }
     Spacer(Modifier.height(Space.l))
+}
+
+/** Icon action in a [BackHeader] (share, edit): 44 dp touch target, [label] for screen readers. */
+@Composable
+fun HeaderIconButton(icon: Icon, label: String, onClick: () -> Unit, color: Color = Theme.colors.foreground) {
+    Box(
+        Modifier.size(44.dp).semantics { contentDescription = label }.pressable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { LineIcon(icon, color = color) }
+}
+
+/**
+ * Delete in a [BackHeader]: a bin icon; the first tap turns it into a red "Delete?" pill
+ * ([confirmLabel]), the second tap deletes. Same arming rules as [ConfirmButton].
+ */
+@Composable
+fun HeaderDeleteButton(
+    label: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onConfirmingChange: (Boolean) -> Unit = {},
+    color: Color = Theme.colors.foreground,
+) {
+    val arm = rememberConfirmArm(onConfirmingChange)
+    if (arm.armed) {
+        val c = Theme.colors
+        PillButton(
+            confirmLabel, { arm.disarm(); onConfirm() }, arm.modifier, enabled = true, compact = true, haptic = true,
+            fill = c.negativeSubtle, pressedFill = c.negativeSubtle.copy(alpha = 0.6f), contentTone = c.negative,
+        )
+    } else {
+        HeaderIconButton(Icon.Delete, label, { arm.arm() }, color)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +235,6 @@ private fun PillButton(
     fill: Color,
     pressedFill: Color,
     contentTone: Color,
-    border: Color? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -210,7 +246,6 @@ private fun PillButton(
             .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
             .alpha(if (enabled) 1f else 0.3f)
             .background(if (pressed) pressedFill else fill, shape)
-            .then(if (border != null) Modifier.border(1.dp, border, shape) else Modifier)
             .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) {
                 if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
@@ -269,8 +304,8 @@ fun DestructiveButton(
 
 /**
  * Confirm pattern: first tap changes the text ([confirmLabel]) and the colours, the second tap runs
- * [onConfirm]; without a second tap the button resets after 4 s. [kind] picks red (destructive) or
- * green (positive) for the confirm state.
+ * [onConfirm]. The armed state ends after 4 s, when another confirm button is armed, or on a tap
+ * anywhere else ([ConfirmArea]). [kind] picks red (destructive) or green (positive), without a border.
  */
 @Composable
 fun ConfirmButton(
@@ -281,57 +316,47 @@ fun ConfirmButton(
     kind: Confirm = Confirm.Destructive,
     compact: Boolean = false,
     enabled: Boolean = true,
-    /** Idle look: secondary (grey pill) or plain underlined text. */
-    textOnly: Boolean = false,
     /** Lets a crowded parent make room while the longer confirm text shows. */
     onConfirmingChange: (Boolean) -> Unit = {},
 ) {
-    var confirming by remember { mutableStateOf(false) }
-    LaunchedEffect(confirming) {
-        onConfirmingChange(confirming)
-        if (confirming) { delay(4000); confirming = false }
-    }
+    val arm = rememberConfirmArm(onConfirmingChange)
     val c = Theme.colors
-    val action = { if (confirming) { confirming = false; onConfirm() } else confirming = true }
-    when {
-        confirming -> {
-            val (fill, tone) = if (kind == Confirm.Destructive) c.negativeSubtle to c.negative else c.positiveSubtle to c.positive
-            PillButton(confirmLabel, action, modifier, enabled, compact, haptic = true, fill = fill, pressedFill = fill.copy(alpha = 0.6f), contentTone = tone, border = tone)
-        }
-        textOnly -> TertiaryButton(label, action, modifier)
-        else -> SecondaryButton(label, action, modifier, enabled, compact)
-    }
-}
-
-/** Text link: underlined, so it reads as clickable; at least 44 dp tall. Optional arrow. */
-@Composable
-fun TertiaryButton(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    tone: Tone = Tone.Default,
-    arrow: Boolean = false,
-) {
-    Row(
-        modifier.heightIn(min = 44.dp).pressable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BasicText(
-            label,
-            style = Theme.type.label.copy(color = tone.color(), textDecoration = TextDecoration.Underline),
+    if (arm.armed) {
+        val (fill, tone) = if (kind == Confirm.Destructive) c.negativeSubtle to c.negative else c.positiveSubtle to c.positive
+        PillButton(
+            confirmLabel, { arm.disarm(); onConfirm() }, modifier.then(arm.modifier), enabled, compact, haptic = true,
+            fill = fill, pressedFill = fill.copy(alpha = 0.6f), contentTone = tone,
         )
-        if (arrow) { Spacer(Modifier.width(Space.xs)); LineIcon(Icon.ChevronRight, size = 18.dp, color = tone.color()) }
+    } else {
+        SecondaryButton(label, { arm.arm() }, modifier, enabled, compact)
     }
 }
 
+/**
+ * Small inline action (add set, retry, cancel …): a compact grey pill that is as wide as its text.
+ * Replaces the former underlined text links: buttons look like buttons. [tone] Muted = less important.
+ */
 @Composable
-fun TextButton(
+fun SmallButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tone: Tone = Tone.Default,
 ) {
-    TertiaryButton(label, onClick, modifier, tone)
+    val c = Theme.colors
+    val shape = RoundedCornerShape(50)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Box(
+        modifier
+            .heightIn(min = ButtonHeight.compact)
+            .background(if (pressed) c.surfacePressed else c.surface, shape)
+            .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Space.m),
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicText(label, style = Theme.type.label.copy(color = tone.color()), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
 }
 
 @Composable

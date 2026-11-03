@@ -15,7 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
 import app.overfit.ui.components.Confirm
 import app.overfit.ui.components.ConfirmButton
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -65,9 +65,6 @@ fun StartScreen(
     onExercises: () -> Unit,
     onOpenWorkout: (Long) -> Unit,
     share: ShareDependencies,
-    onDuo: () -> Unit,
-    coachTips: List<String> = emptyList(),
-    onCoach: () -> Unit = {},
     chatInboxCount: Int = 0,
     chatInboxFull: Boolean = false,
     onChatInbox: () -> Unit = {},
@@ -108,14 +105,6 @@ fun StartScreen(
         }
         if (templates != null && templates.isNotEmpty()) Hairline()
         templates?.forEach { w -> WorkoutRow(w, lastDoneText(t, lastDone[w.id], today)) { onOpenWorkout(w.id) } }
-
-        SectionTitle(t.coachTips)
-        if (coachTips.isEmpty()) Text(t.coachTipsEmpty, tone = Tone.Muted)
-        coachTips.forEach { Text("– $it", Modifier.padding(vertical = Space.xs)) }
-        ListRow(t.coach, onClick = onCoach)
-        Spacer(Modifier.height(Space.xl))
-        Hairline()
-        ListRow(t.share.duoSoon, onClick = onDuo, tone = Tone.Muted)
     }
 }
 
@@ -154,5 +143,5 @@ fun ColumnScope.RunningWorkoutChoice(onOpenRunning: () -> Unit, onEndRunning: ()
     val t = LocalStrings.current
     Text(t.runningWorkoutTitle, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
     PrimaryButton(t.toRunningWorkout, onClick = onOpenRunning)
-    ConfirmButton(t.endRunningWorkout, t.finishConfirm, onConfirm = onEndRunning, kind = Confirm.Positive, textOnly = true, modifier = Modifier.align(Alignment.CenterHorizontally))
+    ConfirmButton(t.endRunningWorkout, t.finishConfirm, onConfirm = onEndRunning, kind = Confirm.Positive, modifier = Modifier.align(Alignment.CenterHorizontally))
 }

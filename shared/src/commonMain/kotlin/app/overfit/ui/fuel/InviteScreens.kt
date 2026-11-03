@@ -53,7 +53,7 @@ import app.overfit.ui.components.RowInput
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.ListRow
@@ -196,7 +196,7 @@ fun InviteRedeemScreen(
     }
 
     if (scanning) {
-        Screen(header = { BackHeader(s.back) { scanning = false } }) {
+        Screen(header = { BackHeader(s.back, { scanning = false }) }) {
             Title(t.inviteScan)
             Spacer(Modifier.height(Space.l))
             Box(Modifier.fillMaxWidth().weight(1f).background(Theme.colors.hairline)) {
@@ -225,7 +225,7 @@ fun InviteRedeemScreen(
         Text(t.inviteRedeemText, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
         if (canScan) {
-            TextButton(t.inviteScan, { scanning = true }, tone = Tone.Default)
+            SmallButton(t.inviteScan, { scanning = true }, tone = Tone.Default)
             Spacer(Modifier.height(Space.m))
         }
         SectionTitle(t.invitePaste)

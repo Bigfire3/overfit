@@ -108,7 +108,7 @@ class DiaryScreenTest {
         compose.onNodeWithText("Push").assertIsDisplayed()
         // Two photos on that day: page dots/description of the vertical pager.
         compose.onNodeWithContentDescription("Foto 1 von 2").assertIsDisplayed()
-        compose.onNodeWithText("Foto löschen").performClick()
+        compose.onNodeWithContentDescription("Foto löschen").performClick() // bin icon top right
         assertEquals(null, deleted)
         compose.onNodeWithText("Wirklich löschen? Nochmal tippen.").performClick()
         assertEquals("p2", deleted)

@@ -42,7 +42,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
-/** Import from the clipboard and from an opened link (inbox), samples, AI prompt, Duo teaser. */
+/** Import from the clipboard and from an opened link (inbox), samples, AI prompt. */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class ShareFlowTest {
@@ -151,12 +151,8 @@ class ShareFlowTest {
     }
 
     @Test
-    fun aiPromptIsCopiedAndDuoTeaserOpens() {
+    fun aiPromptIsCopied() {
         launchOnboarded()
-        compose.onNodeWithText("Duo · bald").performScrollTo().performClick()
-        waitFor("Zwei Handys trainieren gemeinsam")
-        compose.onNodeWithText("Duo ist noch nicht verfügbar", substring = true).assertIsDisplayed()
-        compose.onNodeWithContentDescription("Zurück").performClick()
         openPlus()
         waitFor("KI-Prompt kopieren")
         // The full prompt is visible before copying.

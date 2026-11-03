@@ -40,7 +40,7 @@ import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Segmented
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
@@ -157,11 +157,11 @@ fun ChatProviderScreen(
     if (consent && !sync.enabled) {
         Screen(
             scroll = true,
-            header = { BackHeader(t.back) { consent = false } },
+            header = { BackHeader(t.back, { consent = false }) },
             footer = {
                 ui.error?.let { Text(it.text(c), style = Theme.type.caption) }
                 PrimaryButton(c.consentAgree, onClick = { viewModel.enable(photos) }, loading = ui.busy || sync.busy)
-                TextButton(c.consentCancel, onClick = { consent = false })
+                SmallButton(c.consentCancel, onClick = { consent = false })
             },
         ) {
             Title(c.consentTitle)
@@ -226,7 +226,7 @@ fun ChatProviderScreen(
             SectionTitle(c.chatOn)
             Hairline()
             ListRow(sync.lastSyncAt?.let { c.lastSync(formatMillis(it, t)) } ?: c.neverSynced) {
-                TextButton(c.syncNow, onClick = chat.sync::flush)
+                SmallButton(c.syncNow, onClick = chat.sync::flush)
             }
             if (sync.busy && sync.total > 0) Text(c.uploading(sync.done, sync.total), Modifier.padding(vertical = Space.s), style = Theme.type.caption)
             when (sync.problem) {
@@ -314,7 +314,7 @@ private fun ConnectionRow(conn: ChatConnection, t: Strings, c: ChatStrings, onRe
                     tone = Tone.Muted,
                 )
             }
-            TextButton(c.disconnect, onClick = onRevoke)
+            SmallButton(c.disconnect, onClick = onRevoke)
         }
         Hairline()
     }

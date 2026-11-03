@@ -30,7 +30,7 @@ import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.share.PreviewScreen
@@ -110,8 +110,8 @@ private fun NoteCard(chat: ChatFeature, item: InboxNote) {
         NoteBody(item.text)
         Spacer(Modifier.height(Space.s))
         androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Space.l)) {
-            TextButton(c.inboxAccept, tone = Tone.Default, onClick = { scope.launch { chat.inbox.acceptNote(item) } })
-            TextButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item) } })
+            SmallButton(c.inboxAccept, tone = Tone.Default, onClick = { scope.launch { chat.inbox.acceptNote(item) } })
+            SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item) } })
         }
     }
     Hairline()
@@ -144,7 +144,7 @@ private fun TemplateProposalScreen(
             if (invalid) {
                 Text(c.inboxInvalid, tone = Tone.Muted)
                 Spacer(Modifier.height(Space.m))
-                TextButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item); onDone(null) } })
+                SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item); onDone(null) } })
             }
         }
         return
@@ -177,8 +177,8 @@ private fun TemplateProposalScreen(
             }
         },
         footerExtra = {
-            if (replaces != null) TextButton(c.inboxAsNew, tone = Tone.Default, onClick = { accept(false) })
-            TextButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item); onDone(null) } })
+            if (replaces != null) SmallButton(c.inboxAsNew, tone = Tone.Default, onClick = { accept(false) })
+            SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item); onDone(null) } })
         },
         onAccept = { accept(replaces != null) },
     )
@@ -211,7 +211,7 @@ private fun SavedNote(note: ChatNote, onDelete: () -> Unit) {
         )
         Spacer(Modifier.height(Space.s))
         NoteBody(note.text)
-        TextButton(c.notesDelete, onClick = onDelete, modifier = Modifier.padding(top = Space.s))
+        SmallButton(c.notesDelete, onClick = onDelete, modifier = Modifier.padding(top = Space.s))
     }
     Hairline()
 }

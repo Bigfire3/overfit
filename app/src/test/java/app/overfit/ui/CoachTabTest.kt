@@ -98,7 +98,7 @@ class CoachTabTest {
             coachTransport = { fake },
         )
         compose.setContent { OverfitApp(deps) }
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         compose.onNodeWithTag("tab:COACH").performClick()
         waitFor("Prompts & Vorlagen".uppercase())
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("prompt:Kontext kopieren")).fetchSemanticsNodes().isNotEmpty() }

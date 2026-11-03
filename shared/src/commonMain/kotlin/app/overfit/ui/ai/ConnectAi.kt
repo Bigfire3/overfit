@@ -28,7 +28,7 @@ import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
@@ -91,7 +91,7 @@ fun ConnectAiScreen(
                 loading = status == Status.CHECKING,
             )
             if (onSkip != null) {
-                TextButton(t.aiLater, onSkip, Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally))
+                SmallButton(t.aiLater, onSkip, Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally))
             }
         },
     ) {
@@ -134,7 +134,7 @@ fun ConnectAiScreen(
 
         if (!fuelSelected) {
             Spacer(Modifier.height(Space.l))
-            TextButton(t.aiHowTo, { uriHandler.openUri(provider.keyUrl) }, tone = Tone.Default)
+            SmallButton(t.aiHowTo, { uriHandler.openUri(provider.keyUrl) }, tone = Tone.Default)
         }
         Spacer(Modifier.height(Space.l))
         Text(t.aiPrivacy, style = Theme.type.caption, tone = Tone.Muted)

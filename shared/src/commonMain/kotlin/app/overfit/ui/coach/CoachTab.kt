@@ -63,7 +63,7 @@ import app.overfit.ui.components.PromptView
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
@@ -258,8 +258,8 @@ private fun ChatSection(chat: CoachChatService, nav: CoachTabNav) {
     }
     MultilineInput(input, { input = it }, h.chatPlaceholder, Modifier.testTag("coach:tabInput"), minHeight = 48.dp)
     Row(Modifier.fillMaxWidth().padding(vertical = Space.s), horizontalArrangement = Arrangement.SpaceBetween) {
-        TextButton(h.chatNew, { nav.openChat("", input.trim()); input = "" })
-        TextButton(h.chatSend, {
+        SmallButton(h.chatNew, { nav.openChat("", input.trim()); input = "" })
+        SmallButton(h.chatSend, {
             val text = input.trim()
             if (text.isNotEmpty()) {
                 val (id, _) = chat.send(current?.id, text)
@@ -324,7 +324,7 @@ fun CoachChatScreen(
             if (attached.isNotEmpty()) Text(h.attachedPhotos(attached.size), style = Theme.type.caption, tone = Tone.Muted)
             MultilineInput(input, { input = it }, h.chatPlaceholder, Modifier.testTag("coach:chatInput"), minHeight = 48.dp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(h.attachPhoto, { picking = !picking }, tone = if (picking) Tone.Default else Tone.Muted)
+                SmallButton(h.attachPhoto, { picking = !picking }, tone = if (picking) Tone.Default else Tone.Muted)
                 app.overfit.ui.components.PrimaryButton(h.chatSend, {
                     val text = input.trim()
                     if (text.isNotEmpty()) {
@@ -341,19 +341,19 @@ fun CoachChatScreen(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { Title(h.chatTitle) }
             if (id.isNotEmpty()) {
-                TextButton(h.chatNew, { id = ""; input = ""; attached.clear() })
+                SmallButton(h.chatNew, { id = ""; input = ""; attached.clear() })
                 Spacer(Modifier.width(Space.m))
                 // Confirm pattern from the design system: first tap turns red with "Really delete?".
                 app.overfit.ui.components.ConfirmButton(
                     h.chatDelete, h.chatDeleteConfirm, { chat.delete(id); id = "" },
-                    Modifier, compact = true, textOnly = true,
+                    Modifier, compact = true,
                 )
             }
         }
         Spacer(Modifier.height(Space.m))
         if (!chat.available()) {
             Text(h.chatNoAccess, style = Theme.type.caption, tone = Tone.Muted)
-            TextButton(h.accessSetup, onAccess)
+            SmallButton(h.accessSetup, onAccess)
             Spacer(Modifier.height(Space.s))
         }
         if (messages.isEmpty()) Text(LocalCoachStrings.current.hub.chatIntro, tone = Tone.Muted)
@@ -380,7 +380,7 @@ private fun MessageItem(m: ChatMessage, onImportWorkout: (String) -> Unit, onRet
             m.status == ChatMessageStatus.SENDING -> Text(h.chatThinking, tone = Tone.Muted)
             m.status == ChatMessageStatus.FAILED -> {
                 Text(h.chatFailed, tone = Tone.Muted)
-                TextButton(h.chatRetry, onRetry, tone = Tone.Default)
+                SmallButton(h.chatRetry, onRetry, tone = Tone.Default)
             }
             else -> {
                 NoteBody(m.text)
@@ -413,7 +413,7 @@ private fun WorkoutCard(w: SharedTraining, onUse: () -> Unit) {
             Text("– $name · ${e.sets.size}×", style = Theme.type.caption)
         }
         Spacer(Modifier.height(Space.s))
-        TextButton(h.workoutUse, onUse, tone = Tone.Default)
+        SmallButton(h.workoutUse, onUse, tone = Tone.Default)
     }
 }
 

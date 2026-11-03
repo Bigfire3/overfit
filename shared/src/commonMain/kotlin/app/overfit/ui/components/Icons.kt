@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, Training, History, Exercises, Photos, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach }
+enum class Icon { Back, Check, Home, Training, History, Exercises, Photos, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -83,6 +83,31 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
             Icon.Drag -> {
                 line(5f, 9f, 19f, 9f)
                 line(5f, 15f, 19f, 15f)
+            }
+            // Box with an arrow out of it: share.
+            Icon.Share -> {
+                path(8.5f to 10f, 6f to 10f, 6f to 20f, 18f to 20f, 18f to 10f, 15.5f to 10f)
+                line(12f, 3.5f, 12f, 14f)
+                path(8.5f to 7f, 12f to 3.5f, 15.5f to 7f)
+            }
+            // Trash can: delete.
+            Icon.Delete -> {
+                line(4.5f, 6.5f, 19.5f, 6.5f)
+                path(9.5f to 6.5f, 9.5f to 4f, 14.5f to 4f, 14.5f to 6.5f)
+                path(6.5f to 6.5f, 7.5f to 20f, 16.5f to 20f, 17.5f to 6.5f)
+                line(10.25f, 10f, 10.25f, 16.5f)
+                line(13.75f, 10f, 13.75f, 16.5f)
+            }
+            // Pencil: edit.
+            Icon.Edit -> {
+                path(15.5f to 4.5f, 19.5f to 8.5f, 8.5f to 19.5f, 4.5f to 19.5f, 4.5f to 15.5f, close = true)
+                line(13f, 7f, 17f, 11f)
+            }
+            // Three dots in a column: more actions.
+            Icon.More -> {
+                drawCircle(color, 1.4f * u, p(12f, 5.5f))
+                drawCircle(color, 1.4f * u, p(12f, 12f))
+                drawCircle(color, 1.4f * u, p(12f, 18.5f))
             }
             Icon.Settings -> {
                 line(4f, 8f, 20f, 8f)

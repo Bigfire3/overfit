@@ -13,3 +13,8 @@ fun ComposeTestRule.waitUntilState(timeoutMillis: Long = 20_000, condition: () -
     onAllNodes(isRoot()).fetchSemanticsNodes()
     condition()
 }
+
+/** Waits until the Training tab (start screen) is shown, recognised by its "new workout" button. */
+fun ComposeTestRule.waitForTrainingTab(newWorkoutLabel: String = "Neues Workout", timeoutMillis: Long = 20_000) = waitUntil(timeoutMillis) {
+    onAllNodes(androidx.compose.ui.test.hasContentDescription(newWorkoutLabel)).fetchSemanticsNodes().isNotEmpty()
+}

@@ -1,6 +1,6 @@
 package app.overfit.i18n
 
-/** Texts for sharing, importing, sample templates and the Duo teaser (part of [Strings.share]). */
+/** Texts for sharing, importing, sample templates (part of [Strings.share]). */
 data class ShareStrings(
     val shareTemplate: String,
     val shareLink: String,
@@ -48,10 +48,6 @@ data class ShareStrings(
     val aiTemplatePrompt: (example: String) -> String,
 
 
-    val duoSoon: String,
-    val duoTitle: String,
-    val duoBody: String,
-    val duoNote: String,
 )
 
 val ShareGerman = ShareStrings(
@@ -119,10 +115,6 @@ Regeln:
     },
 
 
-    duoSoon = "Duo · bald",
-    duoTitle = "Duo",
-    duoBody = "Zwei Handys trainieren gemeinsam: Ihr hakt Sätze synchron ab und teilt euch einen Pausentimer, auch wenn ihr an verschiedenen Geräten trainiert.",
-    duoNote = "Duo ist noch nicht verfügbar. Es werden keine Daten dafür erhoben.",
 )
 
 val ShareEnglish = ShareStrings(
@@ -190,8 +182,4 @@ Rules:
     },
 
 
-    duoSoon = "Duo · soon",
-    duoTitle = "Duo",
-    duoBody = "Two phones train together: you tick off sets in sync and share one rest timer, even on different devices.",
-    duoNote = "Duo isn't available yet. No data is collected for it.",
 )

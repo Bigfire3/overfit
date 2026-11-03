@@ -63,7 +63,7 @@ import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
@@ -192,7 +192,7 @@ fun ImportScreen(
         preview != null -> PreviewScreen(preview, unit, language, state.busy, onBack = viewModel::reset) {
             viewModel.accept(onImported)
         }
-        scanning -> Screen(header = { BackHeader(t.back) { scanning = false } }) {
+        scanning -> Screen(header = { BackHeader(t.back, { scanning = false }) }) {
             Title(s.scanQr)
             Spacer(Modifier.height(Space.s))
             Text(s.scanHint, tone = Tone.Muted)
@@ -461,21 +461,6 @@ fun QrView(text: String, modifier: Modifier = Modifier, rounded: Boolean = true)
 
 /** Light margin around the symbol in modules. ISO asks for 4; scanners cope with less, we keep 3 plus the white card. */
 const val QR_QUIET_ZONE = 3
-
-// ---------------------------------------------------------------------------------------------
-// Duo teaser
-
-@Composable
-fun DuoScreen(onBack: () -> Unit) {
-    val t = LocalStrings.current
-    Screen(header = { BackHeader(t.back, onBack) }) {
-        Title(t.share.duoTitle)
-        Spacer(Modifier.height(Space.l))
-        Text(t.share.duoBody)
-        Spacer(Modifier.height(Space.m))
-        Text(t.share.duoNote, style = Theme.type.caption, tone = Tone.Muted)
-    }
-}
 
 // ---------------------------------------------------------------------------------------------
 // Entry points in other screens

@@ -24,6 +24,9 @@ import app.overfit.domain.WeightUnit
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.HeaderDeleteButton
+import app.overfit.ui.components.HeaderIconButton
+import app.overfit.ui.components.Icon
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
@@ -36,7 +39,8 @@ import app.overfit.ui.theme.Theme
 import app.overfit.workout.WorkoutFormat
 
 /**
- * A saved workout: exercises with sets and targets, "Start" as the primary action, edit and share.
+ * A saved workout: exercises with sets and targets; "Start" and below it "Edit" at the bottom,
+ * share and delete as icons top right.
  * Follows the stored workout, so it shows changes made in the editor or by a workout right away.
  */
 @Composable
@@ -54,8 +58,11 @@ fun WorkoutPlanScreen(
     onEndRunning: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
+    /** Deletes the saved workout (in the app scope); the screen closes itself once it is gone. */
+    onDelete: () -> Unit,
 ) {
     val t = LocalStrings.current
+    var deleteArmed by remember { mutableStateOf(false) }
     var template by remember(templateId) { mutableStateOf<Template?>(null) }
     LaunchedEffect(templateId) {
         templates.templates.collect {
@@ -66,24 +73,29 @@ fun WorkoutPlanScreen(
     val w = template
     Screen(
         scroll = true,
-        header = { BackHeader(t.back, onBack) },
+        header = {
+            BackHeader(t.back, onBack) {
+                if (w != null) {
+                    HeaderIconButton(Icon.Share, t.share.shareTemplate, onShare)
+                    HeaderDeleteButton(t.deleteTemplate, t.deleteConfirm, onDelete, onConfirmingChange = { deleteArmed = it })
+                }
+            }
+        },
         // No footer until the workout is loaded: a visible but still disabled "Start" swallows early taps.
+        // Bottom: big "Start", below it an equally big "Edit".
         footer = if (w == null) null else ({
             if (workoutRunning) {
                 RunningWorkoutChoice(onToRunning, onEndRunning)
             } else {
                 PrimaryButton(t.startThisWorkout, { onStart(w) })
             }
+            SecondaryButton(t.edit, onEdit)
         }),
     ) {
         if (w == null) return@Screen
         Title(w.name)
         Spacer(Modifier.height(Space.s))
-        Text(lastDone, style = Theme.type.caption, tone = Tone.Muted)
-        Row(Modifier.padding(top = Space.m), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-            SecondaryButton(t.edit, onEdit, Modifier, compact = true)
-            SecondaryButton(t.share.shareTemplate, onShare, Modifier, compact = true)
-        }
+        Text(if (deleteArmed) t.deletedKeepsHistory else lastDone, style = Theme.type.caption, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
         Hairline()
         if (w.exercises.isEmpty()) Text(t.workoutPlanEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted)

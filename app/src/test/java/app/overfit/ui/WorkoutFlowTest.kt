@@ -113,7 +113,7 @@ class WorkoutFlowTest {
         compose.waitUntil(5_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
         compose.onNodeWithText("Speichern").performClick()
-        waitFor("Letzte Coach-Tipps")
+        compose.waitForTrainingTab()
         compose.waitUntilState(5_000) { runBlocking { data.workouts.getFinished(id)?.note } == "Stark heute" }
         val saved = requireNotNull(runBlocking { data.workouts.get(id) })
         assertEquals(2, saved.completedSets)
