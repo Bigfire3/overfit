@@ -49,5 +49,6 @@ fun androidDependencies(
     share = AndroidPlatformShare(context),
     inbox = ImportInbox(),
     coachPhotos = AndroidCoachPhotos(),
+    kv = kv,
     )
 }

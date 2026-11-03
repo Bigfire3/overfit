@@ -43,6 +43,7 @@ fun MainViewController(): UIViewController {
         share = IosPlatformShare(),
         inbox = IosIncoming.inbox,
         coachPhotos = app.overfit.platform.IosCoachPhotos(),
+        kv = kv,
     )
     return ComposeUIViewController { OverfitApp(deps) }
 }

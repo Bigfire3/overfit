@@ -388,6 +388,28 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - Standard-Grenzen (5000 Dokumente / 25 MB, 300 Fotos à 3 MB, Refresh-Token 90 Tage) sind Schätzwerte; R2-Kosten bleiben im
   kostenlosen Kontingent, solange es wenige Nutzer sind.
 
+## KI-Chat-Verbindungen, App-Seite (Phase 10b, Nacht 3.11., Session H)
+- **Sync per Fingerabdruck statt Änderungsprotokoll:** `ChatSync` vergleicht je Dokument einen Hash des Inhalts (nicht von `updatedAt`) mit
+  dem zuletzt hochgeladenen Stand (SharedPreferences/UserDefaults). Dadurch gibt es keine Warteschlange, die verloren gehen kann:
+  Fehler (offline, 5xx) setzen nur „beim nächsten Lauf alles vergleichen“; nach einem Prozessstart wird einmal alles verglichen (Marker
+  vor dem Prozesstod sind weg). Nachteil: ein Lauf liest alle Trainings aus Room – bei einigen hundert Trainings unkritisch.
+- **Keine Schemaänderung:** Sync-Zustand und Notizen aus dem Chat liegen im Key-Value-Speicher; Room bleibt unberührt, damit
+  Phase 3/4 (v3/v4) nicht kollidieren. Nur additive DAO-Abfragen (`WorkoutDao.getAll`, `TemplateDao.getIds`).
+- **Vorlagen-ID im Sync = lokale Nummer als Text** (`template/12`); `replacesTemplateId` kommt genauso zurück. Trainings: Session-UUID.
+- **Transport:** `FuelApi` implementiert `SignedTransport` (Geräte-Identität, Signatur, Re-Registrierung, Zeitkorrektur), `ChatApi`
+  setzt darauf auf – eine Identität, ein Signaturpfad.
+- **Einschalten/Trennen laufen im App-Scope** (`AppData.scope`), nicht im Bildschirm-Scope (Falle aus PR #25).
+- **Notizen aus dem Chat:** Übernehmen speichert in `ChatNotes` (Liste im Profil, `forWorkout` für den Verlauf), Verwerfen löscht. `ack` für beide;
+  schlägt es fehl, wird es gemerkt und nachgeholt, damit nichts doppelt kommt.
+- **Kontext-Text ≤ 12 000 Zeichen** (passt in jeden Chat); bei Überlänge werden die ältesten Trainings gekürzt, die Antwortregeln bleiben.
+  Rückweg über den vorhandenen Zwischenablage-Import (```json-Block im Teilen-Format).
+- **Markdown in Notizen** nur als flache Zeilen (Überschrift, Aufzählung, `**`/`` ` `` entfernt) – passt zum Designsystem ohne Spans.
+
+### Zur Prüfung durch Fabian
+- Texte der Einwilligung („Daten gehen an den Chat-Anbieter, nicht für Werbung/KI-Training genutzt“) sind meine Formulierung; vor dem
+  Store-Start juristisch prüfen (zusammen mit der Datenschutzerklärung aus Phase 10a).
+- Chat-Anleitungen (Claude/ChatGPT/Gemini-Menüs) entsprechen dem Stand laut `backend/README.md`; die Oberflächen der Anbieter ändern sich oft.
+
 ## Phase 4 – KI-Coach (Nacht 3.11., Session G)
 - **Antwortformat: Structured Outputs statt Tool.** Anthropic/Fuel: `output_config.format` (JSON-Schema), OpenAI/OpenRouter:
   `response_format: json_schema, strict`. Kein erzwungenes `tool_choice` (Sonnet 5.5 lehnt `any`/`tool` mit 400 ab). Der

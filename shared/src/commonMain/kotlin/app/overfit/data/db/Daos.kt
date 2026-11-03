@@ -68,6 +68,9 @@ interface TemplateDao {
     @Query("SELECT * FROM workout_template ORDER BY position, name COLLATE NOCASE")
     fun observeTemplates(): Flow<List<WorkoutTemplateEntity>>
 
+    @Query("SELECT id FROM workout_template ORDER BY position, name COLLATE NOCASE")
+    suspend fun getIds(): List<Long>
+
     @Query("SELECT name FROM workout_template")
     suspend fun getNames(): List<String>
 
@@ -119,6 +122,11 @@ interface WorkoutDao {
     @Transaction
     @Query("SELECT * FROM workout_session WHERE id = :id")
     suspend fun get(id: String): SessionWithExercises?
+
+    /** All workouts, oldest first (KI-Chat sync). */
+    @Transaction
+    @Query("SELECT * FROM workout_session ORDER BY startedAt")
+    suspend fun getAll(): List<SessionWithExercises>
 
     @Upsert
     suspend fun upsertSession(session: WorkoutSessionEntity)

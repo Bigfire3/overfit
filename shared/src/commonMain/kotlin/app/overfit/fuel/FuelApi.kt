@@ -41,7 +41,7 @@ class FuelApi(
     private val attestor: Attestor = NoAttestor,
     private val nowSec: () -> Long = { Clock.System.now().epochSeconds },
     private val nonce: () -> String = ::randomNonce,
-) : FuelService {
+) : FuelService, SignedTransport {
     private val base = baseUrl.trim().trimEnd('/')
     private val http = http.config { install(HttpTimeout) { requestTimeoutMillis = 130_000 } }
     private val json = Json { ignoreUnknownKeys = true }
@@ -53,8 +53,15 @@ class FuelApi(
 
     // --- Plumbing ---------------------------------------------------------------------------------------------
 
-    private suspend fun send(method: HttpMethod, path: String, body: String? = null, signed: Boolean = true): HttpResponse {
-        val bytes = body?.encodeToByteArray() ?: ByteArray(0)
+    private suspend fun send(
+        method: HttpMethod,
+        path: String,
+        body: String? = null,
+        signed: Boolean = true,
+        rawBody: ByteArray? = null,
+        rawType: ContentType = ContentType.Application.Json,
+    ): HttpResponse {
+        val bytes = rawBody ?: body?.encodeToByteArray() ?: ByteArray(0)
         val build: HttpRequestBuilder.() -> Unit = {
             this.method = method
             if (signed) {
@@ -64,8 +71,8 @@ class FuelApi(
                 header(FuelHeaders.NONCE, h.nonce)
                 header(FuelHeaders.SIGNATURE, h.signature)
             }
-            if (body != null) {
-                contentType(ContentType.Application.Json)
+            if (body != null || rawBody != null) {
+                contentType(if (rawBody != null) rawType else ContentType.Application.Json)
                 setBody(bytes)
             }
             header(HttpHeaders.Accept, "application/json")
@@ -79,9 +86,15 @@ class FuelApi(
         }
     }
 
-    private suspend fun call(method: HttpMethod, path: String, body: String? = null): HttpResponse {
+    private suspend fun call(
+        method: HttpMethod,
+        path: String,
+        body: String? = null,
+        rawBody: ByteArray? = null,
+        rawType: ContentType = ContentType.Application.Json,
+    ): HttpResponse {
         ensureRegistered()
-        var response = send(method, path, body)
+        var response = send(method, path, body, rawBody = rawBody, rawType = rawType)
         for (attempt in 0 until 2) {
             if (response.status.value != 401) break
             val error = parseError(response)
@@ -93,7 +106,7 @@ class FuelApi(
                 }
                 else -> break
             }
-            response = send(method, path, body)
+            response = send(method, path, body, rawBody = rawBody, rawType = rawType)
         }
         return response
     }
@@ -126,6 +139,9 @@ class FuelApi(
             registered = true
         }
     }
+
+    override suspend fun request(method: String, path: String, body: ByteArray?, contentType: String): String =
+        parse(call(HttpMethod.parse(method), path, rawBody = body, rawType = ContentType.parse(contentType))) { it.toString() }
 
     private inline fun <reified T> decode(element: JsonElement): T = json.decodeFromJsonElement(element)
 

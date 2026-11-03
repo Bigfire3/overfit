@@ -69,6 +69,8 @@ class CoachService(
     fun review(id: String): Flow<ReviewItem?> = dao.observe(id).map { it?.toItem() }
     fun reviewForSession(sessionId: String): Flow<ReviewItem?> = dao.observeLatestForSession(sessionId).map { it?.toItem() }
     val memory: Flow<CoachMemoryEntity?> = dao.observeMemory()
+    /** Last known memory text, for synchronous readers (chat sync). */
+    var memoryText: String? = null
     val memoryVersions: Flow<List<CoachMemoryEntity>> = dao.observeMemoryVersions()
     /** Newest finished workout (for "Review last workout"). */
     val latestFinished = dao.observeLatestFinished()
@@ -139,7 +141,10 @@ class CoachService(
     suspend fun delete(id: String) = dao.delete(id)
 
     /** Sends everything that is queued; returns immediately, the work runs in the app scope. */
-    fun processQueue(): Job = scope.launch { sendPending() }
+    fun processQueue(): Job = scope.launch {
+        // A failure here (e.g. database closed) must not crash the app; the queue is tried again next time.
+        try { sendPending() } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+    }
 
     /** Same as [processQueue] but suspends until done (tests). */
     suspend fun sendPending() = mutex.withLock {

@@ -22,9 +22,18 @@ class WorkoutRepository(
 ) : WorkoutStore {
     private val dao = db.workoutDao()
 
+    /** Called after a workout was saved, finished or deleted (KI-Chat sync); `finished` = ended or discarded. */
+    var onChanged: ((id: String, finished: Boolean) -> Unit)? = null
+
     override suspend fun loadActive(): Workout? = dao.getActive()?.toDomain()
 
     suspend fun get(id: String): Workout? = dao.get(id)?.toDomain()
+
+    /** One workout with the facts the domain model does not carry (end time, feeling); null if it does not exist. */
+    suspend fun record(id: String): WorkoutRecord? = dao.get(id)?.toRecord()
+
+    /** All workouts (running and finished) for the KI-Chat sync. */
+    suspend fun allRecords(): List<WorkoutRecord> = dao.getAll().map { it.toRecord() }
 
     suspend fun status(id: String): SessionStatus? = dao.get(id)?.session?.status
 
@@ -33,7 +42,10 @@ class WorkoutRepository(
      * sets are rewritten. A workout has a few dozen rows, so this stays fast and leaves no
      * half-saved state behind if the process dies.
      */
-    override suspend fun save(workout: Workout) = db.transaction { write(workout) }
+    override suspend fun save(workout: Workout) {
+        db.transaction { write(workout) }
+        onChanged?.invoke(workout.id, false)
+    }
 
     private suspend fun write(workout: Workout) {
         val existing = dao.get(workout.id)?.session
@@ -93,16 +105,32 @@ class WorkoutRepository(
         )
     }
 
-    override suspend fun finish(workout: Workout, endedAt: Long) = db.transaction {
-        write(workout)
-        dao.finish(workout.id, endedAt)
+    override suspend fun finish(workout: Workout, endedAt: Long) {
+        db.transaction {
+            write(workout)
+            dao.finish(workout.id, endedAt)
+        }
+        onChanged?.invoke(workout.id, true)
     }
 
-    override suspend fun delete(id: String) = dao.delete(id)
+    override suspend fun delete(id: String) {
+        dao.delete(id)
+        onChanged?.invoke(id, true)
+    }
 
     override suspend fun lastSets(exerciseId: String): List<SetValues> =
         dao.lastCompletedSets(exerciseId).map { SetValues(it.weightKg, it.reps, it.durationSec) }
 }
+
+/** A workout plus what the sync needs: [endedAt] is null while it runs. */
+data class WorkoutRecord(val workout: Workout, val endedAt: Long?, val feeling: Int?, val updatedAt: Long)
+
+private fun SessionWithExercises.toRecord() = WorkoutRecord(
+    workout = toDomain(),
+    endedAt = if (session.status == SessionStatus.FINISHED) session.endedAt else null,
+    feeling = session.feeling,
+    updatedAt = session.updatedAt,
+)
 
 private fun SessionWithExercises.toDomain(): Workout {
     val restStart = session.restStartedAt

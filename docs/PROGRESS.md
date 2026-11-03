@@ -13,7 +13,49 @@
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
-| 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite offen (nach Phase 3) |
+| 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Nacht 3.11. – KI-Chat-Verbindungen, Teil 2: App-Seite (Session H, Phase 10b)
+Fertig:
+- **Profil → KI-Coach**: die fünf Wege (eigener Key, Fuel | Claude, ChatGPT, Gemini) mit Status; je Chat Kurzanleitung, Server-Adresse
+  `<Backend>/mcp` zum Kopieren, Gemini zusätzlich Gem-Ersatzweg. Ohne Backend-URL: „startet bald“, aber alles Lokale geht
+- **KI-Chat verbinden**: Einwilligungsdialog (Hochladen, verschlüsselt, Abschalten löscht, Daten gehen an den Chat-Anbieter) mit
+  Häkchen „Körperfotos teilen“ (Standard aus) → `enable` → Erst-Upload (`reset`, Pakete ≤ 500, Fortschritt)
+- **ChatSync** (`shared/.../chat/`): Fingerabdruck-Abgleich je Dokument (profile, template, workout; memory vorbereitet), gebündelt
+  höchstens alle 10 s, sofort beim Beenden und beim Wechsel in den Hintergrund, Löschungen über `deletes`, Offline-Warteschlange
+  (nichts geht verloren, nächster Lauf sendet die Differenz), Hinweis bei `sync_quota_exceeded`
+- **Mit Chat verbinden**: Kopplungscode groß (Inter, tabellarisch), 10-min-Countdown, „Neuer Code“, Abfrage bis „Verbunden mit …“;
+  Verbindungsliste mit „Trennen“, Foto-Schalter nachträglich, „KI-Chat trennen“ (zweimal tippen, löscht alles)
+- **Eingang**: bei Start und Rückkehr in den Vordergrund; Start-Tab zeigt „N neue Einträge aus dem Chat“. Vorlagen → vorhandene
+  Import-Vorschau mit Chat-Nachricht, bei `replacesTemplateId` „Vorlage aktualisieren“ (Diff) neben „Als neue Vorlage“;
+  Notizen übernehmen/verwerfen, Liste „Notizen aus dem Chat“ (Profil); `ack` auch für Verworfene (offline nachgeholt)
+- **Kontext kopieren** + **Gem-/GPT-Anleitung kopieren** (Ersatzweg ohne Server, DE/EN je App-Sprache)
+- Tests: Mapping App→Sync-Dokument, Batches, Sync (virtuelle Zeit, Offline, Quota, Reset, Löschen, Fotos), Client gegen MockEngine,
+  Inbox → Vorschau + Diff, Kontext-Text, UI-Durchlauf (ohne und mit gemocktem Backend)
+
+Offen / Hinweise:
+- **Foto-Upload** (Phase 3, Session F): Schnittstelle `ChatDataSource.photos()/photoJpeg()` und `ChatApi.putPhoto` stehen, im Sync
+  verdrahtet (nur mit Häkchen); nach F's Merge `AppChatSource` an `WorkoutRepository.photos`/`readPhoto` anschließen (verkleinern ~1500 px)
+- **Coach-Gedächtnis** (Phase 4, Session G): `ChatFeature(memory = …)` und `sync.markMemory()` anschließen, sobald es gemergt ist
+- **Notizen am Training**: `ChatFeature.notes.forWorkout(workoutId)` liefert die Notizen; im Verlauf (Phase 3) anzeigen
+- Workout-/Vorlagen-IDs: Training = Session-UUID, Vorlage = lokale Nummer als Text (kommt als `replacesTemplateId` zurück)
+
+### Von Fabian zu tun (KI-Chat, App-Seite)
+Nichts Neues; Voraussetzung bleibt das Backend-Deployment aus Teil 1 (Worker-URL als GitHub-Variable `OVERFIT_BACKEND_URL`, R2-Bucket,
+`SYNC_ENCRYPTION_KEY`). Danach die Chat-Connectoren eintragen (Schritte stehen in der App unter Profil → KI-Coach).
+
+### Bitte auf dem Handy testen (KI-Chat, App-Seite)
+Ohne Backend (geht sofort):
+1. Profil → **KI-Coach**: oben „Eigener API-Key“/„Fuel“, unten Claude, ChatGPT, Gemini mit „startet bald“
+2. **Gemini** öffnen: Text „Startet bald“, Anleitung, Ersatzweg „eigenes Gem“. **Kontext kopieren** → in ein Notizfeld einfügen: Profil,
+   letzte Trainings, Fortschritt, Antwortformat als ```json-Block. **Gem-/GPT-Anleitung kopieren** → einfügen und lesen
+3. In Gemini/ChatGPT/Claude den Kontext einfügen, um eine Vorlage bitten; Antwort kopieren → Übungen → Vorlagen → Importieren → Zwischenablage
+Mit Backend (nach Deployment):
+4. Claude → **KI-Chat verbinden** → Hinweise lesen, Foto-Schalter bleibt aus → „Zustimmen und verbinden“ → Fortschritt, dann „KI-Chat ist eingeschaltet“
+5. „Code anzeigen“ → großer Code + Countdown; in claude.ai den Connector mit der Adresse aus der App anlegen, Code eintippen → in der App „Verbunden mit Claude“
+6. Im Chat „Plane mir ein Push-Training“ → Vorlage erscheint auf dem Start-Tab („1 neuer Eintrag aus dem Chat“) → Vorschau → Übernehmen
+7. Ein Training beenden → nach wenigen Sekunden sieht der Chat es („Wie war mein letztes Training?“). Flugmodus an, Satz abhaken, Flugmodus aus, App öffnen → Hinweis verschwindet, Daten kommen an
+8. **Trennen** einer Verbindung; **KI-Chat trennen** (zweimal tippen) → Server leer, Chat hat keinen Zugriff mehr
 
 ## Phase 4: KI-Coach (Session G, Nacht 3.11.)
 Fertig:
@@ -26,7 +68,9 @@ Fertig:
 - Warteschlange: ohne Netz/Timeout/Überlastung wartet die Anfrage und geht beim nächsten Öffnen der App automatisch raus;
   sonst Fehlertext mit „Erneut versuchen“ (Rohantwort einsehbar)
 - Coach-Gedächtnis: lesen, bearbeiten, Versionen wiederherstellen, löschen; der Coach überarbeitet es nach jeder Auswertung
-- Coach-Einstellungen: Modell je Anbieter, „Körperfotos an Coach senden“ (Standard aus), Coach-Anweisungen editierbar
+- Coach-Einstellungen: Modell je Anbieter, „Körperfotos an Coach senden“ (Standard aus), Coach-Anweisungen editierbar;
+  erreichbar über Profil → KI-Coach (Seite der fünf Wege) und Profil → Coach
+- Coach-Gedächtnis geht bei verbundener KI-Chat-Verbindung als `memory/coach` mit (Sync nach jeder Änderung)
 - Ohne KI-Zugang: Hinweis mit „KI verbinden“ / „Fuel nutzen“ und eine als Demo markierte Beispiel-Auswertung
 - Start: „Letzte Coach-Tipps“ aus der neuesten Auswertung, Zeile „Coach“; Profil → Coach
 - Room v4 (`coach_review`, `coach_memory`, nur neue Tabellen, Migrationstest)
@@ -48,7 +92,7 @@ Offen / Hinweise:
    öffnen → Auswertung kommt von selbst
 7. Profil → Coach → „Fortschritt bewerten“
 8. Profil → Coach-Gedächtnis: Text ansehen, ändern, Speichern; Versionen wiederherstellen; löschen (zweimal tippen)
-9. Profil → Coach → Coach-Einstellungen: Modell, Fotos (Standard aus), Anweisungen ändern/zurücksetzen
+9. Profil → KI-Coach → Coach-Einstellungen: Modell, Fotos (Standard aus), Anweisungen ändern/zurücksetzen
 10. KI trennen → Coach → „Letztes Training auswerten“ → Hinweis „Kein KI-Zugang“ → „Demo-Auswertung ansehen“
 11. Mit Fuel: unter der Auswertung „Fuel · 0,0x € · Saldo …“
 

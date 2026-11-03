@@ -1,8 +1,8 @@
 package app.overfit.ui.main
 
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
@@ -41,6 +41,9 @@ fun StartScreen(
     onDuo: () -> Unit,
     coachTips: List<String> = emptyList(),
     onCoach: () -> Unit = {},
+    chatInboxCount: Int = 0,
+    chatInboxFull: Boolean = false,
+    onChatInbox: () -> Unit = {},
 ) {
     val t = LocalStrings.current
     val latest = latestWeight(state.weights)
@@ -62,6 +65,14 @@ fun StartScreen(
             Text(t.asOf(t.date(LocalDate.parse(latest.date))), style = Theme.type.caption, tone = Tone.Muted)
         } else {
             Text(t.noWeight, style = Theme.type.title, tone = Tone.Muted)
+        }
+
+        if (chatInboxCount > 0) {
+            val chatText = app.overfit.i18n.LocalChatStrings.current
+            Spacer(Modifier.height(Space.l))
+            Hairline()
+            ListRow(chatText.inboxStart(chatInboxCount), onClick = onChatInbox) { LineIcon(Icon.Plus) }
+            if (chatInboxFull) Text(chatText.inboxFull, Modifier.padding(vertical = Space.s), style = Theme.type.caption)
         }
 
         SectionTitle(t.templates)
