@@ -4,6 +4,7 @@ import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -88,9 +89,10 @@ class MinimizeWorkoutTest {
         show()
 
         // Start the workout, check off a set (rest starts), minimize with the button
-        compose.onNodeWithText("Training starten").performClick()
-        waitFor("Freies Training")
+        waitFor("Push")
         compose.onNodeWithText("Push").performClick()
+        waitFor("Starten")
+        compose.onNodeWithText("Starten").performClick()
         waitFor("0/2 erledigt", substring = true)
         compose.onNodeWithContentDescription("Satz 1 abhaken").performClick()
         waitFor("Überspringen")
@@ -104,8 +106,8 @@ class MinimizeWorkoutTest {
         assertEquals(true, shown("1:", substring = true))
 
         // Browse all main screens: the bar stays
-        for (tab in listOf("Verlauf", "Übungen", "Fotos", "Profil", "Start")) {
-            compose.onNodeWithText(tab).performClick()
+        for (tab in listOf("Verlauf", "Fotos", "Profil", "Training")) {
+            compose.onNode(hasText(tab) and hasClickAction()).performClick()
             waitForDescription("Training öffnen")
         }
 
@@ -150,7 +152,7 @@ class MinimizeWorkoutTest {
             today = { LocalDate(2026, 11, 3) }, restAlerts = alerts,
         )
         show()
-        waitFor("Training starten")
+        waitFor("Duo · bald")
         assertEquals(false, compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty())
     }
 }

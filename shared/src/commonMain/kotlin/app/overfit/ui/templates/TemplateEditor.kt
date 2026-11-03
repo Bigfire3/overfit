@@ -228,6 +228,7 @@ fun TemplateEditorScreen(
                         tone = if (confirmDelete) Tone.Default else Tone.Muted,
                         onClick = { if (confirmDelete) viewModel.delete() else confirmDelete = true },
                     )
+                    Text(t.deletedKeepsHistory, style = Theme.type.caption, tone = Tone.Muted)
                 }
             }
         }

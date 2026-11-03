@@ -188,6 +188,13 @@ interface WorkoutDao {
     )
     fun observeHistory(): Flow<List<HistoryRow>>
 
+    /** Start of the last finished workout per saved workout ("last time 3 days ago"). */
+    @Query(
+        """SELECT templateId, MAX(startedAt) AS lastStartedAt FROM workout_session
+           WHERE status = 'FINISHED' AND templateId IS NOT NULL GROUP BY templateId""",
+    )
+    fun observeLastDone(): Flow<List<TemplateLastDone>>
+
     @Transaction
     @Query("SELECT * FROM workout_session WHERE status = 'FINISHED' ORDER BY startedAt")
     suspend fun allFinished(): List<SessionWithExercises>

@@ -508,6 +508,25 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
   Was vor dem Wechsel unter Apache-2.0 veröffentlicht wurde, bleibt unter Apache-2.0 nutzbar. Das Repo war bis dahin
   privat, deshalb spielt das praktisch keine Rolle.
 
+## Tab „Training“: Workouts statt Vorlagen (3.11., Session O)
+
+Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templates verstehe ich nicht … Alles soll gespeichert werden.“
+
+- **Begriff:** In der UI heißt ein gespeicherter Plan überall „Workout“ (DE und EN), eine laufende/abgeschlossene Einheit weiter „Training“ (DE) / „workout“ (EN). Intern bleiben `workout_template`, `Template`, `TemplateRepository` – keine Schemaänderung, keine Migration.
+- **Tab 1:** DE „Training“, EN „Workouts“ (im Englischen liest sich der Plural als Liste besser), Icon Blitz. Der Tab zeigt nur noch: laufendes Training oben („Läuft gerade“ + „Training fortsetzen“ als PrimaryButton), Liste der Workouts (Name, Übungen, „zuletzt vor N Tagen“), Coach-Tipps, Duo. Begrüßung und Gewicht sind raus (Gewicht steht im Profil). Der Übungen-Tab zeigt nur noch Übungen.
+- **„+“ oben rechts** öffnet eine eigene Seite (kein Bottom-Sheet, das Designsystem hat keins) mit „Workout erstellen“ (Editor, speichert, startet nicht) und „Leer starten“. Darunter unter „Weitere Wege“ Import, KI-Prompt und Beispiel-Workouts.
+- **Workout-Seite:** Tipp auf ein Workout öffnet eine Ansicht mit „Starten“ (PrimaryButton), „Bearbeiten“, „Teilen“. Import, Chat-Eingang, Coach und „Als Workout speichern“ im Verlauf führen ebenfalls dorthin statt in den Editor.
+- **Automatisch übernehmen (`WorkoutPlan`, `TemplateRepository.adopt`):** Endet ein Training (Beenden *und* Verwerfen), übernimmt sein Workout Übungsliste, Reihenfolge, Satzanzahl, Pausen und Namen – ohne Dialog. Ein leer gestartetes Training mit mindestens einer Übung wird ein neues Workout; die Sitzung bekommt dessen ID (für „zuletzt“, Coach). Zielwerte werden *nicht* aus den Ist-Werten kopiert: Sätze, die bleiben, behalten ihre geplanten Werte, neue Sätze/Übungen bekommen leere Ziele, die beim nächsten Start wie bisher aus der letzten Ausführung kommen.
+- **Coach:** Weil Ist-Werte nicht in die Ziele geschrieben werden, bleiben Zielwerte, die der Coach gesetzt hat, erhalten. Die Übernahme läuft beim Beenden (vor der Coach-Auswertung); ein angenommener Coach-Plan ändert danach die Werte im selben Workout und gewinnt damit für das nächste Mal. Übungsnotizen aus dem Training bleiben beim Training (sie sind oft tagesbezogen), das Workout behält seine eigenen.
+- **Name:** Leer gestartet heißt das Training „Workout vom 3. Nov.“; im Beenden-Flow steht der Name als Eingabefeld oben, eine Änderung benennt Training und Workout um.
+- **Schutzregeln:** Ein Training ohne Übungen leert nie ein Workout und legt keins an. Ein Workout, das während des Trainings gelöscht wurde, wird nicht wiederhergestellt. Gelöschte Workouts bleiben im Verlauf (Sitzungen speichern ihre Werte selbst, `templateId` ohne Fremdschlüssel). „Alle Daten löschen“ verwirft ohne Übernahme. Schlägt die Übernahme fehl, wird trotzdem beendet.
+- **Sicherung:** Das laufende Training wird schon nach jeder Änderung gespeichert (Phase 2); Verwerfen geht nur über das Bestätigungsmuster.
+- **Übungen ohne eigenen Tab** (Fabian: „Der Übungskatalog soll auch nicht mit in der Tableiste sein.“): Tab-Leiste = Training, Verlauf, Fotos, Profil. Der Katalog (eigene Übungen, Suche, Fortschritt je Übung) öffnet über das Hantel-Icon oben im Training-Tab neben „+“ – dort, wo man trainiert, statt versteckt im Profil – und weiterhin über jeden Übungs-Picker.
+
+### Zur Prüfung durch Fabian
+- Auch **Verwerfen** übernimmt die Struktur (ein leer gestartetes, verworfenes Training mit Übungen erscheint als Workout). Begründung: „nichts darf verloren gehen“. Wer das nicht will, löscht das Workout. Alternative: beim Verwerfen nichts übernehmen.
+- Benennt man das Training um (im Training oder beim Beenden), heißt auch das Workout so.
+
 ## KI-Kontext, Auswertung je Übung, Gemini (3.11., Session N)
 - **Ein Profil-Block für alle KI-Wege:** `aiProfileFacts` (domain/ModelContext.kt) baut „Name · Alter · Körpergewicht (Stand …)“ und wird überall verwendet: Coach (eigener Key und Fuel, im dynamischen System-Block), „Kontext kopieren“, KI-Vorlage (Teilen/Erstellen), Gem-/GPT-Anleitung (als „Über mich“-Zeile oben) und der Chat-Sync. Fehlende Werte fallen weg, ein unplausibles Alter (außerhalb 13–110) auch. Die Beschriftung folgt der App-Sprache, damit ein eingefügter deutscher Prompt deutsch bleibt. Der Coach-Prompt bleibt englisch. Diese Texte sind KI-Eingaben, keine UI, deshalb stehen sie wie die übrigen Prompt-Regeln im Code und nicht in Strings.kt.
 - **MCP:** Die App lädt die Zeile als `summary` im Profil-Dokument hoch. Das Backend stellt sie als `user` an den Anfang **jeder** Tool-Antwort (bei Foto-Antworten als erste Textzeile). Bei älteren App-Versionen ohne `summary` baut das Backend die Zeile selbst aus Name, Geburtsjahr und Gewicht. Es gibt keine eigene Kontext-Ressource. Die Tool-Antwort ist der Weg, der in Claude, ChatGPT und Gemini sicher ankommt.

@@ -1,6 +1,8 @@
 package app.overfit.ui
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -8,6 +10,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import app.overfit.ai.Providers
@@ -87,13 +91,14 @@ class AppSmokeTest {
 
         keyIsValid = true
         compose.onNodeWithText("Verbinden").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodes(hasTextExactly("Training starten")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Letzte Coach-Tipps", ignoreCase = true)).fetchSemanticsNodes().isNotEmpty() }
 
-        // Start tab shows the profile. (Robolectric runs in non-touch mode, so the first focusable row may
-        // get initial focus and scroll the screen a little – hence performScrollTo.)
-        compose.onNodeWithText("Hallo, Fabi").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("82,4 kg").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Stand 2. Nov. 2026").performScrollTo().assertIsDisplayed()
+        // Training tab (no profile hero anymore): empty state with the "+" button; the profile data is in the store.
+        compose.onNodeWithContentDescription("Neues Workout").assertIsDisplayed()
+        compose.onNodeWithText("Noch keine Workouts", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().assertIsDisplayed()
+        assertEquals("Fabi", store.state.value.profile.name)
+        assertEquals(82.4, store.state.value.weights.last().kg, 0.001)
         assertEquals("sk-or-wrong", secrets.load())
         assertTrue(store.state.value.onboardingDone)
         assertEquals(1995, store.state.value.profile.birthYear)
@@ -101,8 +106,12 @@ class AppSmokeTest {
         // Other tabs
         compose.onNodeWithText("Verlauf").performClick()
         compose.onNodeWithText("Noch keine Trainings", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("Übungen").performClick()
-        compose.onNodeWithText("Katalog").assertIsDisplayed()
+        // Exercises are no tab anymore: four tabs, the catalogue opens from the Training tab
+        compose.onAllNodes(hasText("Übungen") and hasClickAction()).assertCountEquals(0)
+        compose.onNode(hasText("Training") and hasClickAction()).performClick()
+        compose.onNodeWithContentDescription("Übungen").performClick()
+        compose.onNodeWithText("Eigene Übung").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Zurück").performClick()
         compose.onNodeWithText("Fotos").performClick()
         compose.onNodeWithText("Foto-Tagebuch").assertIsDisplayed()
 
@@ -120,10 +129,9 @@ class AppSmokeTest {
         compose.onNodeWithText("English").performScrollTo().performClick()
         compose.onNodeWithText("Settings").assertExists()
         compose.onNodeWithText("Profile").assertIsDisplayed()
-        compose.onNodeWithText("Start").performClick()
-        compose.onNodeWithText("Hi, Fabi").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("82.4 kg").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("As of Nov 2, 2026").performScrollTo().assertIsDisplayed()
+        compose.onNode(hasText("Workouts") and hasClickAction()).performClick()
+        compose.onNode(hasText("Latest coach tips", ignoreCase = true)).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("New workout").assertIsDisplayed()
     }
 
     @Test
@@ -158,7 +166,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Später einrichten").performClick()
 
         // Catalogue: German search term finds the English exercise
-        compose.onNodeWithText("Übungen").performClick()
+        compose.onNodeWithContentDescription("Übungen").performClick()
         waitFor("Suchen, z. B. Klimmzug")
         compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("Klimmzug")
         waitFor("Pull-up")
@@ -184,11 +192,14 @@ class AppSmokeTest {
                 kotlinx.coroutines.runBlocking { data.exercises.exercises.first() }.any { it.isCustom && it.name == "Klimmzug" }
         }
 
-        // Template: name, one exercise from the picker, an extra set, save
-        compose.onNodeWithText("Vorlagen").performClick()
-        compose.onNodeWithText("Neue Vorlage").performClick()
-        waitFor("Name der Vorlage")
-        compose.onNodeWithText("Name der Vorlage").performTextInput("Push")
+        // Workout: back from the catalogue to the Training tab → "+" → create; name, one exercise from the picker, an extra set, save
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        waitFor("Letzte Coach-Tipps")
+        compose.onNodeWithContentDescription("Neues Workout").performClick()
+        waitFor("Workout erstellen")
+        compose.onNodeWithText("Workout erstellen").performClick()
+        waitFor("Name des Workouts")
+        compose.onNodeWithText("Name des Workouts").performTextInput("Push")
         compose.onNodeWithText("Übung hinzufügen").performClick()
         waitFor("Übungen hinzufügen")
         compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("Bankdrücken")
@@ -200,17 +211,21 @@ class AppSmokeTest {
         waitFor("4 Sätze", substring = true)
         compose.onNodeWithText("Speichern").performClick()
 
-        // Back in the templates list (its footer button), the template shows its exercise
-        waitFor("Neue Vorlage")
-        compose.onNodeWithText("Push").assertIsDisplayed()
-        compose.onNodeWithText("Bench Press").assertIsDisplayed()
+        // Saving closes the editor; the Training tab lists the workout with its exercise
+        waitFor("Letzte Coach-Tipps")
         compose.waitUntil(5_000) { kotlinx.coroutines.runBlocking { data.templates.templates.first() }.size == 1 }
-        compose.onNodeWithText("Start").performClick()
-        waitFor("Push")
+        compose.onNodeWithText("Push", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Bench Press", substring = true).assertIsDisplayed()
     }
 
-    private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {
-        compose.onAllNodes(androidx.compose.ui.test.hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty()
+    private fun waitFor(text: String, substring: Boolean = false) {
+        try {
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(androidx.compose.ui.test.hasText(text, substring = substring, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (e: Throwable) {
+            throw AssertionError("Waiting for \"$text\":\n" + compose.onRoot().printToString().take(3000), e)
+        }
     }
 
     private fun hasTextExactly(text: String) = androidx.compose.ui.test.hasText(text, substring = false)

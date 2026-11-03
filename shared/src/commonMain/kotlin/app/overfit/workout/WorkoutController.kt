@@ -12,6 +12,7 @@ import app.overfit.platform.HapticPattern
 import app.overfit.platform.Haptics
 import app.overfit.platform.RestAlert
 import app.overfit.platform.RestAlerts
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -23,6 +24,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 /** Settings the workout needs, read fresh on every use. */
 data class WorkoutPrefs(
@@ -54,6 +58,12 @@ class WorkoutController(
     private val prefs: () -> WorkoutPrefs,
     private val scope: CoroutineScope,
     private val clock: () -> Long,
+    /**
+     * Called when a workout ends (finished or discarded, inside the write lock): passes the
+     * structure on to its saved workout or creates one, returns the workout with the template ID
+     * to store. Default: nothing is saved (tests).
+     */
+    private val plans: suspend (Workout) -> Workout = { it },
 ) {
     data class State(
         /** False until the stored workout (if any) has been loaded. */
@@ -117,10 +127,15 @@ class WorkoutController(
 
     // --- Start / end ---------------------------------------------------------------------------
 
-    /** Starts a free workout. Does nothing while another workout is running. */
-    fun startEmpty(name: String = stringsFor(prefs().language).defaultWorkoutName): Boolean {
+    /**
+     * Starts an empty workout; it becomes a saved workout when it ends. Default name: "Workout
+     * vom 3. November". Does nothing while another workout is running.
+     */
+    fun startEmpty(name: String? = null): Boolean {
         if (workout != null) return false
-        begin(Workout.empty(name, clock()))
+        val now = clock()
+        val today = Instant.fromEpochMilliseconds(now).toLocalDateTime(TimeZone.currentSystemDefault()).date
+        begin(Workout.empty(name ?: stringsFor(prefs().language).newWorkoutName(today), now))
         return true
     }
 
@@ -149,7 +164,7 @@ class WorkoutController(
         val job = scope.launch {
             writeLock.withLock {
                 pendingSave = null
-                store.finish(w.copy(rest = null), endedAt)
+                store.finish(adopt(w).copy(rest = null), endedAt)
             }
         }
         finishJob = job
@@ -159,19 +174,33 @@ class WorkoutController(
 
     private var finishJob: Job? = null
 
+    /** [plans] that never breaks finishing or discarding: on an error the workout stays as it is. */
+    private suspend fun adopt(w: Workout): Workout = try {
+        plans(w)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        w
+    }
+
     /** Waits until the last finished workout is stored (the finish flow reads it right after). */
     suspend fun awaitFinished() { finishJob?.join() }
 
     /** The finish flow was opened; a later return to the workout screen should not open it again. */
     fun consumeFinished() { _state.value = _state.value.copy(finishedId = null) }
 
-    /** Throws the running workout away. */
-    suspend fun discard() {
+    /**
+     * Throws the running workout away: it does not count in the history. Its structure is still
+     * passed on to the saved workout (nothing built during the workout gets lost), except with
+     * [keepStructure] = false (reset of all data).
+     */
+    suspend fun discard(keepStructure: Boolean = true) {
         val w = workout ?: return
         clear()
         scope.launch {
             writeLock.withLock {
                 pendingSave = null
+                if (keepStructure) adopt(w)
                 store.delete(w.id)
             }
         }.join()

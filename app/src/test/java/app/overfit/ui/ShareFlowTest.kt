@@ -68,37 +68,42 @@ class ShareFlowTest {
         }
     }
 
+    /** Training tab → "+" (new workout screen with the import rows under "Weitere Wege"). */
+    private fun openPlus() {
+        compose.onNodeWithContentDescription("Neues Workout").performClick()
+        waitFor("Weitere Wege".uppercase())
+    }
+
     private fun waitFor(text: String) = compose.waitUntil(20_000) {
-        compose.onAllNodes(androidx.compose.ui.test.hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()
+        compose.onAllNodes(androidx.compose.ui.test.hasText(text, substring = true, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty()
     }
 
     @Test
     fun importFromClipboardShowsPreviewAndSaves() {
         launchOnboarded()
         share.clipboard = "Hier dein Plan:\n```json\n${AiPrompt.EXAMPLE}\n```\nViel Erfolg!"
-        compose.onNodeWithText("Übungen").performClick()
-        compose.onNodeWithText("Vorlagen").performClick()
-        waitFor("Vorlage importieren")
-        compose.onNodeWithText("Vorlage importieren").performScrollTo().performClick()
+        openPlus()
+        waitFor("Workout importieren")
+        compose.onNodeWithText("Workout importieren").performScrollTo().performClick()
         compose.onNodeWithText("Aus Zwischenablage importieren").performClick()
         waitFor("Oberkörper A")
         compose.onNodeWithText("Vorschau").assertIsDisplayed()
         compose.onNodeWithText("Bench Press").assertIsDisplayed()
         compose.onNodeWithText("3 Übungen").assertIsDisplayed()
         compose.onNodeWithText("Übernehmen").performClick()
-        // The new template opens in the editor.
-        // The new template opens in the editor (its save button is pinned in the footer).
-        waitFor("Speichern")
+        // The new workout opens in its plan screen (primary action "Starten" pinned in the footer).
+        waitFor("Starten")
         compose.onNodeWithText("Oberkörper A").assertIsDisplayed()
+        compose.onNodeWithText("Bearbeiten").assertIsDisplayed()
+        assertEquals(1, runBlocking { data.templates.templates.first() }.size)
     }
 
     @Test
     fun emptyClipboardAndGarbageShowErrors() {
         launchOnboarded()
-        compose.onNodeWithText("Übungen").performClick()
-        compose.onNodeWithText("Vorlagen").performClick()
-        waitFor("Vorlage importieren")
-        compose.onNodeWithText("Vorlage importieren").performScrollTo().performClick()
+        openPlus()
+        waitFor("Workout importieren")
+        compose.onNodeWithText("Workout importieren").performScrollTo().performClick()
         compose.onNodeWithText("Aus Zwischenablage importieren").performClick()
         waitFor("Die Zwischenablage ist leer.")
         share.clipboard = "Einkaufsliste: Milch, Eier"
@@ -120,14 +125,14 @@ class ShareFlowTest {
     @Test
     fun samplesAddedFromStartAndProfileIdempotently() {
         launchOnboarded()
-        waitFor("Beispielvorlagen hinzufügen")
-        compose.onNodeWithText("Beispielvorlagen hinzufügen").performScrollTo().performClick()
+        waitFor("Beispiel-Workouts hinzufügen")
+        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
         // The row disappears after the first template is saved; all three must still arrive.
         waitFor("Legs")
         waitFor("Pull")
         waitFor("Push")
         compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("Beispielvorlagen hinzufügen").performScrollTo().performClick()
+        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
         waitFor("schon da")
         assertEquals(3, runBlocking { data.templates.templates.first() }.size)
     }
@@ -139,10 +144,9 @@ class ShareFlowTest {
         waitFor("Zwei Handys trainieren gemeinsam")
         compose.onNodeWithText("Duo ist noch nicht verfügbar", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Zurück").performClick()
-        compose.onNodeWithText("Übungen").performClick()
-        compose.onNodeWithText("Vorlagen").performClick()
-        waitFor("KI-Vorlage kopieren")
-        compose.onNodeWithText("KI-Vorlage kopieren").performScrollTo().performClick()
+        openPlus()
+        waitFor("KI-Prompt kopieren")
+        compose.onNodeWithText("KI-Prompt kopieren").performScrollTo().performClick()
         assertTrue(share.clipboard!!.contains("```json"))
         assertTrue(share.clipboard!!.contains("Bench Press"))
     }

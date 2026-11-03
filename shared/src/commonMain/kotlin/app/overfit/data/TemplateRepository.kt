@@ -9,8 +9,11 @@ import app.overfit.domain.PlannedSet
 import app.overfit.domain.Template
 import app.overfit.domain.TemplateExercise
 import app.overfit.domain.TemplateSummary
+import app.overfit.domain.Workout
+import app.overfit.domain.WorkoutPlan
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
 
 class TemplateRepository(
@@ -27,6 +30,38 @@ class TemplateRepository(
             val byTemplate = names.groupBy({ it.templateId }, { it.name })
             templates.map { TemplateSummary(it.id, it.name, byTemplate[it.id].orEmpty()) }
         }
+
+    /** Start (epoch ms) of the last finished workout per template ID; templates never trained are missing. */
+    val lastDone: Flow<Map<Long, Long>> =
+        db.workoutDao().observeLastDone().map { rows -> rows.associate { it.templateId to it.lastStartedAt } }
+
+    /**
+     * Keeps the saved workout in step with a workout that just ended (finished or discarded):
+     * a workout started from a saved one passes its structure on ([WorkoutPlan.adopt]), a workout
+     * started empty becomes a new saved workout ([WorkoutPlan.create]). Returns [workout] with the
+     * new template ID set. A saved workout deleted in the meantime is not brought back.
+     */
+    suspend fun adopt(workout: Workout): Workout {
+        if (workout.exercises.isEmpty()) return workout
+        val templateId = workout.templateId
+        if (templateId == null) {
+            val created = WorkoutPlan.create(workout) ?: return workout
+            return workout.copy(templateId = save(created))
+        }
+        val existing = get(templateId) ?: return workout
+        val adopted = WorkoutPlan.adopt(existing, workout)
+        if (adopted != existing) save(adopted)
+        return workout
+    }
+
+    suspend fun rename(id: Long, name: String) {
+        val trimmed = name.trim().take(80)
+        if (trimmed.isEmpty()) return
+        val existing = dao.getWithExercises(id)?.template ?: return
+        if (existing.name == trimmed) return
+        dao.updateTemplate(existing.copy(name = trimmed, updatedAt = clock()))
+        onChanged?.invoke()
+    }
 
     /** One-shot list of all template names. */
     suspend fun names(): List<String> = dao.getNames()

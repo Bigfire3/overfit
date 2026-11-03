@@ -90,7 +90,7 @@ class CoachFlowTest {
     @Test
     fun reviewLastWorkoutAndAcceptPlan() {
         setUp(withKey = true)
-        waitFor("Training starten")
+        waitFor("Duo · bald")
         compose.onNodeWithText("Coach").performScrollTo().performClick()
         waitFor("Letztes Training auswerten")
         compose.onNodeWithText("Letztes Training auswerten").performClick()
@@ -101,7 +101,7 @@ class CoachFlowTest {
         waitFor("Mehr schlafen")
         waitFor("Bench Press", substring = true)
         compose.onNodeWithText("Alle annehmen").performClick()
-        waitFor("Plan übernommen. Die Vorlage ist angepasst.")
+        waitFor("Plan übernommen. Das Workout ist angepasst.")
 
         compose.waitUntil(10_000) {
             runBlocking { data.templates.get(templateId) }?.exercises?.single()?.sets?.first()?.weightKg == 62.5
@@ -113,7 +113,7 @@ class CoachFlowTest {
     @Test
     fun withoutAccessTheDemoReviewIsOffered() {
         setUp(withKey = false)
-        waitFor("Training starten")
+        waitFor("Duo · bald")
         compose.onNodeWithText("Coach").performScrollTo().performClick()
         waitFor("Letztes Training auswerten")
         compose.onNodeWithText("Letztes Training auswerten").performClick()
@@ -126,7 +126,7 @@ class CoachFlowTest {
     @Test
     fun editingTheCoachMemory() {
         setUp(withKey = true, seedWorkout = false)
-        waitFor("Training starten")
+        waitFor("Duo · bald")
         compose.onNodeWithText("Profil").performClick()
         waitFor("Coach-Gedächtnis")
         compose.onNodeWithText("Coach-Gedächtnis").performScrollTo().performClick()

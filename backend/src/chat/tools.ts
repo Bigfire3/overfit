@@ -270,7 +270,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'list_templates',
-    title: 'Vorlagen auflisten',
+    title: 'Workouts auflisten',
     description:
       'Lists the user\'s workout templates (routines such as "Push", "Pull", "Legs") with id, name, number of exercises and exercise names. Use get_template for the full plan with sets, target weights and rest times.',
     inputSchema: obj({}),
@@ -287,7 +287,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'get_template',
-    title: 'Vorlage lesen',
+    title: 'Workout lesen',
     description: 'Returns one workout template in full: exercises in order (exerciseId, name, trackingType), planned sets with target kg/reps/seconds, rest seconds and notes.',
     inputSchema: obj({ template_id: { type: 'string', description: 'templateId aus list_templates' } }, ['template_id']),
     annotations: READ,
@@ -478,7 +478,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'create_template',
-    title: 'Vorlage anlegen oder ändern',
+    title: 'Workout anlegen oder ändern',
     description:
       'Creates a new workout template (or a revised version of an existing one) and puts it into the user\'s Overfit inbox. The app shows it with a preview the next time it is opened, and the user taps "Übernehmen" to save it – nothing changes without the user\'s confirmation. Use exercise ids from search_exercise_catalog, list_exercises or get_template; for exercises not in the catalog pass a clear name (+ tracking_type). Weights always in kg. Returns an import link the user can also tap directly. Tell the user to open Overfit to accept it.',
     inputSchema: obj(
@@ -518,7 +518,7 @@ export const TOOLS: ToolDef[] = [
       });
       return {
         inboxId,
-        status: 'Im Overfit-Eingang. Die App zeigt die Vorlage beim nächsten Öffnen mit Vorschau zum Übernehmen.',
+        status: 'Im Overfit-Eingang. Die App zeigt das Workout beim nächsten Öffnen mit Vorschau zum Übernehmen.',
         importLink: link,
         appLink: `overfit://t#${payload}`,
         warnings,
