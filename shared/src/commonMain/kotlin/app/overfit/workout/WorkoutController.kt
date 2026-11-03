@@ -12,6 +12,7 @@ import app.overfit.platform.HapticPattern
 import app.overfit.platform.Haptics
 import app.overfit.platform.RestAlert
 import app.overfit.platform.RestAlerts
+import app.overfit.platform.RestTicks
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +35,8 @@ data class WorkoutPrefs(
     val vibration: Boolean = true,
     val unit: WeightUnit = WeightUnit.KG,
     val language: Language = Language.DE,
+    /** Ticks in the last 3 s of a rest. */
+    val ticks: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_REST_SEC = 90
@@ -317,10 +320,21 @@ class WorkoutController(
         }
     }
 
-    /** Ends [rest] in the app when its time is up: vibration and the timer disappears. */
+    /**
+     * Ends [rest] in the app when its time is up: vibration and the timer disappears. Before that,
+     * plays the ticks of the last 3 s where the platform leaves them to the app (iOS in the
+     * foreground; Android plays them from its alarm, see [RestAlerts.appPlaysTicks]).
+     */
     private fun watchRest(rest: RestTimer) {
         restJob?.cancel()
         restJob = scope.launch {
+            val ticksAt = RestTicks.startAt(rest.endsAt, prefs().ticks, clock())
+            if (ticksAt != null) {
+                delay(ticksAt - clock())
+                val w = workout ?: return@launch
+                if (w.rest != rest) return@launch
+                if (prefs().ticks && alerts.appPlaysTicks()) alerts.playTicks()
+            }
             delay(rest.remainingMs(clock()))
             val w = workout ?: return@launch
             if (w.rest != rest) return@launch
@@ -350,6 +364,8 @@ class WorkoutController(
             skipLabel = t.restSkip,
             channelRunning = t.channelRest,
             channelOver = t.channelRestOver,
+            ticks = p.ticks,
+            ticksBody = t.restTicksBody,
         )
     }
 

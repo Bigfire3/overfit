@@ -10,8 +10,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTrack
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -27,7 +34,10 @@ import kotlinx.coroutines.launch
  * - At the end: an alarm via [AlarmManager.setExactAndAllowWhileIdle] (exact when the user allows
  *   exact alarms, otherwise the closest inexact variant) wakes [RestAlarmReceiver], which posts
  *   the "rest is over" notification – unless the app is visible, then the app itself vibrates.
- * No foreground service and no wakelock.
+ * - Ticks (setting "Countdown ticks"): a second exact alarm at end − 3 s wakes [RestTickReceiver],
+ *   which plays one short sound with all three ticks on the media stream and ducks other audio
+ *   for that moment. It plays in the foreground too, so the app never plays them a second time.
+ * No foreground service and no wakelock of our own (the alarm's wakelock covers the 2 s sound).
  *
  * [iconRes] is a monochrome drawable from the app module.
  */
@@ -54,39 +64,68 @@ class AndroidRestAlerts(
         val manager = NotificationManagerCompat.from(context)
         manager.cancel(ID_OVER)
 
-        val end = endIntent(context, alert)
-        if (Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()) {
-            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, alert.endsAt, end)
-        } else {
-            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, alert.endsAt, end)
-        }
+        setAlarm(alert.endsAt, endIntent(context, alert))
+        // ±15 s while the ticks play: they no longer fit the new end.
+        if (RestTickPlayer.playingFor.let { it != null && it != alert.endsAt }) RestTickPlayer.stop()
+        val ticksAt = RestTicks.startAt(alert, System.currentTimeMillis())
+        if (ticksAt != null) setAlarm(ticksAt, ticksIntent(context, ticksAt)) else alarms.cancel(ticksIntent(context, null))
 
-        val running = NotificationCompat.Builder(context, CHANNEL_RUNNING)
-            .setSmallIcon(iconRes)
-            .setContentTitle(alert.title)
-            .setContentText(alert.body)
-            .setOngoing(true)
-            .setSilent(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setShowWhen(true)
-            .setWhen(alert.endsAt)
-            .setUsesChronometer(true)
-            .setChronometerCountDown(true)
-            .setTimeoutAfter((alert.endsAt - System.currentTimeMillis()).coerceAtLeast(1_000))
-            .setContentIntent(openApp(context))
-            .addAction(0, alert.plusLabel, action(context, ACTION_PLUS))
-            .addAction(0, alert.skipLabel, action(context, ACTION_SKIP))
-            .build()
-        notify(context, ID_RUNNING, running)
+        postRunning(context, runningExtras(alert, iconRes))
+    }
+
+    private fun setAlarm(at: Long, intent: PendingIntent) {
+        if (Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()) {
+            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent)
+        } else {
+            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent)
+        }
     }
 
     override fun cancel() {
         alarms.cancel(endIntent(context, null))
+        alarms.cancel(ticksIntent(context, null))
+        RestTickPlayer.stop()
         NotificationManagerCompat.from(context).run {
             cancel(ID_RUNNING)
             cancel(ID_OVER)
+        }
+    }
+
+    override suspend fun notificationsAllowed(): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+    /** When the dialog was last asked for from the settings (see [onPermissionResult]). */
+    private var askedAt = 0L
+
+    override fun allowNotifications() {
+        val requester = permissionRequester
+        if (Build.VERSION.SDK_INT >= 33 && requester != null &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            askedAt = android.os.SystemClock.elapsedRealtime()
+            requester(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            openNotificationSettings()
+        }
+    }
+
+    /**
+     * Result of the permission dialog. Denied twice before, Android shows no dialog and answers
+     * "denied" right away: then the settings open instead, so "Allow" always leads somewhere.
+     */
+    fun onPermissionResult(granted: Boolean) {
+        val asked = askedAt
+        askedAt = 0L
+        if (!granted && asked != 0L && android.os.SystemClock.elapsedRealtime() - asked < NO_DIALOG_MS) openNotificationSettings()
+    }
+
+    private fun openNotificationSettings() {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }.onFailure {
+            val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { context.startActivity(details) }
         }
     }
 
@@ -104,6 +143,8 @@ class AndroidRestAlerts(
         const val CHANNEL_RUNNING = "rest_running"
         const val CHANNEL_OVER = "rest_over"
         const val CHANNEL_OVER_SILENT = "rest_over_silent"
+        /** A "denied" faster than this came without a dialog. */
+        private const val NO_DIALOG_MS = 400L
         const val ID_RUNNING = 1001
         const val ID_OVER = 1002
         const val ACTION_PLUS = "app.overfit.REST_PLUS"
@@ -112,10 +153,12 @@ class AndroidRestAlerts(
         const val EXTRA_BODY = "body"
         const val EXTRA_VIBRATE = "vibrate"
         const val EXTRA_ICON = "icon"
+        const val EXTRA_TICKS_AT = "ticksAt"
         private const val REQUEST_END = 1
         private const val REQUEST_PLUS = 2
         private const val REQUEST_SKIP = 3
         private const val REQUEST_OPEN = 4
+        private const val REQUEST_TICKS = 5
 
         fun ensureChannels(context: Context, runningName: String, overName: String) {
             val nm = context.getSystemService(NotificationManager::class.java)
@@ -152,6 +195,77 @@ class AndroidRestAlerts(
             }
             return PendingIntent.getBroadcast(
                 context, REQUEST_END, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+        private const val EXTRA_RUN_TITLE = "runTitle"
+        private const val EXTRA_RUN_BODY = "runBody"
+        private const val EXTRA_ENDS_AT = "endsAt"
+        private const val EXTRA_PLUS = "plus"
+        private const val EXTRA_SKIP = "skip"
+        private const val REQUEST_DISMISSED = 6
+        /** A swipe this close to the end is left alone (the rest is over anyway). */
+        private const val REPOST_MIN_LEFT_MS = 1_000L
+
+        /** Everything needed to (re)build the countdown notification, also after a process kill. */
+        fun runningExtras(alert: RestAlert, iconRes: Int) = android.os.Bundle().apply {
+            putString(EXTRA_RUN_TITLE, alert.title)
+            putString(EXTRA_RUN_BODY, alert.body)
+            putLong(EXTRA_ENDS_AT, alert.endsAt)
+            putString(EXTRA_PLUS, alert.plusLabel)
+            putString(EXTRA_SKIP, alert.skipLabel)
+            putInt(EXTRA_ICON, iconRes)
+        }
+
+        /**
+         * Posts the countdown. Ongoing, and since Android 14 lets users swipe even ongoing
+         * notifications away, its delete intent ([RestDismissedReceiver]) posts it again while
+         * the rest runs. Programmatic cancels (skip, end, finish) and the timeout at the end do
+         * not repost (checked via the end time).
+         */
+        fun postRunning(context: Context, extras: android.os.Bundle) {
+            val endsAt = extras.getLong(EXTRA_ENDS_AT)
+            val dismissed = PendingIntent.getBroadcast(
+                context,
+                REQUEST_DISMISSED,
+                Intent(context, RestDismissedReceiver::class.java).putExtras(extras),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val running = NotificationCompat.Builder(context, CHANNEL_RUNNING)
+                .setSmallIcon(extras.getInt(EXTRA_ICON).takeIf { it != 0 } ?: context.applicationInfo.icon)
+                .setContentTitle(extras.getString(EXTRA_RUN_TITLE))
+                .setContentText(extras.getString(EXTRA_RUN_BODY))
+                .setOngoing(true)
+                .setSilent(true)
+                .setOnlyAlertOnce(true)
+                .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setShowWhen(true)
+                .setWhen(endsAt)
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+                .setTimeoutAfter((endsAt - System.currentTimeMillis()).coerceAtLeast(1_000))
+                .setContentIntent(openApp(context))
+                .setDeleteIntent(dismissed)
+                .addAction(0, extras.getString(EXTRA_PLUS), action(context, ACTION_PLUS))
+                .addAction(0, extras.getString(EXTRA_SKIP), action(context, ACTION_SKIP))
+                .build()
+            notify(context, ID_RUNNING, running)
+        }
+
+        /** Swiped away: back while the rest still runs. */
+        fun onRunningDismissed(context: Context, extras: android.os.Bundle?) {
+            val endsAt = extras?.getLong(EXTRA_ENDS_AT) ?: return
+            if (endsAt - System.currentTimeMillis() < REPOST_MIN_LEFT_MS) return
+            postRunning(context, extras)
+        }
+
+        /** The tick alarm; [at] = null only to cancel. */
+        internal fun ticksIntent(context: Context, at: Long?): PendingIntent {
+            val intent = Intent(context, RestTickReceiver::class.java)
+            if (at != null) intent.putExtra(EXTRA_TICKS_AT, at)
+            return PendingIntent.getBroadcast(
+                context, REQUEST_TICKS, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
 
@@ -213,6 +327,92 @@ class RestAlarmReceiver : BroadcastReceiver() {
             .apply { if (vibrate) setVibrate(AndroidHaptics.REST_END_TIMINGS) }
             .build()
         AndroidRestAlerts.notify(context, AndroidRestAlerts.ID_OVER, notification)
+    }
+}
+
+/** Delete intent of the countdown notification (user swiped it away), see [AndroidRestAlerts.postRunning]. */
+class RestDismissedReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        AndroidRestAlerts.onRunningDismissed(context.applicationContext, intent.extras)
+    }
+}
+
+/**
+ * The ticks before a rest ends. Skipped when the alarm comes late (no exact-alarm permission,
+ * the ticks would no longer match the countdown). Keeps the broadcast open while the sound plays,
+ * so the alarm's wakelock keeps the CPU awake for these 2 seconds with the screen off.
+ */
+class RestTickReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val at = intent.getLongExtra(AndroidRestAlerts.EXTRA_TICKS_AT, 0L)
+        if (!RestTicks.onTime(at, System.currentTimeMillis())) return
+        val pending = goAsync()
+        RestTickPlayer.play(context.applicationContext, at + RestTicks.LEAD_MS) { pending.finish() }
+    }
+}
+
+/**
+ * Plays [RestTicks.pcm] once. Media stream (audible in silent mode, follows the media volume like
+ * the music), usage "navigation guidance" so other audio is ducked for a moment instead of paused
+ * (transient focus, may duck). Main thread only.
+ */
+internal object RestTickPlayer {
+    private val pcm by lazy { RestTicks.pcm() }
+    private var track: AudioTrack? = null
+    private var finish: (() -> Unit)? = null
+    /** End of the rest whose ticks are playing, null when silent. */
+    var playingFor: Long? = null
+        private set
+    private var focus: AudioFocusRequest? = null
+    private var audio: AudioManager? = null
+    private val handler by lazy { Handler(Looper.getMainLooper()) }
+    private val done = Runnable { stop() }
+
+    fun play(context: Context, restEndsAt: Long, onDone: () -> Unit) {
+        stop()
+        finish = onDone
+        playingFor = restEndsAt
+        val attributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        runCatching {
+            val am = context.getSystemService(AudioManager::class.java)
+            audio = am
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(attributes)
+                .build()
+            focus = request
+            am.requestAudioFocus(request)
+            val t = AudioTrack.Builder()
+                .setAudioAttributes(attributes)
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(RestTicks.SAMPLE_RATE)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build(),
+                )
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .setBufferSizeInBytes(pcm.size * 2)
+                .build()
+            track = t
+            t.write(pcm, 0, pcm.size)
+            t.play()
+        }.onFailure { stop(); return }
+        handler.postDelayed(done, RestTicks.durationMs + 150)
+    }
+
+    /** Stops a playing tick sound (rest skipped or changed) and gives the audio focus back. */
+    fun stop() {
+        handler.removeCallbacks(done)
+        track?.let { runCatching { it.stop() }; it.release() }
+        track = null
+        focus?.let { f -> audio?.abandonAudioFocusRequest(f) }
+        focus = null
+        playingFor = null
+        finish?.invoke()
+        finish = null
     }
 }
 

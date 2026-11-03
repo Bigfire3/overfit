@@ -400,13 +400,23 @@ class DayWithOverfitTest {
 
         tab("Training")
 
-        // Language, theme, vibration
+        // Language, theme, notifications (permission denied: "Allow" asks the platform)
+        alerts.allowed = false
         tab("Profil")
+        waitFor("Benachrichtigungen erlauben")
+        assertTrue(shown("Ohne diese Erlaubnis meldet sich der Pausentimer", substring = true))
+        compose.onNodeWithText("Benachrichtigungen erlauben").performScrollTo().performClick()
+        assertEquals(1, alerts.allowRequests)
         click("Dunkel")
         assertEquals(ThemeMode.DARK, store.state.value.settings.theme)
         click("Hell")
         assertEquals(ThemeMode.LIGHT, store.state.value.settings.theme)
-        click("Aus")
+        // Two on/off rows: vibration first, then the countdown ticks.
+        compose.onAllNodes(hasText("Aus"))[0].performScrollTo().performClick()
+        assertFalse(store.state.value.settings.vibration)
+        assertTrue(store.state.value.settings.restTicks)
+        compose.onAllNodes(hasText("Aus"))[1].performScrollTo().performClick()
+        compose.waitUntilState(10_000) { !store.state.value.settings.restTicks }
         assertFalse(store.state.value.settings.vibration)
         click("English")
         waitFor("Settings")

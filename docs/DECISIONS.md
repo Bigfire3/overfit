@@ -997,6 +997,53 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - **Editor-Kopf:** Name groß als Eingabe mit Stift daneben (fokussiert das Feld), darunter „Bearbeitungsmodus“; Übungsbild mit „?“ öffnet
   die Übungsdetails. Langes Drücken auf den Übungskopf verschiebt weiter per Ziehen.
 
+## Ticken vor Pausenende (Session AG, 3.11.)
+- **Was:** Bei 3, 2 und 1 s Restzeit je ein kurzer Klick, danach wie bisher das Pausenende (Benachrichtigung/Vibration). Schalter
+  „Ticken vor Pausenende“ im Profil unter „Vibration“, Standard an (fehlt das Feld im gespeicherten Zustand, gilt an). Eine Pause, die
+  beim Planen (z. B. nach −15 s) weniger als 3 s übrig hat, tickt nicht (kein halber Countdown).
+- **Ein Ton für alle drei Ticks:** `RestTicks` (commonMain) erzeugt eine 2,06-s-Tonfolge synthetisch (Sinus-Burst 1,8 kHz, 45 ms, schnell
+  abklingend, 0/1/2 s), keine fremden Sounds. So muss jede Plattform nur *einen* Ton zum Zeitpunkt Ende − 3 s starten, und die Ticks
+  bleiben untereinander exakt im Takt. Planung (`RestTicks.startAt`, Toleranz `onTime` 700 ms) ist gemeinsamer, getesteter Code.
+- **Android:** Zweiter exakter Alarm (`setExactAndAllowWhileIdle`, ohne Erlaubnis die inexakte Variante) bei Ende − 3 s auf
+  `RestTickReceiver`. Neu planen ersetzt ihn (gleicher PendingIntent), Überspringen/Verwerfen/Beenden bricht ihn ab, Einstellung aus
+  oder < 3 s übrig = kein Tick-Alarm (Robolectric-Test). Kommt der Alarm mehr als 0,7 s zu spät (keine Exakt-Erlaubnis), entfällt das
+  Ticken, statt falsch zu zählen. Der Receiver spielt per `AudioTrack` mit `USAGE_ASSISTANCE_NAVIGATION_GUIDANCE` (Medienstrom, also
+  Medienlautstärke wie die Musik) und Audiofokus `GAIN_TRANSIENT_MAY_DUCK`: Spotify wird kurz leiser, nicht pausiert. `goAsync()` hält
+  den Broadcast offen, solange der Ton läuft; damit deckt der Wakelock des Alarms die 2 s ab – kein eigener Wakelock, kein
+  Foreground-Service. Der Alarm spielt auch, wenn die App offen ist (die App selbst tickt auf Android nie), so gibt es nie doppelte Ticks.
+  ±15 s während des Tickens stoppt den Ton. **Lautlos-Modus:** Ticks hörbar (Medienstrom ist vom Klingelmodus unabhängig); nur bei
+  Medienlautstärke 0 still. „Bitte nicht stören“ lässt Medien standardmäßig durch.
+- **iOS:** Im Hintergrund läuft kein App-Code, daher eine zweite lokale Benachrichtigung bei Ende − 3 s („Pause · Noch 3 Sekunden“)
+  mit eigenem Ton. Der WAV wird einmal nach `Library/Sounds` geschrieben (dort darf iOS Benachrichtigungstöne laden, kein
+  Bundle-/XcodeGen-Eingriff nötig; Name versioniert, weil iOS Töne cacht). Im Vordergrund zeigt iOS die Benachrichtigung ohne Delegate
+  nicht an, dann spielt die App denselben Ton selbst (`WorkoutController` fragt `RestAlerts.appPlaysTicks()` = App aktiv) über
+  `AVAudioPlayer` mit Kategorie `playback` + `mixWithOthers` + `duckOthers`, danach Sitzung freigeben mit `notifyOthersOnDeactivation`
+  (Musik wird wieder laut). **Lautlos-Modus:** im Vordergrund hörbar (Kategorie playback ignoriert den Schalter); im Hintergrund nicht,
+  weil iOS Benachrichtigungstöne im Lautlos-Modus stummschaltet – umgehen ließe sich das nur mit „Critical Alerts“ (Apple-Sonderfreigabe
+  für Gesundheit/Sicherheit) oder einer dauerhaften Hintergrund-Audiositzung (Store-Ablehnungsrisiko, Akku). Dann bleibt die Vibration
+  der Benachrichtigung. Lautstärke im Hintergrund = Klingel-/Hinweislautstärke, nicht Medien (iOS-Vorgabe).
+- **Pausen-Benachrichtigung nicht wegwischbar (Zusatz, Fabian: „Manchmal geht die Notification einfach weg“):** Seit Android 14
+  lassen sich auch `ongoing`-Benachrichtigungen wegwischen (Ausnahme nur Foreground-Services in bestimmten Fällen, und auch die seit
+  14 nicht mehr). Lösung: Die Countdown-Benachrichtigung hat einen Delete-Intent (`RestDismissedReceiver`), der sie sofort neu postet,
+  solange die Pause noch ≥ 1 s läuft. Alle Daten dafür stecken im Intent, es klappt also auch, wenn der Prozess beendet war.
+  Programmatisches Abbrechen (Überspringen, Training beenden/verwerfen) und das Zeitlimit am Pausenende lösen keinen Repost aus.
+  **Kein Foreground-Service:** Er brächte keinen Schutz vor dem Wegwischen (Android 14+), bräuchte einen FGS-Typ (`specialUse` mit
+  Play-Begründung oder `health` mit Sensor-Berechtigung) und eine Dauerbenachrichtigung über das ganze Training; zu arbeiten gibt es
+  im Hintergrund nichts (Alarme erledigen Ende und Ticks). Andere Ursachen fürs Verschwinden geprüft: Sie endet absichtlich am
+  Pausenende (Zeitlimit + Ersatz durch „Pause vorbei“) und gibt es zwischen den Pausen nicht (keine Trainings-Dauerbenachrichtigung).
+  Kanal „Pausentimer“ hat niedrige Wichtigkeit (lautlos), wird dadurch aber nicht ausgeblendet; Doze betrifft nur Alarme, die sind
+  `AllowWhileIdle`. Eine Benachrichtigung über das ganze Training wäre ein eigenes Feature (offen, falls Fabian sie möchte).
+- **Abschnitt „Benachrichtigungen“ in den Einstellungen (Fabian: „in den settings soll es ein Notifications Absatz geben“):** eigene
+  Überschrift unter „Training“. Inhalt: Berechtigungsstatus („Erlaubt“ bzw. „Erlauben“ + Hinweis), exakte Alarme (nur wenn nicht
+  erlaubt, Android 12+, nötig für pünktliches Ticken und Pausenende), Vibration (aus „Training“ verschoben, gespeicherter Wert
+  unverändert), Ticken, Hinweis zur Countdown-Benachrichtigung. „Erlauben“: Android 13+ zeigt den Systemdialog; kommt „abgelehnt“
+  in < 400 ms zurück, hat Android keinen Dialog mehr gezeigt (zweimal abgelehnt) → App-Benachrichtigungseinstellungen öffnen.
+  Unter Android 13 gibt es keine Laufzeit-Berechtigung, dann direkt die Einstellungen. iOS: nie gefragt → Systemdialog, sonst
+  die App-Seite in der Einstellungen-App. Status wird bei jedem Zurückkehren in die App neu gelesen.
+- **Verworfen:** Ticks als drei einzelne Alarme (drei Wakeups, Takt schwankt), Foreground-Service während der Pause (Android 14+
+  braucht dafür einen Typ, `shortService` ist begrenzt, dauernd sichtbare Benachrichtigung gibt es schon), Ticks im
+  Benachrichtigungskanal (Kanalton läuft über den Klingelstrom und ist im Lautlos-Modus stumm).
+
 ## Feedback-Runde 4 (Session AF, 3.11.)
 - **Beispiele nach „Daten löschen“:** `resetAll()` löschte den Flag `samples_seeded_v1`, säte aber erst beim nächsten Start neu. Jetzt sät `resetAll()` Push/Pull/Legs sofort (einmalig, wie beim ersten Start). Backup-Wiederherstellung ruft `resetAll(reseedSamples = false)`: wiederhergestellte Daten bekommen keine zusätzlichen Beispiele. Im Normalbetrieb gelöschte Beispiele bleiben weg (Flag bleibt gesetzt).
 - **Schwarzer Screen nach Workout löschen:** `templates.templates` ist ein `combine` zweier Room-Abfragen und emittiert nach dem Löschen mehrfach. `WorkoutPlanScreen` rief bei jeder Emission mit „Workout weg“ `onBack()` auf; ein zweiter Pop entfernte auch den Training-Tab, der Back-Stack war leer. Jetzt schließt der Screen genau einmal.
