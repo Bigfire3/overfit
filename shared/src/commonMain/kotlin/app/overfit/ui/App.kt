@@ -55,6 +55,7 @@ import app.overfit.i18n.fuelStringsFor
 import app.overfit.platform.Haptics
 import app.overfit.platform.NoHaptics
 import app.overfit.ui.fuel.FuelScreen
+import app.overfit.ui.fuel.RedeemCodeScreen
 import app.overfit.ui.fuel.LedgerScreen
 import app.overfit.ui.fuel.RecoveryScreen
 import app.overfit.ui.fuel.SpotInviteScreen
@@ -193,6 +194,8 @@ class AppDependencies(
     coachPhotos: CoachPhotoLoader? = null,
     /** Replaces the real providers (tests). */
     coachTransport: ((ProviderId) -> CoachTransport)? = null,
+    /** How this build was installed; decides with `/v1/config` whether "Top up on the web" is shown. */
+    val distribution: app.overfit.fuel.Distribution = app.overfit.fuel.Distribution.Sideload,
 ) {
     val fuelSession = FuelSession(fuel)
     /** The AI coach: requests, queue, reviews, memory. Runs in the app scope. */
@@ -295,6 +298,7 @@ class AppDependencies(
 @Serializable data object AboutRoute
 @Serializable data object FuelRoute
 @Serializable data object LedgerRoute
+@Serializable data object RedeemCodeRoute
 @Serializable data object RecoveryRoute
 @Serializable data object SpotInviteRoute
 @Serializable data class SpotRedeemRoute(val code: String = "")
@@ -412,6 +416,12 @@ fun OverfitApp(deps: AppDependencies) {
             LaunchedEffect(incoming, state.onboardingDone) {
                 // A Spot link (QR scanned with the camera app) goes to "I was spotted", not to the training import.
                 val spot = incoming
+                // Back from the web purchase page (overfit://guthaben): credit screen, which reloads the balance.
+                if (spot != null && state.onboardingDone && app.overfit.fuel.isCreditReturnLink(spot)) {
+                    deps.inbox.consume()
+                    nav.navigate(FuelRoute) { launchSingleTop = true }
+                    return@LaunchedEffect
+                }
                 if (spot != null && state.onboardingDone && isSpotLink(spot)) {
                     deps.inbox.consume()
                     nav.navigate(SpotRedeemRoute(spot)) { launchSingleTop = true }
@@ -900,8 +910,11 @@ fun OverfitApp(deps: AppDependencies) {
                             onSpotInvite = { nav.navigate(SpotInviteRoute) },
                             onSpotRedeem = { nav.navigate(SpotRedeemRoute()) },
                             fuelActive = state.providerId == ProviderId.FUEL,
+                            onRedeemCode = { nav.navigate(RedeemCodeRoute) },
+                            distribution = deps.distribution,
                         )
                     }
+                    composable<RedeemCodeRoute> { RedeemCodeScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<LedgerRoute> { LedgerScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<RecoveryRoute> { RecoveryScreen(deps.fuelSession, onBack = nav::popBackStack, onRestored = {}) }
                     composable<SpotInviteRoute> { SpotInviteScreen(deps.fuelSession, onBack = nav::popBackStack) }

@@ -18,6 +18,7 @@ import { handleAdminCredit } from './admin';
 import { handleVerifyPurchase } from './purchases';
 import { createChallenge, createSpotToken, redeemSpot } from './spot';
 import { packageCreditMicro } from './money';
+import { createWebLink, handlePaymentWebhook, redeemCode, webCheckout, webOrder, webPurchaseConfig, webSession } from './web';
 import { authServerMetadata, authorizeGet, authorizePost, protectedResourceMetadata, registerClient, revoke, token } from './chat/oauth';
 import { handleMcp } from './chat/mcp';
 import {
@@ -59,6 +60,32 @@ async function chatPublicRoute(req: Request, env: Env, cfg: Config, path: string
   return null;
 }
 
+/** Öffentliche Endpunkte der Kaufseite (GitHub Pages, ohne Login, CORS offen: keine Cookies, keine Konto-Daten). */
+async function webPublicRoute(req: Request, env: Env, cfg: Config, path: string): Promise<Response> {
+  const m = req.method;
+  const ip = clientIp(req);
+  const body = async () => {
+    const text = await req.text();
+    if (text.length > 4096) throw new ApiError(413, 'body_too_large', 'Anfrage zu groß');
+    return json(new TextEncoder().encode(text || '{}'));
+  };
+  if (path === '/v1/web/session' && m === 'POST') {
+    await rateLimit(env, `websess:${ip}`, 120, 3600);
+    return Response.json(await webSession(env, cfg, await body()));
+  }
+  if (path === '/v1/web/checkout' && m === 'POST') {
+    await rateLimit(env, `webco:${ip}`, cfg.rlSensitivePerHour * 3, 3600);
+    return Response.json(await webCheckout(env, cfg, await body()));
+  }
+  const order = WEB_ORDER_ROUTE.exec(path);
+  if (order && m === 'GET') {
+    await rateLimit(env, `weborder:${ip}`, 600, 3600);
+    return Response.json(await webOrder(env, order[1]));
+  }
+  throw new ApiError(404, 'not_found', 'Unbekannter Endpunkt');
+}
+const WEB_ORDER_ROUTE = /^\/v1\/web\/orders\/([A-Za-z0-9_-]{16,64})$/;
+
 const CHAT_ROUTES = ['/v1/chat', '/v1/chat/enable', '/v1/chat/disable', '/v1/chat/sync', '/v1/chat/pairing', '/v1/chat/inbox',
   '/v1/chat/inbox/ack', '/v1/chat/connections/revoke'];
 const PHOTO_ROUTE = /^\/v1\/chat\/photos\/([A-Za-z0-9_.:-]{1,80})$/;
@@ -86,6 +113,8 @@ function publicConfig(env: Env, cfg: Config) {
       priceMicro: p.priceMicro,
       creditMicro: packageCreditMicro(p.priceMicro, cfg.storeFeeBp, cfg.markupBp),
     })),
+    /** Guthaben im Web kaufen (Merchant of Record); `testMode` = Sandbox, keine echte Zahlung. */
+    webPurchase: webPurchaseConfig(env, cfg),
     spot: {
       starterMicro: cfg.spotStarterMicro,
       rewardMicro: cfg.spotRewardMicro,
@@ -117,6 +146,18 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     return out;
   }
 
+  if (path.startsWith('/v1/web/')) {
+    if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    const out = await webPublicRoute(req, env, cfg, path).catch((e) => (e instanceof ApiError ? errorResponse(e) : Promise.reject(e)));
+    const res = new Response(out.body, out);
+    for (const [k, v] of Object.entries(CORS)) res.headers.set(k, v);
+    return res;
+  }
+
+  if (path === '/v1/webhooks/payment' && method === 'POST') {
+    return Response.json(await handlePaymentWebhook(env, cfg, req));
+  }
+
   if (path === '/v1/admin/credit') {
     await rateLimit(env, `admin:${clientIp(req)}`, 20, 3600);
     return handleAdminCredit(req, env, cfg, new Uint8Array(await req.arrayBuffer()));
@@ -131,7 +172,8 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   }
 
   const routes = ['/v1/account', '/v1/account/profile', '/v1/account/ledger', '/v1/messages', '/v1/purchases/verify',
-    '/v1/spot/token', '/v1/spot/challenge', '/v1/spot/redeem', '/v1/recovery/code', '/v1/recovery/restore'];
+    '/v1/spot/token', '/v1/spot/challenge', '/v1/spot/redeem', '/v1/recovery/code', '/v1/recovery/restore',
+    '/v1/purchase/web-link', '/v1/purchases/web-link', '/v1/codes/redeem'];
   const photo = PHOTO_ROUTE.exec(path);
   if (!routes.includes(path) && !CHAT_ROUTES.includes(path) && !photo) throw new ApiError(404, 'not_found', 'Unbekannter Endpunkt');
 
@@ -189,6 +231,16 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
       if (method !== 'POST') throw wrongMethod();
       await sensitive();
       return Response.json(await handleVerifyPurchase(env, cfg, device, json(body)));
+    case '/v1/purchase/web-link':
+    case '/v1/purchases/web-link':
+      if (method !== 'POST') throw wrongMethod();
+      await sensitive();
+      return Response.json(await createWebLink(env, cfg, device, body.length ? json(body) : {}));
+    case '/v1/codes/redeem':
+      if (method !== 'POST') throw wrongMethod();
+      await sensitive();
+      await rateLimit(env, `codeip:${clientIp(req)}`, cfg.rlSensitivePerHour * 3, 3600);
+      return Response.json(await redeemCode(env, device, json(body)));
     case '/v1/spot/token':
       if (method !== 'POST') throw wrongMethod();
       return Response.json(await createSpotToken(env, cfg, device));

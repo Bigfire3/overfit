@@ -6,6 +6,12 @@ const DEFAULT_PACKAGES = {
   'overfit.fuel.10': { priceMicro: 10_000_000 },
 };
 
+const DEFAULT_WEB_PACKAGES = {
+  'web.5': { priceMicro: 5_000_000 },
+  'web.10': { priceMicro: 10_000_000 },
+  'web.20': { priceMicro: 20_000_000 },
+};
+
 function int(v: string | undefined, def: number, min = 0): number {
   if (v === undefined || v === '') return def;
   const n = Number(v);
@@ -52,6 +58,11 @@ export function getConfig(env: Env): Config {
     // Preise je Modell in µ€/MTok (Tabelle in providers.ts); PRICE_TABLE überschreibt einzelne Modelle.
     prices: { ...currentPrices(), ...json<Record<string, Price>>(env.PRICE_TABLE, {}) },
     packages: json(env.PACKAGES, DEFAULT_PACKAGES),
+    webPackages: json(env.WEB_PACKAGES, DEFAULT_WEB_PACKAGES),
+    webPurchaseOff: env.WEB_PURCHASE === 'off',
+    webPurchaseUrl: env.WEB_PURCHASE_URL || 'https://bigfire3.github.io/overfit/guthaben/',
+    webPurchaseChannels: (env.WEB_PURCHASE_CHANNELS ?? 'sideload').split(',').map((c) => c.trim()).filter((c) => c === 'sideload' || c === 'store'),
+    webLinkTtlSec: int(env.WEB_LINK_TTL_SEC, 15 * 60, 60),
     rlDevicePerMin: int(env.RL_DEVICE_PER_MIN, 60, 1),
     rlMessagesPerMin: int(env.RL_MESSAGES_PER_MIN, 10, 1),
     rlRegisterPerHourIp: int(env.RL_REGISTER_PER_HOUR_IP, 20, 1),

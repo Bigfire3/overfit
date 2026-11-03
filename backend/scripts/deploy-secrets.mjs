@@ -9,9 +9,13 @@
 // - SPOT_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
 //   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
 // - ADMIN_SECRET (nur Testbetrieb): wird bei jedem Lauf neu erzeugt, außer ein GitHub-Secret ist gesetzt; der Workflow nutzt ihn sofort.
+// - Web-Kauf (Paddle): PADDLE_API_KEY, PADDLE_WEBHOOK_SECRET, PADDLE_CLIENT_TOKEN. Optional; fehlt einer (weder in GitHub
+//   noch im Worker), bleibt der Web-Kauf aus, mit Hinweis in der Zusammenfassung (kein Abbruch).
 // - Optional (Play/Apple-Prüfer): nur gesetzt, wenn vorhanden; sonst Hinweis in der Zusammenfassung.
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+
+export const PADDLE = ['PADDLE_API_KEY', 'PADDLE_WEBHOOK_SECRET', 'PADDLE_CLIENT_TOKEN'];
 
 export const OPTIONAL = [
   'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME', 'PLAY_INTEGRITY_SERVICE_ACCOUNT',
@@ -61,6 +65,17 @@ export function plan(mode, env, existing) {
       notes.push('`ADMIN_SECRET`: für diesen Lauf neu erzeugt (nur Testbetrieb, für Test-Guthaben).');
     }
   }
+  const paddleMissing = [];
+  for (const n of PADDLE) {
+    if (given(n)) secrets[n] = given(n);
+    else if (!have.has(n)) paddleMissing.push(n);
+  }
+  const webPurchase = paddleMissing.length === 0;
+  if (webPurchase) notes.push('Web-Kauf (Paddle): alle drei Secrets vorhanden.');
+  else {
+    notes.push(`Web-Kauf bleibt **aus**: es fehlt ${paddleMissing.map((n) => `\`${n}\``).join(', ')} ` +
+      '(Paddle → Developer Tools → Authentication bzw. Notifications; Anleitung in backend/README.md → „Web-Kauf“).');
+  }
   const skipped = [];
   for (const n of OPTIONAL) {
     if (given(n)) secrets[n] = given(n);
@@ -70,7 +85,7 @@ export function plan(mode, env, existing) {
     notes.push(`Optional übersprungen (kein GitHub-Secret gesetzt): ${skipped.map((n) => `\`${n}\``).join(', ')}. ` +
       'Das sind die Store-Prüfer für echte Käufe und Spot-Geräteprüfung; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
   }
-  return { secrets, notes, errors, generated };
+  return { secrets, notes, errors, generated, webPurchase };
 }
 
 const MISSING_HELP = {

@@ -188,6 +188,16 @@ class FuelApi(
         return parse(call(HttpMethod.Post, "/v1/spot/redeem", body)) { decode(it) }
     }
 
+    override suspend fun webPurchaseLink(locale: String): WebPurchaseLink {
+        val body = buildJsonObject { put("locale", locale) }.toString()
+        return parse(call(HttpMethod.Post, "/v1/purchase/web-link", body)) { decode(it) }
+    }
+
+    override suspend fun redeemCode(code: String): CodeRedeemResult {
+        val body = buildJsonObject { put("code", code.trim()) }.toString()
+        return parse(call(HttpMethod.Post, "/v1/codes/redeem", body)) { decode(it) }
+    }
+
     override suspend fun messages(bodyJson: String): FuelMessageResult = parse(call(HttpMethod.Post, "/v1/messages", bodyJson)) { element ->
         val meta = element.jsonObject["overfit"]?.jsonObject
         FuelMessageResult(

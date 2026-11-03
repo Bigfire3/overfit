@@ -217,18 +217,48 @@ Body `{ "platform": "google"|"apple", "productId": "overfit.fuel.10", "purchaseT
 → `{ "productId": "…", "creditedMicro": 7870370, "alreadyCredited": false, "balanceMicro": 7870370 }`.
 Gutschrift = `Preis × (1 − storeFeeBp) / (1 + markupBp)` (abgerundet), **idempotent pro Kauf** (`alreadyCredited: true` bei Wiederholung, auch von anderen Konten – ein Kauf zählt nur einmal). Die App ruft das nach jedem erfolgreichen Store-Kauf auf (und beim Start für noch nicht bestätigte Käufe) und schließt die Transaktion erst danach ab. Ohne Store-Zugangsdaten im Backend: `503 purchases_unavailable`.
 
-## Geplant: Web-Kauf und Fuel-Codes (noch nicht gebaut)
-Siehe docs/monetization.md. Nur Vertrag, keine Implementierung.
+## Web-Kauf und Guthaben-Codes (Session Z, Testmodus)
+Siehe docs/monetization.md. Anbieter: Paddle (Merchant of Record), hinter der Schnittstelle `PaymentProvider`
+(`backend/src/payments/`). Im Testbetrieb immer Sandbox; echte Zahlungen nur im Produktionsbetrieb mit `PADDLE_ENV=live`.
+**Guthaben = Endpreis inkl. USt (1:1)**, keine Gebühr wird abgezogen.
 
-### `POST /v1/purchases/web-link` (signiert)
-Body `{ "productId": "overfit.fuel.10", "locale": "de" }` → `{ "url": "https://…/buy?t=<token>", "expiresAt": "…" }`.
-Token: signiert (HMAC), enthält anonyme Konto-ID, Produkt, Ablauf (≤ 15 Minuten), einmalig nutzbar. Die App öffnet `url` im Browser; kein Login nötig. Nur in Ländern/Stores ausgeliefert, in denen der Link erlaubt ist (Konfiguration in `/v1/config`).
+`/v1/config` → `webPurchase`: `{ enabled, testMode, provider, channels: ["sideload"], pageUrl, packages: [{ id, priceMicro, creditMicro }] }`.
+`enabled` = Paddle eingerichtet; `testMode` = Sandbox; `channels` = wo die App „Im Web aufladen“ zeigt (`sideload` = APK von GitHub,
+`store` = Play Store / App Store; Standard nur `sideload`, Repo-Variable `WEB_PURCHASE_CHANNELS`). Pakete: `web.5`, `web.10`, `web.20`.
 
-### `POST /v1/webhooks/payment` (Merchant of Record, Signatur des Anbieters)
-Body: Zahlungsereignis (Paddle/Lemon Squeezy/Stripe) mit Token aus dem Kauflink oder Code-Bestellung. Prüft die Anbieter-Signatur, bucht Fuel **idempotent pro Transaktions-ID** (`Preis × (1 − Anbietergebühr) / (1 + markupBp)`), `200` auch bei Wiederholung.
+### `POST /v1/purchase/web-link` (signiert; Alias `/v1/purchases/web-link`)
+Body `{ "locale": "de" }` → `{ "url": "https://bigfire3.github.io/overfit/guthaben/#t=<token>&lang=de", "expiresAt": …, "ttlSec": 900 }`.
+Token: 24 Zufallsbytes, nur der Hash liegt in D1 (`web_links`), 15 Minuten gültig, höchstens 5 begonnene Checkouts, nach der
+ersten bezahlten Zahlung verbraucht. Steht im Fragment (nicht in Server-Logs). `503 web_purchase_unavailable`, wenn nicht eingerichtet.
+
+### Öffentlich für die Kaufseite (ohne Signatur, CORS `*`, keine Cookies)
+- `POST /v1/web/session` `{ "token"?: … }` → `{ enabled, testMode, client: { provider, environment, clientToken }, packages, link: null | { status: valid | expired | used | invalid, expiresAt } }`
+- `POST /v1/web/checkout` `{ "token"?, "packageId": "web.10", "kind": "credit" | "code", "locale" }` → `{ orderId, transactionId, checkoutUrl, client, testMode }`.
+  `credit` braucht einen gültigen Token (`404 link_invalid`, `410 link_expired | link_used`), `code` nicht. Legt die Bestellung an und
+  erstellt beim Anbieter eine Transaktion (Preis ohne Katalog, `tax_mode: internal`, `custom_data.overfit_order`). Die Seite öffnet
+  sie mit Paddle.js (`Paddle.Checkout.open({ transactionId })`). `502 payment_unavailable` bei Anbieterfehlern. 30/h je IP.
+- `GET /v1/web/orders/<orderId>` → `{ kind, status: open | paid | refunded | chargeback, priceMicro, creditMicro, testMode, code, codeStatus }`.
+  `orderId` ist geheim (nur der Käufer kennt sie); `code` erst nach Zahlung, nie nach Sperre.
+
+### `POST /v1/webhooks/payment` (Signatur des Anbieters)
+Paddle: Header `Paddle-Signature: ts=…;h1=…`, HMAC-SHA256 über `ts:Rohbody` mit dem Webhook-Secret, hex; ±300 s; mehrere `h1`
+(Schlüsselwechsel) erlaubt. Falsch → `401 invalid_signature`.
+- `transaction.completed`: Bestellung über Transaktions-ID (oder `custom_data`), Währung EUR und Betrag ≥ Preis, sonst Vorfall
+  `amount_mismatch` ohne Buchung. **Idempotent** über `web_events` (`paid:<txn>`) in derselben Transaktion wie die Buchung:
+  Wiederholungen und parallele Zustellungen buchen genau einmal (`200 { duplicate: true }`). `credit` → Posten + Buchung
+  `type = purchase`, `source = web`, `ref = paddle:<txn>`. `code` → Guthaben-Code (`credit_codes`).
+- `adjustment.created|updated` mit `status = approved` und `action = refund | chargeback` (idempotent über `adj:<id>`):
+  anteiliges Guthaben zurückholen, von allen Posten des Kontos, **höchstens bis 0** (Buchung `type = refund | chargeback`,
+  `source = web | code`). Bestellung `refunded | chargeback`, `incident` = Aktion, `…:shortfall` wenn das Guthaben schon verbraucht war.
+  Code noch nicht eingelöst → Wert sinkt bzw. Code gesperrt (`revoked`); schon eingelöst → Abzug beim Einlöser.
+- Andere Ereignisse: `200 { ignored }`.
 
 ### `POST /v1/codes/redeem` (signiert)
-Body `{ "code": "XXXX-XXXX-XXXX" }` → `{ "creditedMicro": …, "balanceMicro": … }`. Codes entstehen per Webhook (Kauf ohne App, Geschenk), sind einmalig einlösbar; Fehler `invalid_code`, `already_redeemed`.
+Body `{ "code": "ABCD-EFGH-JKMN" }` (Groß/klein, Bindestriche, Leerzeichen egal) → `{ "creditedMicro": …, "balanceMicro": … }`.
+Einmalig, in einer Transaktion (parallel: genau einer gewinnt). Fehler `400/404 invalid_code`, `409 already_redeemed`, `410 code_revoked`.
+Posten `kind = code` (verfällt nicht), Buchung `type = code_redeem`, `source = code`.
+
+Buchungen (`/v1/account/ledger`) tragen dafür das Feld `source` (`null` | `web` | `code`).
 
 ## Spot (Einladungen)
 

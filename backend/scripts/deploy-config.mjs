@@ -42,7 +42,19 @@ export function readJsonc(path) {
   return JSON.parse(text);
 }
 
-export function buildConfig(mode, databaseId, base = readJsonc(join(root, 'wrangler.jsonc'))) {
+/**
+ * Web-Kauf aus Repo-Variablen: echte Zahlungen (`PADDLE_ENV=live`) nur im Produktionsbetrieb, der Testbetrieb ist immer
+ * Sandbox. `WEB_PURCHASE_CHANNELS` (sideload,store) steuert, wo die App den Knopf zeigt.
+ */
+export function webVars(mode, env) {
+  const v = {};
+  if (mode === 'production' && (env.PADDLE_ENV ?? '').trim() === 'live') v.PADDLE_ENV = 'live';
+  const ch = (env.WEB_PURCHASE_CHANNELS ?? '').trim();
+  if (/^(sideload|store)(,(sideload|store))*$/.test(ch)) v.WEB_PURCHASE_CHANNELS = ch;
+  return v;
+}
+
+export function buildConfig(mode, databaseId, base = readJsonc(join(root, 'wrangler.jsonc')), env = process.env) {
   const n = NAMES[mode];
   if (!n) throw new Error(`Unbekannter Modus: ${mode} (test | production)`);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(databaseId ?? '')) throw new Error(`Ungültige database_id: ${databaseId}`);
@@ -53,7 +65,7 @@ export function buildConfig(mode, databaseId, base = readJsonc(join(root, 'wrang
   cfg.r2_buckets = [{ ...base.r2_buckets[0], bucket_name: n.bucket }];
   // Workers AI (Stufe `lite`) und AI-Gateway-URLs; nur im Deploy, damit lokale Tests kein Cloudflare-Konto brauchen.
   cfg.ai = { binding: 'AI' };
-  cfg.vars = { ...base.vars, ...MODE_VARS[mode], AI_GATEWAY_ID: n.gateway };
+  cfg.vars = { ...base.vars, ...MODE_VARS[mode], AI_GATEWAY_ID: n.gateway, ...webVars(mode, env) };
   return cfg;
 }
 

@@ -10,10 +10,54 @@
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
 | 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); Feinschliff laufend |
 | 6 | Store-Release (App Store, Play Store) | offen |
-| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Stufen Standard/Pro/Lite mit Gemini, Claude, Workers AI über AI Gateway (Session X); Store-Kauf offen (braucht Konten) |
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Stufen Standard/Pro/Lite mit Gemini, Claude, Workers AI über AI Gateway (Session X); Web-Kauf mit Guthaben-Codes im Testmodus (Paddle-Sandbox, Session Z); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Guthaben im Web kaufen, Testmodus (Session Z, 3.11.)
+**Erledigt:**
+- **Backend:** `POST /v1/purchase/web-link` (signiert, Token 15 min, einmalig), öffentliche Endpunkte der Kaufseite
+  (`/v1/web/session`, `/v1/web/checkout`, `/v1/web/orders/<id>`), `POST /v1/webhooks/payment` mit Paddle-Signaturprüfung,
+  idempotente Buchung (Quelle `web`, Paddle-Transaktions-ID), Rückerstattung/Chargeback bis höchstens 0 mit Vorfall-Markierung,
+  Guthaben-Codes (`POST /v1/codes/redeem`). `/v1/config` → `webPurchase` (an/aus, Testmodus, Kanäle, Pakete). Migration `0004_web_purchase.sql`.
+  Paddle hinter `PaymentProvider`. Pakete 5/10/20 €, **Guthaben = Preis** (Begründung und offene Margenfrage: DECISIONS, monetization.md).
+- **Webseite** `web/guthaben/`: Paketwahl, „Testmodus – keine echte Zahlung“, Paddle-Checkout, Erfolgsseite mit „Zurück zur App“
+  (`overfit://guthaben`), ohne App „Guthaben-Code kaufen“ (Code auf der Erfolgsseite), Rechtstexte als „folgt vor dem Start“ markiert.
+- **App:** Guthaben → „Im Web aufladen“ (öffnet den Kauflink im Browser; Kontostand lädt neu beim Zurückkommen und per Deep Link),
+  „Code einlösen“, neue Buchungsarten (Aufladung im Web, Code eingelöst, Erstattung, Rückbuchung). Knopf nur, wenn `/v1/config` ihn für
+  den Kanal freigibt: seitlich installierte APK an, Store-Builds (Play-Installer, iOS) aus.
+- **Deploy-Workflow:** Secrets `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_CLIENT_TOKEN` (fehlen sie, bleibt der Web-Kauf aus,
+  Hinweis in der Zusammenfassung); Zusammenfassung nennt Webhook-URL und Status. Pages-Workflow schreibt die Backend-Adresse in die Kaufseite.
+- Tests: `backend/test/web.test.ts` (Token, Signatur, Idempotenz, Rückerstattung, Chargeback, Codes, Config, Umzug),
+  `web/test/guthaben.mjs` (Kaufseite im Browser), `WebPurchaseTest` (common), `WebCreditTest` + `CreditReturnLinkTest` (Robolectric);
+  `OwnKeyPrivacyTest` unverändert grün.
+**Offen:** echter Lauf gegen die Paddle-Sandbox (nur gemockt geprüft); Live-Betrieb braucht Paddle-Live-Konto, Rechtstexte,
+juristische Prüfung und die Margenentscheidung.
+
+### Von Fabian zu tun (Session Z, alles im Browser)
+1. **sandbox-login.paddle.com/signup** → Sandbox-Konto anlegen (kostenlos, keine Prüfung).
+2. Paddle → **Checkout → Checkout settings** → *Default payment link*: `https://bigfire3.github.io/overfit/guthaben/` → Save.
+3. Paddle → **Developer tools → Authentication**: *API keys* → **New API key** (Name `overfit-test`, Recht *Transactions: Write*) → Wert kopieren.
+   Dann *Client-side tokens* → **New client-side token** → Wert kopieren.
+4. Paddle → **Developer tools → Notifications → New destination**: Typ *Webhook*, URL = deine Worker-Adresse (Repo-Variable
+   `OVERFIT_BACKEND_URL`) + `/v1/webhooks/payment`, Ereignisse `transaction.completed`, `adjustment.created`, `adjustment.updated` → Save →
+   Ziel öffnen → *Secret key* kopieren.
+5. GitHub → Settings → Secrets and variables → Actions → **New repository secret**: `PADDLE_API_KEY`, `PADDLE_CLIENT_TOKEN`, `PADDLE_WEBHOOK_SECRET`.
+6. Actions → **Backend deployen** → Run workflow → `mode` = test. Zusammenfassung: „Web-Kauf: An, Testmodus“ und die Webhook-URL (= Schritt 4).
+7. Actions → **Web veröffentlichen (GitHub Pages)** → Run workflow (Kaufseite bekommt die Backend-Adresse).
+8. Neues APK aus „Overfit latest“ installieren, dann testen (unten). Testkarte: `4242 4242 4242 4242`, Ablauf in der Zukunft, CVC `100`.
+
+### Bitte auf dem Handy testen (Session Z, nach den Schritten oben)
+1. Profil → Guthaben (Opt-in falls eigener Key) → unter „Aufladen“ steht „Im Web aufladen“ mit „Testmodus – keine echte Zahlung“.
+2. Antippen → Browser öffnet die Kaufseite: „Guthaben aufladen“, Testmodus-Hinweis, 5/10/20 € (10 € vorgewählt). 5 € wählen →
+   „Weiter zur Zahlung“ → Paddle-Fenster → Testkarte → bezahlen → „Danke! 5 € Guthaben sind auf deinem Konto.“
+3. „Zurück zur App“ → Guthaben-Screen öffnet sich, Saldo +5,00 €. Buchungen: „Aufladung im Web +5,00 €“.
+4. Gleichen Link nochmal öffnen (Browser-Verlauf): „Mit diesem Kauflink wurde schon bezahlt“ und Code-Kauf angeboten.
+5. Am Rechner `https://bigfire3.github.io/overfit/guthaben/` öffnen → „Guthaben-Code kaufen“ → bezahlen → Code wird angezeigt →
+   in der App Guthaben → „Code einlösen“ → Code eingeben → „5,00 € Guthaben gutgeschrieben.“ Zweites Mal: „schon eingelöst“.
+6. Erstattung: Paddle-Sandbox → Transactions → Kauf öffnen → Refund (voll) → nach Freigabe sinkt der Saldo um 5 € (nie unter 0),
+   Buchung „Erstattung“.
 
 ## Fuel mit mehreren KI-Anbietern und AI Gateway (Session X, 3.11.)
 **Erledigt:**

@@ -49,5 +49,20 @@ fun androidDependencies(
     share = AndroidPlatformShare(context),
     inbox = ImportInbox(),
     kv = kv,
+    distribution = androidDistribution(context),
     )
 }
+
+/**
+ * Store build = installed by Google Play (or another store app); everything else (APK from GitHub, adb) is sideloaded.
+ * The web purchase button follows this (store rules), see `/v1/config` → `webPurchase.channels`.
+ */
+fun androidDistribution(context: Context): app.overfit.fuel.Distribution {
+    val installer = runCatching {
+        if (android.os.Build.VERSION.SDK_INT >= 30) context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+        else @Suppress("DEPRECATION") context.packageManager.getInstallerPackageName(context.packageName)
+    }.getOrNull()
+    return if (installer in STORE_INSTALLERS) app.overfit.fuel.Distribution.Store else app.overfit.fuel.Distribution.Sideload
+}
+
+private val STORE_INSTALLERS = setOf("com.android.vending", "com.google.android.feedback", "com.amazon.venezia", "com.huawei.appmarket", "com.sec.android.app.samsungapps")

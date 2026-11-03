@@ -84,10 +84,12 @@ export async function settle(
 export function grantStatements(
   env: Env,
   accountId: string,
-  kind: 'purchase' | 'spot_bonus' | 'spot_reward' | 'test_credit',
+  kind: 'purchase' | 'spot_bonus' | 'spot_reward' | 'test_credit' | 'code_redeem',
   amountMicro: number,
   expiresAt: number | null,
   ref: string,
+  /** Quelle der Buchung: null = Store/intern, 'web' = Web-Kauf, 'code' = Guthaben-Code. */
+  source: 'web' | 'code' | null = null,
 ): D1PreparedStatement[] {
   const t = now();
   return [
@@ -96,8 +98,8 @@ export function grantStatements(
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(randomId(), accountId, kind, amountMicro, amountMicro, expiresAt, t, ref),
     env.DB.prepare(
-      `INSERT INTO ledger (account_id, ts, type, amount_micro, ref) VALUES (?, ?, ?, ?, ?)`,
-    ).bind(accountId, t, kind, amountMicro, ref),
+      `INSERT INTO ledger (account_id, ts, type, amount_micro, ref, source) VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(accountId, t, kind, amountMicro, ref, source),
   ];
 }
 
@@ -117,4 +119,39 @@ export async function expiringLots(
 
 export function monthKey(ts = now()): string {
   return new Date(ts * 1000).toISOString().slice(0, 7);
+}
+
+/**
+ * Statements, die bis zu `amountMicro` von den Posten eines Kontos abziehen (nie unter 0), plus die Buchung.
+ * Für Rückerstattungen und Chargebacks. Gibt den tatsächlich abgezogenen Betrag zurück.
+ */
+export async function clawbackStatements(
+  env: Env,
+  accountId: string,
+  amountMicro: number,
+  type: 'refund' | 'chargeback',
+  ref: string,
+  source: 'web' | 'code',
+): Promise<{ stmts: D1PreparedStatement[]; takenMicro: number }> {
+  const lots = await env.DB.prepare(
+    `SELECT id, remaining_micro FROM lots WHERE account_id = ?1 AND remaining_micro > 0 AND (expires_at IS NULL OR expires_at > ?2)
+     ORDER BY (expires_at IS NULL) DESC, created_at DESC`,
+  )
+    .bind(accountId, now())
+    .all<{ id: string; remaining_micro: number }>();
+  const stmts: D1PreparedStatement[] = [];
+  let left = amountMicro;
+  for (const lot of lots.results) {
+    if (left <= 0) break;
+    const take = Math.min(left, lot.remaining_micro);
+    stmts.push(env.DB.prepare('UPDATE lots SET remaining_micro = MAX(remaining_micro - ?1, 0) WHERE id = ?2').bind(take, lot.id));
+    left -= take;
+  }
+  const taken = amountMicro - left;
+  stmts.push(
+    env.DB.prepare('INSERT INTO ledger (account_id, ts, type, amount_micro, ref, source) VALUES (?, ?, ?, ?, ?, ?)').bind(
+      accountId, now(), type, -taken, ref, source,
+    ),
+  );
+  return { stmts, takenMicro: taken };
 }

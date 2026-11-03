@@ -23,6 +23,10 @@ interface FuelService {
     suspend fun redeemSpot(token: String): SpotRedeemResult
     /** Sends an Anthropic-style Messages request through Fuel (used by the coach in phase 4). */
     suspend fun messages(bodyJson: String): FuelMessageResult
+    /** Short-lived, single-use link to the web purchase page for this account (opened in the browser). */
+    suspend fun webPurchaseLink(locale: String): WebPurchaseLink = throw FuelException("web_purchase_unavailable", 503)
+    /** Redeems a credit code bought on the web. Errors: `invalid_code`, `already_redeemed`, `code_revoked`. */
+    suspend fun redeemCode(code: String): CodeRedeemResult = throw FuelException("invalid_code", 404)
 }
 
 /**

@@ -802,3 +802,41 @@ Prüfung des Codes (Start, Vordergrund, Fuel-Konto, Registrierung, `/v1/config`,
   Room-Schema). „Mit KI ausfüllen“ fragt über `AiGateway.send(light = true)`: mit Fuel `lite`, mit eigenem Key unverändert.
   `FuelProvider` merkt sich `/v1/config` 10 Minuten. Die Config wird nur geladen, wenn Fuel der KI-Zugang ist; die Garantie „eigener Key =
   null Backend-Anfragen“ bleibt (OwnKeyPrivacyTest).
+
+## Guthaben im Web, Testmodus (Session Z, 3.11.)
+- **Anbieter: Paddle (Billing) als Merchant of Record, zuerst nur Sandbox.** Paddle übernimmt EU-USt, Belege, Erstattungen und
+  Chargebacks; die Sandbox ist für ein Einzelkonto sofort und kostenlos nutzbar (keine Domain- oder Kontoprüfung, Default Payment
+  Link darf jede Domain sein). Lemon Squeezy wäre gleichwertig, gehört aber inzwischen zu Stripe und wird umgebaut; Stripe allein
+  hieße USt selbst abführen (OSS). Gebühr Paddle: 5 % + 0,50 € je Kauf. Die Integration liegt hinter `PaymentProvider`
+  (`backend/src/payments/provider.ts`: `createCheckout`, `parseWebhook`); ein Wechsel betrifft nur `paddle.ts`.
+- **Checkout per API-Transaktion + Paddle.js auf der eigenen Seite** (`/v1/web/checkout` legt die Transaktion mit Preis ohne
+  Katalog, `tax_mode: internal` an). So braucht Fabian im Paddle-Dashboard keine Produkte/Preise anzulegen; Pakete und Preise
+  stehen im Backend (`WEB_PACKAGES`). Paddle hat keine eigene gehostete Seite; der Default Payment Link zeigt auf `/guthaben/`.
+- **Pakete 5/10/20 € statt 2/5/10 €:** Die Fixgebühr von 0,50 € frisst bei 2 € ein Viertel des Preises. 5 € bleibt der kleinste
+  Einstieg, 20 € für Vielnutzer.
+- **1:1-Guthaben (5 € = 5 €), Endpreise inkl. USt.** Weicht bewusst von der Store-Formel ab (Fabians Vorgabe: ehrlich, Marge in den
+  Modellpreisen). Folge: Mit heutigem Aufschlag 8 % verliert jeder echte Web-Kauf Geld (USt + Paddle). Im Testmodus egal; vor dem
+  Live-Start muss der Aufschlag auf ≈ 35–40 % (Rechnung in docs/monetization.md). Nicht jetzt geändert, weil das auch die
+  App-Preise (Store, Coach-Kosten) verschiebt und eine Geldentscheidung ist.
+- **Kauflink = Zufallstoken mit Hash in D1 statt HMAC-signiertem Token.** Einmaligkeit und Ablauf muss der Server ohnehin
+  speichern; ein signierter Token brächte nichts dazu, würde aber die Konto-ID in die URL tragen. Token im Fragment (`#t=`), damit er
+  weder in Logs noch im Referer landet. 15 Minuten, bis zu 5 Checkouts (Paket wechseln, Abbruch), nach der ersten Zahlung verbraucht.
+- **Backend-Adresse der Kaufseite nur aus `config.js` (Pages-Workflow, Repo-Variable `OVERFIT_BACKEND_URL`), nie aus der URL:**
+  sonst könnte ein präparierter Link unsere Seite auf einen fremden Server mit fremdem Paddle-Konto umleiten.
+- **Sandbox nie in Produktion:** Ein Produktions-Worker bietet den Web-Kauf nur mit `PADDLE_ENV=live` an; der Testbetrieb ist immer
+  Sandbox. Sonst könnte jemand mit Testkarten echtes Guthaben (= echte KI-Kosten) erzeugen.
+- **Idempotenz:** Wächterzeile `web_events (provider, event_key)` in derselben D1-Batch-Transaktion wie die Gutschrift; eine zweite
+  Zustellung scheitert am Primärschlüssel und rollt komplett zurück. Erstattungen erst bei `status = approved`; abgezogen wird von
+  allen Posten des Kontos (unbefristete zuerst), nie unter 0, Fehlbetrag als `incident = …:shortfall` an der Bestellung.
+  Chargeback-Rücknahmen (`chargeback_reversal`) buchen nichts automatisch zurück (selten, lieber von Hand).
+- **Guthaben-Codes** 12 Zeichen aus 31 (ohne 0/O/1/I/L, ≈ 59 Bit), Klartext in D1 (wie ein Gutschein; wer die DB hat, hat ohnehin
+  die Salden). Der Käufer sieht den Code nur auf der Erfolgsseite (Bestell-ID als Geheimnis). Erstattung vor dem Einlösen senkt den
+  Wert bzw. sperrt den Code, danach Abzug beim Einlöser. Codes verfallen nicht.
+- **Store-Regeln:** App-Knopf „Im Web aufladen“ nur, wenn `/v1/config` → `webPurchase.channels` den Kanal enthält. Kanal Android:
+  Installer (Play/andere Stores = `store`, sonst `sideload`), iOS immer `store`. Standard `sideload`, Repo-Variable
+  `WEB_PURCHASE_CHANNELS`. „Code einlösen“ bleibt überall sichtbar (kein Kaufweg in der App).
+- **Datenschutz-Garantie:** Der Web-Kauf ist ein Opt-in hinter dem bestehenden Guthaben-Opt-in; `OwnKeyPrivacyTest` bleibt grün.
+- **Benennung:** Neue Texte sagen „Guthaben“/„Credit“ (Session Y benennt den Rest um); sie liegen in `i18n/WebCreditStrings.kt`,
+  damit es mit der parallelen Umbenennung keine Konflikte gibt. Neue Ledger-Typen: `code_redeem`, `refund`, `chargeback`; neues Feld
+  `source` (`web`, `code`).
+- Impressum, Datenschutz, AGB auf der Kaufseite sind sichtbar als „folgt vor dem Start“ markiert, keine erfundenen Rechtstexte.

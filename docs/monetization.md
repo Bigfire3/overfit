@@ -1,6 +1,6 @@
 # Monetarisierung
 
-Marke: **overfit – personal training for everyone** (siehe DECISIONS.md). Stand: Plan, mit Fabian abgestimmt. Umgesetzt ist heute nur Fuel (mit Preisstufen) mit Store-Kauf im Backend-Vertrag (`/v1/purchases/verify`); alles andere hier ist geplant.
+Marke: **overfit – personal training for everyone** (siehe DECISIONS.md). Stand: Plan, mit Fabian abgestimmt. Umgesetzt sind das Coach-Guthaben (früher „Fuel“, mit Preisstufen) mit Store-Kauf im Backend-Vertrag (`/v1/purchases/verify`) und der Web-Kauf mit Guthaben-Codes **im Testmodus** (Paddle-Sandbox, Session Z); alles andere hier ist geplant.
 
 ## Grundsätze
 - **Grundfunktionen kostenlos, keine Werbung.** Training loggen, Katalog, Workouts, Pausentimer, Auswertung, Diary, Teilen, eigener API-Key bleiben gratis.
@@ -25,12 +25,24 @@ Abgerechnet wird je Anfrage nach Token zum Listenpreis des Modells plus 8 % Aufs
 Fällt der Anbieter einer Stufe aus, antwortet die andere; der Nutzer zahlt nie mehr als die gewählte Stufe (Differenz trägt die Marge).
 Preise pflegt der Betreiber in `backend/src/providers.ts`.
 
-## Fuel günstiger im Web (geplant)
-- Eigene Webseite mit niedrigerem Preis (keine Store-Gebühr). Aus der App wird nur dorthin verlinkt, **wo es erlaubt ist**: EU über die DMA-Programme der Stores, USA über externe Links nach den Epic-Urteilen. Die Regeln ändern sich laufend und müssen **vor dem Start juristisch geprüft** werden; pro Land per Konfiguration schaltbar.
-- **Kauf ohne Login:** Die App öffnet einen kurzlebigen, signierten Kauflink mit der anonymen Konto-ID. Zahlung über einen **Merchant of Record** (z. B. Paddle oder Lemon Squeezy; übernehmen die EU-Umsatzsteuer; Stripe als Alternative, dann USt selbst). Ein Webhook bucht das Fuel aufs Konto.
-- **Fuel-Codes:** zum Einlösen in der App, als Geschenk oder ohne App kaufbar.
-- **E-Mail-Login** optional, erst später für Geräte-Sync nötig (bis dahin: Wiederherstellungscode).
-- Backend-Vertrag: `docs/backend-api.md`, Abschnitt „Geplant: Web-Kauf“. Noch nicht gebaut.
+## Guthaben im Web (Session Z, Testmodus)
+- Kaufseite `https://bigfire3.github.io/overfit/guthaben/`, Pakete **5 €, 10 €, 20 €**. Die Preise sind **Endpreise inkl. USt**,
+  das Guthaben entspricht dem Betrag: **5 € zahlen = 5 € Guthaben**, ohne Abzug. Das ist ehrlicher als die Store-Formel
+  (Preis × (1 − Gebühr) / (1 + Aufschlag)); die Marge steckt allein in den Modellpreisen (`MARKUP_BP`), die die App nennt.
+- **Kauf ohne Login:** „Im Web aufladen“ in der App holt einen kurzlebigen, einmaligen Kauflink (15 min) zur anonymen Konto-ID und
+  öffnet ihn im Browser. Zahlung über **Paddle als Merchant of Record** (übernimmt EU-USt, Beleg, Erstattungen). Ein Webhook bucht
+  das Guthaben idempotent; Erstattung/Chargeback holt es zurück (nie unter 0) und markiert den Vorfall.
+- **Guthaben-Codes:** ohne App auf derselben Seite kaufbar (Geschenk), einmalig in der App einlösbar („Code einlösen“).
+- **Store-Regeln:** Der App-Knopf ist per `/v1/config` → `webPurchase.channels` schaltbar. Standard: nur in seitlich installierten
+  APKs (GitHub), in Store-Builds aus, bis die Rechtslage geprüft ist (EU: DMA-Programme der Stores, USA: externe Links nach den
+  Epic-Urteilen; Apple verlangt dann parallel den In-App-Kauf). „Code einlösen“ bleibt überall (Codes kauft man außerhalb der App).
+- **Vor dem Live-Start (Fabian):** Paddle-Live-Konto mit Domain- und Kontoprüfung, Impressum, Datenschutz, AGB/Widerruf (die Seite
+  zeigt Platzhalter „folgt vor dem Start“), juristische Prüfung, dann Repo-Variable `PADDLE_ENV = live` und Live-Keys.
+- **Marge (offen, Geldentscheidung):** Paddle nimmt 5 % + 0,50 € je Kauf, die USt (DE 19 %) geht ab. Von 10 € bleiben ≈ 7,40 €,
+  von 5 € ≈ 3,45 €, von 20 € ≈ 15,30 €. Mit 1:1-Guthaben trägt sich das erst bei einem Aufschlag von ≈ 35 % (10 €) bis ≈ 45 % (5 €);
+  heute sind es 8 %. Vorschlag vor dem Live-Start: `MARKUP_BP` auf ≈ 3500–4000 und die Store-Gutschrift auf Preis × (1 − Store-Gebühr)
+  ohne zweiten Aufschlag umstellen. Im Testmodus kostet das nichts (Sandbox, kein echtes Geld). Siehe DECISIONS.md.
+- Backend-Vertrag: `docs/backend-api.md`, Abschnitt „Web-Kauf und Guthaben-Codes“.
 
 ## Später
 1. **Pro-Abo** (optional): Duo, erweiterte Statistiken, verschlüsseltes Cloud-Backup/Sync, mehr Coach-Gedächtnis, etwas Fuel inklusive.
@@ -39,4 +51,5 @@ Preise pflegt der Betreiber in `backend/src/providers.ts`.
 4. **Einmaliger Unterstützer-Kauf.**
 
 ## Offene Punkte für Fabian
-- Gewerbe anmelden, Umsatzsteuer (Kleinunternehmer vs. Regelbesteuerung), Impressum, Datenschutzerklärung, AGB und Widerrufsbelehrung (digitale Inhalte), Konto beim Merchant of Record, Store-Konten (Small-Business-Programme beantragen), juristische Prüfung der externen Kaufwege.
+- Gewerbe anmelden, Umsatzsteuer (Kleinunternehmer vs. Regelbesteuerung), Impressum, Datenschutzerklärung, AGB und Widerrufsbelehrung (digitale Inhalte), Paddle-Live-Konto, Store-Konten (Small-Business-Programme beantragen), juristische Prüfung der externen Kaufwege.
+- Aufschlag für das 1:1-Web-Guthaben festlegen (siehe „Marge“ oben).
