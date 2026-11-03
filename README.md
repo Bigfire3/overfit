@@ -105,6 +105,6 @@ App einen geänderten Katalog automatisch ein. Eigene Einstellungen an Übungen 
 
 ## Lizenzen
 
-Code: [Apache License 2.0](LICENSE).
+Code: © Fabian Zänker, alle Rechte vorbehalten (siehe [LICENSE](LICENSE)). Der Code ist einsehbar, aber nicht zur Weiterverwendung freigegeben.
 Übungsgrafiken: Workout Guide (Bryl Lim, Everkinetic), CC BY-SA 4.0. Ergänzend free-exercise-db (Unlicense).
 Schrift: Inter (SIL Open Font License 1.1, siehe `licenses/Inter-OFL.txt`). Details im „Über"-Screen der App.

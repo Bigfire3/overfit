@@ -1,12 +1,10 @@
 name: iOS CI
 
-# macOS minutes are expensive (10x), so iOS only builds for pull requests to main,
-# pushes to main and on demand – not on every push to a claude/** branch.
+# Pausiert (3.11.): macOS-Minuten kosten 10x und haben die meisten Actions-Kosten verursacht.
+# Läuft nur noch von Hand (Actions → iOS CI → Run workflow), z. B. vor einem Release oder
+# nach größeren Änderungen an iosMain/iosApp. Kotlin/Native-Code prüft weiterhin
+# :shared:compileKotlinIosSimulatorArm64 in der Android-CI bzw. lokal.
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:

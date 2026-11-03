@@ -40,6 +40,10 @@ jobs:
       - name: Tests
         run: ./gradlew :shared:testAndroidHostTest :app:testDebugUnitTest --console=plain
 
+      # Ersatz für die pausierte iOS-CI: iosMain kompiliert unter Linux (nur Klibs, kein Linken).
+      - name: iOS-Code kompilieren (Kotlin/Native)
+        run: ./gradlew :shared:compileKotlinIosSimulatorArm64 --console=plain
+
       - name: Signaturschlüssel aus Secrets
         env:
           KEYSTORE_BASE64: ${{ secrets.OVERFIT_KEYSTORE_BASE64 }}
