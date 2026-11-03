@@ -93,7 +93,8 @@ In Xcode einen iPhone-Simulator wählen und starten. Der Kotlin-Teil wird beim B
 ## iPhone: TestFlight
 
 Der Workflow „iOS TestFlight“ (`.github/workflows/ios-testflight.yml`, nur manuell) baut ein signiertes Archiv und lädt
-es zu TestFlight hoch. Build-Nummer = Run-Nummer, Bundle-ID `app.overfit` (änderbar über die Variable `IOS_BUNDLE_ID`).
+es zu TestFlight hoch. **Kein Mac nötig:** alles läuft auf GitHubs macOS-Runnern, du brauchst nur den Browser
+(developer.apple.com, appstoreconnect.apple.com, github.com) und das iPhone. Build-Nummer = Run-Nummer, Bundle-ID `app.overfit` (änderbar über die Variable `IOS_BUNDLE_ID`).
 Einmalig einrichten:
 
 1. **Apple Developer Program** beitreten: developer.apple.com/programs → „Enroll“ (99 €/Jahr, als Einzelperson mit
@@ -121,9 +122,9 @@ Einmalig einrichten:
 9. **iPhone**: App „TestFlight“ aus dem App Store laden, mit derselben Apple-ID anmelden → Overfit → „Installieren“.
    Jeder neue Lauf erscheint dort als Update. TestFlight-Builds laufen 90 Tage.
 
-### iPhone ohne bezahltes Konto (Mac nötig)
+### iPhone ohne bezahltes Konto (nur mit Mac)
 
-Mit einem Mac geht es auch kostenlos, aber umständlicher:
+Nur falls ein Mac verfügbar ist, geht es auch kostenlos, aber umständlicher:
 
 1. Xcode aus dem Mac App Store, dann JDK 21 und XcodeGen (`brew install openjdk@21 xcodegen`).
 2. Repo klonen, `cd iosApp && xcodegen && open Overfit.xcodeproj`.

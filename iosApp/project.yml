@@ -22,7 +22,7 @@ targets:
     info:
       path: Overfit/Info.plist
       properties:
-        CFBundleDisplayName: Overfit
+        CFBundleDisplayName: overfit
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         OverfitBackendUrl: $(OVERFIT_BACKEND_URL)
