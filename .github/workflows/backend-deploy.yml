@@ -58,6 +58,8 @@ jobs:
     steps:
       - name: Voraussetzungen prüfen
         id: pre
+        # Läuft vor dem Checkout: backend/ existiert hier noch nicht.
+        working-directory: .
         run: |
           set -u
           SUMMARY="$GITHUB_STEP_SUMMARY"
