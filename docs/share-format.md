@@ -72,3 +72,17 @@ Eingehende alte Links mit `fedb:`-IDs funktionieren weiter:
 
 Die Seite muss nur lesen (Fragment → Base64url → inflate-raw → JSON). Anzeige: Name, Übungen (`id` ohne Katalog als lesbarer
 Name aus der ID oder `name`/`custom[].name`), Sätze. Zusätzlich Button „In Overfit öffnen“ auf `overfit://t#<payload>`.
+
+## Kompakter QR-Inhalt (`OF1:`, seit Session Q)
+
+Nur für den QR-Code der App (`shared/.../share/QrPayload.kt`); der geteilte *Link* und die `.overfit`-Datei bleiben unverändert.
+```
+OF1:<Base45>      Base45 (RFC 9285) von: Flag-Byte (0 = roh, 1 = Raw Deflate) + Binärform des Trainings
+OFS:<ID>          Kurz-Code über das Backend (docs/backend-api.md), nur eine ID
+```
+Binärform (alle Zahlen als LEB128-Varint, Strings = Länge + UTF-8): Version `1`, Art (0 Workout/Vorlage, 1 abgeschlossenes Training),
+Name, Notiz, Übungen (Referenzart 0 Katalog-ID als Text, 1 Name, 2 `custom`-Ref, **3 Katalog-ID als 24-Bit-Hash**;
+Pause/Notiz optional; Sätze als Gruppen „n × (kg·100, Wdh., Sek.)“), eigene Übungen (`custom`). Katalog-IDs `wg:…` werden als
+die ersten 24 Bit von FNV-1a übertragen und beim Import über den lokalen Katalog zurückgeführt (Test: keine Kollision im
+Katalog); unbekannte Hashes werden übersprungen. Gewichte sind auf 0,01 kg genau. `ShareFormat.parseInput` liest `OF1:` auch
+mitten im Text, `ImportViewModel` erkennt `OFS:`.

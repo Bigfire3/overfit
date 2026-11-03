@@ -55,6 +55,20 @@
                 <data android:scheme="content" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.overfit" />
                 <data android:scheme="file" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.overfit" />
             </intent-filter>
+            <!-- Datei mit unbekanntem Typ (WhatsApp, Downloads liefern oft application/octet-stream): Overfit prüft den Inhalt selbst. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/octet-stream" />
+                <data android:scheme="file" android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <!-- "Teilen mit …" aus Dateien-App, WhatsApp, Mail: .overfit-Datei an Overfit schicken. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/x-overfit" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
         </activity>
 
         <receiver

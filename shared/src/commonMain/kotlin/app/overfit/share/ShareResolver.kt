@@ -93,6 +93,8 @@ object ShareMapper {
      */
     fun resolve(training: SharedTraining, catalog: List<Exercise>): ImportPreview {
         val byId = catalog.associateBy { it.id }
+        // IDs from compact QR content (QrPayload): hash of a catalogue ID.
+        val byHash = catalog.filter { it.id.startsWith("wg:") }.associateBy { QrPayload.hashedId(it.id) }
         val index = ExerciseSearch.index(catalog)
         val customByRef = training.custom.associateBy { it.ref }
         val lines = training.exercises.map { se ->
@@ -104,7 +106,7 @@ object ShareMapper {
                 se.ref != null && custom != null -> catalog.firstOrNull { it.isCustom && it.name.trim().equals(custom.name.trim(), ignoreCase = true) }
                     ?: findExact(custom.name, catalog)
                 se.ref != null -> null
-                else -> se.id?.let { byId[it] }
+                else -> se.id?.let { byId[it] ?: byHash[it] }
                     ?: se.name?.let { findByName(it, catalog, index) }
                     // Unknown catalogue ID (e.g. "fedb:Barbell_Curl" from before free-exercise-db was removed): exact name only.
                     ?: se.id?.let { unknownId(it) }?.let { findExact(it, catalog) }
@@ -144,7 +146,7 @@ object ShareMapper {
 
     /** Readable name from an unknown catalogue ID like `fedb:Barbell_Curl` → "Barbell Curl". */
     private fun unknownId(id: String): String? =
-        id.substringAfter(':').replace('_', ' ').replace('-', ' ').trim().takeIf { it.isNotEmpty() }
+        if (id.startsWith(QrPayload.HASHED_ID_PREFIX)) null else id.substringAfter(':').replace('_', ' ').replace('-', ' ').trim().takeIf { it.isNotEmpty() }
             ?.replaceFirstChar { it.uppercase() }
 
     /** Same name ignoring case, spaces and punctuation ("Barbell Curl" = "Barbell-Curl"). */

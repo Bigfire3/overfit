@@ -360,7 +360,8 @@ fun OverfitApp(deps: AppDependencies) {
             .crossfade(true)
             .build()
     }
-    LaunchedEffect(Unit) { deps.data.seedCatalog() }
+    // App scope: the first saved workout changes the screen, a composition scope would cancel the seeding half-way.
+    LaunchedEffect(Unit) { deps.data.seedCatalog(); deps.data.scope.launch { deps.data.seedSamplesOnce() } }
     // KI-Chat: back in the foreground → send what is left and fetch the inbox; to the background → send a running workout now.
     // Queued coach requests go out on app start and whenever the app comes back to the foreground.
     LifecycleResumeEffect(deps) {
@@ -600,12 +601,19 @@ fun OverfitApp(deps: AppDependencies) {
                         var withActual by rememberSaveable { mutableStateOf(route.withActual) }
                         ShareScreen(
                             viewModel = viewModel(key = "workout-share-${route.workoutId}-$withActual") {
-                                ShareViewModel({ deps.data.workouts.getFinished(route.workoutId)?.workout?.let { ShareMapper.fromWorkout(it, withActual) } })
+                                ShareViewModel({ deps.data.workouts.getFinished(route.workoutId)?.workout?.let { ShareMapper.fromWorkout(it, withActual) } }, share.shortCodes)
                             },
                             platform = deps.share,
                             onBack = nav::popBackStack,
                             description = LocalStrings.current.history.shareWorkoutHint,
-                            extra = { Chip(LocalStrings.current.history.withActual, withActual, { withActual = !withActual }) },
+                            extra = {
+                                val h = LocalStrings.current.history
+                                Chip(h.withActual, withActual, { withActual = !withActual })
+                                Spacer(Modifier.height(Space.s))
+                                Text(h.withActualHint(withActual), style = Theme.type.caption, tone = Tone.Muted)
+                            },
+                            unit = state.profile.unit,
+                            language = state.language,
                         )
                     }
                     composable<ExercisesRoute> {
@@ -818,7 +826,7 @@ fun OverfitApp(deps: AppDependencies) {
                     composable<ChatNotesRoute> { ChatNotesScreen(deps.chat, onBack = nav::popBackStack) }
                     composable<ImportRoute> {
                         ImportScreen(
-                            viewModel = viewModel { ImportViewModel(deps.data.importer) },
+                            viewModel = viewModel { ImportViewModel(deps.data.importer, share.shortCodes) },
                             share = share,
                             unit = state.profile.unit,
                             language = state.language,
@@ -832,9 +840,11 @@ fun OverfitApp(deps: AppDependencies) {
                     composable<ShareRoute> { entry ->
                         val id = entry.toRoute<ShareRoute>().templateId
                         ShareScreen(
-                            viewModel = viewModel { ShareViewModel(id, deps.data.templates) },
+                            viewModel = viewModel { ShareViewModel(id, deps.data.templates, share.shortCodes) },
                             platform = deps.share,
                             onBack = nav::popBackStack,
+                            unit = state.profile.unit,
+                            language = state.language,
                         )
                     }
                     composable<DuoRoute> { DuoScreen(onBack = nav::popBackStack) }

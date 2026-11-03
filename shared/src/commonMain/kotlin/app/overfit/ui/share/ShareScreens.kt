@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,7 +40,14 @@ import app.overfit.share.ImportInbox
 import app.overfit.share.ImportPreview
 import app.overfit.share.PlatformShare
 import app.overfit.share.PreviewExercise
+import app.overfit.share.NoShortCodes
 import app.overfit.share.QrCode
+import app.overfit.share.QrPayload
+import app.overfit.share.ShortCodeService
+import app.overfit.share.qrTextFor
+import app.overfit.platform.rememberFilePicker
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.foundation.layout.size
 import app.overfit.share.QrScanner
 import app.overfit.share.ShareFailure
 import app.overfit.share.ShareFormat
@@ -75,6 +82,8 @@ class ShareDependencies(
     val inbox: ImportInbox,
     /** Lives as long as the app: work that must finish even when its screen leaves the composition. */
     val scope: kotlinx.coroutines.CoroutineScope,
+    /** Short codes over the backend (not deployed yet: [NoShortCodes], the QR then carries the full content). */
+    val shortCodes: ShortCodeService = NoShortCodes,
     /** "About me" line (name, age, weight) in the app language for the AI prompt; null when nothing is known. */
     val aiProfile: () -> String? = { null },
 )
@@ -98,11 +107,13 @@ fun aiTemplateText(t: ShareStrings, profileHeader: String?): String =
 // ---------------------------------------------------------------------------------------------
 // Import
 
-class ImportViewModel(private val importer: TemplateImporter) : ViewModel() {
+class ImportViewModel(private val importer: TemplateImporter, private val shortCodes: ShortCodeService = NoShortCodes) : ViewModel() {
     data class State(
         val preview: ImportPreview? = null,
         val error: ShareFailure? = null,
         val busy: Boolean = false,
+        /** Shown as a note instead of a failure reason (e.g. "this is a backup"). */
+        val note: Boolean = false,
     )
 
     private val _state = MutableStateFlow(State())
@@ -111,15 +122,33 @@ class ImportViewModel(private val importer: TemplateImporter) : ViewModel() {
 
     /** Reads text from link, file, scan or clipboard and shows the preview. */
     fun handle(text: String?) {
+        QrPayload.shortId(text.orEmpty())?.let { id ->
+            viewModelScope.launch {
+                val training = runCatching { shortCodes.fetch(id) }.getOrNull()
+                if (training == null) _state.value = State(error = ShareFailure.NOT_OVERFIT) else showPreview(ShareParse.Ok(training))
+            }
+            return
+        }
         when (val parsed = ShareFormat.parseInput(text.orEmpty())) {
             is ShareParse.Fail -> _state.value = State(error = parsed.reason)
-            is ShareParse.Ok -> {
-                input = parsed
-                viewModelScope.launch {
-                    val preview = importer.preview(parsed.training)
-                    _state.value = if (preview.exercises.isEmpty()) State(error = ShareFailure.INVALID) else State(preview = preview)
-                }
-            }
+            is ShareParse.Ok -> showPreview(parsed)
+        }
+    }
+
+    private fun showPreview(parsed: ShareParse.Ok) {
+        input = parsed
+        viewModelScope.launch {
+            val preview = importer.preview(parsed.training)
+            _state.value = if (preview.exercises.isEmpty()) State(error = ShareFailure.INVALID) else State(preview = preview)
+        }
+    }
+
+    /** Content of a picked file: a `.overfit` file (JSON) or, by mistake, a backup ZIP. */
+    fun handleFile(bytes: ByteArray) {
+        when {
+            bytes.size >= 2 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte() -> _state.value = State(note = true)
+            bytes.size > ShareFormat.MAX_JSON_BYTES -> _state.value = State(error = ShareFailure.TOO_LARGE)
+            else -> handle(bytes.decodeToString())
         }
     }
 
@@ -154,6 +183,8 @@ fun ImportScreen(
     var denied by remember { mutableStateOf(false) }
     var aiCopied by remember { mutableStateOf(false) }
 
+    val pickFile = rememberFilePicker { bytes -> denied = false; viewModel.handleFile(bytes) }
+
     LaunchedEffect(pending) { share.inbox.consume()?.let { scanning = false; viewModel.handle(it) } }
 
     val preview = state.preview
@@ -180,6 +211,7 @@ fun ImportScreen(
             header = { BackHeader(t.back, onBack) },
             footer = {
                 state.error?.let { Text(it.message(s), style = Theme.type.caption, tone = Tone.Default) }
+                if (state.note) Text(s.importIsBackup, style = Theme.type.caption, tone = Tone.Default)
                 if (denied) Text(s.scanCameraDenied, style = Theme.type.caption, tone = Tone.Muted)
                 PrimaryButton(s.importFromClipboard, onClick = { denied = false; viewModel.handle(share.platform.pasteText()) })
             },
@@ -195,6 +227,7 @@ fun ImportScreen(
                 Column(Modifier.padding(vertical = Space.m)) { Text(s.scanIosHint, tone = Tone.Muted) }
                 Hairline()
             }
+            ListRow(s.importPickFile, onClick = { denied = false; pickFile() })
             // The AI prompt with its full text (shared component with the Coach tab).
             app.overfit.ui.components.PromptView(
                 title = s.aiTemplateCopy,
@@ -283,11 +316,21 @@ private fun PreviewRow(line: PreviewExercise, unit: WeightUnit, language: Langua
 // Share
 
 /** Link/QR/file for a template or a finished workout ([source] builds the shared training). */
-class ShareViewModel(private val source: suspend () -> SharedTraining?) : ViewModel() {
-    constructor(templateId: Long, templates: TemplateRepository) :
-        this({ templates.get(templateId)?.let { ShareMapper.fromTemplate(it) } })
+class ShareViewModel(
+    private val source: suspend () -> SharedTraining?,
+    private val shortCodes: ShortCodeService = NoShortCodes,
+) : ViewModel() {
+    constructor(templateId: Long, templates: TemplateRepository, shortCodes: ShortCodeService = NoShortCodes) :
+        this({ templates.get(templateId)?.let { ShareMapper.fromTemplate(it) } }, shortCodes)
 
-    data class State(val name: String = "", val link: String? = null, val json: String? = null)
+    data class State(
+        val name: String = "",
+        val link: String? = null,
+        val json: String? = null,
+        /** Compact app-internal QR content (`OF1:…`, or `OFS:<id>` with the backend), null if it does not fit. */
+        val qrText: String? = null,
+        val training: SharedTraining? = null,
+    )
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -295,7 +338,8 @@ class ShareViewModel(private val source: suspend () -> SharedTraining?) : ViewMo
     init {
         viewModelScope.launch {
             val training = source() ?: return@launch
-            _state.value = State(training.name, ShareFormat.toLink(training), ShareFormat.toJson(training))
+            val qr = qrTextFor(training, shortCodes).takeIf { QrCode.fits(it) }
+            _state.value = State(training.name, ShareFormat.toLink(training), ShareFormat.toJson(training), qr, training)
         }
     }
 }
@@ -309,12 +353,16 @@ fun ShareScreen(
     description: String? = null,
     /** Optional extra controls below the description (e.g. a toggle). */
     extra: (@Composable ColumnScope.() -> Unit)? = null,
+    unit: WeightUnit = WeightUnit.KG,
+    language: Language = Language.DE,
+    /** Shows what the shared content contains (counts, example values). */
+    showPreview: Boolean = true,
 ) {
     val t = LocalStrings.current
     val s = t.share
     val state by viewModel.state.collectAsStateWithLifecycle()
     val link = state.link
-    val qrFits = link != null && link.length <= ShareFormat.MAX_QR_LINK_LENGTH && QrCode.fits(link)
+    val qrText = state.qrText
     var copied by remember { mutableStateOf(false) }
     Screen(
         scroll = true,
@@ -334,10 +382,14 @@ fun ShareScreen(
             Spacer(Modifier.height(Space.m))
             extra()
         }
+        state.training?.takeIf { showPreview }?.let { training ->
+            Spacer(Modifier.height(Space.m))
+            SharePreview(training, unit, language)
+        }
         Spacer(Modifier.height(Space.l))
         if (link != null) {
-            if (qrFits) {
-                QrView(link, Modifier.widthIn(max = 320.dp).fillMaxWidth().align(Alignment.CenterHorizontally))
+            if (qrText != null) {
+                QrView(qrText, Modifier.size(QR_DISPLAY_SIZE).align(Alignment.CenterHorizontally))
                 Spacer(Modifier.height(Space.m))
                 Text(s.qrHint, style = Theme.type.caption, tone = Tone.Muted)
             } else {
@@ -356,18 +408,59 @@ fun ShareScreen(
     }
 }
 
-/** QR code: always black on white with quiet zone, so every scanner reads it regardless of the theme. */
+/** Display size of the share QR code (before: 320 dp wide). The quiet zone is part of it. */
+private val QR_DISPLAY_SIZE = 200.dp
+
+/** "What gets shared": counts and, if values are included, one example set. */
 @Composable
-fun QrView(text: String, modifier: Modifier = Modifier) {
+private fun SharePreview(training: SharedTraining, unit: WeightUnit, language: Language) {
+    val s = LocalStrings.current.share
+    val sets = training.exercises.sumOf { it.sets.size }
+    val example = training.exercises.firstNotNullOfOrNull { e ->
+        e.sets.firstOrNull { it.kg != null || it.reps != null || it.sec != null }
+    }?.let { set ->
+        buildList {
+            set.kg?.let { add(formatWeight(it, unit, language)) }
+            set.reps?.let { add(if (set.kg != null) "× $it" else "$it×") }
+            set.sec?.let { add(Numbers.formatDuration(it)) }
+        }.joinToString(" ")
+    }
+    Hairline()
+    Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
+        Text(s.sharePreviewTitle, style = Theme.type.caption, tone = Tone.Muted)
+        Text(s.sharePreviewCounts(training.exercises.size, sets), style = Theme.type.label)
+        Text(if (example != null) s.sharePreviewValues(example) else s.sharePreviewNoValues, style = Theme.type.caption, tone = Tone.Muted)
+    }
+    Hairline()
+}
+
+/**
+ * Generic QR code for any text (workouts, Spot invites, later Duo): black on white with quiet zone, so every scanner
+ * reads it regardless of the theme. Round modules; the three finder patterns stay solid squares with rounded corners.
+ */
+@Composable
+fun QrView(text: String, modifier: Modifier = Modifier, rounded: Boolean = true) {
     val qr = remember(text) { runCatching { QrCode.encode(text) }.getOrNull() } ?: return
-    val quiet = 3
-    Canvas(modifier.aspectRatio(1f).background(Color.White)) {
+    val quiet = QR_QUIET_ZONE
+    Canvas(modifier.aspectRatio(1f).background(Color.White, RoundedCornerShape(8.dp))) {
         val cell = size.width / (qr.size + 2 * quiet)
+        fun inFinder(x: Int, y: Int) = (x < 8 && y < 8) || (x >= qr.size - 8 && y < 8) || (x < 8 && y >= qr.size - 8)
         for (y in 0 until qr.size) for (x in 0 until qr.size) {
-            if (qr[x, y]) drawRect(Color.Black, Offset((x + quiet) * cell, (y + quiet) * cell), Size(cell + 0.5f, cell + 0.5f))
+            if (!qr[x, y]) continue
+            val topLeft = Offset((x + quiet) * cell, (y + quiet) * cell)
+            if (!rounded || inFinder(x, y)) {
+                drawRect(Color.Black, topLeft, Size(cell + 0.5f, cell + 0.5f))
+            } else {
+                // Slightly overlapping rounded squares: round look, but neighbours still read as one block.
+                val inset = cell * 0.04f
+                drawRoundRect(Color.Black, topLeft + Offset(inset, inset), Size(cell - 2 * inset, cell - 2 * inset), CornerRadius(cell * 0.38f))
+            }
         }
     }
 }
+
+/** Light margin around the symbol in modules. ISO asks for 4; scanners cope with less, we keep 3 plus the white card. */
+const val QR_QUIET_ZONE = 3
 
 // ---------------------------------------------------------------------------------------------
 // Duo teaser

@@ -44,6 +44,17 @@ class AppData(
     /** Loads the bundled catalogue if it changed. Failures are not fatal (the list just stays empty). */
     suspend fun seedCatalog(): Result<Boolean> = runCatching { catalog.seedIfNeeded(clock()) }
 
+    /**
+     * Adds Push/Pull/Legs once: at the first start and, once, on existing installs (flag in the key-value store).
+     * Afterwards they are normal workouts: deleting them keeps them gone; "Add sample workouts" brings them back on request.
+     */
+    suspend fun seedSamplesOnce(): Result<Int> = runCatching {
+        if (kv.get(KEY_SAMPLES_SEEDED) != null) return@runCatching 0
+        val added = importer.addSamples()
+        kv.put(KEY_SAMPLES_SEEDED, "1")
+        added
+    }
+
     /** "Delete all data": workouts, templates and custom exercises go, the catalogue is loaded again. */
     suspend fun resetAll() {
         database.transaction {
@@ -57,6 +68,11 @@ class AppData(
         coachSettings.reset()
         workouts.photoFiles.list().forEach { workouts.photoFiles.delete(it) }
         kv.remove(CatalogSeeder.KEY_VERSION)
+        kv.remove(KEY_SAMPLES_SEEDED)
         seedCatalog()
+    }
+
+    companion object {
+        const val KEY_SAMPLES_SEEDED = "samples_seeded_v1"
     }
 }

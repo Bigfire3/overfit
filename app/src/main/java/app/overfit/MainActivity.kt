@@ -1,7 +1,10 @@
 package app.overfit
 
 import android.graphics.Color
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -69,20 +72,33 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra(EXTRA_OPEN_WORKOUT)
             (application as OverfitApp).dependencies.requestOpenWorkout()
         }
-        if (intent?.action != Intent.ACTION_VIEW) return
-        val uri = intent.data ?: return
-        val text = when (uri.scheme) {
-            "content", "file" -> runCatching {
-                contentResolver.openInputStream(uri)?.use { it.readBytes().takeIf { b -> b.size <= MAX_FILE_BYTES }?.decodeToString() }
-            }.getOrNull()
-            else -> uri.toString()
-        }
+        val text = IncomingShare.textOf(this, intent)
         if (text != null) (application as OverfitApp).dependencies.inbox.offer(text)
         // Handled once: a rotation or recreate must not import the same link again.
-        intent.data = null
+        intent?.data = null
+        intent?.removeExtra(Intent.EXTRA_STREAM)
+        intent?.removeExtra(Intent.EXTRA_TEXT)
+    }
+}
+
+/** What an opened link, a tapped `.overfit` file (VIEW) or a file shared to Overfit (SEND, e.g. from WhatsApp) carries. */
+object IncomingShare {
+    private const val MAX_FILE_BYTES = 300 * 1024
+
+    fun textOf(context: Context, intent: Intent?): String? = when (intent?.action) {
+        Intent.ACTION_VIEW -> intent.data?.let { read(context, it) }
+        Intent.ACTION_SEND -> {
+            val stream = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            else @Suppress("DEPRECATION") intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            stream?.let { read(context, it) } ?: intent.getStringExtra(Intent.EXTRA_TEXT)
+        }
+        else -> null
     }
 
-    private companion object {
-        const val MAX_FILE_BYTES = 300 * 1024
+    private fun read(context: Context, uri: Uri): String? = when (uri.scheme) {
+        "content", "file" -> runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }?.takeIf { it.size <= MAX_FILE_BYTES }?.decodeToString()
+        }.getOrNull()
+        else -> uri.toString()
     }
 }
