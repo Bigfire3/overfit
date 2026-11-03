@@ -38,7 +38,7 @@ Datei `*.overfit` (MIME `application/x-overfit`) mit demselben **JSON (unkomprim
 | Feld | Bedeutung |
 |---|---|
 | `v` | Format-Version, aktuell `1`. Höhere Version → „App aktualisieren“, nicht importieren. Unbekannte Felder werden ignoriert. |
-| `kind` | `"template"` (Vorlage). Reserviert: `"workout"` (abgeschlossenes Training, kommt mit Phase 3). Unbekannte `kind` → nicht importierbar. |
+| `kind` | `"template"` (Vorlage) oder `"workout"` (abgeschlossenes Training, seit Phase 3: gleiche Felder; `sets` sind entweder die geloggten Ist-Werte – nur erledigte Sätze – oder die geplanten Werte; nie Notizen, Gefühl, Fotos). Beide werden als Vorlage importiert. Unbekannte `kind` → nicht importierbar. |
 | `name` | Name der Vorlage (Pflicht, max. 80 Zeichen). |
 | `note` | Optionale Notiz zur Vorlage. |
 | `exercises[]` | Übungen in Reihenfolge. Je Eintrag **genau eine** Referenz: `id` (Katalog-ID, z. B. `wg:bench-press`, `fedb:Barbell_Curl`), `name` (freier Name DE/EN, wird über die unscharfe Suche aufgelöst; nicht auflösbar → eigene Übung) oder `ref` (Verweis auf `custom[]`). Reihenfolge der Auswertung: `ref` > `id` > `name`. |

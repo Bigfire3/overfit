@@ -259,8 +259,8 @@ class BackupService(
                 val existing = exerciseDao.get(e.id)
                 val type = enumOr(e.trackingType, TrackingType.WEIGHT_REPS)
                 if (existing != null && existing.source != ExerciseSource.CUSTOM) {
-                    exerciseDao.updateSettings(e.id, type, e.defaultRestSec, now)
-                    if (e.isArchived) exerciseDao.archive(e.id, now)
+                    exerciseDao.updateSettings(e.id, type, e.defaultRestSec, e.updatedAt)
+                    if (e.isArchived) exerciseDao.archive(e.id, e.updatedAt)
                 } else {
                     exerciseDao.upsert(e.toEntity(type))
                 }
@@ -336,7 +336,7 @@ class BackupService(
 
         fun fileName(date: String) = "overfit-backup-$date.zip"
 
-        internal val codec = Json { ignoreUnknownKeys = true; encodeDefaults = false; explicitNulls = false }
+        internal val codec = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     }
 }
 

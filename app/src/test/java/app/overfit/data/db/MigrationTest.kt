@@ -110,6 +110,57 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migration2to3KeepsWorkoutsAndAddsPhotoTable() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v2 = helper.createDatabase(2)
+        v2.execSQL(
+            "INSERT INTO exercise (id, name, source, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType, defaultRestSec, isArchived, createdAt, updatedAt) " +
+                "VALUES ('ex1', 'Bench', 'CUSTOM', NULL, 'chest', '', NULL, 'WEIGHT_REPS', NULL, 0, 1, 2)",
+        )
+        v2.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1000, 5000, 'gut', 4, NULL, 'NONE', NULL, NULL, NULL, 5000)",
+        )
+        v2.execSQL("INSERT INTO session_exercise (id, sessionId, exerciseId, position, restSec, note, origin, replacedExerciseId) VALUES ('se1', 'w1', 'ex1', 0, 90, NULL, 'PLANNED', NULL)")
+        v2.execSQL(
+            "INSERT INTO set_entry (id, sessionExerciseId, position, targetWeightKg, targetReps, targetDurationSec, weightKg, reps, durationSec, completed, completedAt, rpe) " +
+                "VALUES ('s1', 'se1', 0, 60.0, 8, NULL, 62.5, 8, NULL, 1, 2000, NULL)",
+        )
+        v2.close()
+
+        val v3 = helper.runMigrationsAndValidate(3, OverfitDatabase.MIGRATIONS.toList())
+        try {
+            assertEquals(1L, v3.count("workout_session"))
+            assertEquals(1L, v3.count("set_entry"))
+            assertEquals(0L, v3.count("workout_photo"))
+        } finally {
+            v3.close()
+        }
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val repo = app.overfit.data.WorkoutRepository(db)
+            val finished = repo.getFinished("w1")!!
+            assertEquals("gut", finished.note)
+            assertEquals(4, finished.feeling)
+            assertEquals(62.5, finished.workout.exercises.single().sets.single().actual.weightKg)
+            repo.addPhoto("w1", byteArrayOf(1, 2, 3), takenAt = 6000)
+            assertEquals(1, repo.photosOf("w1").size)
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

@@ -129,3 +129,32 @@ fun SmallInput(
         Hairline()
     }
 }
+
+/** Multi-line, borderless text field with a hairline underneath (notes). */
+@Composable
+fun MultilineInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    minHeight: androidx.compose.ui.unit.Dp = 96.dp,
+) {
+    val style = Theme.type.body.copy(color = Theme.colors.foreground)
+    Column(modifier.fillMaxWidth()) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = style,
+            cursorBrush = SolidColor(Theme.colors.foreground),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+            modifier = Modifier.fillMaxWidth().heightIn(min = minHeight).padding(vertical = Space.m),
+            decorationBox = { inner ->
+                Box {
+                    if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
+                    inner()
+                }
+            },
+        )
+        Hairline()
+    }
+}

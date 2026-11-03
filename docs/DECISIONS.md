@@ -387,3 +387,32 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
   gehen (dessen Bedingungen gelten).
 - Standard-Grenzen (5000 Dokumente / 25 MB, 300 Fotos à 3 MB, Refresh-Token 90 Tage) sind Schätzwerte; R2-Kosten bleiben im
   kostenlosen Kontingent, solange es wenige Nutzer sind.
+
+## Phase 3 – Beenden-Flow, Verlauf, Fotos, Backup (Nacht 3.11., Session F)
+- **Room v3**: neue Tabelle `workout_photo` (mehrere Fotos je Training, Datei app-privat unter `filesDir/photos` bzw.
+  Application Support/photos, Name `<uuid>.jpg`). Reine Ergänzung → AutoMigration 2→3 + Migrationstest. Die alte Spalte
+  `workout_session.photoPath` bleibt ungenutzt stehen (nicht destruktiv).
+- **Fotos** werden beim Hinzufügen auf max. 1600 px lange Kante verkleinert, EXIF-Drehung angewendet, JPEG 85 %
+  (`prepareJpeg`, expect/actual). Kamera Android: System-Kamera-Intent in den App-Cache (nie Galerie), Foto-Auswahl über
+  den System-Photo-Picker (keine Speicherberechtigung). Weil das Manifest CAMERA (QR-Scanner) deklariert, fragt die App vor
+  dem Kamera-Intent die Berechtigung ab. iOS: UIImagePickerController (Kamera/Mediathek), Info.plist-Texte ergänzt.
+- **Beenden-Flow**: „Beenden“ legt das Training wie bisher sofort als abgeschlossen ab (kein Datenverlust, falls die App
+  danach stirbt); der Flow ergänzt nur Notiz, Gefühl (1–5, optional) und Fotos. Zurück = Speichern.
+  Coach-Platz für Phase 4: `AppDependencies.finishCoachSection` + `workoutSavedListeners`.
+- **Bestwerte**: höchstes Gewicht, geschätztes 1RM (Epley, nur 1–12 Wdh.), meiste Wdh., längste Zeit – je nach
+  Erfassungsart. Das erste Mal ist kein Bestwert. Volumen = kg × Wdh. erledigter Sätze mit positivem Gewicht.
+- **Backup**: eine ZIP-Datei (`backup.json` deflate + `photos/*.jpg` unkomprimiert), eigener kleiner ZIP-Writer/-Reader
+  in commonMain (keine Bibliothek nötig, jede Entpack-App kann die Datei öffnen). Enthält abgeschlossene Trainings,
+  Vorlagen, eigene und referenzierte Übungen inkl. geänderter Einstellungen, Fotos, Profil und Einstellungen; nie API-Key,
+  Geräteschlüssel, Fuel-Daten. Import: erst vollständig lesen/prüfen (Format, Version, CRC), Vorschau, dann
+  „Alle Daten ersetzen“ (wie „Alle Daten löschen“ + Einfügen). Neuere Version → „App aktualisieren“; unbekannte Felder
+  werden ignoriert, fehlende Übungen als archivierte eigene Übung angelegt. Während eines laufenden Trainings gesperrt.
+  Andere Features hängen sich über `BackupContributor` (`extras`) an (Phase 4: Coach-Gedächtnis).
+  Laufende Trainings sind nicht im Backup. Alles im Speicher (ok bis einige hundert Fotos; Streaming später).
+- **Teilen eines Trainings**: `kind: "workout"`, Standard „mit Ist-Werten“ (Schalter auf dem Teilen-Screen), Import wird
+  zur Vorlage. Die Web-Fallback-Seite konnte `workout` schon anzeigen.
+- **Änderungs-Benachrichtigung** für KI-Chat-Sync/Coach: `WorkoutRepository.changes` bzw. `AppData.dataChanged`
+  (Room-InvalidationTracker, kein Polling).
+
+### Zur Prüfung durch Fabian
+- Backup-Format ZIP statt reinem JSON (wegen Fotos); Dateiname `overfit-backup-<Datum>.zip`.

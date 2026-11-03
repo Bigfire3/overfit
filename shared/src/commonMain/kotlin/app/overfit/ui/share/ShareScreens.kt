@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -282,7 +283,15 @@ class ShareViewModel(private val source: suspend () -> SharedTraining?) : ViewMo
 }
 
 @Composable
-fun ShareScreen(viewModel: ShareViewModel, platform: PlatformShare, onBack: () -> Unit) {
+fun ShareScreen(
+    viewModel: ShareViewModel,
+    platform: PlatformShare,
+    onBack: () -> Unit,
+    /** Optional explanation below the title (e.g. what a shared workout contains). */
+    description: String? = null,
+    /** Optional extra controls below the description (e.g. a toggle). */
+    extra: (@Composable ColumnScope.() -> Unit)? = null,
+) {
     val t = LocalStrings.current
     val s = t.share
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -299,6 +308,14 @@ fun ShareScreen(viewModel: ShareViewModel, platform: PlatformShare, onBack: () -
         Text(s.shareTemplate, tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
         Title(state.name)
+        if (description != null) {
+            Spacer(Modifier.height(Space.s))
+            Text(description, style = Theme.type.caption, tone = Tone.Muted)
+        }
+        if (extra != null) {
+            Spacer(Modifier.height(Space.m))
+            extra()
+        }
         Spacer(Modifier.height(Space.l))
         if (link != null) {
             if (qrFits) {

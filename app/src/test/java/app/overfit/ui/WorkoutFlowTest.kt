@@ -1,5 +1,9 @@
 package app.overfit.ui
 
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performTextInput
+
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -98,15 +102,25 @@ class WorkoutFlowTest {
         waitFor("Alle Sätze erledigt")
         compose.onNodeWithText("Alle Sätze erledigt").assertIsNotEnabled()
 
-        // Finish (two taps) → back to start, stored as finished
+        // Finish (two taps) → finish flow (summary, note) → save → start; stored as finished
         val id = requireNotNull(deps.workout.state.value.workout).id
         compose.onNodeWithText("Beenden").performClick()
         compose.onNodeWithText("Beenden? Nochmal tippen").performClick()
-        waitFor("Training starten")
+        waitFor("Wie war das Training?")
         compose.waitUntil(5_000) { runBlocking { data.workouts.status(id) } == SessionStatus.FINISHED }
+        compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Stark heute")
+        compose.onNodeWithText("Speichern").performClick()
+        waitFor("Training starten")
+        compose.waitUntil(5_000) { runBlocking { data.workouts.getFinished(id)?.note } == "Stark heute" }
         val saved = requireNotNull(runBlocking { data.workouts.get(id) })
         assertEquals(2, saved.completedSets)
         assertEquals(60.0, saved.exercises.single().sets.first().actual.weightKg)
+
+        // History tab shows the workout; the detail has the note
+        compose.onNodeWithText("Verlauf").performClick()
+        waitFor("Push")
+        compose.onAllNodes(hasText("Push")).onFirst().performClick()
+        waitFor("Stark heute")
     }
 
     private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {

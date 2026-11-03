@@ -68,6 +68,9 @@ fun SettingsScreen(
     restAlerts: RestAlerts,
     share: ShareDependencies,
     onReset: () -> Unit,
+    exportingBackup: Boolean,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
 ) {
     val t = LocalStrings.current
     val storedAge = state.profile.birthYear?.let { ageFromBirthYear(it, today).toString() } ?: ""
@@ -143,6 +146,11 @@ fun SettingsScreen(
 
         SectionTitle(t.templates)
         SamplesRow(share)
+
+        SectionTitle(t.photos.backupSection)
+        ListRow(if (exportingBackup) t.photos.backupExporting else t.photos.backupExport, onClick = { if (!exportingBackup) onExportBackup() })
+        Text(t.photos.backupExportHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        ListRow(t.photos.backupImport, onClick = onImportBackup)
 
         SectionTitle(t.data)
         OfflineImagesRow(offlineImages)
