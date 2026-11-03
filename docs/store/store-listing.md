@@ -15,7 +15,7 @@ Dein Trainer in der Tasche: kennt dein Training, wertet aus, plant. Werbefrei. (
 **Langbeschreibung:**
 overfit – personal training for everyone.
 
-Ein persönlicher Trainer in der Tasche, der dein Training kennt, auswertet und plant. Für alle, nicht nur für Leute, die sich einen Personal Trainer leisten können. Schwarz-weiß, schnell, ohne Werbung und Ablenkung.
+Ein persönlicher Trainer in der Tasche, im Chat erreichbar, der dein Training kennt, auswertet und plant. Für alle, nicht nur für Leute, die sich einen Personal Trainer leisten können. Schwarz-weiß, schnell, ohne Werbung und Ablenkung.
 
 TRAINIEREN
 • 302 Übungen mit Grafiken und Fotos, deutsche Suche und Filter
@@ -36,7 +36,7 @@ AUSWERTUNG
 
 KI-COACH
 • Der Coach kennt dein Training und hat ein Gedächtnis für Ziele, Verletzungen und Vorlieben
-• Coach-Tab mit Chat: frag, lass auswerten, plane dein nächstes Training
+• Coach-Tab: dein persönlicher Trainer im Chat – Workout-Vorschläge, Auswertungen, Gedächtnis, Prompts mit sichtbarem Text
 • Eigener API-Key (Gemini, Claude, OpenAI, OpenRouter) oder Fuel, das Coach-Guthaben in der App
 • KI-Chat-Verbindung: nutze Claude, ChatGPT oder Gemini mit deinen echten Trainingsdaten
 
@@ -62,7 +62,7 @@ Your trainer in your pocket: knows your training, reviews it, plans it. No ads. 
 **Long description:**
 overfit – personal training for everyone.
 
-A personal trainer in your pocket that knows your training, reviews it and plans it. For everyone, not only for people who can afford a personal trainer. Black and white, fast, no ads and no distractions.
+A personal trainer in your pocket, one chat away, that knows your training, reviews it and plans it. For everyone, not only for people who can afford a personal trainer. Black and white, fast, no ads and no distractions.
 
 TRAIN
 • 302 exercises with graphics and photos, search and filters
@@ -83,7 +83,7 @@ REVIEW
 
 AI COACH
 • The coach knows your training and has a memory for goals, injuries and preferences
-• Coach tab with chat: ask, get reviews, plan your next workout
+• Coach tab: your personal trainer in chat – workout suggestions, reviews, memory, prompts with visible text
 • Your own API key (Gemini, Claude, OpenAI, OpenRouter) or Fuel, the coach credit inside the app
 • AI chat connection: use Claude, ChatGPT or Gemini with your real training data
 

@@ -25,12 +25,18 @@ import androidx.room.useWriterConnection
         WorkoutPhotoEntity::class,
         CoachReviewEntity::class,
         CoachMemoryEntity::class,
+        CoachChatEntity::class,
+        CoachChatMessageEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
     // v1 → v2 adds the workout tables, v2 → v3 the photo table, v3 → v4 the coach tables (nothing is dropped or rewritten).
     // v4 → v5 is manual ([MIGRATION_4_5]): free-exercise-db removed, exercise.note added.
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
+    // v5 → v6 adds the coach chat tables (pure addition).
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 5, to = 6),
+    ],
 )
 @TypeConverters(Converters::class)
 @ConstructedBy(OverfitDatabaseConstructor::class)
@@ -39,6 +45,7 @@ abstract class OverfitDatabase : RoomDatabase() {
     abstract fun templateDao(): TemplateDao
     abstract fun workoutDao(): WorkoutDao
     abstract fun coachDao(): CoachDao
+    abstract fun coachChatDao(): CoachChatDao
 
     companion object {
         const val NAME = "overfit.db"

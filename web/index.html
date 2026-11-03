@@ -14,7 +14,7 @@
 <main>
   <div class="brand">overfit</div>
   <h1 data-i18n="h1">personal training for everyone</h1>
-  <p class="sub" data-i18n="sub">A trainer in your pocket that knows your training, reviews it and plans it – for everyone, not only for people who can afford a personal trainer. No ads, no accounts. Open source.</p>
+  <p class="sub" data-i18n="sub">Your personal trainer in chat, in your pocket: knows your training, reviews it and plans it – for everyone, not only for people who can afford a personal trainer. No ads, no accounts. Open source.</p>
   <div class="actions">
     <a class="btn primary" id="dl" href="https://github.com/Bigfire3/overfit/releases/latest/download/overfit.apk" data-i18n="dl">Download for Android</a>
     <a class="btn secondary" href="https://github.com/Bigfire3/overfit" data-i18n="src">Source code on GitHub</a>
@@ -24,7 +24,7 @@
 <script>
 (function () {
   var de = (navigator.language || '').toLowerCase().indexOf('de') === 0;
-  var T = de ? { h1: 'personal training for everyone', sub: 'Dein Trainer in der Tasche: kennt dein Training, wertet aus und plant – für alle, nicht nur für Leute, die sich einen Personal Trainer leisten können. Ohne Werbung, ohne Konto. Open Source.', dl: 'Für Android herunterladen', src: 'Quellcode auf GitHub', foot: 'Du hast einen Trainingslink bekommen? Öffne ihn auf dem Handy – mit installiertem overfit öffnet er direkt in der App.' } : null;
+  var T = de ? { h1: 'personal training for everyone', sub: 'Dein persönlicher Trainer im Chat, in der Tasche: kennt dein Training, wertet aus und plant – für alle, nicht nur für Leute, die sich einen Personal Trainer leisten können. Ohne Werbung, ohne Konto. Open Source.', dl: 'Für Android herunterladen', src: 'Quellcode auf GitHub', foot: 'Du hast einen Trainingslink bekommen? Öffne ihn auf dem Handy – mit installiertem overfit öffnet er direkt in der App.' } : null;
   if (T) { document.documentElement.lang = 'de'; document.querySelectorAll('[data-i18n]').forEach(function (e) { e.textContent = T[e.getAttribute('data-i18n')]; }); }
 })();
 </script>
