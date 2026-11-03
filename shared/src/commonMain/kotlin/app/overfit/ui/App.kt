@@ -35,7 +35,18 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.overfit.ai.Providers
+import app.overfit.data.AppData
 import app.overfit.data.AppStore
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.toRoute
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.network.ktor3.KtorNetworkFetcherFactory
+import coil3.request.crossfade
+import coil3.svg.SvgDecoder
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
 import app.overfit.i18n.stringsFor
@@ -45,7 +56,14 @@ import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.Tone
-import app.overfit.ui.main.ExercisesScreen
+import app.overfit.ui.exercises.CatalogViewModel
+import app.overfit.ui.exercises.CustomExerciseScreen
+import app.overfit.ui.exercises.ExerciseDetailScreen
+import app.overfit.ui.exercises.ExercisePickerScreen
+import app.overfit.ui.exercises.ExerciseViewModel
+import app.overfit.ui.exercises.ExercisesScreen
+import app.overfit.ui.templates.TemplateEditorScreen
+import app.overfit.ui.templates.TemplateEditorViewModel
 import app.overfit.ui.main.HistoryScreen
 import app.overfit.ui.main.PhotosScreen
 import app.overfit.ui.main.StartScreen
@@ -71,6 +89,7 @@ import kotlin.time.Clock
 class AppDependencies(
     val store: AppStore,
     val providers: Providers,
+    val data: AppData,
     val versionName: String,
     val today: () -> LocalDate = { Clock.System.todayIn(TimeZone.currentSystemDefault()) },
 )
@@ -88,6 +107,18 @@ class AppDependencies(
 @Serializable data object ConnectRoute
 @Serializable data object CoachMemoryRoute
 @Serializable data object AboutRoute
+@Serializable data class ExerciseDetailRoute(val id: String)
+/** Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). */
+@Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "")
+/** Template editor; [templateId] 0 = new template. */
+@Serializable data class TemplateEditorRoute(val templateId: Long = 0)
+/** Exercise picker; [single] = replace mode. The result goes through [PickedExercises]. */
+@Serializable data class ExercisePickerRoute(val single: Boolean = false)
+
+/** Hands the picker's result back to the editor below it on the back stack. */
+class PickedExercises {
+    val result = MutableStateFlow<List<String>?>(null)
+}
 
 enum class Tab(val route: Any, val icon: Icon, val label: (Strings) -> String) {
     START(StartRoute, Icon.Home, { it.navStart }),
@@ -102,6 +133,18 @@ enum class Tab(val route: Any, val icon: Icon, val label: (Strings) -> String) {
 @Composable
 fun OverfitApp(deps: AppDependencies) {
     val state by deps.store.state.collectAsStateWithLifecycle()
+    val templates by deps.data.templates.templates.collectAsStateWithLifecycle(initialValue = null)
+    val picked = remember { PickedExercises() }
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .components {
+                add(SvgDecoder.Factory())
+                add(KtorNetworkFetcherFactory())
+            }
+            .crossfade(true)
+            .build()
+    }
+    LaunchedEffect(Unit) { deps.data.seedCatalog() }
     OverfitTheme(state.settings.theme) {
         CompositionLocalProvider(LocalStrings provides stringsFor(state.language)) {
             val nav = rememberNavController()
@@ -143,9 +186,71 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
 
-                    composable<StartRoute> { StartScreen(state) }
+                    composable<StartRoute> {
+                        StartScreen(
+                            state = state,
+                            templates = templates,
+                            onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
+                            onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
+                        )
+                    }
                     composable<HistoryRoute> { HistoryScreen() }
-                    composable<ExercisesRoute> { ExercisesScreen() }
+                    composable<ExercisesRoute> {
+                        val catalog = viewModel { CatalogViewModel(deps.data.exercises) }
+                        ExercisesScreen(
+                            catalog = catalog,
+                            templates = templates,
+                            language = state.language,
+                            onOpenExercise = { nav.navigate(ExerciseDetailRoute(it.id)) },
+                            onNewCustomExercise = { nav.navigate(CustomExerciseRoute(name = catalog.filter.value.query.trim())) },
+                            onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
+                            onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
+                        )
+                    }
+                    composable<ExerciseDetailRoute> { entry ->
+                        val id = entry.toRoute<ExerciseDetailRoute>().id
+                        ExerciseDetailScreen(
+                            viewModel = viewModel { ExerciseViewModel(id, deps.data.exercises) },
+                            onBack = nav::popBackStack,
+                            onEditCustom = { nav.navigate(CustomExerciseRoute(id = it)) },
+                        )
+                    }
+                    composable<CustomExerciseRoute> { entry ->
+                        val route = entry.toRoute<CustomExerciseRoute>()
+                        CustomExerciseScreen(
+                            viewModel = viewModel { ExerciseViewModel(route.id.ifEmpty { null }, deps.data.exercises) },
+                            initialName = route.name,
+                            onBack = nav::popBackStack,
+                            onSaved = { nav.popBackStack() },
+                        )
+                    }
+                    composable<TemplateEditorRoute> { entry ->
+                        val id = entry.toRoute<TemplateEditorRoute>().templateId
+                        val editor = viewModel {
+                            TemplateEditorViewModel(id, deps.data.templates, deps.data.exercises, state.profile.unit, state.language)
+                        }
+                        val result by picked.result.collectAsStateWithLifecycle()
+                        LaunchedEffect(result) {
+                            result?.let { editor.onExercisesPicked(it); picked.result.value = null }
+                        }
+                        TemplateEditorScreen(
+                            viewModel = editor,
+                            unit = state.profile.unit,
+                            onClose = nav::popBackStack,
+                            onAddExercises = { nav.navigate(ExercisePickerRoute(single = false)) },
+                            onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
+                        )
+                    }
+                    composable<ExercisePickerRoute> { entry ->
+                        val single = entry.toRoute<ExercisePickerRoute>().single
+                        ExercisePickerScreen(
+                            catalog = viewModel { CatalogViewModel(deps.data.exercises) },
+                            language = state.language,
+                            single = single,
+                            onBack = nav::popBackStack,
+                            onPicked = { ids -> picked.result.value = ids; nav.popBackStack() },
+                        )
+                    }
                     composable<PhotosRoute> { PhotosScreen() }
                     composable<SettingsRoute> {
                         SettingsScreen(
@@ -156,8 +261,10 @@ fun OverfitApp(deps: AppDependencies) {
                             onConnect = { nav.navigate(ConnectRoute) },
                             onCoachMemory = { nav.navigate(CoachMemoryRoute) },
                             onAbout = { nav.navigate(AboutRoute) },
+                            offlineImages = deps.data.offlineImages,
                             onReset = {
                                 deps.store.resetAll()
+                                deps.data.scope.launch { deps.data.resetAll() }
                                 nav.navigate(NameRoute) { popUpTo(0) { inclusive = true } }
                             },
                         )

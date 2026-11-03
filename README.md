@@ -76,6 +76,19 @@ cd iosApp && xcodegen && open Overfit.xcodeproj
 
 In Xcode einen iPhone-Simulator wählen und starten. Der Kotlin-Teil wird beim Build automatisch über Gradle gebaut.
 
+## Übungskatalog neu erzeugen
+
+Der Katalog (`shared/src/commonMain/composeResources/files/catalog/`) wird mit einem Skript aus zwei fest gepinnten
+Quellen gebaut (Workout Guide und free-exercise-db, Commit-SHAs oben im Skript):
+
+```bash
+python3 tools/catalog/import_catalog.py
+```
+
+Das Skript braucht nur Python 3. Es lädt die Quellen (Cache unter `tools/catalog/.cache/`), führt Dubletten zusammen
+(Workout Guide hat Vorrang) und schreibt `exercises.json` und die Workout-Guide-SVGs. Beim nächsten Start spielt die
+App einen geänderten Katalog automatisch ein. Eigene Einstellungen an Übungen bleiben dabei erhalten.
+
 ## Lizenzen
 
 Code: [Apache License 2.0](LICENSE).

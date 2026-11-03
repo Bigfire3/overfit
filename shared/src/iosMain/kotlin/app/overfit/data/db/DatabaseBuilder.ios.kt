@@ -1,0 +1,21 @@
+package app.overfit.data.db
+
+import androidx.room.Room
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import platform.Foundation.NSDocumentDirectory
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSUserDomainMask
+
+/** iOS: bundled SQLite, database in the app's Documents directory (backed up, not visible to the user). */
+@OptIn(ExperimentalForeignApi::class)
+fun buildDatabase(): OverfitDatabase {
+    val dir = NSFileManager.defaultManager.URLForDirectory(NSDocumentDirectory, NSUserDomainMask, null, true, null)
+    val path = requireNotNull(dir?.path) { "No documents directory" } + "/" + OverfitDatabase.NAME
+    return Room.databaseBuilder<OverfitDatabase>(name = path)
+        .setDriver(BundledSQLiteDriver())
+        .setQueryCoroutineContext(Dispatchers.IO)
+        .configure()
+}

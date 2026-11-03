@@ -65,6 +65,12 @@ android {
         }
     }
 
+    sourceSets {
+        // Exportierte Room-Schemas für MigrationTestHelper (Asset-Ordner = Klassenname der Datenbank).
+        // Robolectric-Unit-Tests sehen nur die Assets der App-Variante, daher debug (nicht im Release-APK).
+        getByName("debug").assets.srcDir("../shared/schemas")
+    }
+
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -78,6 +84,10 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.room.testing)
+    testImplementation(libs.sqlite.framework)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(platform(libs.androidx.compose.bom))

@@ -1,5 +1,13 @@
 package app.overfit.ui.settings
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.overfit.data.images.OfflineImages
+import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.pressableRow
+import coil3.compose.LocalPlatformContext
+
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -43,6 +51,7 @@ fun SettingsScreen(
     onConnect: () -> Unit,
     onCoachMemory: () -> Unit,
     onAbout: () -> Unit,
+    offlineImages: OfflineImages,
     onReset: () -> Unit,
 ) {
     val t = LocalStrings.current
@@ -96,6 +105,7 @@ fun SettingsScreen(
         ListRow(t.about, onClick = onAbout)
 
         SectionTitle(t.data)
+        OfflineImagesRow(offlineImages)
         ListRow(
             if (confirmReset) t.resetConfirm else t.reset,
             tone = if (confirmReset) Tone.Default else Tone.Muted,
@@ -134,4 +144,23 @@ fun AboutScreen(versionName: String, onBack: () -> Unit) {
         Spacer(Modifier.height(Space.m))
         Text(t.aboutLibrariesText, style = Theme.type.caption)
     }
+}
+
+/** "Download all images" with progress; tapping again only loads what is still missing. */
+@Composable
+private fun OfflineImagesRow(offlineImages: OfflineImages) {
+    val t = LocalStrings.current
+    val context = LocalPlatformContext.current
+    val status by offlineImages.status.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { offlineImages.refresh(context) }
+    val value = when {
+        status.running -> t.offlineImagesRunning(status.done, status.total)
+        status.total > 0 && status.stored == status.total -> t.offlineImagesDone(status.stored, status.total)
+        else -> t.offlineImagesIdle(status.stored)
+    }
+    Column(Modifier.pressableRow { offlineImages.start(context) }.padding(vertical = Space.m)) {
+        Text(t.offlineImages)
+        Text(value, style = Theme.type.caption, tone = Tone.Muted)
+    }
+    Hairline()
 }

@@ -50,6 +50,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
@@ -74,8 +75,15 @@ fun Text(
     style: TextStyle = Theme.type.body,
     tone: Tone = Tone.Default,
     align: TextAlign? = null,
+    maxLines: Int = Int.MAX_VALUE,
 ) {
-    BasicText(text, modifier, style = style.copy(color = tone.color(), textAlign = align ?: TextAlign.Unspecified))
+    BasicText(
+        text,
+        modifier,
+        style = style.copy(color = tone.color(), textAlign = align ?: TextAlign.Unspecified),
+        overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis,
+        maxLines = maxLines,
+    )
 }
 
 @Composable
@@ -152,6 +160,10 @@ private fun Modifier.pressable(
             onClick()
         }
 }
+
+/** Press feedback (dimming) for whole rows, like the list rows. */
+@Composable
+fun Modifier.pressableRow(onClick: () -> Unit): Modifier = pressable(onClick = onClick)
 
 /** The one primary action on a screen: inverted, full width, pill. */
 @Composable
