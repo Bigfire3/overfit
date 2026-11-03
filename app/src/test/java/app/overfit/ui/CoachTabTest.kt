@@ -68,7 +68,7 @@ class CoachTabTest {
         put("workout", JsonPrimitive(AiPrompt.EXAMPLE.replace("Oberkörper A", "Coach Oberkörper")))
     }.toString()
     private val fake = FakeCoachTransport { prompt, _ ->
-        if (prompt.schemaName == CoachChatSchema.NAME) CoachReply(chatAnswer, chatAnswer, costMicro = 4_200) else CoachReply("{}", "{}")
+        if (prompt.schemaName == CoachChatSchema.NAME) CoachReply(chatAnswer, chatAnswer, costMicro = 4_200, servedModel = "gemini-3.6-flash") else CoachReply("{}", "{}")
     }
 
     @After
@@ -127,7 +127,7 @@ class CoachTabTest {
         compose.onNodeWithText("Senden").performScrollTo().performClick()
         waitFor("Probier das hier.")
         waitFor("Workout-Vorschlag: Coach Oberkörper")
-        waitFor("Kosten: 0,0042 €")
+        waitFor("Gemini 3.6 Flash (Google) · 0,0042 €")
 
         // The system prompt has the profile and the workouts; a second question carries the history.
         val first = fake.prompts.last()

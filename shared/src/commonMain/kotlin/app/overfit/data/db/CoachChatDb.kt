@@ -25,7 +25,7 @@ data class CoachChatEntity(
  * One message of a coach chat. A question is stored at once ([fromUser]); the answer row exists from the moment the
  * question is sent ([status] SENDING) so the chat shows a loading line, and turns DONE or FAILED. [workoutJson] is a
  * proposed workout in the share format v1 (shown as "Use workout" card); [photoIds] the photos the user explicitly
- * attached (comma-separated). [costMicro]: what the answer cost with Fuel.
+ * attached (comma-separated). [costMicro]: what the answer cost with credit.
  */
 @kotlinx.serialization.Serializable
 @Entity(
@@ -43,6 +43,9 @@ data class CoachChatMessageEntity(
     val workoutJson: String? = null,
     val photoIds: String? = null,
     val costMicro: Long? = null,
+    /** Credit: model ID that answered, and the chosen model if a replacement answered (the chosen model's price was charged). */
+    val servedModel: String? = null,
+    val fallbackFrom: String? = null,
     val errorKind: String? = null,
     /** Answer of the demo mode (no AI access): shown with a hint, never sent to a provider as history. */
     val demo: Boolean = false,

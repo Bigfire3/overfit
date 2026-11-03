@@ -12,18 +12,34 @@ export type ProviderKind = 'gemini' | 'anthropic' | 'workers-ai';
 export interface TierDef {
   provider: ProviderKind;
   model: string;
+  /** Echter Modellname für die Anzeige (kein Marketingname, siehe DECISIONS.md „Ehrliche Begriffe“). */
+  displayName: string;
+  /** Anbieter für die Anzeige, z. B. „Google“. */
+  vendor: string;
+  /** Typische Thinking-Token je Coach-Anfrage (zählen als Ausgabe), nur für die Kostenschätzung. */
+  thinkingTokens: number;
   images: boolean;
   /** Ausweich-Stufe, wenn der Anbieter ausfällt (5xx, 429, Zeitüberschreitung, Netzwerk). */
   fallback: Tier | null;
 }
 
 export const TIERS: Record<Tier, TierDef> = {
-  standard: { provider: 'gemini', model: 'gemini-3.6-flash', images: true, fallback: 'pro' },
-  pro: { provider: 'anthropic', model: 'claude-sonnet-5-5', images: true, fallback: 'standard' },
-  lite: { provider: 'workers-ai', model: '@cf/meta/llama-3.1-8b-instruct', images: false, fallback: 'standard' },
+  standard: { provider: 'gemini', model: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', vendor: 'Google', thinkingTokens: 1000, images: true, fallback: 'pro' },
+  pro: { provider: 'anthropic', model: 'claude-sonnet-5-5', displayName: 'Claude Sonnet 5.5', vendor: 'Anthropic', thinkingTokens: 0, images: true, fallback: 'standard' },
+  lite: { provider: 'workers-ai', model: '@cf/meta/llama-3.1-8b-instruct', displayName: 'Llama 3.1 8B', vendor: 'Cloudflare', thinkingTokens: 0, images: false, fallback: 'standard' },
 };
 export const TIER_NAMES = Object.keys(TIERS) as Tier[];
 export const DEFAULT_TIER: Tier = 'standard';
+
+/**
+ * Typische Token-Mengen je Aufgabe für die Kostenschätzung in der App, gemessen an den echten Prompts
+ * (Methode: docs/DECISIONS.md „Kostenschätzung“). Ohne Cache-Rabatt, also eher zu hoch als zu niedrig.
+ */
+export const USAGE_PROFILES = {
+  coach: { inputTokens: 8200, outputTokens: 1400 },
+  chat: { inputTokens: 6700, outputTokens: 500 },
+  autofill: { inputTokens: 900, outputTokens: 120 },
+} as const;
 
 /** Wechselkurs für alle Listenpreise in USD (vom Betreiber zu pflegen). */
 export const EUR_PER_USD = 0.92;
@@ -112,9 +128,11 @@ export class UpstreamError extends Error {
 
 export interface CallOptions {
   timeoutMs: number;
-  /** Anfrage enthält Bilder → das Gateway protokolliert sie nicht (Körperfotos). */
+  /** Anfrage enthält Bilder (Körperfotos) → das Gateway speichert keine Inhalte, nur Metadaten. */
   hasImages: boolean;
   tier: Tier;
+  /** Ein anderes Modell als das gewählte beantwortet die Anfrage. */
+  fallback?: boolean;
 }
 
 type Block = Record<string, unknown>;
@@ -144,10 +162,16 @@ async function baseUrl(env: Env, cfg: Config, provider: 'anthropic' | 'google-ai
   return provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://generativelanguage.googleapis.com';
 }
 
-function gatewayHeaders(cfg: Config, o: CallOptions): Record<string, string> {
+/**
+ * Gateway-Header. Bei Foto-Anfragen `cf-aig-collect-log-payload: false`: Das Gateway speichert dann weder Anfrage noch
+ * Antwort, protokolliert aber weiter Metadaten (Tokens, Kosten, Modell, Dauer, Status). Bewusst nicht
+ * `cf-aig-collect-log: false`, das würde den ganzen Eintrag samt Kosten unterdrücken.
+ */
+export function gatewayHeaders(cfg: Config, o: CallOptions): Record<string, string> {
   if (!cfg.aiGatewayId) return {};
-  const h: Record<string, string> = { 'cf-aig-metadata': JSON.stringify({ tier: o.tier }) };
-  if (o.hasImages) h['cf-aig-collect-log'] = 'false';
+  const meta = { tier: o.tier, photo: o.hasImages, fallback: !!o.fallback };
+  const h: Record<string, string> = { 'cf-aig-metadata': JSON.stringify(meta) };
+  if (o.hasImages) h['cf-aig-collect-log-payload'] = 'false';
   return h;
 }
 
@@ -282,7 +306,7 @@ export function workersAiRequest(body: Record<string, unknown>, maxOutput: numbe
 
 async function callWorkersAi(env: Env, cfg: Config, body: Record<string, unknown>, model: string, maxOutput: number, o: CallOptions): Promise<Normalized> {
   const ai = env.AI!;
-  const opts = cfg.aiGatewayId ? { gateway: { id: cfg.aiGatewayId, metadata: { tier: o.tier } } } : {};
+  const opts = cfg.aiGatewayId ? { gateway: { id: cfg.aiGatewayId, metadata: { tier: o.tier, photo: o.hasImages, fallback: !!o.fallback } } } : {};
   let res: { response?: unknown; usage?: { prompt_tokens?: number; completion_tokens?: number } };
   try {
     res = (await Promise.race([

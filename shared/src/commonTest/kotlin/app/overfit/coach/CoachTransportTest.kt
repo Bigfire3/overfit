@@ -286,6 +286,22 @@ class CoachTransportTest {
     }
 
     @Test
+    fun fuelReportsTheModelThatAnsweredAndTheChosenOneOnFallback() = runTest {
+        val fake = FakeFuel(tiers("standard", "pro", "lite")) {
+            FuelMessageResult(fuelAnswer, 30_000, 4_170_000, servedModel = "claude-sonnet-5-5", chosenModel = "gemini-3.6-flash")
+        }
+        val reply = FuelCoach(FuelProvider { fake }).send(prompt, "standard")
+        assertEquals("claude-sonnet-5-5", reply.servedModel)
+        assertEquals("gemini-3.6-flash", reply.fallbackFrom)
+        val same = FakeFuel(tiers("standard")) {
+            FuelMessageResult(fuelAnswer, 30_000, 4_170_000, servedModel = "gemini-3.6-flash", chosenModel = "gemini-3.6-flash")
+        }
+        val r2 = FuelCoach(FuelProvider { same }).send(prompt, "standard")
+        assertEquals("gemini-3.6-flash", r2.servedModel)
+        assertEquals(null, r2.fallbackFrom)
+    }
+
+    @Test
     fun fuelTierFallsBackToWhatTheBackendOffers() = runTest {
         assertEquals("standard", sentModel(tiers("standard", "pro", "lite"), "standard"))
         assertEquals("lite", sentModel(tiers("standard", "pro", "lite"), "lite"))

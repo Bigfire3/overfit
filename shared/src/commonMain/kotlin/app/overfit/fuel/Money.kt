@@ -39,3 +39,18 @@ fun formatRevealNumber(micro: Long, language: Language): String {
     val frac = (cents % 100).toString().padStart(2, '0')
     return if (language == Language.DE) "${cents / 100},$frac" else "${cents / 100}.$frac"
 }
+
+/**
+ * Estimated cost in cents for the model setting: "1,5 ct" (from 1 ct, one decimal), "0,02 ct" (below, two decimals),
+ * "< 0,01 ct"; from 1 € as euro. Integer maths only.
+ */
+fun formatCents(micro: Long, language: Language): String {
+    if (micro >= MICRO_PER_EURO) return formatEuro(micro, language)
+    val unit = if (language == Language.DE) "ct" else "¢"
+    fun num(whole: Long, frac: String) = if (language == Language.DE) "$whole,$frac" else "$whole.$frac"
+    return when {
+        micro >= 10_000 -> { val tenths = (micro + 500) / 1_000; "${num(tenths / 10, (tenths % 10).toString())} $unit" }
+        (micro + 50) / 100 == 0L -> "< ${num(0, "01")} $unit"
+        else -> { val h = (micro + 50) / 100; "${num(h / 100, (h % 100).toString().padStart(2, '0'))} $unit" }
+    }
+}

@@ -194,6 +194,8 @@ class FuelApi(
             body = element,
             costMicro = meta?.get("costMicro")?.jsonPrimitive?.longOrNull ?: 0,
             balanceMicro = meta?.get("balanceMicro")?.jsonPrimitive?.longOrNull ?: 0,
+            servedModel = meta?.get("model")?.jsonPrimitive?.contentOrNull,
+            chosenModel = meta?.get("requestedModel")?.jsonPrimitive?.contentOrNull,
         )
     }
 }

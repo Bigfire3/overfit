@@ -35,6 +35,9 @@ data class CoachReply(
     val raw: String,
     val costMicro: Long? = null,
     val balanceMicro: Long? = null,
+    /** Credit: model that really answered (ID), and the model chosen when a replacement answered instead (else null). */
+    val servedModel: String? = null,
+    val fallbackFrom: String? = null,
     /** Output was cut off (max tokens). */
     val truncated: Boolean = false,
     /** The model declined (safety). */
@@ -60,7 +63,7 @@ object CoachModels {
     const val OPENROUTER = "anthropic/claude-sonnet-5.5"
     /** Newest Gemini Flash marked "Stable" in Google's model list (3.8 Flash is still "New"). */
     const val GEMINI = "gemini-3.6-flash"
-    /** Fuel sends a tier instead of a model (backend/src/providers.ts); Standard = Gemini Flash, Pro = Claude Sonnet. */
+    /** Credit sends a tier ID instead of a model (backend/src/providers.ts); internal only, the UI shows the real model names. */
     const val FUEL = app.overfit.ai.TIER_STANDARD
     const val MAX_TOKENS = 8_000
     /** Gemini counts its thinking tokens into the output limit, so it gets more room. */
@@ -317,7 +320,12 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
             throw CoachException(CoachErrorKind.NETWORK, e.message)
         }
         val body = result.body as? JsonObject ?: throw CoachException(CoachErrorKind.SERVER, "Not an object")
-        return anthropicReply(body, body.toString()).copy(costMicro = result.costMicro, balanceMicro = result.balanceMicro)
+        return anthropicReply(body, body.toString()).copy(
+            costMicro = result.costMicro,
+            balanceMicro = result.balanceMicro,
+            servedModel = result.servedModel,
+            fallbackFrom = result.chosenModel?.takeIf { result.servedModel != null && it != result.servedModel },
+        )
     }
 }
 

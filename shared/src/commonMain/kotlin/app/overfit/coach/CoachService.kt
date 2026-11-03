@@ -64,6 +64,9 @@ class CoachService(
     private val clock: () -> Long,
     /** Fuel tiers of the backend (coach quality setting); null = unknown. Only asked while Fuel is the provider. */
     private val fuelTiers: suspend () -> Map<String, app.overfit.fuel.FuelTierInfo>? = { null },
+    /** Credit: backend config (markup, typical tokens) and balance for the cost display of the model setting. */
+    private val fuelConfig: suspend () -> app.overfit.fuel.FuelConfig? = { null },
+    private val fuelBalance: suspend () -> Long? = { null },
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
 ) {
     private val mutex = Mutex()
@@ -81,6 +84,8 @@ class CoachService(
     fun access(): CoachAccess = access.invoke()
 
     suspend fun fuelTiers(): Map<String, app.overfit.fuel.FuelTierInfo>? = fuelTiers.invoke()
+    suspend fun fuelConfig(): app.overfit.fuel.FuelConfig? = fuelConfig.invoke()
+    suspend fun fuelBalance(): Long? = fuelBalance.invoke()
 
     /** The transport for [id] (shared with the coach chat). */
     fun transportFor(id: ProviderId): CoachTransport = transport(id)
@@ -259,6 +264,8 @@ class CoachService(
                 planStatus = if (review.nextSession != null) PlanStatus.OPEN else PlanStatus.NONE,
                 costMicro = reply.costMicro,
                 balanceMicro = reply.balanceMicro,
+                servedModel = reply.servedModel,
+                fallbackFrom = reply.fallbackFrom,
             ),
         )
         val memory = review.memory?.trim()

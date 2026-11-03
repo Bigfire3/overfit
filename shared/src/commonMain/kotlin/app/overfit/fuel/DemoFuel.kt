@@ -13,6 +13,7 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
     private var tokenCounter = 0
 
     private val entries = listOf(
+        LedgerEntry(6, nowSec() - 1_800, "usage", -2_609, "claude-sonnet-5-5", "standard", 1_000, 0, 0, 500, fallback = true),
         LedgerEntry(5, nowSec() - 3_600, "usage", -2_609, "gemini-3.6-flash", "standard", 1_000, 0, 0, 500),
         LedgerEntry(4, nowSec() - 90_000, "usage", -10_412, "claude-sonnet-5-5", "pro", 1_600, 0, 0, 720),
         LedgerEntry(3, nowSec() - 180_000, "spot_reward", 1_000_000),
@@ -23,9 +24,9 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
     override suspend fun config() = FuelConfig(
         markupBp = 800, storeFeeBp = 1_500,
         tiers = mapOf(
-            "standard" to FuelTierInfo(true, "gemini-3.6-flash", true, TierPrice(690_000, 3_450_000)),
-            "pro" to FuelTierInfo(true, "claude-sonnet-5-5", true, TierPrice(1_840_000, 9_200_000)),
-            "lite" to FuelTierInfo(true, "@cf/meta/llama-3.1-8b-instruct", false, TierPrice(259_153, 760_488)),
+            "standard" to FuelTierInfo(true, "gemini-3.6-flash", true, TierPrice(690_000, 3_450_000), "Gemini 3.6 Flash", "Google", 1_000),
+            "pro" to FuelTierInfo(true, "claude-sonnet-5-5", true, TierPrice(1_840_000, 9_200_000), "Claude Sonnet 5.5", "Anthropic"),
+            "lite" to FuelTierInfo(true, "@cf/meta/llama-3.1-8b-instruct", false, TierPrice(259_153, 760_488), "Llama 3.1 8B", "Cloudflare"),
         ),
         packages = listOf(
             FuelPackage("overfit.fuel.5", 5_000_000, 3_935_185),
