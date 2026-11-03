@@ -180,7 +180,7 @@ internal fun SummaryRows(s: WorkoutSummary, unit: WeightUnit, language: Language
     }
 }
 
-private fun recordText(r: PersonalRecord, unit: WeightUnit, language: Language, t: Strings): String {
+internal fun recordText(r: PersonalRecord, unit: WeightUnit, language: Language, t: Strings): String {
     val h = t.history
     fun kg(v: Double) = formatKg(v, unit, language)
     return when (r.kind) {

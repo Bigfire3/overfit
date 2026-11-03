@@ -492,3 +492,11 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - **iOS-CI pausiert:** macOS-Minuten kosten 10x und waren am 3.11. rund 90 % der Actions-Kosten. `ios.yml` läuft nur noch
   per „Run workflow“. Ersatz: Die Android-CI kompiliert `iosMain` (`:shared:compileKotlinIosSimulatorArm64`, Linux).
   Gemergt wird bei grüner Android-CI; die iOS-CI vor einem iOS-Release oder nach größeren iOS-Änderungen von Hand starten.
+
+## Foto-Tagebuch wie BeReal (Session M, 3.11.)
+- **Wochenstart nach Sprache:** DE Montag, EN Sonntag (US-Konvention); die Spec nennt „Mo–So“, die englische Fassung folgt der Sprache wie gefordert.
+- **Serie:** Wochen in Folge mit mindestens einem Training. Die laufende Woche ohne Training bricht die Serie nicht, bis sie vorbei ist.
+- **Tippziel:** Tag mit Foto öffnet das Vollbild beim ältesten Foto des Tages; Tag nur mit Training öffnet das Training im Verlauf.
+- **Vergleichen** bleibt erhalten und nimmt im Raster das letzte Foto des Tages.
+- **Bestwerte im Vollbild** werden mit `WorkoutRepository.summary` nachgeladen (max. 3 Zeilen), kein neues Schema.
+- **Teilen eines Fotos** gab es im Viewer bisher nicht; neu über `PlatformShare.shareBytes` (JPEG).
