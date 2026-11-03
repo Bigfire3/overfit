@@ -119,6 +119,7 @@ final class ScreenshotTests: OverfitUITestCase {
         suffix = "hell"
         shot("00-homescreen")
         guard icon.exists else { return }
+        app.terminate() // cold start, so the launch screen shows
         icon.tap()
         usleep(150_000)
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
