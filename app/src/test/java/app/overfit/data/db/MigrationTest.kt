@@ -110,6 +110,33 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migration2to4AddsEmptyCoachTables() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v2 = helper.createDatabase(2)
+        v2.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, restStartedAt, restEndsAt, restAfterSetId, updatedAt) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1, 2, NULL, NULL, NULL, NULL, NULL, NULL, 3)",
+        )
+        v2.close()
+
+        // Validates the migrated schema against schemas/.../4.json.
+        val v4 = helper.runMigrationsAndValidate(4, OverfitDatabase.MIGRATIONS.toList())
+        try {
+            assertEquals(1L, v4.count("workout_session"))
+            assertEquals("coach_review exists and is empty", 0L, v4.count("coach_review"))
+            assertEquals("coach_memory exists and is empty", 0L, v4.count("coach_memory"))
+        } finally {
+            v4.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 
