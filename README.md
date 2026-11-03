@@ -4,6 +4,20 @@ Minimalistische App für Android und iOS zum Loggen von Krafttraining und Calist
 Schwarz-weiß, Deutsch und Englisch, ohne Werbung, mit deinem eigenen API-Key. Gebaut mit Kotlin Multiplatform und Compose Multiplatform.
 Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRESS.md) · Entscheidungen: [docs/DECISIONS.md](docs/DECISIONS.md)
 
+## Funktionen
+
+- **Training loggen**: Übungskatalog (über 1000 Übungen, deutsche Suche, Filter), eigene Übungen, Vorlagen; Workout-Modus mit
+  Sätzen abhaken, Werten, Notizen je Übung, Satz/Übung hinzufügen, ersetzen, umsortieren; läuft nach App-Neustart weiter
+- **Pausentimer** mit ±15 s und Überspringen, auch im Hintergrund (Benachrichtigung, Alarm, Haptik; Schalter „Vibration“)
+- **Beenden-Flow**: Zusammenfassung, neue Bestwerte, Gefühl, Notiz, Körperfotos (nur app-privat); **Verlauf** mit Details, Fortschritt je Übung
+- **Foto-Tagebuch**: Zeitachse, Vollbild, zwei Fotos vergleichen
+- **Teilen und Importieren**: Vorlagen und Trainings als Link, QR-Code oder Datei; Beispielvorlagen Push/Pull/Legs;
+  **KI-Vorlage** per Chat (ChatGPT, Claude, Gemini) erstellen und aus der Zwischenablage einfügen
+- **KI-Coach**: mit eigenem API-Key oder „Fuel“ (Coach-Guthaben); **KI-Chat-Verbindung** (Claude, ChatGPT, Gemini) oder „Kontext kopieren“
+- **Fuel und Spot**: Guthaben in Euro; Freunde per QR „spotten“, beide bekommen 1 € Fuel
+- **Backup** als eine ZIP-Datei (Export/Import), **Alle Daten löschen**
+- Deutsch und Englisch, Hell/Dunkel/System, kg/lb, ohne Werbung und Tracking
+
 ## App aufs Handy laden und installieren
 
 1. Am Handy im Browser (z. B. Chrome) bei **github.com** einloggen – das Repo ist privat, ohne Login gibt es nur „404".
