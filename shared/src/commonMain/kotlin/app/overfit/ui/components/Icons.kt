@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, History, Exercises, Photos, Settings, Plus, Close, Search, ChevronDown, ChevronUp }
+enum class Icon { Back, Check, Home, History, Exercises, Photos, Settings, Plus, Close, Search, ChevronDown, ChevronUp, Drag }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -71,6 +71,10 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
             }
             Icon.ChevronDown -> path(6f to 9.5f, 12f to 15.5f, 18f to 9.5f)
             Icon.ChevronUp -> path(6f to 14.5f, 12f to 8.5f, 18f to 14.5f)
+            Icon.Drag -> {
+                line(5f, 9f, 19f, 9f)
+                line(5f, 15f, 19f, 15f)
+            }
             Icon.Settings -> {
                 line(4f, 8f, 20f, 8f)
                 line(4f, 16f, 20f, 16f)

@@ -47,7 +47,11 @@ interface ExerciseDao {
     @Query("UPDATE exercise SET isArchived = 1, updatedAt = :now WHERE id = :id")
     suspend fun archive(id: String, now: Long)
 
-    @Query("SELECT COUNT(*) FROM template_exercise WHERE exerciseId = :id")
+    /** References from templates and workouts (both block deleting the exercise). */
+    @Query(
+        """SELECT (SELECT COUNT(*) FROM template_exercise WHERE exerciseId = :id) +
+                  (SELECT COUNT(*) FROM session_exercise WHERE exerciseId = :id)""",
+    )
     suspend fun usageCount(id: String): Int
 
     @Query("DELETE FROM exercise WHERE id = :id")
@@ -101,4 +105,58 @@ interface TemplateDao {
 
     @Insert
     suspend fun insertSets(sets: List<TemplateSetEntity>)
+}
+
+@Dao
+interface WorkoutDao {
+    @Transaction
+    @Query("SELECT * FROM workout_session WHERE status = 'ACTIVE' ORDER BY startedAt DESC LIMIT 1")
+    suspend fun getActive(): SessionWithExercises?
+
+    @Query("SELECT id FROM workout_session WHERE status = 'ACTIVE' LIMIT 1")
+    fun observeActiveId(): Flow<String?>
+
+    @Transaction
+    @Query("SELECT * FROM workout_session WHERE id = :id")
+    suspend fun get(id: String): SessionWithExercises?
+
+    @Upsert
+    suspend fun upsertSession(session: WorkoutSessionEntity)
+
+    @Query("DELETE FROM session_exercise WHERE sessionId = :sessionId")
+    suspend fun deleteExercisesOf(sessionId: String)
+
+    @Insert
+    suspend fun insertExercises(entries: List<SessionExerciseEntity>)
+
+    @Insert
+    suspend fun insertSets(sets: List<SetEntryEntity>)
+
+    @Query("UPDATE workout_session SET status = 'FINISHED', endedAt = :endedAt, restStartedAt = NULL, restEndsAt = NULL, restAfterSetId = NULL, updatedAt = :endedAt WHERE id = :id")
+    suspend fun finish(id: String, endedAt: Long)
+
+    /** Children go with it (CASCADE). */
+    @Query("DELETE FROM workout_session WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("DELETE FROM workout_session")
+    suspend fun deleteAll()
+
+    /**
+     * Completed sets of [exerciseId] from the most recent finished workout that has any, in order.
+     * Feeds "last time" and the prefill of new sets.
+     */
+    @Query(
+        """SELECT s.* FROM set_entry s
+           JOIN session_exercise se ON se.id = s.sessionExerciseId
+           WHERE se.id = (
+               SELECT se2.id FROM session_exercise se2
+               JOIN workout_session ws ON ws.id = se2.sessionId
+               WHERE se2.exerciseId = :exerciseId AND ws.status = 'FINISHED'
+                 AND EXISTS (SELECT 1 FROM set_entry s2 WHERE s2.sessionExerciseId = se2.id AND s2.completed = 1)
+               ORDER BY ws.startedAt DESC, se2.position DESC LIMIT 1
+           ) AND s.completed = 1
+           ORDER BY s.position""",
+    )
+    suspend fun lastCompletedSets(exerciseId: String): List<SetEntryEntity>
 }

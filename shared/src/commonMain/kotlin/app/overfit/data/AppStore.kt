@@ -7,6 +7,7 @@ import app.overfit.domain.ThemeMode
 import app.overfit.domain.WeightEntry
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.upsertWeight
+import app.overfit.workout.WorkoutPrefs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +20,9 @@ import kotlinx.serialization.json.Json
 data class Settings(
     val language: Language,
     val theme: ThemeMode = ThemeMode.DARK,
+    /** Rest when neither template nor exercise sets one. */
+    val defaultRestSec: Int = WorkoutPrefs.DEFAULT_REST_SEC,
+    val vibration: Boolean = true,
 )
 
 /** Everything except the API key, which lives in [SecretStore]. */
@@ -49,7 +53,7 @@ data class DeviceDefaults(val language: Language, val unit: WeightUnit)
 
 /**
  * Single source of truth for profile and settings. Persists as JSON after every change.
- * Profile data is small; workout data will get its own database (Room) later.
+ * Profile data is small; workouts live in the database (Room).
  */
 class AppStore(
     private val kv: KeyValueStore,
@@ -85,6 +89,9 @@ class AppStore(
         edit { it.copy(weights = upsertWeight(it.weights, WeightEntry(date.toString(), kg))) }
     fun setLanguage(language: Language) = edit { it.copy(settings = it.settings.copy(language = language)) }
     fun setTheme(theme: ThemeMode) = edit { it.copy(settings = it.settings.copy(theme = theme)) }
+    fun setDefaultRest(sec: Int) =
+        edit { it.copy(settings = it.settings.copy(defaultRestSec = sec.coerceIn(0, MAX_REST_SEC))) }
+    fun setVibration(on: Boolean) = edit { it.copy(settings = it.settings.copy(vibration = on)) }
     fun completeOnboarding() = edit { it.copy(onboardingDone = true) }
 
     fun apiKey(): String? = secrets.load()
@@ -109,7 +116,8 @@ class AppStore(
         _state.value = AppState(initial(), hasApiKey = false)
     }
 
-    private companion object {
-        const val KEY = "overfit.state.v1"
+    companion object {
+        private const val KEY = "overfit.state.v1"
+        const val MAX_REST_SEC = 3_600
     }
 }

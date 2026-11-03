@@ -3,6 +3,11 @@
 
     <!-- KI-Anbieter (Ktor) und Übungsbilder der free-exercise-db (Coil). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Pausentimer: Benachrichtigung (ab Android 13 mit Abfrage), Vibration, exakter Alarm zum Pausenende
+         (vom Nutzer erlaubt; ohne Erlaubnis inexakt). Kein Foreground-Service, kein Wakelock. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- QR-Scan beim Vorlagen-Import; ohne Kamera bleibt die App voll nutzbar. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -51,6 +56,13 @@
                 <data android:scheme="file" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.overfit" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name="app.overfit.platform.RestAlarmReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="app.overfit.platform.RestActionReceiver"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

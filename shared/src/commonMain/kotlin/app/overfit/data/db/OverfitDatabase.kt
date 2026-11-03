@@ -1,5 +1,6 @@
 package app.overfit.data.db
 
+import androidx.room.AutoMigration
 import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
@@ -16,22 +17,28 @@ import androidx.room.useWriterConnection
         WorkoutTemplateEntity::class,
         TemplateExerciseEntity::class,
         TemplateSetEntity::class,
+        WorkoutSessionEntity::class,
+        SessionExerciseEntity::class,
+        SetEntryEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    // v1 → v2 only adds the workout tables (nothing is dropped or rewritten).
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 @TypeConverters(Converters::class)
 @ConstructedBy(OverfitDatabaseConstructor::class)
 abstract class OverfitDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
     abstract fun templateDao(): TemplateDao
+    abstract fun workoutDao(): WorkoutDao
 
     companion object {
         const val NAME = "overfit.db"
 
         /**
-         * All migrations. Rule (SPEC): never migrate destructively – every schema change gets a
-         * migration here and a migration test.
+         * Manual migrations. Rule (SPEC): never migrate destructively – every schema change gets a
+         * migration (here or as an [AutoMigration] for pure additions) and a migration test.
          */
         val MIGRATIONS: Array<Migration> = arrayOf()
     }

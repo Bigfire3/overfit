@@ -32,6 +32,8 @@ import kotlinx.datetime.LocalDate
 fun StartScreen(
     state: AppState,
     templates: List<TemplateSummary>?,
+    activeWorkout: Boolean,
+    onStartWorkout: () -> Unit,
     onOpenTemplate: (Long) -> Unit,
     onNewTemplate: () -> Unit,
     share: ShareDependencies,
@@ -41,8 +43,9 @@ fun StartScreen(
     val latest = latestWeight(state.weights)
     Screen(
         scroll = true,
-        // Workout mode follows in a later phase.
-        footer = { PrimaryButton(t.startWorkout, onClick = {}, enabled = false) },
+        footer = {
+            PrimaryButton(if (activeWorkout) t.continueWorkout else t.startWorkout, onClick = onStartWorkout)
+        },
     ) {
         Text(t.greeting(state.profile.name), style = Theme.type.label, tone = Tone.Muted)
         Spacer(Modifier.height(Space.xl))

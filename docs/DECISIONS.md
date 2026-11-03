@@ -197,6 +197,56 @@ Zuerst als native Android-Version gebaut (PR #17), dann nach der KMP-Entscheidun
   (In-Memory-Room mit Android-Treiber, Katalog direkt aus dem Quellbaum). `MigrationTestHelper` liest die Schemas
   aus den Assets, daher hängt `shared/schemas` an den **debug**-Assets von `:app` (nur Debug-APK, nicht Release).
 
+## Phase 2 – Workout-Modus, Pausentimer, Haptik
+
+- **Datenmodell v2** (`AutoMigration(1 → 2)`, fügt nur Tabellen hinzu, nichts wird gelöscht oder umgeschrieben;
+  Migrationstest mit Daten in v1): `workout_session` (UUID, Name, `templateId` ohne Fremdschlüssel, damit
+  gelöschte Vorlagen den Verlauf nicht berühren, Status ACTIVE/FINISHED, Start/Ende, Notiz, Gefühl, Foto, aiStatus,
+  laufende Pause als `restStartedAt`/`restEndsAt`) → `session_exercise` (UUID, Reihenfolge, Pause, Notiz, Herkunft
+  PLANNED/ADDED/REPLACED + ersetzte Übung) → `set_entry` (UUID, Ziel- und Istwerte, erledigt, Zeitpunkt, RPE).
+  Übungen in Trainings blockieren das Löschen (RESTRICT): eigene Übungen werden dann archiviert wie bei Vorlagen.
+- **Workout-State:** reines Modell `domain/Workout.kt` (alle Änderungen als Funktionen, gut testbar) plus
+  `WorkoutController` (eine Instanz pro Prozess in `AppDependencies`, Main-Thread). Nach jeder Änderung wird das
+  ganze Training in einer Transaktion geschrieben (wenige Dutzend Zeilen). Schreibvorgänge werden zusammengefasst
+  (nur der neueste Stand) und sind mit Beenden/Abbrechen strikt geordnet; ein beendetes Training wird von einem
+  späten Schreibvorgang nie wieder aktiv. Beim App-Start lädt der Controller das aktive Training, die App springt
+  direkt hinein.
+- **Vorbelegung:** Istwerte starten mit den Zielwerten der Vorlage, Lücken kommen von „letztes Mal“ (erledigte Sätze
+  des letzten abgeschlossenen Trainings mit der Übung, je Satzposition). Abhaken einer leeren Zeile übernimmt die
+  Zielwerte. Unterwegs hinzugefügte Übungen bekommen die Sätze vom letzten Mal, sonst 3 leere.
+- **Pausentimer als Wanduhrzeiten** (Start/Ende in ms, gespeichert): läuft ohne App weiter und überlebt den
+  Prozess-Tod. Dauer: Vorlage → Übung → globale Standard-Pause (neu im Profil, Standard 90 s). Nach dem letzten
+  offenen Satz startet keine Pause. ±15 s, Überspringen; „−15 s“ über die Restzeit hinaus beendet die Pause. Wird
+  der Satz wieder geöffnet, der die Pause gestartet hat, endet sie. Der Controller bekommt Uhr und Scope injiziert,
+  dadurch Tests mit virtueller Zeit.
+- **Android – Hintergrund:** laufende, stumme Benachrichtigung mit systemseitigem Countdown (Chronometer, keine
+  Wakeups) und Aktionen +15 s / Überspringen (Receiver erreicht den Controller auch nach Prozess-Tod). Zum
+  Pausenende ein Alarm per `setExactAndAllowWhileIdle`, der die Benachrichtigung „Pause vorbei“ (hohe Priorität,
+  Vibration) zeigt. **Kein Foreground-Service, kein Wakelock.** Gründe: `shortService` ist auf 3 min begrenzt,
+  `specialUse` braucht eine Play-Begründung, `USE_EXACT_ALARM` ist Wecker-/Kalender-Apps vorbehalten.
+  `SCHEDULE_EXACT_ALARM` muss der Nutzer ab Android 14 erlauben: Im Profil erscheint dann „Pausenende sekundengenau
+  → Erlauben“ (Systemeinstellung). Ohne Erlaubnis `setAndAllowWhileIdle` (kann bei gesperrtem Bildschirm etwas später
+  kommen). Ist die App sichtbar, unterdrückt der Receiver die Benachrichtigung, die App vibriert selbst.
+  Benachrichtigungs-Berechtigung (Android 13+) wird beim ersten Trainingsstart abgefragt. Zwei Kanäle für das
+  Pausenende (mit/ohne Vibration), weil Kanaleinstellungen später nicht änderbar sind. Ton vorerst aus.
+- **iOS:** lokale Benachrichtigung zum Pausenende (`UNTimeIntervalNotificationTrigger`, feste ID, ±15 s ersetzt
+  sie). Im Vordergrund zeigt iOS sie ohne Delegate nicht an, die App vibriert selbst. Mit Vibration an hat die
+  Benachrichtigung den Standardton, weil iOS sonst nicht vibriert (im Lautlos-Modus nur Vibration). Live Activity
+  später.
+- **Haptik** als Interface `Haptics` nach den Produktentscheidungen der Koordination: **Tick** = leichter Klick beim
+  Abhaken (Android `EFFECT_CLICK`, iOS leichter Impact), **RestEnd** = drei kurze Pulse (Android Waveform
+  3 × 120 ms, iOS 3 × heavy Impact), **Reveal** = Herzschlag aus zwei Pulsen und **RevealFinish** = ein kräftiger
+  Puls, angelegt für den späteren Spot-Reveal (noch ungenutzt). Schalter „Vibration“ im Profil (Standard an) gilt
+  für App-Haptik und Benachrichtigungen.
+- **Training beenden** legt das Training vorerst nur als abgeschlossen ab (Beenden-Flow folgt in Phase 3). Beenden
+  und Abbrechen brauchen wie Löschen einen zweiten Tipp. Abbrechen löscht das Training mit allen Sätzen.
+- **Drag & Drop** ohne Fremdbibliothek (`ui/components/Reorder.kt`): langes Drücken auf den Griff, Tausch, sobald die
+  Kante die Mitte des Nachbarn überschreitet (kein Hin- und Herspringen bei unterschiedlich hohen Einträgen),
+  Auto-Scroll am Rand. Im Training und im Vorlagen-Editor; „Nach oben/unten“ bleibt dort für Barrierefreiheit.
+- **Pausenleiste** nie Vollbild: minimiert eine Leiste über dem Button „Nächsten Satz loggen“, erweitert ein höherer
+  Bereich mit großem Countdown. Die Liste bleibt darüber bedienbar; Tippen auf „Nächste“ springt zur Übung.
+- **Offen:** „Bildschirm anlassen“, Ton zum Pausenende, RPE-Feld und Live Activity folgen später (Phase 5).
+
 ## Phase 8: Trainings teilen (Session B)
 - **Deflate selbst geschrieben:** Die Kotlin-Standardbibliothek hat kein Deflate, und eine KMP-Bibliothek nur dafür wäre
   zusätzliche Abhängigkeit auf beiden Plattformen. `Deflate.kt` (Raw Deflate, RFC 1951) schreibt einen Fixed-Huffman-Block

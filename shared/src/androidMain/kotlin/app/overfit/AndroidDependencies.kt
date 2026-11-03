@@ -15,6 +15,7 @@ import app.overfit.platform.AndroidAttestor
 import app.overfit.platform.AndroidDeviceKey
 import app.overfit.platform.AndroidHaptics
 import app.overfit.platform.AndroidKeyValueStore
+import app.overfit.platform.AndroidRestAlerts
 import app.overfit.platform.AndroidSecretStore
 import app.overfit.platform.createHttpClient
 import app.overfit.platform.deviceDefaults
@@ -30,6 +31,8 @@ fun androidDependencies(
     kv: KeyValueStore = AndroidKeyValueStore(context),
     secrets: SecretStore = AndroidSecretStore(context),
     database: OverfitDatabase = buildDatabase(context),
+    /** Monochrome status bar icon for the rest timer notifications. */
+    restIcon: Int = context.applicationInfo.icon,
 ): AppDependencies {
     val fuel = FuelAccess(kv, backendUrl) { url ->
         FuelApi(createHttpClient(), url, RequestSigner(AndroidDeviceKey()), AndroidAttestor(context))
@@ -40,6 +43,7 @@ fun androidDependencies(
     data = AppData(database, kv),
     versionName = versionName,
     haptics = AndroidHaptics(context),
+    restAlerts = AndroidRestAlerts(context, restIcon),
     fuel = fuel,
     share = AndroidPlatformShare(context),
     inbox = ImportInbox(),

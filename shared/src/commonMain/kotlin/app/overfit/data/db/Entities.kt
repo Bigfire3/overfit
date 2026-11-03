@@ -7,6 +7,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
+import app.overfit.domain.ExerciseOrigin
 import app.overfit.domain.ExerciseSource
 import app.overfit.domain.TrackingType
 
@@ -127,3 +128,107 @@ data class TemplateWithExercises(
 
 /** Row for template lists: template plus exercise names in order. */
 data class TemplateExerciseName(val templateId: Long, val name: String)
+
+// --- Workouts (schema v2) ---------------------------------------------------------------------
+
+enum class SessionStatus { ACTIVE, FINISHED }
+
+enum class AiStatus { NONE, QUEUED, SENT, DONE, FAILED }
+
+/**
+ * A workout. At most one is [SessionStatus.ACTIVE]; its rest timer is stored as wall-clock times
+ * so the workout continues seamlessly after a process kill or reboot of the app.
+ * [templateId] is informational only (no foreign key): deleting a template keeps the history.
+ */
+@Entity(tableName = "workout_session", indices = [Index("status"), Index("startedAt")])
+data class WorkoutSessionEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val templateId: Long?,
+    val status: SessionStatus,
+    val startedAt: Long,
+    val endedAt: Long?,
+    val note: String?,
+    /** Feeling 1–5 (phase 3). */
+    val feeling: Int?,
+    val photoPath: String?,
+    @ColumnInfo(defaultValue = "NONE") val aiStatus: AiStatus = AiStatus.NONE,
+    val restStartedAt: Long?,
+    val restEndsAt: Long?,
+    val restAfterSetId: String?,
+    val updatedAt: Long,
+)
+
+@Entity(
+    tableName = "session_exercise",
+    foreignKeys = [
+        ForeignKey(
+            entity = WorkoutSessionEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sessionId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        // History must keep its exercises: custom exercises in use are archived, never deleted.
+        ForeignKey(
+            entity = ExerciseEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["exerciseId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+    indices = [Index("sessionId"), Index("exerciseId")],
+)
+data class SessionExerciseEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val exerciseId: String,
+    val position: Int,
+    val restSec: Int?,
+    val note: String?,
+    val origin: ExerciseOrigin,
+    /** Set when [origin] is REPLACED: the exercise that was planned. No foreign key on purpose. */
+    val replacedExerciseId: String?,
+)
+
+/** A set: target (planned) vs. actual values. Which fields count depends on the tracking type. */
+@Entity(
+    tableName = "set_entry",
+    foreignKeys = [
+        ForeignKey(
+            entity = SessionExerciseEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sessionExerciseId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("sessionExerciseId")],
+)
+data class SetEntryEntity(
+    @PrimaryKey val id: String,
+    val sessionExerciseId: String,
+    val position: Int,
+    val targetWeightKg: Double?,
+    val targetReps: Int?,
+    val targetDurationSec: Int?,
+    val weightKg: Double?,
+    val reps: Int?,
+    val durationSec: Int?,
+    val completed: Boolean,
+    val completedAt: Long?,
+    /** Optional RPE (setting, off by default). */
+    val rpe: Int?,
+)
+
+data class SessionExerciseWithDetails(
+    @Embedded val entry: SessionExerciseEntity,
+    @Relation(parentColumn = "exerciseId", entityColumn = "id")
+    val exercise: ExerciseEntity,
+    @Relation(parentColumn = "id", entityColumn = "sessionExerciseId")
+    val sets: List<SetEntryEntity>,
+)
+
+data class SessionWithExercises(
+    @Embedded val session: WorkoutSessionEntity,
+    @Relation(entity = SessionExerciseEntity::class, parentColumn = "id", entityColumn = "sessionId")
+    val exercises: List<SessionExerciseWithDetails>,
+)

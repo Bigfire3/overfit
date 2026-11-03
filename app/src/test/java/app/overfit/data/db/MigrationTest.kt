@@ -6,6 +6,12 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import android.content.Context
+import androidx.sqlite.SQLiteConnection
+import app.overfit.data.toDomain
+import androidx.sqlite.execSQL
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -43,6 +49,69 @@ class MigrationTest {
             db.close()
         }
     }
+
+    @Test
+    fun migration1to2KeepsDataAndAddsEmptyWorkoutTables() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v1 = helper.createDatabase(1)
+        v1.execSQL(
+            "INSERT INTO exercise (id, name, source, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType, defaultRestSec, isArchived, createdAt, updatedAt) " +
+                "VALUES ('ex1', 'Bench', 'CUSTOM', NULL, 'chest,triceps', '', 'barbell', 'WEIGHT_REPS', 90, 0, 1, 2)",
+        )
+        v1.execSQL("INSERT INTO workout_template (id, name, note, position, createdAt, updatedAt) VALUES (1, 'Push', 'n', 0, 1, 2)")
+        v1.execSQL("INSERT INTO template_exercise (id, templateId, exerciseId, position, restSec, note) VALUES (1, 1, 'ex1', 0, 60, NULL)")
+        v1.execSQL("INSERT INTO template_set (id, templateExerciseId, position, targetWeightKg, targetReps, targetDurationSec) VALUES (1, 1, 0, 50.0, 8, NULL)")
+        v1.close()
+
+        // Validates the migrated schema against schemas/.../2.json.
+        val v2 = helper.runMigrationsAndValidate(2, OverfitDatabase.MIGRATIONS.toList())
+        try {
+            assertEquals(1L, v2.count("exercise"))
+            assertEquals(1L, v2.count("workout_template"))
+            assertEquals(1L, v2.count("template_exercise"))
+            assertEquals(1L, v2.count("template_set"))
+            listOf("workout_session", "session_exercise", "set_entry").forEach {
+                assertEquals("$it exists and is empty", 0L, v2.count(it))
+            }
+        } finally {
+            v2.close()
+        }
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val ex = db.exerciseDao().get("ex1")
+            assertNotNull(ex)
+            assertEquals("Bench", ex!!.name)
+            assertEquals(90, ex.defaultRestSec)
+            val template = db.templateDao().getWithExercises(1)!!
+            assertEquals("Push", template.template.name)
+            assertEquals(60, template.exercises.single().entry.restSec)
+            assertEquals(8, template.exercises.single().sets.single().targetReps)
+            assertNull(db.workoutDao().getActive())
+            // The new tables are usable: a workout can reference the migrated exercise.
+            val repo = app.overfit.data.WorkoutRepository(db)
+            repo.save(
+                app.overfit.domain.Workout.empty("T", 1, "w1").addExercise(
+                    app.overfit.domain.Workout.added(db.exerciseDao().get("ex1")!!.toDomain(), emptyList()),
+                ),
+            )
+            assertEquals("w1", repo.loadActive()!!.id)
+        } finally {
+            db.close()
+        }
+    }
+
+    private suspend fun SQLiteConnection.count(table: String): Long =
+        prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 
     private companion object {
         const val TEST_DB = "migration-test"

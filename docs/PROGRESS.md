@@ -5,7 +5,7 @@
 | 0 | Setup, Gerüst, CI, erstes APK | erledigt |
 | 0b | Kotlin Multiplatform, Schwarz-Weiß-Design, DE/EN, Onboarding, eigener API-Key, iOS-Hülle | erledigt |
 | 1 | Übungskatalog, eigene Übungen, Vorlagen | erledigt |
-| 2 | Workout-Modus, Pausentimer | offen |
+| 2 | Workout-Modus, Pausentimer | erledigt |
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | offen |
 | 4 | KI-Coach | offen |
 | 5 | Feinschliff | offen |
@@ -14,6 +14,43 @@
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite offen (nach Phase 3) |
+
+## Phase 2: Workout-Modus und Pausentimer (Session A)
+Phase 2 abgeschlossen:
+- „Training starten“ → freies Training oder aus Vorlage (Zielwerte der Vorlage, Lücken von „letztes Mal“)
+- Workout-Screen: Name editierbar, laufende Zeit, „x/y erledigt“, Sätze abhaken (Häkchen + Kontrast), Werte live
+  ändern, Satz hinzufügen/duplizieren/löschen, Übung hinzufügen/ersetzen/entfernen, Notiz je Übung,
+  Umsortieren per Drag & Drop (auch im Vorlagen-Editor), „Letztes Mal: …“, unten „Nächsten Satz loggen“
+- Training überlebt App-Kill und Neustart (Room v2, AutoMigration 1→2 mit Migrationstest); die App springt beim
+  Start direkt ins laufende Training
+- Pausentimer: startet beim Abhaken (Vorlage → Übung → Standard-Pause aus dem Profil), minimiert/erweitert,
+  ±15 s, Überspringen, Tippen auf „Nächste“ springt zur Übung
+- Hintergrund: Android laufende Countdown-Benachrichtigung mit +15 s/Überspringen und exakter Alarm zum Pausenende
+  (Berechtigungsabfrage ab Android 13, kein Wakelock); iOS lokale Benachrichtigung
+- Haptik-Interface (Tick, Pausenende, Reveal vorbereitet), Schalter „Vibration“ und „Standard-Pause“ im Profil
+- „Beenden“ (zweimal tippen) legt das Training als abgeschlossen ab; „Training abbrechen“ mit Bestätigung
+- Tests: Workout-Modell, Controller mit virtueller Zeit (Timer, Prozess-Tod), Formatierung (Common, 136 gesamt);
+  Repository, Migration 1→2 und UI-Durchlauf Vorlage → Training → Satz → Pause → Beenden (Robolectric)
+
+Offen / Hinweise:
+- Beenden-Flow mit Zusammenfassung, Foto, Verlauf: Phase 3 (Verlauf-Tab zeigt Trainings noch nicht)
+- „Bildschirm anlassen“, Ton zum Pausenende, RPE, iOS Live Activity: später
+- iOS: Benachrichtigung/Haptik nur von der iOS-CI gebaut, noch nicht auf echtem iPhone getestet
+
+## Bitte auf dem Handy testen: Workout und Pausentimer (Phase 2)
+1. Start → „Training starten“ → Vorlage wählen. Beim ersten Mal Benachrichtigungen erlauben
+2. Satz abhaken (Kreis rechts) → kurze Vibration, Pausenleiste unten; antippen → groß, nochmal → klein;
+   −15 s / +15 s / Überspringen
+3. Werte ändern (auch „92,5“, „±“), Satz hinzufügen/duplizieren/löschen, Übung hinzufügen/ersetzen/entfernen,
+   Übung am Griff (zwei Striche) lange drücken und ziehen; dasselbe Ziehen im Vorlagen-Editor
+4. Pause starten, Bildschirm sperren → Countdown in der Benachrichtigung, am Ende „Pause vorbei“ mit Vibration;
+   Aktionen +15 s / Überspringen in der Benachrichtigung
+5. Falls im Profil „Pausenende sekundengenau → Erlauben“ erscheint: antippen, erlauben, zurück → Zeile verschwindet
+6. Während des Trainings App aus den letzten Apps wischen und neu öffnen → Training (und laufende Pause) ist da
+7. Profil: Standard-Pause z. B. 60, Vibration Aus → Abhaken vibriert nicht mehr
+8. „Nächsten Satz loggen“ bis „Alle Sätze erledigt“, dann „Beenden“ zweimal → zurück auf Start; neues Training mit
+   derselben Übung zeigt „Letztes Mal: …“
+9. Training starten und „Training abbrechen“ (zweimal) → verworfen
 
 ## Nacht 3.11. – Fuel & Spot in der App (Session D)
 Fertig:
@@ -117,7 +154,7 @@ antwortet bis dahin 503 `purchases_unavailable` / `attestation_unavailable`); Ap
 3. „In Overfit öffnen“ antippen → die App öffnet sich (sobald der `overfit://`-Import aus Session B drin ist)
 4. Link ohne `#…` oder mit abgeschnittenem Payload öffnen → freundliche Fehlermeldung, kein Absturz
 
-## Letzte Session
+## Davor: Phase 1
 Phase 1 abgeschlossen (erst nativ gebaut, dann auf KMP portiert):
 - Import-Skript `tools/catalog/import_catalog.py`: Workout Guide und free-exercise-db, an Commits gepinnt →
   1098 Übungen + 302 Workout-Guide-SVGs in den Compose Resources (offline, Android und iOS)
