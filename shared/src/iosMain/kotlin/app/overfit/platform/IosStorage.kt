@@ -41,8 +41,7 @@ import platform.Security.kSecMatchLimitOne
 import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
 
-class IosKeyValueStore : KeyValueStore {
-    private val defaults = NSUserDefaults.standardUserDefaults
+class IosKeyValueStore(private val defaults: NSUserDefaults = NSUserDefaults.standardUserDefaults) : KeyValueStore {
     override fun get(key: String): String? = defaults.stringForKey(key)
     override fun put(key: String, value: String) = defaults.setObject(value, forKey = key)
     override fun remove(key: String) = defaults.removeObjectForKey(key)

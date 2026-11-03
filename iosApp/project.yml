@@ -72,3 +72,26 @@ targets:
         script: |
           cd "$SRCROOT/.."
           ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+  # UI tests (XCUITest): smoke flow and screenshots, run by .github/workflows/ios.yml in the simulator.
+  OverfitUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: OverfitUITests
+    dependencies:
+      - target: Overfit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.overfit.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        TEST_TARGET_NAME: Overfit
+schemes:
+  Overfit:
+    build:
+      targets:
+        Overfit: all
+        OverfitUITests: [test]
+    test:
+      targets:
+        - OverfitUITests
