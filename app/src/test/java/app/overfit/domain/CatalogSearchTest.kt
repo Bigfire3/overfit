@@ -1,11 +1,11 @@
 package app.overfit.domain
 
-import androidx.test.core.app.ApplicationProvider
 import app.overfit.data.catalog.CatalogSeeder
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 /** Suchqualität gegen den echten, gebündelten Katalog: typische Suchen liefern die Grundübung zuerst. */
 @RunWith(RobolectricTestRunner::class)
@@ -15,7 +15,7 @@ class CatalogSearchTest {
     }
 
     private fun index(): List<ExerciseSearch.Indexed> = index ?: run {
-        val catalog = CatalogSeeder.load(ApplicationProvider.getApplicationContext())
+        val catalog = CatalogSeeder.parse(File("../shared/src/commonMain/composeResources/files/catalog/exercises.json").readBytes())
         ExerciseSearch.index(
             catalog.exercises.map {
                 Exercise(
@@ -41,5 +41,12 @@ class CatalogSearchTest {
         assertEquals("Push-up", first("Liegestütz"))
         assertEquals("Plank", first("Unterarmstütz"))
         assertEquals("Lateral Raise", first("seitheben"))
+    }
+
+    @Test
+    fun englishMuscleLabelFindsExercises() {
+        val r = ExerciseSearch.search(index(), ExerciseSearch.Filter("chest"))
+        assertEquals(true, r.isNotEmpty())
+        assertEquals(true, r.take(20).all { Muscle.CHEST in it.primaryMuscles + it.secondaryMuscles || "chest" in it.name.lowercase() })
     }
 }

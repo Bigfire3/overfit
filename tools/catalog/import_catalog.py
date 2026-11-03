@@ -6,9 +6,10 @@ Quellen (Commit-SHAs gepinnt, damit der Import reproduzierbar ist):
   * free-exercise-db (yuhonas, Unlicense) – Ergänzung, Bilder werden in der App lazy geladen.
 
 Ergebnis:
-  app/src/main/assets/catalog/exercises.json
-  app/src/main/assets/catalog/wg/<slug>.svg        (unverändert aus Workout Guide)
-  app/src/main/assets/catalog/LICENSE-ASSETS-workout-guide.txt
+  shared/src/commonMain/composeResources/files/catalog/exercises.json
+  shared/src/commonMain/composeResources/files/catalog/wg/<slug>.svg   (unverändert aus Workout Guide)
+  shared/src/commonMain/composeResources/files/catalog/LICENSE-ASSETS-workout-guide.txt
+(Compose Resources: gemeinsam für Android und iOS.)
 
 Aufruf (aus dem Repo-Root):  python3 tools/catalog/import_catalog.py
 Nur Python-Standardbibliothek. Downloads werden unter tools/catalog/.cache zwischengespeichert.
@@ -30,7 +31,7 @@ FEDB_RAW = f"https://raw.githubusercontent.com/yuhonas/free-exercise-db/{FEDB_SH
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = Path(__file__).resolve().parent / ".cache"
-OUT = ROOT / "app/src/main/assets/catalog"
+OUT = ROOT / "shared/src/commonMain/composeResources/files/catalog"
 
 # --- Vereinheitlichte Schlüssel (deutsche Bezeichnungen stehen in der App) -------------------
 

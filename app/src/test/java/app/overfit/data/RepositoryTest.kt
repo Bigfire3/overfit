@@ -1,6 +1,5 @@
 package app.overfit.data
 
-import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.data.db.OverfitDatabase
@@ -28,8 +27,9 @@ class RepositoryTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        db = Room.inMemoryDatabaseBuilder(context, OverfitDatabase::class.java).allowMainThreadQueries().build()
+        db = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext())
+            .allowMainThreadQueries()
+            .build()
         exercises = ExerciseRepository(db)
         templates = TemplateRepository(db)
     }
@@ -76,10 +76,9 @@ class RepositoryTest {
         val id = templates.save(Template(0, "T", null, listOf(te(a, 10))))
         templates.delete(id)
         assertNull(templates.get(id))
-        val cursor = db.openHelper.writableDatabase
         listOf("template_exercise", "template_set").forEach { table ->
-            cursor.query("SELECT COUNT(*) FROM $table").use {
-                it.moveToFirst()
+            db.query("SELECT COUNT(*) FROM $table", null).use {
+                assertTrue(it.moveToFirst())
                 assertEquals(table, 0, it.getInt(0))
             }
         }

@@ -1,25 +1,32 @@
 package app.overfit
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import app.overfit.ui.navigation.OverfitNavHost
-import app.overfit.ui.theme.OverfitTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import app.overfit.ui.OverfitApp
+import app.overfit.ui.theme.isDark
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Immer dunkles Theme → helle Systemleisten-Icons.
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-        )
+        enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
+        val deps = (application as OverfitApp).dependencies
         setContent {
-            OverfitTheme {
-                OverfitNavHost()
+            val state by deps.store.state.collectAsState()
+            val dark = state.settings.theme.isDark()
+            // System bar icons follow the in-app theme (dark by default).
+            LaunchedEffect(dark) {
+                val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
+                else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(style, style)
             }
+            OverfitApp(deps)
         }
     }
 }

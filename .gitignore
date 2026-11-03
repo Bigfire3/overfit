@@ -9,4 +9,14 @@
 .externalNativeBuild/
 .cxx/
 .kotlin/
+local.properties
+
+# Kotlin Multiplatform / iOS
+/shared/build/
+/iosApp/Overfit.xcodeproj/
+/iosApp/build/
+xcuserdata/
+*.xcworkspace/
+DerivedData/
+/iosApp/Overfit/Info.plist
 tools/catalog/.cache/

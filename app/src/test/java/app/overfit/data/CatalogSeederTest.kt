@@ -1,6 +1,5 @@
 package app.overfit.data
 
-import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.data.catalog.CatalogFile
@@ -21,25 +20,28 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 class CatalogSeederTest {
-    private lateinit var context: Context
     private lateinit var db: OverfitDatabase
     private lateinit var seeder: CatalogSeeder
+    private val kv = InMemoryKeyValueStore()
+    private val readCatalog: suspend () -> ByteArray = { File(CATALOG_DIR + "exercises.json").readBytes() }
 
     @Before
     fun setUp() {
-        context = ApplicationProvider.getApplicationContext()
-        db = Room.inMemoryDatabaseBuilder(context, OverfitDatabase::class.java).allowMainThreadQueries().build()
-        seeder = CatalogSeeder(context, db)
+        db = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext())
+            .allowMainThreadQueries()
+            .build()
+        seeder = CatalogSeeder(db, kv, readCatalog)
     }
 
     @After
     fun tearDown() = db.close()
 
     @Test
-    fun bundledCatalogIsConsistent() {
+    fun bundledCatalogIsConsistent() = runTest {
         val catalog = seeder.load()
         assertTrue("Katalog hat ${catalog.exercises.size} Übungen", catalog.exercises.size >= 1000)
         assertEquals(catalog.exercises.size, catalog.exercises.map { it.id }.toSet().size)
@@ -49,7 +51,7 @@ class CatalogSeederTest {
             if (e.source == ExerciseSource.WORKOUT_GUIDE) {
                 val image = e.image
                 if (image == null) problems += "${e.id}: kein Bild"
-                else if (runCatching { context.assets.open(image).close() }.isFailure) problems += "${e.id}: Bild fehlt ($image)"
+                else if (!File(RESOURCES_DIR + image).isFile) problems += "${e.id}: Bild fehlt ($image)"
             }
             (e.primary + e.secondary).filter { Muscle.fromKey(it) == null }.forEach { problems += "${e.id}: Muskel $it" }
             if (e.equipment != null && Equipment.fromKey(e.equipment) == null) problems += "${e.id}: Equipment ${e.equipment}"
@@ -94,6 +96,19 @@ class CatalogSeederTest {
     fun seedIfNeededOnlyOnce() = runTest {
         assertTrue(seeder.seedIfNeeded(now = 1))
         assertNotNull(db.exerciseDao().get(seeder.load().exercises.first().id))
+        assertEquals(seeder.load().version, kv.get(CatalogSeeder.KEY_VERSION))
         assertFalse(seeder.seedIfNeeded(now = 2))
+    }
+
+    @Test
+    fun seedIfNeededSeedsAgainWhenVersionKeyIsGone() = runTest {
+        assertTrue(seeder.seedIfNeeded(now = 1))
+        kv.remove(CatalogSeeder.KEY_VERSION)
+        assertTrue(seeder.seedIfNeeded(now = 2))
+    }
+
+    private companion object {
+        const val RESOURCES_DIR = "../shared/src/commonMain/composeResources/files/"
+        const val CATALOG_DIR = RESOURCES_DIR + "catalog/"
     }
 }
