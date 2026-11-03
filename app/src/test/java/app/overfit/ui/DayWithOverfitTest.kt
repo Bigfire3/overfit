@@ -129,7 +129,10 @@ class DayWithOverfitTest {
         // Sub-screens hide the tab bar: step back until it is there (screens settle asynchronously).
         repeat(4) {
             if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
-            if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) back()
+            // The back button can vanish between the check and the click while a screen settles: then just retry.
+            if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) {
+                try { back() } catch (_: AssertionError) {}
+            }
             compose.waitForIdle()
         }
         compose.waitUntil(10_000) { compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty() }
