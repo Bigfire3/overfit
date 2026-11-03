@@ -233,20 +233,24 @@ describe('Ausweichen bei Ausfall', () => {
 });
 
 describe('AI Gateway', () => {
-  it('leitet alle Anbieter über das Gateway; Bilder werden nicht protokolliert', async () => {
+  it('leitet alle Anbieter über das Gateway; bei Fotos nur Metadaten, keine Inhalte', async () => {
     const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit' }));
     await fund(c);
     await c.call('POST', '/v1/messages', body('standard', { messages: [{ role: 'user', content: [IMG] }] }));
     const [gUrl, gInit] = gemini.mock.calls[0];
     expect(gUrl).toBe('https://gateway.test/overfit/google-ai-studio/v1beta/models/gemini-3.6-flash:generateContent');
-    expect(gInit.headers['cf-aig-collect-log']).toBe('false');
-    expect(JSON.parse(gInit.headers['cf-aig-metadata'])).toEqual({ tier: 'standard' });
+    // Nicht „collect-log: false“ (das würde auch Kosten und Tokens unterdrücken), sondern nur die Inhalte abschalten.
+    expect(gInit.headers['cf-aig-collect-log']).toBeUndefined();
+    expect(gInit.headers['cf-aig-collect-log-payload']).toBe('false');
+    expect(JSON.parse(gInit.headers['cf-aig-metadata'])).toEqual({ tier: 'standard', photo: true, fallback: false });
     await c.call('POST', '/v1/messages', body('pro'));
     const [aUrl, aInit] = anthropic.mock.calls[0];
     expect(aUrl).toBe('https://gateway.test/overfit/anthropic/v1/messages');
     expect(aInit.headers['cf-aig-collect-log']).toBeUndefined();
+    expect(aInit.headers['cf-aig-collect-log-payload']).toBeUndefined(); // ohne Foto: normales Logging
+    expect(JSON.parse(aInit.headers['cf-aig-metadata'])).toEqual({ tier: 'pro', photo: false, fallback: false });
     await c.call('POST', '/v1/messages', body('lite'));
-    expect(ai.run.mock.calls[0][2]).toEqual({ gateway: { id: 'overfit', metadata: { tier: 'lite' } } });
+    expect(ai.run.mock.calls[0][2]).toEqual({ gateway: { id: 'overfit', metadata: { tier: 'lite', photo: false, fallback: false } } });
   });
 });
 

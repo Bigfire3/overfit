@@ -89,7 +89,7 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
       if (images > 0 && !TIERS[fb].images) throw e;
       console.warn('fallback', tier, '→', fb, e.status, e.message);
       served = fb;
-      result = await callTier(env, cfg, fb, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, left)));
+      result = await callTier(env, cfg, fb, body, maxTokens as number, { ...opts(Math.min(cfg.upstreamTimeoutMs, left)), fallback: true });
     }
   } catch (e) {
     await release(env, holdId);
@@ -119,13 +119,16 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     cacheRead: usage?.cache_read_input_tokens ?? 0,
     cacheWrite: usage?.cache_creation_input_tokens ?? 0,
     output: usage?.output_tokens ?? 0,
+    providerCostMicro: usage ? costMicro(usage, cfg.prices[servedModel], 0) : null,
+    fallback: served !== tier,
+    photo: images > 0,
   });
   if (charged > 0) await rewardInviter(env, cfg, device.accountId);
   const balance = await availableMicro(env, device.accountId);
   return Response.json(
     {
       ...result.body,
-      overfit: { costMicro: charged, balanceMicro: balance, currency: 'EUR', tier, servedTier: served, model: servedModel, fallback: served !== tier },
+      overfit: { costMicro: charged, balanceMicro: balance, currency: 'EUR', tier, servedTier: served, model: servedModel, modelName: TIERS[served].displayName, vendor: TIERS[served].vendor, requestedModel: TIERS[tier].model, requestedModelName: TIERS[tier].displayName, requestedVendor: TIERS[tier].vendor, fallback: served !== tier },
     },
     { headers: { 'x-overfit-cost-micro': String(charged), 'x-overfit-balance-micro': String(balance) } },
   );
