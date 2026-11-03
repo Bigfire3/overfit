@@ -49,7 +49,7 @@ import app.overfit.chat.ChatFeature
 import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.FuelSession
-import app.overfit.fuel.isSpotLink
+import app.overfit.fuel.isInviteLink
 import app.overfit.i18n.LocalFuelStrings
 import app.overfit.i18n.fuelStringsFor
 import app.overfit.platform.Haptics
@@ -58,9 +58,9 @@ import app.overfit.ui.fuel.FuelScreen
 import app.overfit.ui.fuel.RedeemCodeScreen
 import app.overfit.ui.fuel.LedgerScreen
 import app.overfit.ui.fuel.RecoveryScreen
-import app.overfit.ui.fuel.SpotInviteScreen
-import app.overfit.ui.fuel.SpotRedeemScreen
-import app.overfit.ui.fuel.SpotRevealScreen
+import app.overfit.ui.fuel.InviteShowScreen
+import app.overfit.ui.fuel.InviteRedeemScreen
+import app.overfit.ui.fuel.InviteRevealScreen
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.overfit.ui.chat.AiCoachScreen
@@ -300,9 +300,9 @@ class AppDependencies(
 @Serializable data object LedgerRoute
 @Serializable data object RedeemCodeRoute
 @Serializable data object RecoveryRoute
-@Serializable data object SpotInviteRoute
-@Serializable data class SpotRedeemRoute(val code: String = "")
-@Serializable data class SpotRevealRoute(val amountMicro: Long, val inviterName: String = "")
+@Serializable data object InviteShowRoute
+@Serializable data class InviteRedeemRoute(val code: String = "")
+@Serializable data class InviteRevealRoute(val reviews: Int, val inviterName: String = "")
 @Serializable data object ImportRoute
 @Serializable data object DuoRoute
 @Serializable data class ShareRoute(val templateId: Long)
@@ -415,16 +415,16 @@ fun OverfitApp(deps: AppDependencies) {
             // Links, files and scans from outside open the import screen (not during onboarding).
             LaunchedEffect(incoming, state.onboardingDone) {
                 // An invite link (QR scanned with the camera app) goes to "redeem invite", not to the training import.
-                val spot = incoming
+                val link = incoming
                 // Back from the web purchase page (overfit://guthaben): credit screen, which reloads the balance.
-                if (spot != null && state.onboardingDone && app.overfit.fuel.isCreditReturnLink(spot)) {
+                if (link != null && state.onboardingDone && app.overfit.fuel.isCreditReturnLink(link)) {
                     deps.inbox.consume()
                     nav.navigate(FuelRoute) { launchSingleTop = true }
                     return@LaunchedEffect
                 }
-                if (spot != null && state.onboardingDone && isSpotLink(spot)) {
+                if (link != null && state.onboardingDone && isInviteLink(link)) {
                     deps.inbox.consume()
-                    nav.navigate(SpotRedeemRoute(spot)) { launchSingleTop = true }
+                    nav.navigate(InviteRedeemRoute(link)) { launchSingleTop = true }
                     return@LaunchedEffect
                 }
                 if (incoming != null && state.onboardingDone &&
@@ -907,8 +907,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                             onLedger = { nav.navigate(LedgerRoute) },
                             onRecovery = { nav.navigate(RecoveryRoute) },
-                            onSpotInvite = { nav.navigate(SpotInviteRoute) },
-                            onSpotRedeem = { nav.navigate(SpotRedeemRoute()) },
+                            onInviteShow = { nav.navigate(InviteShowRoute) },
+                            onInviteRedeem = { nav.navigate(InviteRedeemRoute()) },
                             fuelActive = state.providerId == ProviderId.FUEL,
                             onRedeemCode = { nav.navigate(RedeemCodeRoute) },
                             distribution = deps.distribution,
@@ -917,22 +917,22 @@ fun OverfitApp(deps: AppDependencies) {
                     composable<RedeemCodeRoute> { RedeemCodeScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<LedgerRoute> { LedgerScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<RecoveryRoute> { RecoveryScreen(deps.fuelSession, onBack = nav::popBackStack, onRestored = {}) }
-                    composable<SpotInviteRoute> { SpotInviteScreen(deps.fuelSession, onBack = nav::popBackStack) }
-                    composable<SpotRedeemRoute> { entry ->
-                        SpotRedeemScreen(
+                    composable<InviteShowRoute> { InviteShowScreen(deps.fuelSession, onBack = nav::popBackStack) }
+                    composable<InviteRedeemRoute> { entry ->
+                        InviteRedeemScreen(
                             canScan = deps.share.canScanInApp,
-                            initialCode = entry.toRoute<SpotRedeemRoute>().code,
+                            initialCode = entry.toRoute<InviteRedeemRoute>().code,
                             session = deps.fuelSession,
                             onBack = nav::popBackStack,
-                            onRedeemed = { micro, name ->
-                                nav.navigate(SpotRevealRoute(micro, name.orEmpty())) { popUpTo<SpotRedeemRoute> { inclusive = true } }
+                            onRedeemed = { reviews, name ->
+                                nav.navigate(InviteRevealRoute(reviews, name.orEmpty())) { popUpTo<InviteRedeemRoute> { inclusive = true } }
                             },
                         )
                     }
-                    composable<SpotRevealRoute> { entry ->
-                        val route = entry.toRoute<SpotRevealRoute>()
-                        SpotRevealScreen(
-                            amountMicro = route.amountMicro,
+                    composable<InviteRevealRoute> { entry ->
+                        val route = entry.toRoute<InviteRevealRoute>()
+                        InviteRevealScreen(
+                            reviews = route.reviews,
                             inviterName = route.inviterName.ifEmpty { null },
                             haptics = deps.haptics,
                             vibration = state.settings.vibration,

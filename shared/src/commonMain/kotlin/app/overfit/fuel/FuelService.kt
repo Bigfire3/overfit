@@ -19,8 +19,8 @@ interface FuelService {
     suspend fun ledger(before: Long? = null, limit: Int = 50): LedgerPage
     suspend fun createRecoveryCode(): String
     suspend fun restore(code: String): FuelAccount
-    suspend fun spotToken(): SpotToken
-    suspend fun redeemSpot(token: String): SpotRedeemResult
+    suspend fun inviteToken(): InviteToken
+    suspend fun redeemInvite(token: String): InviteRedeemResult
     /** Sends an Anthropic-style Messages request through Fuel (used by the coach in phase 4). */
     suspend fun messages(bodyJson: String): FuelMessageResult
     /** Short-lived, single-use link to the web purchase page for this account (opened in the browser). */

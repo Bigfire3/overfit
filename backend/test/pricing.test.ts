@@ -18,16 +18,16 @@ const STRIPE_WORST = [
 ];
 const STORE_FEE = 0.15; // Small-Business-Programm, auf den Preis ohne USt
 const STORE_VAT = [0.19, 0.27]; // DE und höchster EU-Satz (HU)
-const SPOT_SHARE = 0.1; // Einladungsboni/Test-Gutschriften als Anteil am Netto
+const INVITE_SHARE = 0.1; // Einladungsboni/Test-Gutschriften als Anteil am Netto
 const MIN_PROFIT_SHARE = 0.05; // Untergrenze (Ziel: 7 %)
 const TARGET_PROFIT_SHARE = 0.07;
 
 const webNet = (p: number, fee = STRIPE_MIX) => p - (p * fee.pct + fee.fixed);
 const storeNet = (p: number, vat: number) => (p / (1 + vat)) * (1 - STORE_FEE);
 /** Gewinn als Anteil am Netto: Guthaben wird zum Listenpreis × (1 + Aufschlag) verbraucht. */
-const profitShare = (credit: number, net: number, markupBp: number) => (net - credit / (1 + markupBp / 10_000) - SPOT_SHARE * net) / net;
-/** Nötiger Aufschlag für einen Zielgewinn: credit ÷ (1 + m) = net × (1 − Spot − Ziel). */
-const neededMarkup = (credit: number, net: number, target: number) => credit / (net * (1 - SPOT_SHARE - target)) - 1;
+const profitShare = (credit: number, net: number, markupBp: number) => (net - credit / (1 + markupBp / 10_000) - INVITE_SHARE * net) / net;
+/** Nötiger Aufschlag für einen Zielgewinn: credit ÷ (1 + m) = net × (1 − Rücklage − Ziel). */
+const neededMarkup = (credit: number, net: number, target: number) => credit / (net * (1 - INVITE_SHARE - target)) - 1;
 
 describe('Aufschlag deckt jeden Kanal und jedes Paket', () => {
   const cfg = getConfig(baseEnv());

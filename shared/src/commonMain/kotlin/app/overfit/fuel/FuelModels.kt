@@ -9,23 +9,37 @@ import kotlinx.serialization.json.JsonElement
 data class ExpiringItem(val amountMicro: Long, val expiresAt: Long)
 
 @Serializable
-data class SpotStatus(val invitedThisMonth: Int = 0, val monthlyLimit: Int = 0, val redeemedStarter: Boolean = false)
+data class InviteStatus(val invitedThisMonth: Int = 0, val monthlyLimit: Int = 0, val redeemedStarter: Boolean = false)
+
+/** Gifted coach reviews (invite bonus): a counter of its own, not euros. Used before the credit, they expire. */
+@Serializable
+data class GiftReviewItem(val count: Int, val expiresAt: Long)
+
+@Serializable
+data class GiftReviews(val remaining: Int = 0, val expiring: List<GiftReviewItem> = emptyList())
 
 @Serializable
 data class FuelAccount(
     val accountId: String = "",
+    /** Available credit (bought + gifted) in µ€. */
     val balanceMicro: Long = 0,
+    /** Bought credit (store, web, credit code); null = old backend without the split. */
+    val purchasedMicro: Long? = null,
+    /** Gifted credit (starting credit, admin credit, old euro invite bonuses); used first. */
+    val giftedMicro: Long? = null,
+    /** Expiry of gifted credit (bought credit never expires). */
     val expiring: List<ExpiringItem> = emptyList(),
+    val giftReviews: GiftReviews = GiftReviews(),
     val displayName: String? = null,
     val hasRecoveryCode: Boolean = false,
-    val spot: SpotStatus = SpotStatus(),
+    val invite: InviteStatus = InviteStatus(),
 )
 
 @Serializable
 data class LedgerEntry(
     val id: Long,
     val ts: Long,
-    /** usage | purchase | spot_bonus | spot_reward */
+    /** usage | purchase | code_redeem | test_credit | invite_bonus | invite_reward | invite_expired | refund | chargeback */
     val type: String,
     val amountMicro: Long,
     val model: String? = null,
@@ -39,7 +53,30 @@ data class LedgerEntry(
     val fallback: Boolean = false,
     /** Where credit came from: null = store/internal, `web` = bought on the web page, `code` = redeemed credit code. */
     val source: String? = null,
-)
+    /** Gifted reviews: +n granted, −1 used (then [amountMicro] is 0), −n expired; null = euro entry only. */
+    val reviews: Int? = null,
+    /** paid | gifted | used | refunded | expired (from the server; computed locally for old backends). */
+    val category: String? = null,
+) {
+    val kind: LedgerKind
+        get() = when (category) {
+            "paid" -> LedgerKind.Paid
+            "gifted" -> LedgerKind.Gifted
+            "used" -> LedgerKind.Used
+            "refunded" -> LedgerKind.Refunded
+            "expired" -> LedgerKind.Expired
+            else -> when (type) {
+                "usage" -> LedgerKind.Used
+                "purchase", "code_redeem" -> LedgerKind.Paid
+                "refund", "chargeback" -> LedgerKind.Refunded
+                "invite_expired" -> LedgerKind.Expired
+                else -> if (amountMicro < 0) LedgerKind.Used else LedgerKind.Gifted
+            }
+        }
+}
+
+/** How a ledger entry is labeled in the app: paid with real money, gifted, used, refunded or expired. */
+enum class LedgerKind { Paid, Gifted, Used, Refunded, Expired }
 
 @Serializable
 data class LedgerPage(val entries: List<LedgerEntry> = emptyList(), val next: Long? = null)
@@ -48,9 +85,12 @@ data class LedgerPage(val entries: List<LedgerEntry> = emptyList(), val next: Lo
 data class FuelPackage(val productId: String, val priceMicro: Long, val creditMicro: Long)
 
 @Serializable
-data class SpotConfig(
-    val starterMicro: Long = 1_000_000,
-    val rewardMicro: Long = 1_000_000,
+data class InviteConfig(
+    /** Gifted coach reviews for the invited friend / the inviter. */
+    val starterReviews: Int = 5,
+    val rewardReviews: Int = 5,
+    /** Tier the gifted reviews apply to (the cheapest image model). */
+    val giftTier: String = "standard",
     val tokenTtlSec: Int = 45,
     val monthlyLimitPerInviter: Int = 10,
     val expiryDays: Int = 180,
@@ -122,24 +162,25 @@ data class FuelConfig(
     val usageProfiles: Map<String, UsageProfile> = emptyMap(),
     val packages: List<FuelPackage> = emptyList(),
     val webPurchase: WebPurchaseConfig = WebPurchaseConfig(),
-    val spot: SpotConfig = SpotConfig(),
+    val invite: InviteConfig = InviteConfig(),
 )
 
 @Serializable
-data class SpotToken(val token: String, val expiresAt: Long, val ttlSec: Int = 45)
+data class InviteToken(val token: String, val expiresAt: Long, val ttlSec: Int = 45)
 
 @Serializable
-data class SpotChallenge(val challenge: String, val expiresAt: Long = 0)
+data class InviteChallenge(val challenge: String, val expiresAt: Long = 0)
 
 @Serializable
-data class SpotInviter(val displayName: String? = null)
+data class Inviter(val displayName: String? = null)
 
 @Serializable
-data class SpotRedeemResult(
-    val grantedMicro: Long,
+data class InviteRedeemResult(
+    val grantedReviews: Int = 0,
     val expiresAt: Long = 0,
-    val inviter: SpotInviter = SpotInviter(),
+    val inviter: Inviter = Inviter(),
     val balanceMicro: Long = 0,
+    val giftReviews: GiftReviews = GiftReviews(),
 )
 
 @Serializable
@@ -154,6 +195,8 @@ data class FuelMessageResult(
     val servedModel: String? = null,
     /** Model ID the user chose and whose price was charged; differs from [servedModel] on a fallback. */
     val chosenModel: String? = null,
+    /** Paid with a gifted review (invite bonus) instead of credit. */
+    val giftReview: Boolean = false,
 )
 
 /** Proof that the device is genuine (Play Integrity token / App Attest object), bound to a server challenge. */

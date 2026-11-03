@@ -33,11 +33,11 @@ import app.overfit.fuel.FuelException
 import app.overfit.fuel.FuelSession
 import app.overfit.fuel.RevealPhase
 import app.overfit.fuel.RevealPlan
-import app.overfit.fuel.SpotToken
+import app.overfit.fuel.InviteToken
 import app.overfit.fuel.formatEuro
 import app.overfit.fuel.formatRevealNumber
-import app.overfit.fuel.parseSpotToken
-import app.overfit.fuel.spotLink
+import app.overfit.fuel.parseInviteToken
+import app.overfit.fuel.inviteLink
 import app.overfit.i18n.LocalFuelStrings
 import app.overfit.i18n.LocalStrings
 import app.overfit.platform.HapticPattern
@@ -69,7 +69,7 @@ internal fun rotateAfterMs(ttlSec: Int): Long = (minOf(30, maxOf(ttlSec - 10, 5)
 
 /** "Freunde einladen": name + QR code with a rotating one-time token. */
 @Composable
-fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
+fun InviteShowScreen(session: FuelSession, onBack: () -> Unit) {
     val t = LocalFuelStrings.current
     val s = LocalStrings.current
     val service = session.current()
@@ -82,7 +82,7 @@ fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
     val shownName = name ?: storedName
     val scope = rememberCoroutineScope()
 
-    var token by remember { mutableStateOf<SpotToken?>(null) }
+    var token by remember { mutableStateOf<InviteToken?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var progress by remember { mutableFloatStateOf(0f) }
     var secondsLeft by remember { mutableLongStateOf(0) }
@@ -90,11 +90,11 @@ fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
         if (service == null) return@LaunchedEffect
         while (true) {
             val fresh = try {
-                service.spotToken()
+                service.inviteToken()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = spotErrorText((e as? FuelException)?.code ?: "network", t)
+                error = inviteErrorText((e as? FuelException)?.code ?: "network", t)
                 token = null
                 delay(5_000)
                 continue
@@ -113,41 +113,44 @@ fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
         }
     }
 
-    val starter = (config as? Loaded.Ready)?.value?.spot?.starterMicro ?: 1_000_000
+    val cfg = (config as? Loaded.Ready)?.value
+    val starter = cfg?.invite?.starterReviews ?: 5
     Screen(scroll = true, header = { BackHeader(s.back, onBack) }) {
-        Title(t.spotInvite)
+        Title(t.inviteShow)
         Spacer(Modifier.height(Space.m))
         if (isDemo) {
             Text(t.demoBanner, style = Theme.type.caption, tone = Tone.Muted)
             Spacer(Modifier.height(Space.m))
         }
-        Text(t.spotInviteText(formatEuro(starter, t.language)), tone = Tone.Muted)
+        Text(t.inviteShowText(starter), tone = Tone.Muted)
+        Spacer(Modifier.height(Space.s))
+        Text(t.inviteGiftNote(giftModelName(cfg), cfg?.invite?.expiryDays ?: 180), style = Theme.type.caption, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
 
         val current = token
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (current != null) {
-                QrView(spotLink(current.token), Modifier.size(240.dp))
+                QrView(inviteLink(current.token), Modifier.size(240.dp))
                 Spacer(Modifier.height(Space.m))
                 HairlineProgress(1f - progress, Modifier.padding(horizontal = Space.xl))
                 Spacer(Modifier.height(Space.s))
-                Text(t.spotRotates(secondsLeft.toInt()), style = Theme.type.caption, tone = Tone.Muted)
+                Text(t.inviteRotates(secondsLeft.toInt()), style = Theme.type.caption, tone = Tone.Muted)
             } else {
                 Text(error ?: t.loading, tone = Tone.Muted)
             }
         }
 
-        SectionTitle(t.spotName)
+        SectionTitle(t.inviteName)
         ListRow(s.name) {
             RowInput(shownName, { name = it.take(24) }, onCommit = {
                 val value = name ?: return@RowInput
                 scope.launch { runCatching { service?.setDisplayName(value) } }
             })
         }
-        Text(t.spotNameHint, style = Theme.type.caption, tone = Tone.Muted)
-        (account as? Loaded.Ready)?.value?.spot?.takeIf { it.monthlyLimit > 0 }?.let {
+        Text(t.inviteNameHint, style = Theme.type.caption, tone = Tone.Muted)
+        (account as? Loaded.Ready)?.value?.invite?.takeIf { it.monthlyLimit > 0 }?.let {
             Spacer(Modifier.height(Space.m))
-            Text(t.spotCount(it.invitedThisMonth, it.monthlyLimit), style = Theme.type.caption, tone = Tone.Muted)
+            Text(t.inviteCount(it.invitedThisMonth, it.monthlyLimit), style = Theme.type.caption, tone = Tone.Muted)
         }
     }
 }
@@ -157,10 +160,10 @@ fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
  * [canScan]: the in-app QR scanner exists (Android); on iOS the camera app opens the link instead.
  */
 @Composable
-fun SpotRedeemScreen(
+fun InviteRedeemScreen(
     session: FuelSession,
     onBack: () -> Unit,
-    onRedeemed: (grantedMicro: Long, inviterName: String?) -> Unit,
+    onRedeemed: (grantedReviews: Int, inviterName: String?) -> Unit,
     canScan: Boolean = false,
     initialCode: String = "",
 ) {
@@ -174,19 +177,19 @@ fun SpotRedeemScreen(
     var scanning by remember { mutableStateOf(false) }
 
     fun redeem(raw: String) {
-        val token = parseSpotToken(raw)
-        if (token == null) { message = t.spotNoCode; return }
+        val token = parseInviteToken(raw)
+        if (token == null) { message = t.inviteNoCode; return }
         if (service == null || busy) return
         busy = true
         message = null
         scope.launch {
             try {
-                val result = service.redeemSpot(token)
-                onRedeemed(result.grantedMicro, result.inviter.displayName)
+                val result = service.redeemInvite(token)
+                onRedeemed(result.grantedReviews, result.inviter.displayName)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                message = spotErrorText((e as? FuelException)?.code ?: "network", t)
+                message = inviteErrorText((e as? FuelException)?.code ?: "network", t)
             }
             busy = false
         }
@@ -194,13 +197,13 @@ fun SpotRedeemScreen(
 
     if (scanning) {
         Screen(header = { BackHeader(s.back) { scanning = false } }) {
-            Title(t.spotScan)
+            Title(t.inviteScan)
             Spacer(Modifier.height(Space.l))
             Box(Modifier.fillMaxWidth().weight(1f).background(Theme.colors.hairline)) {
                 QrScanner(
                     Modifier.fillMaxSize(),
                     onScanned = { code -> scanning = false; input = code; redeem(code) },
-                    onPermissionDenied = { scanning = false; message = t.spotCameraDenied },
+                    onPermissionDenied = { scanning = false; message = t.inviteCameraDenied },
                 )
             }
             Spacer(Modifier.height(Space.m))
@@ -211,22 +214,22 @@ fun SpotRedeemScreen(
     Screen(
         scroll = true,
         header = { BackHeader(s.back, onBack) },
-        footer = { PrimaryButton(t.spotRedeemAction, onClick = { redeem(input) }, enabled = input.isNotBlank(), loading = busy) },
+        footer = { PrimaryButton(t.inviteRedeemAction, onClick = { redeem(input) }, enabled = input.isNotBlank(), loading = busy) },
     ) {
-        Title(t.spotRedeem)
+        Title(t.inviteRedeem)
         Spacer(Modifier.height(Space.m))
         if (session.demo.collectAsStateWithLifecycle().value) {
             Text(t.demoBanner, style = Theme.type.caption, tone = Tone.Muted)
             Spacer(Modifier.height(Space.m))
         }
-        Text(t.spotRedeemText, tone = Tone.Muted)
+        Text(t.inviteRedeemText, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
         if (canScan) {
-            TextButton(t.spotScan, { scanning = true }, tone = Tone.Default)
+            TextButton(t.inviteScan, { scanning = true }, tone = Tone.Default)
             Spacer(Modifier.height(Space.m))
         }
-        SectionTitle(t.spotPaste)
-        BigInput(input, { input = it.trim(); message = null }, t.spotPastePlaceholder, onDone = { redeem(input) })
+        SectionTitle(t.invitePaste)
+        BigInput(input, { input = it.trim(); message = null }, t.invitePastePlaceholder, onDone = { redeem(input) })
         message?.let {
             Spacer(Modifier.height(Space.m))
             Text(it, style = Theme.type.caption)
@@ -237,13 +240,14 @@ fun SpotRedeemScreen(
 private val RevealNumber = TextStyle(fontSize = 88.sp, lineHeight = 96.sp, letterSpacing = (-2).sp, fontFeatureSettings = "tnum")
 
 /**
- * The invite reveal: the screen goes black, two heartbeat pulses, then the amount counts up from 0,00 in Inter with tabular
- * digits, "Einladung von <Name>" below it, and a strong pulse at the end. Deliberate exception to "no animations".
+ * The invite reveal: the screen goes black, two heartbeat pulses, then the number of gifted coach reviews counts up from 0
+ * in Inter with tabular digits, "Coach-Auswertungen geschenkt" and "Einladung von <Name>" below it, and a strong pulse at
+ * the end. Deliberate exception to "no animations".
  */
 @Composable
-fun SpotRevealScreen(amountMicro: Long, inviterName: String?, haptics: Haptics, vibration: Boolean, onClose: () -> Unit) {
+fun InviteRevealScreen(reviews: Int, inviterName: String?, haptics: Haptics, vibration: Boolean, onClose: () -> Unit) {
     val t = LocalFuelStrings.current
-    val plan = remember(amountMicro) { RevealPlan(amountMicro) }
+    val plan = remember(reviews) { RevealPlan(reviews.toLong()) }
     var elapsed by remember { mutableLongStateOf(0) }
     LaunchedEffect(plan) {
         val start = TimeSource.Monotonic.markNow()
@@ -272,9 +276,10 @@ fun SpotRevealScreen(amountMicro: Long, inviterName: String?, haptics: Haptics, 
         if (phase != RevealPhase.Black) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.m)) {
                 BasicText(
-                    formatRevealNumber(plan.valueAt(elapsed), t.language) + " €",
+                    plan.valueAt(elapsed).toString(),
                     style = Theme.type.hero.merge(RevealNumber).copy(color = white, textAlign = TextAlign.Center),
                 )
+                BasicText(t.revealReviews(reviews), style = Theme.type.body.copy(color = white))
                 BasicText(t.revealFrom(inviterName), style = Theme.type.body.copy(color = white))
             }
         }

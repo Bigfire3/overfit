@@ -110,3 +110,111 @@ export async function webRevenueReport(env: Env, cfg: Config, nowSec = Math.floo
     ...summarizeRevenue(rows.results, currentYear),
   };
 }
+
+/**
+ * Gebühren-Annahmen für den Finanzbericht (Schätzung, Rechengrundlage wie backend/test/pricing.test.ts):
+ * Stripe konservative Mischung 2,5 % + 0,25 € je Zahlung; Stores 15 % (Small-Business-Programm) auf den Preis ohne
+ * USt, USt 19 % (DE) angenommen – Apple/Google führen die USt ab, sie ist keine Einnahme.
+ */
+export const FEE_ASSUMPTIONS = {
+  stripePct: 0.025,
+  stripeFixedMicro: 250_000,
+  storeFeePct: 0.15,
+  storeVatPct: 0.19,
+} as const;
+
+export interface ChannelRevenue {
+  channel: 'web' | 'google' | 'apple';
+  label: string;
+  orders: number;
+  /** Vom Käufer bezahlt (abzüglich Erstattungen), echte Euro. */
+  grossMicro: number;
+  /** Geschätzte Gebühren (Stripe) bzw. Gebühr + USt (Store). */
+  feesMicro: number;
+  /** Was bei Fabian ankommt (geschätzt). */
+  netMicro: number;
+  /** Dafür ausgegebenes Guthaben. */
+  creditMicro: number;
+}
+
+/**
+ * Einnahmen in echten Euro je Kanal im Zeitraum, offenes Guthaben (gekauft/geschenkt getrennt), KI-Kosten und Rohgewinn.
+ * Geschenktes (Startguthaben, Admin-Gutschrift, Einladungsbonus) ist nie Einnahme: Einnahmen stammen nur aus
+ * bezahlten Bestellungen (web_orders, purchases).
+ */
+export async function financeReport(env: Env, cfg: Config, from: number, to: number) {
+  const f = FEE_ASSUMPTIONS;
+  const environment = cfg.testMode || cfg.devMode ? 'sandbox' : 'live';
+  const web = await env.DB.prepare(
+    `SELECT COUNT(*) AS orders, COALESCE(SUM(COALESCE(paid_micro, price_micro)), 0) AS paid,
+            COALESCE(SUM(reversed_micro), 0) AS reversed, COALESCE(SUM(credit_micro), 0) AS credit
+     FROM web_orders WHERE paid_at IS NOT NULL AND paid_at >= ? AND paid_at < ? AND environment = ?`,
+  )
+    .bind(from, to, environment)
+    .first<{ orders: number; paid: number; reversed: number; credit: number }>();
+  const store = await env.DB.prepare(
+    `SELECT platform, COUNT(*) AS orders, COALESCE(SUM(price_micro), 0) AS paid, COALESCE(SUM(credited_micro), 0) AS credit
+     FROM purchases WHERE created_at >= ? AND created_at < ? GROUP BY platform`,
+  )
+    .bind(from, to)
+    .all<{ platform: string; orders: number; paid: number; credit: number }>();
+
+  const channels: ChannelRevenue[] = [];
+  const wOrders = web?.orders ?? 0;
+  const wGross = (web?.paid ?? 0) - (web?.reversed ?? 0);
+  // Stripe behält die Gebühr auch bei Erstattungen; geschätzt auf den ursprünglich bezahlten Betrag.
+  const wFees = Math.round((web?.paid ?? 0) * f.stripePct) + wOrders * f.stripeFixedMicro;
+  channels.push({ channel: 'web', label: 'Web (Stripe)', orders: wOrders, grossMicro: wGross, feesMicro: wFees, netMicro: wGross - wFees, creditMicro: web?.credit ?? 0 });
+  for (const [channel, label] of [['google', 'Google Play'], ['apple', 'App Store']] as const) {
+    const row = store.results.find((r) => r.platform === channel);
+    const gross = row?.paid ?? 0;
+    const net = Math.round((gross / (1 + f.storeVatPct)) * (1 - f.storeFeePct));
+    channels.push({ channel, label, orders: row?.orders ?? 0, grossMicro: gross, feesMicro: gross - net, netMicro: net, creditMicro: row?.credit ?? 0 });
+  }
+
+  const t = Math.floor(Date.now() / 1000);
+  const open = await env.DB.prepare(
+    `SELECT
+       (SELECT COALESCE(SUM(remaining_micro), 0) FROM lots WHERE kind IN ('test_credit', 'invite_bonus', 'invite_reward') AND (expires_at IS NULL OR expires_at > ?1)) AS gifted,
+       (SELECT COALESCE(SUM(remaining_micro), 0) FROM lots WHERE kind NOT IN ('test_credit', 'invite_bonus', 'invite_reward') AND (expires_at IS NULL OR expires_at > ?1)) AS purchased,
+       (SELECT COALESCE(SUM(remaining), 0) FROM review_gifts WHERE expires_at > ?1) AS reviews`,
+  )
+    .bind(t)
+    .first<{ gifted: number; purchased: number; reviews: number }>();
+  const ai = await env.DB.prepare(
+    `SELECT COALESCE(SUM(CASE WHEN reviews = -1 THEN 0 ELSE cost_micro END), 0) AS paid,
+            COALESCE(SUM(CASE WHEN reviews = -1 THEN cost_micro ELSE 0 END), 0) AS gifted,
+            SUM(CASE WHEN reviews = -1 THEN 1 ELSE 0 END) AS giftedRequests,
+            SUM(CASE WHEN cost_micro IS NULL THEN 1 ELSE 0 END) AS unknown
+     FROM ledger WHERE type = 'usage' AND ts >= ? AND ts < ?`,
+  )
+    .bind(from, to)
+    .first<{ paid: number; gifted: number; giftedRequests: number | null; unknown: number | null }>();
+
+  const sum = (k: 'grossMicro' | 'feesMicro' | 'netMicro') => channels.reduce((a, c) => a + c[k], 0);
+  const aiCost = (ai?.paid ?? 0) + (ai?.gifted ?? 0);
+  return {
+    environment,
+    channels,
+    revenue: { grossMicro: sum('grossMicro'), feesMicro: sum('feesMicro'), netMicro: sum('netMicro') },
+    openCredit: {
+      purchasedMicro: open?.purchased ?? 0,
+      giftedMicro: open?.gifted ?? 0,
+      giftReviews: open?.reviews ?? 0,
+    },
+    aiCost: {
+      totalMicro: aiCost,
+      /** Aus Guthaben bezahlte Anfragen (gekauft oder geschenkte Euro). */
+      creditMicro: ai?.paid ?? 0,
+      /** Geschenkte Auswertungen (Einladungsbonus). */
+      giftReviewsMicro: ai?.gifted ?? 0,
+      giftReviewRequests: ai?.giftedRequests ?? 0,
+      /** Ältere Buchungen ohne bekannte Selbstkosten. */
+      unknownCostRequests: ai?.unknown ?? 0,
+    },
+    /** Netto-Einnahmen − KI-Kosten im Zeitraum (ohne Fixkosten, Steuer). */
+    grossProfitMicro: sum('netMicro') - aiCost,
+    assumptions: FEE_ASSUMPTIONS,
+    note: 'Echte Euro. Geschenktes (Startguthaben, Admin-Gutschrift, Einladungsbonus) zählt nie als Einnahme. Gebühren geschätzt (assumptions).',
+  };
+}

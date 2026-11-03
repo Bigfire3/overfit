@@ -16,7 +16,7 @@ import { handleMessages } from './messages';
 import { DEFAULT_TIER, TIER_NAMES, TIERS, USAGE_PROFILES, tierAvailable } from './providers';
 import { handleAdminCredit, handleAdminUsage } from './admin';
 import { handleVerifyPurchase } from './purchases';
-import { createChallenge, createSpotToken, redeemSpot } from './spot';
+import { createChallenge, createInviteToken, redeemInvite } from './invite';
 import { packageCreditMicro } from './money';
 import { createWebLink, handlePaymentWebhook, redeemCode, webCheckout, webOrder, webPurchaseConfig, webSession } from './web';
 import { authServerMetadata, authorizeGet, authorizePost, protectedResourceMetadata, registerClient, revoke, token } from './chat/oauth';
@@ -126,12 +126,14 @@ function publicConfig(env: Env, cfg: Config) {
     })),
     /** Guthaben im Web kaufen (Merchant of Record); `testMode` = Sandbox, keine echte Zahlung. */
     webPurchase: webPurchaseConfig(env, cfg),
-    spot: {
-      starterMicro: cfg.spotStarterMicro,
-      rewardMicro: cfg.spotRewardMicro,
-      tokenTtlSec: cfg.spotTokenTtlSec,
-      monthlyLimitPerInviter: cfg.spotMonthlyLimitPerInviter,
-      expiryDays: cfg.spotExpiryDays,
+    /** Einladung: beide bekommen geschenkte Coach-Auswertungen (nur Stufe `giftTier`), kein Euro-Guthaben. */
+    invite: {
+      starterReviews: cfg.inviteStarterReviews,
+      rewardReviews: cfg.inviteRewardReviews,
+      giftTier: 'standard',
+      tokenTtlSec: cfg.inviteTokenTtlSec,
+      monthlyLimitPerInviter: cfg.inviteMonthlyLimitPerInviter,
+      expiryDays: cfg.inviteExpiryDays,
     },
   };
 }
@@ -188,7 +190,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   }
 
   const routes = ['/v1/account', '/v1/account/profile', '/v1/account/ledger', '/v1/messages', '/v1/purchases/verify',
-    '/v1/spot/token', '/v1/spot/challenge', '/v1/spot/redeem', '/v1/recovery/code', '/v1/recovery/restore',
+    '/v1/invite/token', '/v1/invite/challenge', '/v1/invite/redeem', '/v1/recovery/code', '/v1/recovery/restore',
     '/v1/purchase/web-link', '/v1/purchases/web-link', '/v1/codes/redeem'];
   const photo = PHOTO_ROUTE.exec(path);
   if (!routes.includes(path) && !CHAT_ROUTES.includes(path) && !photo) throw new ApiError(404, 'not_found', 'Unbekannter Endpunkt');
@@ -257,18 +259,18 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
       await sensitive();
       await rateLimit(env, `codeip:${clientIp(req)}`, cfg.rlSensitivePerHour * 3, 3600);
       return Response.json(await redeemCode(env, device, json(body)));
-    case '/v1/spot/token':
+    case '/v1/invite/token':
       if (method !== 'POST') throw wrongMethod();
-      return Response.json(await createSpotToken(env, cfg, device));
-    case '/v1/spot/challenge':
+      return Response.json(await createInviteToken(env, cfg, device));
+    case '/v1/invite/challenge':
       if (method !== 'POST') throw wrongMethod();
       await sensitive();
       return Response.json(await createChallenge(env, cfg, device));
-    case '/v1/spot/redeem':
+    case '/v1/invite/redeem':
       if (method !== 'POST') throw wrongMethod();
       await sensitive();
-      await rateLimit(env, `spotip:${clientIp(req)}`, cfg.rlSensitivePerHour * 3, 3600);
-      return Response.json(await redeemSpot(env, cfg, device, json(body)));
+      await rateLimit(env, `inviteip:${clientIp(req)}`, cfg.rlSensitivePerHour * 3, 3600);
+      return Response.json(await redeemInvite(env, cfg, device, json(body)));
     case '/v1/recovery/code':
       if (method !== 'POST') throw wrongMethod();
       return Response.json(await createRecoveryCode(env, device));

@@ -931,3 +931,34 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   (bräuchten ~35 % Aufschlag für alle); Stripe Tax/OSS jetzt schon (erst nötig über der Lieferschwelle).
 - **Offen:** echter Lauf gegen Stripe im Testmodus (alles gemockt geprüft); Live-Betrieb braucht Kontoaktivierung, Rechtstexte,
   juristische Prüfung. Bei Preisänderungen `backend/test/pricing.test.ts` anpassen und neu rechnen.
+
+## Session AD – Einladung intern, Guthaben vs. echte Euro, Bonus als Auswertungen (3.11.)
+
+- **„Spot“ intern entfernt:** API `/v1/invite/*`, Env `INVITE_*`, Tabellen `invite_redemptions`/`invite_tokens_used`, Ledger-Typen
+  `invite_bonus`/`invite_reward`, Kotlin `Invite*`. Alte Pfade und alte `spot`-Links werden nicht mehr gelesen (App unveröffentlicht).
+  Der Token-Präfix wechselt mit; laufende 45-s-Codes werden beim Deploy einmal ungültig (harmlos). Bleibende Erwähnungen: Migration 0001
+  (angewandte Migrationen ändern wir nie) und 0007 (benennt um), der Fallback im Deploy-Workflow, `package-lock.json` (`@cspotcode`, fremd).
+- **Signierschlüssel:** Fehlt das GitHub-Secret `INVITE_SIGNING_KEY`, übernimmt der Deploy das alte Secret; fehlen beide, wird ein neuer
+  erzeugt (der Schlüssel signiert nur kurzlebige Tokens und Challenges, ein Wechsel verliert nichts). Der alte Secret-Name im Worker wird
+  gelöscht.
+- **Geschenkte Auswertungen als eigener Zähler (Tabelle `review_gifts`)** statt Euro-Posten: Fabian hat „5 + 5 Auswertungen“ entschieden.
+  Ein Zähler ist ehrlicher als ein Euro-Betrag (die Kosten schwanken je Modell und Preis) und lässt sich auf ein Modell begrenzen.
+- **Was ist eine Coach-Auswertung?** Die App markiert sie im Body (`overfit.purpose = "review"`, nur über Guthaben, wird vor dem Anbieter
+  entfernt). Der Server kann den Inhalt nicht prüfen; dass ein manipulierter Client einen Chat als Auswertung ausgibt, begrenzen Stufe
+  standard, die Obergrenze je Anfrage (0,25 € Anbieterkosten) und die harte Monatsgrenze der echten Kosten (50 €). Das reicht für einen
+  Bonus von 5 Anfragen.
+- **Belohnung bei jeder ersten erfolgreichen Anfrage** (auch wenn sie geschenkt war), nicht erst bei einer bezahlten: Der Neue soll seine
+  geschenkten Auswertungen nutzen können, ohne dass der Einladende leer ausgeht.
+- **Monatsbudget doppelt:** Zählt Auswertungen bei der Einlösung (1000, Vorhersage) und echte Kosten beim Verbrauch (50 €, Garantie).
+  Ausweichen auf Claude bei Ausfall bleibt erlaubt; die echten Kosten zählen in die 50 € mit.
+- **Reservierung geschenkter Auswertungen** zählt den Zähler sofort herunter und gibt ihn bei Fehlschlag zurück. Stürzt der Worker
+  zwischen beidem ab, ist eine Auswertung verloren (sicherer Fehler, selten).
+- **Kontoumzug:** Geschenkte Einladungs-Auswertungen und alte Euro-Einladungsboni des aufgegebenen Kontos verfallen (Buchung
+  `invite_expired`), Startguthaben/Test-Gutschriften und Gekauftes wandern mit. Belohnungen gehen nie an das eigene Konto.
+- **Gekauft vs. geschenkt:** Geschenkt = `test_credit`, `invite_bonus`, `invite_reward`; alles andere (Store, Web, Code) ist gekauft.
+  Verbrauch: Geschenktes zuerst (explizit sortiert, nicht nur über den Verfall). Erstattungen ziehen weiter zuerst vom Gekauften ab.
+- **Kategorie je Buchung kommt vom Server** (`category`), die App rechnet sie für alte Backends selbst aus. „Verfallen“ ist eine fünfte
+  Kategorie neben bezahlt/geschenkt/verbraucht/erstattet.
+- **Finanzbericht:** Gebühren sind geschätzt (Stripe-Mischung 2,5 % + 0,25 €, Store 15 % auf netto bei 19 % USt), weil Stripe und die
+  Stores die echten Gebühren erst in Auszahlungsberichten nennen. Store-Erstattungen fließen noch nicht ein (keine Store-Webhooks).
+- **Kein Room-Update:** Ob eine gespeicherte Antwort geschenkt war, erkennt die App an Kosten 0 (Anzeige „geschenkte Auswertung“).

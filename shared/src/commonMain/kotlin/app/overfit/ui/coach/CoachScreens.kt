@@ -621,7 +621,9 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
 @Composable
 internal fun AnswerCostLine(c: CoachStrings, language: app.overfit.domain.Language, cost: Long, balance: Long?, served: String?, fallbackFrom: String?) {
     val model = served?.let { app.overfit.fuel.modelLabel(it) }
-    val money = app.overfit.fuel.formatCost(cost, language)
+    val f = app.overfit.i18n.LocalFuelStrings.current
+    // Cost is credit used (never a price); 0 = paid with a gifted review (invite bonus).
+    val money = if (cost == 0L) f.answerGifted else f.creditAmount(app.overfit.fuel.formatCost(cost, language))
     val line = c.answerInfo(model, money, balance?.let { formatEuro(it, language) })
     Text(line, style = Theme.type.caption, tone = Tone.Muted)
     if (served != null && fallbackFrom != null) {

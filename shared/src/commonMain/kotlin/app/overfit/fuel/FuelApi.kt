@@ -24,6 +24,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlin.random.Random
@@ -169,10 +170,10 @@ class FuelApi(
         return parse(call(HttpMethod.Post, "/v1/recovery/restore", body)) { decode(it) }
     }
 
-    override suspend fun spotToken(): SpotToken = parse(call(HttpMethod.Post, "/v1/spot/token")) { decode(it) }
+    override suspend fun inviteToken(): InviteToken = parse(call(HttpMethod.Post, "/v1/invite/token")) { decode(it) }
 
-    override suspend fun redeemSpot(token: String): SpotRedeemResult {
-        val challenge = parse(call(HttpMethod.Post, "/v1/spot/challenge")) { decode<SpotChallenge>(it) }
+    override suspend fun redeemInvite(token: String): InviteRedeemResult {
+        val challenge = parse(call(HttpMethod.Post, "/v1/invite/challenge")) { decode<InviteChallenge>(it) }
         // Test server (DEPLOY_MODE=test): no device check, a test token bound to this device instead. Production never accepts it.
         val attestation = attestor.attest(challenge.challenge)
             ?: if (config().mode == "test") Attestation("google", "test:${signer.deviceId}") else null
@@ -185,7 +186,7 @@ class FuelApi(
                 put("challenge", challenge.challenge)
             })
         }.toString()
-        return parse(call(HttpMethod.Post, "/v1/spot/redeem", body)) { decode(it) }
+        return parse(call(HttpMethod.Post, "/v1/invite/redeem", body)) { decode(it) }
     }
 
     override suspend fun webPurchaseLink(locale: String): WebPurchaseLink {
@@ -206,6 +207,7 @@ class FuelApi(
             balanceMicro = meta?.get("balanceMicro")?.jsonPrimitive?.longOrNull ?: 0,
             servedModel = meta?.get("model")?.jsonPrimitive?.contentOrNull,
             chosenModel = meta?.get("requestedModel")?.jsonPrimitive?.contentOrNull,
+            giftReview = meta?.get("giftReview")?.jsonPrimitive?.booleanOrNull ?: false,
         )
     }
 }

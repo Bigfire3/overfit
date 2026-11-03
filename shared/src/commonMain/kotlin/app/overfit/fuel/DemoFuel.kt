@@ -16,9 +16,9 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
         LedgerEntry(6, nowSec() - 1_800, "usage", -2_609, "claude-sonnet-5-5", "standard", 1_000, 0, 0, 500, fallback = true),
         LedgerEntry(5, nowSec() - 3_600, "usage", -2_609, "gemini-3.6-flash", "standard", 1_000, 0, 0, 500),
         LedgerEntry(4, nowSec() - 90_000, "usage", -10_412, "claude-sonnet-5-5", "pro", 1_600, 0, 0, 720),
-        LedgerEntry(3, nowSec() - 180_000, "spot_reward", 1_000_000),
-        LedgerEntry(2, nowSec() - 400_000, "purchase", 3_200_000),
-        LedgerEntry(1, nowSec() - 900_000, "spot_bonus", 1_000_000),
+        LedgerEntry(3, nowSec() - 180_000, "invite_reward", 0, reviews = 5, category = "gifted"),
+        LedgerEntry(2, nowSec() - 400_000, "purchase", 3_200_000, category = "paid"),
+        LedgerEntry(1, nowSec() - 900_000, "test_credit", 1_000_000, category = "gifted"),
     )
 
     override suspend fun config() = FuelConfig(
@@ -37,10 +37,13 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
     override suspend fun account() = FuelAccount(
         accountId = "demo",
         balanceMicro = DEMO_BALANCE_MICRO,
+        purchasedMicro = DEMO_BALANCE_MICRO - 1_000_000,
+        giftedMicro = 1_000_000,
         expiring = listOf(ExpiringItem(1_000_000, nowSec() + 150L * 86_400)),
+        giftReviews = GiftReviews(5, listOf(GiftReviewItem(5, nowSec() + 170L * 86_400))),
         displayName = name,
         hasRecoveryCode = false,
-        spot = SpotStatus(invitedThisMonth = 2, monthlyLimit = 10, redeemedStarter = false),
+        invite = InviteStatus(invitedThisMonth = 2, monthlyLimit = 10, redeemedStarter = false),
     )
 
     override suspend fun setDisplayName(name: String?): String? {
@@ -54,10 +57,13 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
 
     override suspend fun restore(code: String): FuelAccount = account()
 
-    override suspend fun spotToken() = SpotToken("demo-spot-token-${++tokenCounter}", nowSec() + 45, 45)
+    override suspend fun inviteToken() = InviteToken("demo-invite-token-${++tokenCounter}", nowSec() + 45, 45)
 
-    override suspend fun redeemSpot(token: String) =
-        SpotRedeemResult(grantedMicro = 1_000_000, expiresAt = nowSec() + 180L * 86_400, inviter = SpotInviter("Fabian"), balanceMicro = 1_000_000)
+    override suspend fun redeemInvite(token: String) =
+        InviteRedeemResult(
+            grantedReviews = 5, expiresAt = nowSec() + 180L * 86_400, inviter = Inviter("Fabian"), balanceMicro = 0,
+            giftReviews = GiftReviews(5, listOf(GiftReviewItem(5, nowSec() + 180L * 86_400))),
+        )
 
     /** Demo: any well-formed code works once per process; nothing touches a real account. */
     override suspend fun redeemCode(code: String): CodeRedeemResult {

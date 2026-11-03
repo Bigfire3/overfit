@@ -32,6 +32,22 @@ console.table(
 const t = r.totals;
 console.log(`Gesamt: ${t.requests} Anfragen (${t.photoRequests} mit Foto, ${t.fallbackRequests} mit Ausweichung), berechnet ${eur(t.chargedMicro)}, Anbieterkosten ${eur(t.providerCostMicro)}, Marge ${eur(t.marginMicro)}`);
 
+// Finanzen in echten Euro: Einnahmen je Kanal (brutto, Gebühren, netto), offenes Guthaben, KI-Kosten, Rohgewinn.
+const f = r.finance;
+if (f) {
+  const e2 = (micro) => (micro / 1e6).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  console.log(`\nEinnahmen im Zeitraum (echte Euro, ${f.environment === 'live' ? 'echte Zahlungen' : 'Testmodus'}):`);
+  console.table(
+    f.channels.map((c) => ({ Kanal: c.label, Käufe: c.orders, Brutto: e2(c.grossMicro), 'Gebühren/USt (geschätzt)': e2(c.feesMicro), Netto: e2(c.netMicro), 'Guthaben dafür': e2(c.creditMicro) })),
+  );
+  console.log(`Summe: brutto ${e2(f.revenue.grossMicro)}, netto ${e2(f.revenue.netMicro)}`);
+  console.log(`Offenes Guthaben (alle Konten): gekauft ${e2(f.openCredit.purchasedMicro)}, geschenkt ${e2(f.openCredit.giftedMicro)}, geschenkte Auswertungen ${f.openCredit.giftReviews}`);
+  console.log(`KI-Kosten: ${e2(f.aiCost.totalMicro)} (aus Guthaben ${e2(f.aiCost.creditMicro)}, geschenkte Auswertungen ${e2(f.aiCost.giftReviewsMicro)} in ${f.aiCost.giftReviewRequests} Anfragen)` +
+    (f.aiCost.unknownCostRequests ? `, ${f.aiCost.unknownCostRequests} ältere Anfragen ohne bekannte Kosten` : ''));
+  console.log(`Rohgewinn (netto − KI-Kosten): ${e2(f.grossProfitMicro)}`);
+  console.log(f.note);
+}
+
 // Web-Umsatz je Jahr und Rechnungsland (Kleinunternehmer, EU-Lieferschwelle). Werkzeug, keine Steuerberatung.
 const w = r.webRevenue;
 if (w) {

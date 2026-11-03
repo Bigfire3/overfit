@@ -134,7 +134,7 @@ class WebCreditTest {
                 LocalLifecycleOwner provides lifecycle,
             ) {
                 if (redeemOpen.value) RedeemCodeScreen(session, onBack = {})
-                else FuelScreen(session, onBack = {}, onLedger = {}, onRecovery = {}, onSpotInvite = {}, onSpotRedeem = {},
+                else FuelScreen(session, onBack = {}, onLedger = {}, onRecovery = {}, onInviteShow = {}, onInviteRedeem = {},
                     fuelActive = true, onRedeemCode = { onRedeem(); redeemOpen.value = true }, distribution = distribution)
             }
         }
@@ -146,7 +146,7 @@ class WebCreditTest {
         waitFor("Im Web aufladen")
         assertTrue("test-mode note", shown("Testmodus – keine echte Zahlung"))
         // Packages per channel with both values: web 1:1, store with the surcharge shown openly.
-        assertTrue("web package", shown("10,00 € Guthaben · 10,00 €"))
+        assertTrue("web package", shown("10,00 € Guthaben · Preis: 10,00 €"))
         assertTrue("store package", shown("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)"))
         waitFor("1,00")
         val accountCalls = { requests.count { it == "GET /v1/account" } }
@@ -175,7 +175,7 @@ class WebCreditTest {
         compose.waitUntilState { requests.contains("GET /v1/config") }
         compose.waitForIdle()
         assertFalse("store build: no web purchase by default", shown("Im Web aufladen"))
-        assertFalse("no web packages either", shown("10,00 € Guthaben · 10,00 €"))
+        assertFalse("no web packages either", shown("10,00 € Guthaben · Preis: 10,00 €"))
         assertTrue("store package with surcharge", shown("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)"))
     }
 

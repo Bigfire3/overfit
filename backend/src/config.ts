@@ -3,7 +3,7 @@ import { currentPrices } from './providers';
 
 /**
  * Einziger Aufschlag auf alle Modellpreise (Basispunkte). Herleitung und Tabellen: docs/monetization.md „Rechnung“.
- * 2800 = 28 %: deckt im Web (Stripe, Kleinunternehmer ohne USt) Zahlungsgebühr und Einladungsboni (10 % vom Netto)
+ * 2800 = 28 %: deckt im Web (Stripe, Kleinunternehmer ohne USt) Zahlungsgebühr und Rücklage für Geschenktes (10 % vom Netto)
  * und lässt beim kleinsten Paket (5 €) noch 5 % vom Netto, ab 10 € über 7 %. Der Store trägt seine USt und Gebühr
  * selbst über einen offen ausgewiesenen Aufpreis (Store-Preis > Guthaben, siehe DEFAULT_PACKAGES).
  */
@@ -64,13 +64,15 @@ export function getConfig(env: Env): Config {
     upstreamTimeoutMs: int(env.UPSTREAM_TIMEOUT_MS, 100_000, 1000),
     upstreamBudgetMs: int(env.UPSTREAM_BUDGET_MS, 140_000, 1000),
     markupBp: int(env.MARKUP_BP, DEFAULT_MARKUP_BP),
-    spotStarterMicro: int(env.SPOT_STARTER_MICRO, 1_000_000),
-    spotRewardMicro: int(env.SPOT_REWARD_MICRO, 1_000_000),
-    spotTokenTtlSec: int(env.SPOT_TOKEN_TTL_SEC, 45, 5),
-    spotMonthlyLimitPerInviter: int(env.SPOT_MONTHLY_LIMIT_PER_INVITER, 10),
-    spotGlobalMonthlyBudgetMicro: int(env.SPOT_GLOBAL_MONTHLY_BUDGET_MICRO, 50_000_000),
-    spotExpiryDays: int(env.SPOT_EXPIRY_DAYS, 180, 1),
-    rewardExpiryDays: int(env.REWARD_EXPIRY_DAYS, 180, 1),
+    // Einladungsbonus: geschenkte Coach-Auswertungen (Stufe standard), Herleitung docs/monetization.md „Einladungsbonus“.
+    inviteStarterReviews: int(env.INVITE_STARTER_REVIEWS, 5),
+    inviteRewardReviews: int(env.INVITE_REWARD_REVIEWS, 5),
+    inviteTokenTtlSec: int(env.INVITE_TOKEN_TTL_SEC, 45, 5),
+    inviteMonthlyLimitPerInviter: int(env.INVITE_MONTHLY_LIMIT_PER_INVITER, 10),
+    inviteGlobalMonthlyBudgetReviews: int(env.INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS, 1000),
+    inviteGiftMonthlyCostCapMicro: int(env.INVITE_GIFT_MONTHLY_COST_CAP_MICRO, 50_000_000),
+    inviteGiftMaxCostMicro: int(env.INVITE_GIFT_MAX_COST_MICRO, 250_000),
+    inviteExpiryDays: int(env.INVITE_EXPIRY_DAYS, 180, 1),
     maxTokensCap: int(env.MAX_TOKENS_CAP, 8192, 1),
     maxBodyBytes: int(env.MAX_BODY_BYTES, 8 * 1024 * 1024, 1024),
     imageTokensReserve: int(env.IMAGE_TOKENS_RESERVE, 3000),

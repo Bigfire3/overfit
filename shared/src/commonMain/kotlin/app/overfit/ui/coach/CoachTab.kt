@@ -181,7 +181,7 @@ private fun AccessRow(state: AppState, providers: Providers, fuelSession: FuelSe
     val service = if (fuel) fuelSession.current() else null
     val (account, _) = rememberLoaded(service) { service?.account() }
     val label = when {
-        fuel && service != null -> h.accessFuel((account as? Loaded.Ready)?.value?.balanceMicro?.let { formatEuro(it, f.language) })
+        fuel && service != null -> h.accessFuel((account as? Loaded.Ready)?.value?.let { app.overfit.ui.fuel.creditSummary(it, f) })
         state.hasApiKey && !fuel -> h.accessOwnKey(providers.get(state.providerId).label)
         else -> h.accessNone
     }

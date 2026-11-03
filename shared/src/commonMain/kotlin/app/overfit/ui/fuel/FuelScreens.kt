@@ -69,8 +69,8 @@ fun FuelScreen(
     onBack: () -> Unit,
     onLedger: () -> Unit,
     onRecovery: () -> Unit,
-    onSpotInvite: () -> Unit,
-    onSpotRedeem: () -> Unit,
+    onInviteShow: () -> Unit,
+    onInviteRedeem: () -> Unit,
     /** True when Fuel is the chosen AI access. With an own key the screen asks first (no request before). */
     fuelActive: Boolean = true,
     onRedeemCode: () -> Unit = {},
@@ -131,7 +131,7 @@ fun FuelScreen(
         when (val a = account) {
             is Loaded.Loading -> Text(t.loading, tone = Tone.Muted)
             is Loaded.Failed -> ErrorBlock(t, reload)
-            is Loaded.Ready -> Balance(a.value, language, t)
+            is Loaded.Ready -> Balance(a.value, (config as? Loaded.Ready<FuelConfig>)?.value, language, t)
         }
 
         SectionTitle(t.topUp)
@@ -152,9 +152,9 @@ fun FuelScreen(
         }
         WebCreditSection(service, (config as? Loaded.Ready<FuelConfig>)?.value, distribution, language, isDemo, onRedeemCode)
 
-        SectionTitle(t.spot)
-        ListRow(t.spotInvite, onClick = onSpotInvite)
-        ListRow(t.spotRedeem, onClick = onSpotRedeem)
+        SectionTitle(t.invite)
+        ListRow(t.inviteShow, onClick = onInviteShow)
+        ListRow(t.inviteRedeem, onClick = onInviteRedeem)
 
         SectionTitle(t.fuel)
         ListRow(t.ledger, onClick = onLedger)
@@ -162,19 +162,49 @@ fun FuelScreen(
     }
 }
 
+/**
+ * Balance: "4,20 € Guthaben", gifted reviews as their own counter, bought vs. gifted credit and what expires when.
+ * Credit is always "X € Guthaben"; real money (prices) only appears with the packages.
+ */
 @Composable
-private fun Balance(account: FuelAccount, language: Language, t: FuelStrings) {
+private fun Balance(account: FuelAccount, config: FuelConfig?, language: Language, t: FuelStrings) {
+    val s = LocalStrings.current
     Spacer(Modifier.height(Space.m))
     Text(t.balanceLabel, style = Theme.type.caption, tone = Tone.Muted)
-    Text("${t.fuel} · ${formatEuro(account.balanceMicro, language)}", style = Theme.type.title)
+    Text(t.creditAmount(formatEuro(account.balanceMicro, language)), style = Theme.type.title)
+    val reviews = account.giftReviews
+    if (reviews.remaining > 0) {
+        Spacer(Modifier.height(Space.xs))
+        Text(t.giftReviews(reviews.remaining))
+    }
+    val gifted = account.giftedMicro ?: 0
+    val bought = account.purchasedMicro
+    if (bought != null && gifted > 0) {
+        Spacer(Modifier.height(Space.xs))
+        Text(t.balanceSplit(formatEuro(bought, language), formatEuro(gifted, language)), style = Theme.type.caption, tone = Tone.Muted)
+    }
     account.expiring.sumOf { it.amountMicro }.takeIf { it > 0 }?.let { amount ->
         val until = account.expiring.minOf { it.expiresAt }
-        Spacer(Modifier.height(Space.xs))
-        Text(
-            t.expiringLine(formatEuro(amount, language), LocalStrings.current.date(epochToDate(until))),
-            style = Theme.type.caption, tone = Tone.Muted,
-        )
+        Text(t.expiringLine(formatEuro(amount, language), s.date(epochToDate(until))), style = Theme.type.caption, tone = Tone.Muted)
     }
+    reviews.expiring.forEach { item ->
+        Text(t.giftReviewsExpiring(item.count, s.date(epochToDate(item.expiresAt))), style = Theme.type.caption, tone = Tone.Muted)
+    }
+    if (gifted > 0 || reviews.remaining > 0) {
+        Text(t.giftedFirst, style = Theme.type.caption, tone = Tone.Muted)
+    }
+    if (reviews.remaining > 0) {
+        Spacer(Modifier.height(Space.xs))
+        Text(t.giftReviewsScope(giftModelName(config)), style = Theme.type.caption, tone = Tone.Muted)
+    }
+}
+
+/** Real name of the model the gifted reviews cover ("Gemini 3.6 Flash"). */
+internal fun giftModelName(config: FuelConfig?): String {
+    val tier = config?.invite?.giftTier ?: app.overfit.ai.TIER_STANDARD
+    return config?.tiers?.get(tier)?.displayName?.takeIf { it.isNotEmpty() }
+        ?: app.overfit.fuel.modelOfTier(tier)?.let { app.overfit.fuel.modelShortName(it) }
+        ?: "Gemini Flash"
 }
 
 /** Transactions, newest first, paged. */
@@ -215,21 +245,29 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
         entries.forEach { e ->
             val w = app.overfit.i18n.webCreditStringsFor(language)
             val title = when (e.type) {
-                "usage" -> t.ledgerUsage
+                "usage" -> if (e.reviews != null && e.reviews < 0) t.ledgerGiftReviewUsage else t.ledgerUsage
+                "test_credit" -> t.ledgerTestCredit
+                "invite_expired" -> t.ledgerInviteExpired
                 "purchase" -> if (e.source == "web") w.ledgerWebPurchase else t.ledgerPurchase
                 "code_redeem" -> w.ledgerCode
                 "refund" -> w.ledgerRefund
                 "chargeback" -> w.ledgerChargeback
-                "spot_bonus" -> t.ledgerSpotBonus
-                "spot_reward" -> t.ledgerSpotReward
+                "invite_bonus" -> t.ledgerInviteBonus
+                "invite_reward" -> t.ledgerInviteReward
                 else -> e.type
             }
             val sign = if (e.amountMicro > 0) "+" else ""
-            ListRow(title, tone = Tone.Default, trailing = {
-                Text(sign + (if (e.type == "usage") formatCost(e.amountMicro, language) else formatEuro(e.amountMicro, language)))
-            })
-            // detail line under the row: date and, for usage, tokens
+            // Euro amounts are credit ("… € Guthaben"); gifted reviews are a count of their own.
+            val amount = when {
+                e.reviews != null && e.amountMicro == 0L -> t.ledgerReviews(e.reviews)
+                e.type == "usage" -> t.creditAmount(formatCost(e.amountMicro, language))
+                e.reviews != null -> t.creditAmount(sign + formatEuro(e.amountMicro, language)) + " · " + t.ledgerReviews(e.reviews)
+                else -> t.creditAmount(sign + formatEuro(e.amountMicro, language))
+            }
+            ListRow(title, tone = Tone.Default, trailing = { Text(amount) })
+            // detail line under the row: paid/gifted/used/refunded, date and, for usage, tokens
             val detail = buildString {
+                append(ledgerKindLabel(e.kind, t)).append(" · ")
                 append(s.date(epochToDate(e.ts)))
                 if (e.type == "usage") {
                     e.model?.let { append(" · ").append(app.overfit.fuel.modelLabel(it)) }
@@ -246,6 +284,14 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
             is Loaded.Ready -> if (next != null) TextButton(t.loadMore, { load(next) }, tone = Tone.Default)
         }
     }
+}
+
+internal fun ledgerKindLabel(kind: app.overfit.fuel.LedgerKind, t: FuelStrings): String = when (kind) {
+    app.overfit.fuel.LedgerKind.Paid -> t.ledgerKindPaid
+    app.overfit.fuel.LedgerKind.Gifted -> t.ledgerKindGifted
+    app.overfit.fuel.LedgerKind.Used -> t.ledgerKindUsed
+    app.overfit.fuel.LedgerKind.Refunded -> t.ledgerKindRefunded
+    app.overfit.fuel.LedgerKind.Expired -> t.ledgerKindExpired
 }
 
 /** Create/show the recovery code (shown once) and restore on a new phone. */

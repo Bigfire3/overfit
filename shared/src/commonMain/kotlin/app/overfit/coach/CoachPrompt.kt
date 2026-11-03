@@ -36,6 +36,11 @@ data class CoachPrompt(
     val maxTokens: Int? = null,
     /** Earlier turns (coach chat), oldest first; they go before [user]. Empty for one-shot requests. */
     val history: List<PromptTurn> = emptyList(),
+    /**
+     * True for a coach review (workout evaluation). Through the credit backend, reviews on the cheapest image model
+     * first use gifted reviews (invite bonus); chat and other features always pay from the credit.
+     */
+    val review: Boolean = false,
 ) {
     val outputSchema: JsonObject get() = schema ?: CoachSchema.schema
     val outputSchemaName: String get() = schemaName ?: CoachSchema.NAME
@@ -87,7 +92,7 @@ object CoachPromptBuilder {
             appendLine(ctx.profileBlock)
             append("Write every text field in ${if (ctx.language == Language.DE) "German" else "English"}.")
         }
-        return CoachPrompt(static, dynamic, userMessage(ctx), images)
+        return CoachPrompt(static, dynamic, userMessage(ctx), images, review = true)
     }
 
     fun userMessage(ctx: CoachContext): String = buildString {

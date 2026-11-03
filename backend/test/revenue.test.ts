@@ -58,4 +58,36 @@ describe('Web-Umsatz je Jahr und Land (Kleinunternehmer, EU-Lieferschwelle)', ()
     expect(w.years[0]).toMatchObject({ totalMicro: 25 * M, euCrossBorderMicro: 15 * M, orders: 2 });
     expect(w.note).toContain('keine Steuerberatung');
   });
+
+  it('Finanzbericht: echte Euro je Kanal, offenes Guthaben getrennt, KI-Kosten, Rohgewinn; Geschenktes ist keine Einnahme', async () => {
+    const DB = (workerEnv as unknown as Env).DB;
+    const t = Math.floor(Date.now() / 1000);
+    await DB.batch([
+      DB.prepare(`INSERT INTO accounts (id, created_at) VALUES ('acc', ?)`).bind(t),
+      DB.prepare(
+        `INSERT INTO web_orders (id, provider, environment, kind, package_id, price_micro, credit_micro, status, created_at, paid_at, reversed_micro, country, paid_micro)
+         VALUES ('w1', 'stripe', 'sandbox', 'credit', 'web.10', ?, ?, 'paid', ?, ?, 0, 'DE', ?)`,
+      ).bind(10 * M, 10 * M, t, t, 10 * M),
+      DB.prepare(`INSERT INTO purchases VALUES ('google', 'g1', 'acc', 'overfit.fuel.5', ?, ?, ?)`).bind(6_990_000, 5 * M, t),
+      DB.prepare(`INSERT INTO lots VALUES ('p', 'acc', 'purchase', ?, ?, NULL, ?, 'x')`).bind(5 * M, 4 * M, t),
+      DB.prepare(`INSERT INTO lots VALUES ('g', 'acc', 'test_credit', ?, ?, ?, ?, 'x')`).bind(M, M, t + 1000, t),
+      DB.prepare(`INSERT INTO review_gifts VALUES ('r', 'acc', 'invite_bonus', 5, 4, ?, ?, 'x')`).bind(t + 1000, t),
+      DB.prepare(`INSERT INTO ledger (account_id, ts, type, amount_micro, ref) VALUES ('acc', ?, 'test_credit', ?, 'x')`).bind(t, M),
+      DB.prepare(`INSERT INTO ledger (account_id, ts, type, amount_micro, cost_micro) VALUES ('acc', ?, 'usage', -1000, 800)`).bind(t),
+      DB.prepare(`INSERT INTO ledger (account_id, ts, type, amount_micro, cost_micro, reviews) VALUES ('acc', ?, 'usage', 0, 300, -1)`).bind(t),
+    ]);
+    const secret = 'admin-secret-0123456789';
+    const r = await rawFetch('/v1/admin/usage', baseEnv({ ADMIN_SECRET: secret }), { headers: { authorization: `Bearer ${secret}` } });
+    const f = r.body.finance;
+    const web = f.channels.find((c: any) => c.channel === 'web');
+    expect(web).toMatchObject({ grossMicro: 10 * M, feesMicro: 500_000, netMicro: 9_500_000 });
+    const play = f.channels.find((c: any) => c.channel === 'google');
+    expect(play.grossMicro).toBe(6_990_000);
+    expect(play.netMicro).toBe(Math.round((6_990_000 / 1.19) * 0.85));
+    expect(f.channels.find((c: any) => c.channel === 'apple').grossMicro).toBe(0);
+    expect(f.revenue.grossMicro).toBe(10 * M + 6_990_000); // die 1 € Test-Gutschrift zählt nicht
+    expect(f.openCredit).toEqual({ purchasedMicro: 4 * M, giftedMicro: M, giftReviews: 4 });
+    expect(f.aiCost).toMatchObject({ totalMicro: 1100, creditMicro: 800, giftReviewsMicro: 300, giftReviewRequests: 1 });
+    expect(f.grossProfitMicro).toBe(f.revenue.netMicro - 1100);
+  });
 });

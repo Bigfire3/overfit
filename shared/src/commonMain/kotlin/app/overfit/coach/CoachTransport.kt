@@ -42,6 +42,8 @@ data class CoachReply(
     val truncated: Boolean = false,
     /** The model declined (safety). */
     val refused: Boolean = false,
+    /** Credit: paid with a gifted review (invite bonus), nothing taken from the credit. */
+    val giftReview: Boolean = false,
 )
 
 enum class CoachErrorKind(val retryable: Boolean) {
@@ -295,12 +297,18 @@ class GeminiCoach(http: HttpClient, apiKey: () -> String?) :
  * Fuel: the Anthropic body through our backend, which maps it onto the provider of the tier and reports cost and the
  * new balance. [model] is the tier (standard | pro | lite); a tier the backend does not offer falls back to the next.
  */
+/** Anthropic body plus Overfit's own `overfit.purpose` (the backend strips it before the provider sees it). */
+fun fuelBody(prompt: CoachPrompt, tier: String, structured: Boolean): JsonObject {
+    val base = anthropicBody(prompt, tier, structured)
+    return JsonObject(base + ("overfit" to buildJsonObject { put("purpose", if (prompt.review) "review" else "chat") }))
+}
+
 class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
     override val providerId = ProviderId.FUEL
     override suspend fun send(prompt: CoachPrompt, model: String, structured: Boolean): CoachReply {
         if (!fuel.available) throw CoachException(CoachErrorKind.NO_ACCESS)
         val result = try {
-            fuel.messages(anthropicBody(prompt, fuel.resolveTier(model), structured).toString())
+            fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured).toString())
         } catch (e: CancellationException) {
             throw e
         } catch (e: FuelException) {
@@ -321,6 +329,7 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
         }
         val body = result.body as? JsonObject ?: throw CoachException(CoachErrorKind.SERVER, "Not an object")
         return anthropicReply(body, body.toString()).copy(
+            giftReview = result.giftReview,
             costMicro = result.costMicro,
             balanceMicro = result.balanceMicro,
             servedModel = result.servedModel,
