@@ -74,8 +74,8 @@ export function plan(mode, env, existing) {
 }
 
 const MISSING_HELP = {
-  AI_KEY: 'Mindestens ein KI-Schlüssel für Fuel: **`GEMINI_API_KEY`** (Stufe Standard, Google AI Studio: aistudio.google.com/apikey, ' +
-    'beginnt mit `AIza`, Projekt mit Abrechnung) und/oder **`ANTHROPIC_API_KEY`** (Stufe Pro, console.anthropic.com → API Keys, beginnt mit `sk-ant-`). ' +
+  AI_KEY: 'Mindestens ein KI-Schlüssel für Guthaben: **`GEMINI_API_KEY`** (Gemini 3.6 Flash, Google AI Studio: aistudio.google.com/apikey, ' +
+    'beginnt mit `AIza`, Projekt mit Abrechnung) und/oder **`ANTHROPIC_API_KEY`** (Claude Sonnet 5.5, console.anthropic.com → API Keys, beginnt mit `sk-ant-`). ' +
     'Am besten je mit Ausgabenlimit.',
 };
 
