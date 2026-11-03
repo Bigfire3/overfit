@@ -12,7 +12,7 @@ import kotlinx.datetime.LocalDate
  * inside the app on Android and iOS alike, and a missing translation is a compile error.
  */
 data class Strings(
-    val appName: String = "overfit",
+    val appName: String = "Overfit",
     val next: String,
     val back: String,
     val comingSoon: String,
@@ -268,7 +268,7 @@ val German = Strings(
     weightTitle = "Wie viel\nwiegst du?",
     weightError = "Das sieht nicht nach einem realistischen Gewicht aus.",
     aiTitle = "Verbinde\ndeine KI",
-    aiSubtitle = "overfit nutzt deinen eigenen API-Key oder Guthaben. Keine Werbung, kein Abo nötig.",
+    aiSubtitle = "Overfit nutzt deinen eigenen API-Key oder Guthaben. Keine Werbung, kein Abo nötig.",
     aiKeyPlaceholder = "API-Key einfügen",
     aiHowTo = "Wie bekomme ich einen Key?",
     aiConnect = "Verbinden",
@@ -463,7 +463,7 @@ val German = Strings(
     reset = "Alle Daten löschen",
     resetConfirm = "Wirklich alles löschen?",
     app = "App",
-    about = "Über overfit",
+    about = "Über Overfit",
 
     coachMemoryEmpty = "Der Coach hat noch nichts gespeichert. Das Gedächtnis entsteht nach dem ersten bewerteten Training.",
     aboutVersion = { "Version $it" },
@@ -473,7 +473,7 @@ val German = Strings(
     aboutFont = "Schrift: Inter von Rasmus Andersson. Lizenz: SIL Open Font License 1.1.",
     aboutLibraries = "Verwendete Bibliotheken",
     aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor (Apache License 2.0)",
-    aboutLicense = "overfit ist Open Source unter der MIT-Lizenz.",
+    aboutLicense = "Overfit ist Open Source unter der MIT-Lizenz.",
     aboutRepo = "Quellcode auf GitHub",
 )
 
@@ -493,7 +493,7 @@ val English = Strings(
     weightTitle = "How much do\nyou weigh?",
     weightError = "That doesn't look like a realistic weight.",
     aiTitle = "Connect\nyour AI",
-    aiSubtitle = "overfit uses your own API key or credit. No ads, no subscription required.",
+    aiSubtitle = "Overfit uses your own API key or credit. No ads, no subscription required.",
     aiKeyPlaceholder = "Paste API key",
     aiHowTo = "How do I get a key?",
     aiConnect = "Connect",
@@ -688,7 +688,7 @@ val English = Strings(
     reset = "Delete all data",
     resetConfirm = "Really delete everything?",
     app = "App",
-    about = "About overfit",
+    about = "About Overfit",
 
     coachMemoryEmpty = "The coach hasn't saved anything yet. Its memory starts after your first reviewed workout.",
     aboutVersion = { "Version $it" },
@@ -698,7 +698,7 @@ val English = Strings(
     aboutFont = "Typeface: Inter by Rasmus Andersson. License: SIL Open Font License 1.1.",
     aboutLibraries = "Libraries used",
     aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor (Apache License 2.0)",
-    aboutLicense = "overfit is open source under the MIT License.",
+    aboutLicense = "Overfit is open source under the MIT License.",
     aboutRepo = "Source code on GitHub",
 )
 

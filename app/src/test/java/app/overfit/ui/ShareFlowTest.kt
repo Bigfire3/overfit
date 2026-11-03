@@ -146,7 +146,7 @@ class ShareFlowTest {
         // There is no "add sample workouts" row anymore, neither in the Training tab nor in the profile.
         compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
         compose.onNodeWithText("Profil").performClick()
-        waitFor("Über overfit")
+        waitFor("Über Overfit")
         compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
     }
 

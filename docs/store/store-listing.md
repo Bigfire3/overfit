@@ -1,11 +1,11 @@
 # Store-Texte
 
 Gilt für App Store und Google Play. Stand: aktueller Funktionsumfang (siehe docs/PROGRESS.md). Limits: Play Titel 30, Kurzbeschreibung 80, Langbeschreibung 4000; App Store Untertitel 30, Beschreibung 4000.
-Marke: Wortmarke „overfit“ immer klein, Claim „personal training for everyone“ (30 Zeichen) in beiden Sprachen auf Englisch (siehe docs/DECISIONS.md). Keine Funktion bewerben, die es nicht gibt (Duo entfernt 3.11., Fabian).
+Marke: Wortmarke „Overfit“ mit großem O (Fabian, 3.11.), Claim „personal training for everyone“ (30 Zeichen) in beiden Sprachen auf Englisch (siehe docs/DECISIONS.md). Keine Funktion bewerben, die es nicht gibt (Duo entfernt 3.11., Fabian).
 
 ## Deutsch
 
-**Titel (Play, ≤ 30):** overfit: Workout & KI-Coach (27)
+**Titel (Play, ≤ 30):** Overfit: Workout & KI-Coach (27)
 
 **Untertitel (App Store, ≤ 30):** personal training for everyone (30)
 
@@ -13,7 +13,7 @@ Marke: Wortmarke „overfit“ immer klein, Claim „personal training for every
 Dein Trainer in der Tasche: kennt dein Training, wertet aus, plant. Werbefrei. (78)
 
 **Langbeschreibung:**
-overfit – personal training for everyone.
+Overfit – personal training for everyone.
 
 Ein persönlicher Trainer in der Tasche, im Chat erreichbar, der dein Training kennt, auswertet und plant. Für alle, nicht nur für Leute, die sich einen Personal Trainer leisten können. Schwarz-weiß, schnell, ohne Werbung und Ablenkung.
 
@@ -51,7 +51,7 @@ DEINE DATEN
 
 ## English
 
-**Title (Play, ≤ 30):** overfit: Workout & AI Coach (27)
+**Title (Play, ≤ 30):** Overfit: Workout & AI Coach (27)
 
 **Subtitle (App Store, ≤ 30):** personal training for everyone (30)
 
@@ -59,7 +59,7 @@ DEINE DATEN
 Your trainer in your pocket: knows your training, reviews it, plans it. No ads. (78)
 
 **Long description:**
-overfit – personal training for everyone.
+Overfit – personal training for everyone.
 
 A personal trainer in your pocket, one chat away, that knows your training, reviews it and plans it. For everyone, not only for people who can afford a personal trainer. Black and white, fast, no ads and no distractions.
 

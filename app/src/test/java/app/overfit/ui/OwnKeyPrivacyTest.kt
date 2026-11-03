@@ -138,7 +138,7 @@ class OwnKeyPrivacyTest {
         compose.onNodeWithTag("tab:PHOTOS").performClick()
         compose.onNodeWithTag("tab:COACH").performClick()
         waitFor("Prompts & Vorlagen")
-        compose.onNodeWithText("Deine Daten gehen direkt an Anthropic, nicht über overfit-Server.").performScrollTo().assertExists()
+        compose.onNodeWithText("Deine Daten gehen direkt an Anthropic, nicht über Overfit-Server.").performScrollTo().assertExists()
         input("coach:tabInput").performScrollTo().performTextInput("Was soll ich morgen trainieren?")
         compose.onNodeWithText("Senden").performScrollTo().performClick()
         waitFor("Direkt vom Anbieter.")
