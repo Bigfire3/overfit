@@ -66,6 +66,17 @@ class OverfitUITestCase: XCTestCase {
         XCTFail("Nicht antippbar: \"\(label)\"", file: file, line: line)
     }
 
+    /** Confirm buttons change their label and reset after 4 s: tap twice on the same spot, screenshot in between. */
+    func confirm(_ label: String, shotName: String) {
+        guard let button = find(label) else { waitFor(label); return }
+        let spot = button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        spot.tap()
+        usleep(400_000)
+        let screenshot = XCUIScreen.main.screenshot()
+        save(screenshot, name: shotName)
+        spot.tap()
+    }
+
     /** Confirms the system notification prompt that appears on the first workout start. */
     func allowNotificationsIfAsked() {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -90,7 +101,10 @@ class OverfitUITestCase: XCTestCase {
 
     func shot(_ name: String) {
         sleep(1) // let animations settle
-        let screenshot = XCUIScreen.main.screenshot()
+        save(XCUIScreen.main.screenshot(), name: name)
+    }
+
+    func save(_ screenshot: XCUIScreenshot, name: String) {
         let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = "\(name)-\(suffix)"
         attachment.lifetime = .keepAlways
@@ -120,16 +134,16 @@ final class ScreenshotTests: OverfitUITestCase {
     func testHomeScreenAndLaunch() {
         launch(theme: "light")
         waitFor("Legs")
+        // Pressing home twice shows the first home screen page, where new apps land.
+        XCUIDevice.shared.press(.home)
+        sleep(1)
         XCUIDevice.shared.press(.home)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let icon = springboard.icons["overfit"]
-        for _ in 0..<4 where !(icon.exists && icon.isHittable) {
-            springboard.swipeLeft()
-            sleep(1)
-        }
+        _ = icon.waitForExistence(timeout: 5)
         suffix = "hell"
         shot("00-homescreen")
-        guard icon.exists else { return }
+        guard icon.exists && icon.isHittable else { return } // icon on another page: launch screen not captured
         app.terminate() // cold start, so the launch screen shows
         icon.tap()
         usleep(150_000)
@@ -185,9 +199,7 @@ final class ScreenshotTests: OverfitUITestCase {
         shot("06b-mini-leiste")
         tap("Training öffnen")
         tap("Überspringen")
-        tap("Beenden")
-        shot("07-beenden-bestaetigen")
-        tap("Beenden? Nochmal tippen")
+        confirm("Beenden", shotName: "07-beenden-bestaetigen")
         waitFor("Training beendet")
         shot("08-beenden")
         tap("Speichern")
@@ -203,11 +215,13 @@ final class ScreenshotTests: OverfitUITestCase {
         tab("COACH")
         sleep(1)
         shot("10b-coach")
-        tap("Neuer Chat")
         waitFor("Nachricht an den Coach").tap()
         sleep(1)
         app.typeText("Wie trainiere ich morgen?")
-        shot("10c-coach-chat-tastatur")
+        shot("10c-coach-tastatur")
+        tap("Senden")
+        waitFor("Zurück")
+        shot("10d-coach-chat")
         tap("Zurück")
         tab("PHOTOS")
         waitFor("Foto-Tagebuch")
