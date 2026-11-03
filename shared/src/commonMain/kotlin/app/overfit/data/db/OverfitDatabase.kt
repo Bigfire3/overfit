@@ -20,11 +20,12 @@ import androidx.room.useWriterConnection
         WorkoutSessionEntity::class,
         SessionExerciseEntity::class,
         SetEntryEntity::class,
+        WorkoutPhotoEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    // v1 → v2 only adds the workout tables (nothing is dropped or rewritten).
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    // v1 → v2 only adds the workout tables, v2 → v3 the photo table (nothing is dropped or rewritten).
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 @TypeConverters(Converters::class)
 @ConstructedBy(OverfitDatabaseConstructor::class)

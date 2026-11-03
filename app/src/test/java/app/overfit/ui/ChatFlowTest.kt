@@ -120,6 +120,8 @@ class ChatFlowTest {
         compose.onNodeWithText("Körperfotos teilen").assertExists()
         compose.onNodeWithText("Zustimmen und verbinden").performClick()
         await("KI-Chat ist eingeschaltet".uppercase())
+        // The first sync runs in the background after "enabled" is shown.
+        compose.waitUntil(5_000) { "POST /v1/chat/sync" in requests.toList() }
         assertTrue(requests.toString(), "POST /v1/chat/enable" in requests && "POST /v1/chat/sync" in requests)
         assertTrue(requests.indexOf("POST /v1/chat/enable") < requests.indexOf("POST /v1/chat/sync"))
 

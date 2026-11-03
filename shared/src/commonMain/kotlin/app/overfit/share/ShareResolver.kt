@@ -1,14 +1,17 @@
 package app.overfit.share
 
+import app.overfit.domain.PlannedSet
+import app.overfit.domain.TemplateExercise
+import app.overfit.domain.Workout
+import app.overfit.domain.orElse
+
 import app.overfit.data.CustomExerciseInput
 import app.overfit.domain.Equipment
 import app.overfit.domain.Exercise
 import app.overfit.domain.ExerciseSearch
 import app.overfit.domain.ExerciseSource
 import app.overfit.domain.Muscle
-import app.overfit.domain.PlannedSet
 import app.overfit.domain.Template
-import app.overfit.domain.TemplateExercise
 import app.overfit.domain.TrackingType
 
 /** One line of the import preview. [exercise] is set for known exercises, [newExercise] for ones that will be created. */
@@ -55,6 +58,28 @@ object ShareMapper {
             )
         }
         return SharedTraining(name = t.name, note = t.note, exercises = exercises, custom = custom.values.toList())
+    }
+
+    /**
+     * A finished workout as `kind: "workout"`. Sets carry what was done ([withActual], only
+     * completed sets) or what was planned (open sets included; a free set without target uses
+     * its logged values). Notes, feeling and photos are never shared (SPEC).
+     */
+    fun fromWorkout(w: Workout, withActual: Boolean): SharedTraining {
+        val template = Template(
+            id = 0,
+            name = w.name,
+            note = null,
+            exercises = w.exercises.mapNotNull { e ->
+                val sets = if (withActual) {
+                    e.sets.filter { it.completed }.map { PlannedSet(it.actual.weightKg, it.actual.reps, it.actual.durationSec) }
+                } else {
+                    e.sets.map { s -> s.target.orElse(s.actual).let { PlannedSet(it.weightKg, it.reps, it.durationSec) } }
+                }
+                if (withActual && sets.isEmpty()) null else TemplateExercise(e.exercise, e.restSec, null, sets)
+            },
+        )
+        return fromTemplate(template).copy(kind = ShareFormat.KIND_WORKOUT)
     }
 
     /**

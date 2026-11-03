@@ -232,3 +232,65 @@ data class SessionWithExercises(
     @Relation(entity = SessionExerciseEntity::class, parentColumn = "id", entityColumn = "sessionId")
     val exercises: List<SessionExerciseWithDetails>,
 )
+
+// --- Photos (schema v3) -----------------------------------------------------------------------
+
+/**
+ * Body/progress photo of a finished workout (also the photo diary). The file lives only in the
+ * app-private photo directory ([app.overfit.data.AppFiles]); [fileName] is relative to it.
+ */
+@Entity(
+    tableName = "workout_photo",
+    foreignKeys = [
+        ForeignKey(
+            entity = WorkoutSessionEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sessionId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("sessionId"), Index("takenAt")],
+)
+data class WorkoutPhotoEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val fileName: String,
+    val takenAt: Long,
+    val position: Int,
+)
+
+/** Row of the history list: a finished workout with its key numbers. */
+data class HistoryRow(
+    val id: String,
+    val name: String,
+    val startedAt: Long,
+    val endedAt: Long?,
+    val feeling: Int?,
+    val exerciseCount: Int,
+    val completedSets: Int,
+    /** Sum of kg × reps over completed sets with positive weight. */
+    val volumeKg: Double,
+    val photoCount: Int,
+)
+
+/** Photo with the workout it belongs to (photo diary). */
+data class PhotoRow(
+    val id: String,
+    val sessionId: String,
+    val fileName: String,
+    val takenAt: Long,
+    val position: Int,
+    val sessionName: String,
+)
+
+/** A completed set of one exercise in a finished workout (progress, best values). */
+data class ExerciseSetRow(
+    val sessionId: String,
+    val startedAt: Long,
+    val sessionName: String,
+    val exerciseId: String,
+    val weightKg: Double?,
+    val reps: Int?,
+    val durationSec: Int?,
+    val position: Int,
+)

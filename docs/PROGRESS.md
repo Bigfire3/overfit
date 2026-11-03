@@ -6,12 +6,12 @@
 | 0b | Kotlin Multiplatform, Schwarz-Weiß-Design, DE/EN, Onboarding, eigener API-Key, iOS-Hülle | erledigt |
 | 1 | Übungskatalog, eigene Übungen, Vorlagen | erledigt |
 | 2 | Workout-Modus, Pausentimer | erledigt |
-| 3 | Beenden-Flow, Foto, Verlauf, Backup | offen |
+| 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
 | 4 | KI-Coach | offen |
 | 5 | Feinschliff | offen |
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
-| 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
+| 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
@@ -56,6 +56,37 @@ Mit Backend (nach Deployment):
 6. Im Chat „Plane mir ein Push-Training“ → Vorlage erscheint auf dem Start-Tab („1 neuer Eintrag aus dem Chat“) → Vorschau → Übernehmen
 7. Ein Training beenden → nach wenigen Sekunden sieht der Chat es („Wie war mein letztes Training?“). Flugmodus an, Satz abhaken, Flugmodus aus, App öffnen → Hinweis verschwindet, Daten kommen an
 8. **Trennen** einer Verbindung; **KI-Chat trennen** (zweimal tippen) → Server leer, Chat hat keinen Zugriff mehr
+
+## Phase 3: Beenden-Flow, Fotos, Verlauf, Backup (Session F, Nacht 3.11.)
+Fertig:
+- Nach „Beenden“: Zusammenfassung (Dauer, Sätze, Volumen, Übungen, Abweichungen), neue Bestwerte (Gewicht, geschätztes 1RM,
+  Wdh., Zeit), Gefühl 1–5, Notiz, Körperfotos (Kamera / Foto-Auswahl, nur app-privat), Speichern. Platz für den Coach (Phase 4)
+- Verlauf-Tab: Liste, Detail mit allen Sätzen, Notiz, Gefühl, Fotos; „Als Vorlage übernehmen“, „Teilen“ (`kind: "workout"`,
+  mit/ohne Ist-Werte, nie Fotos/Notizen/Gefühl), Löschen. Übungsdetail: Fortschritt (Bestwerte, letzte Trainings, e1RM)
+- Fotos-Tab: Zeitachse nach Monat, Vollbild, zwei Fotos vergleichen, löschen
+- Profil → Backup: Export als eine ZIP-Datei (Teilen-Menü / „In Dateien sichern“), Import mit Vorschau und Bestätigung
+  („Alle Daten ersetzen“); ohne API-Key/Geräteschlüssel
+- Room v3 (Fotos) mit Migrationstest; `changes`/`dataChanged`-Flows und `photosOf()` für KI-Chat-Sync und Coach
+- Tests: Bestwerte/Zusammenfassung, ZIP (auch kaputte Dateien), Training teilen (Common); Migration 2→3, Backup-Rundlauf
+  (Export → Alles löschen → Import = gleiche Daten), alte/kaputte/neuere Backups, UI-Durchlauf Vorlage → 2 Sätze → Beenden →
+  Notiz → Verlauf (Robolectric)
+
+Offen / Hinweise:
+- Android-Zurück-Taste im Beenden-Screen schließt ohne Notiz/Gefühl zu speichern (Training selbst ist gespeichert)
+- Backup liegt beim Erstellen komplett im Speicher; bei sehr vielen Fotos später streamen
+- iOS-Kamera/Fotoauswahl/Dateiauswahl nur von der iOS-CI gebaut, nicht auf echtem iPhone getestet
+
+## Bitte auf dem Handy testen: Beenden, Verlauf, Fotos, Backup (Phase 3)
+1. Vorlage „Push“ starten, 2 Sätze abhaken (Gewicht beim zweiten erhöhen), „Beenden“ zweimal → Zusammenfassung erscheint
+2. Gefühl antippen, Notiz schreiben, „Foto aufnehmen“ (Kamera erlauben) und „Aus Fotos wählen“ → Vorschaubilder, eins entfernen
+3. „Speichern“ → Start. Gleiches Training nochmal mit mehr Gewicht → unter „Neue Bestwerte“ steht die Übung
+4. Verlauf-Tab: Training öffnen → Sätze, Notiz, Fotos; Foto antippen → Vollbild; „Als Vorlage übernehmen“ → Editor
+5. Im Verlauf-Detail „Teilen“ → Schalter „Mit Ist-Werten“, Link kopieren und über Übungen → Importieren wieder einfügen
+6. Übungen → Bankdrücken → Abschnitt „Fortschritt“ (Bestwerte, letzte Trainings)
+7. Fotos-Tab: Zeitachse, „Vergleichen“ → zwei Fotos wählen → nebeneinander; Foto löschen (zweimal tippen)
+8. Profil → „Backup exportieren“ → in Dateien/Drive sichern. Dann Profil → „Alle Daten löschen“, Onboarding kurz
+   durchklicken, Profil → „Backup importieren“ → Datei wählen → Vorschau → „Alle Daten ersetzen“ (zweimal) → alles wieder da
+   (Verlauf, Fotos, Vorlagen, Name). Fotos erscheinen nicht in der Galerie
 
 ## Phase 2: Workout-Modus und Pausentimer (Session A)
 Phase 2 abgeschlossen:

@@ -110,6 +110,9 @@ class AppStore(
         _state.update { it.copy(hasApiKey = false) }
     }
 
+    /** Profile and settings from a backup; onboarding counts as done, the API key stays. */
+    fun restore(persisted: PersistedState) = edit { persisted.copy(onboardingDone = true) }
+
     fun resetAll() {
         runCatching { secrets.delete() }
         kv.remove(KEY)

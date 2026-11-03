@@ -5,6 +5,22 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import app.overfit.data.WorkoutRepository
+import app.overfit.domain.Language
+import app.overfit.domain.Numbers
+import app.overfit.domain.SetValues
+import app.overfit.domain.WeightUnit
+import app.overfit.domain.WorkoutStats
+import app.overfit.ui.components.Hairline
+import app.overfit.ui.theme.Theme
+import app.overfit.workout.WorkoutFormat
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,6 +103,9 @@ fun ExerciseDetailScreen(
     viewModel: ExerciseViewModel,
     onBack: () -> Unit,
     onEditCustom: (String) -> Unit,
+    workouts: WorkoutRepository,
+    unit: WeightUnit,
+    language: Language,
 ) {
     val t = LocalStrings.current
     val exercise by viewModel.exercise.collectAsStateWithLifecycle()
@@ -133,6 +152,51 @@ fun ExerciseDetailScreen(
             ListRow(t.restTime) {
                 RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
             }
+        }
+
+        ExerciseProgress(e, workouts, unit, language)
+    }
+}
+
+/** "Progress": best values and the last workouts with this exercise. */
+@Composable
+private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepository, unit: WeightUnit, language: Language) {
+    val t = LocalStrings.current
+    val h = t.history
+    val rows by remember(e.id) { workouts.exerciseSets(e.id) }.collectAsStateWithLifecycle(initialValue = null)
+    val list = rows ?: return
+    SectionTitle(h.progress)
+    if (list.isEmpty()) {
+        Text(h.progressEmpty, tone = Tone.Muted)
+        return
+    }
+    val type = e.trackingType
+    fun kg(v: Double) = "${Numbers.formatWeight(v, unit, language)} ${unit.symbol}"
+    val bests = WorkoutStats.bests(list.map { SetValues(it.weightKg, it.reps, it.durationSec) }, type)
+    Text(h.bests, style = Theme.type.caption, tone = Tone.Muted)
+    bests.maxWeightKg?.let { ListRow(h.maxWeight, kg(it)) }
+    bests.bestE1rmKg?.let { ListRow(h.bestE1rm, kg(it)) }
+    bests.maxReps?.let { ListRow(h.maxReps, "$it ${t.repsUnit}") }
+    bests.maxDurationSec?.let { ListRow(h.longestTime, Numbers.formatDuration(it)) }
+
+    Spacer(Modifier.height(Space.l))
+    Text(h.recentWorkouts, style = Theme.type.caption, tone = Tone.Muted)
+    val sessions = list.groupBy { it.sessionId }.values.take(10)
+    sessions.forEach { sets ->
+        val ordered = sets.sortedBy { it.position }
+        val values = ordered.map { SetValues(it.weightKg, it.reps, it.durationSec) }
+        val e1rm = if (type == TrackingType.WEIGHT_REPS) WorkoutStats.bests(values, type).bestE1rmKg else null
+        val date = t.date(Instant.fromEpochMilliseconds(ordered.first().startedAt).toLocalDateTime(TimeZone.currentSystemDefault()).date)
+        val text = values.map { WorkoutFormat.values(it, type, unit, language, t) }.filter { it.isNotEmpty() }.joinToString(" · ")
+        Column {
+            Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(date, Modifier.weight(1f), tone = Tone.Muted)
+                    if (e1rm != null) Text(h.e1rmShort(kg(e1rm)), style = Theme.type.caption, tone = Tone.Muted)
+                }
+                Text(text)
+            }
+            Hairline()
         }
     }
 }

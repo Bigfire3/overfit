@@ -2,4 +2,6 @@
 <paths>
     <!-- .overfit-Dateien zum Teilen (AndroidPlatformShare). -->
     <cache-path name="share" path="share/" />
+    <!-- Kamerafoto nach dem Training: nur kurz im Cache, danach app-privat gespeichert. -->
+    <cache-path name="camera" path="camera/" />
 </paths>

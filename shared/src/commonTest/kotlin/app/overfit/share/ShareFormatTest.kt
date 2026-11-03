@@ -105,7 +105,7 @@ class ShareFormatTest {
 
     @Test fun versionAndKind() {
         assertEquals(ShareParse.Fail(ShareFailure.TOO_NEW), ShareFormat.fromJson("""{"v":2,"kind":"template","name":"X","exercises":[]}"""))
-        assertEquals(ShareParse.Fail(ShareFailure.UNSUPPORTED_KIND), ShareFormat.fromJson("""{"v":1,"kind":"workout","name":"X","exercises":[]}"""))
+        assertEquals(ShareParse.Fail(ShareFailure.UNSUPPORTED_KIND), ShareFormat.fromJson("""{"v":1,"kind":"plan","name":"X","exercises":[]}"""))
         assertEquals(ShareParse.Fail(ShareFailure.NOT_OVERFIT), ShareFormat.fromJson("""{"hello":1}"""))
         assertEquals(ShareParse.Fail(ShareFailure.INVALID), ShareFormat.fromJson("""{"v":1,"kind":"template","exercises":[]}"""))
         assertEquals(ShareParse.Fail(ShareFailure.INVALID), ShareFormat.fromJson("""{"v":1,"name":"X","exercises":"nope"}"""))
