@@ -43,6 +43,8 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.Chip
 import app.overfit.ui.components.ExerciseImage
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.share.ShareDependencies
+import app.overfit.ui.share.TemplateImportRows
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
@@ -99,6 +101,8 @@ fun ExercisesScreen(
     onNewCustomExercise: () -> Unit,
     onOpenTemplate: (Long) -> Unit,
     onNewTemplate: () -> Unit,
+    share: ShareDependencies,
+    onImport: () -> Unit,
 ) {
     val t = LocalStrings.current
     var segment by rememberSaveable { mutableStateOf(ExercisesSegment.CATALOG) }
@@ -118,19 +122,27 @@ fun ExercisesScreen(
         if (segment == ExercisesSegment.CATALOG) {
             CatalogList(catalog, language, onClick = onOpenExercise)
         } else {
-            TemplateList(templates, onOpenTemplate)
+            TemplateList(templates, onOpenTemplate, share, onImport)
         }
     }
 }
 
 @Composable
-fun ColumnScope.TemplateList(templates: List<TemplateSummary>?, onOpen: (Long) -> Unit) {
+fun ColumnScope.TemplateList(
+    templates: List<TemplateSummary>?,
+    onOpen: (Long) -> Unit,
+    share: ShareDependencies,
+    onImport: () -> Unit,
+) {
     val t = LocalStrings.current
-    when {
-        templates == null -> Unit
-        templates.isEmpty() -> Text(t.templatesTabEmpty, Modifier.padding(top = Space.l), tone = Tone.Muted)
-        else -> LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            items(templates, key = { it.id }) { template -> TemplateRow(template) { onOpen(template.id) } }
+    if (templates == null) return
+    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        if (templates.isEmpty()) {
+            item(key = "empty") { Text(t.templatesTabEmpty, Modifier.padding(vertical = Space.l), tone = Tone.Muted) }
+        }
+        items(templates, key = { it.id }) { template -> TemplateRow(template) { onOpen(template.id) } }
+        item(key = "import") {
+            TemplateImportRows(share, onImport, showSamples = true)
         }
     }
 }

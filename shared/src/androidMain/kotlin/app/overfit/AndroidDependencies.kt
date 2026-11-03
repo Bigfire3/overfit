@@ -12,6 +12,8 @@ import app.overfit.platform.AndroidKeyValueStore
 import app.overfit.platform.AndroidSecretStore
 import app.overfit.platform.createHttpClient
 import app.overfit.platform.deviceDefaults
+import app.overfit.share.AndroidPlatformShare
+import app.overfit.share.ImportInbox
 import app.overfit.ui.AppDependencies
 
 /** Builds the app's dependencies for Android. Storage and database can be swapped in tests. */
@@ -26,4 +28,6 @@ fun androidDependencies(
     providers = Providers(createHttpClient()),
     data = AppData(database, kv),
     versionName = versionName,
+    share = AndroidPlatformShare(context),
+    inbox = ImportInbox(),
 )

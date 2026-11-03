@@ -6,7 +6,20 @@ struct OverfitApp: App {
     var body: some Scene {
         WindowGroup {
             // Compose draws edge to edge and handles safe areas and the keyboard itself.
-            ComposeView().ignoresSafeArea()
+            ComposeView()
+                .ignoresSafeArea()
+                // Shared trainings: overfit://t#… links and .overfit files (Files, Mail, AirDrop).
+                .onOpenURL { url in
+                    if url.isFileURL {
+                        let scoped = url.startAccessingSecurityScopedResource()
+                        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                        if let text = try? String(contentsOf: url, encoding: .utf8) {
+                            IncomingKt.handleIncoming(text: text)
+                        }
+                    } else {
+                        IncomingKt.handleIncoming(text: url.absoluteString)
+                    }
+                }
         }
     }
 }

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.data.images.OfflineImages
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.share.SamplesRow
+import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.components.pressableRow
 import coil3.compose.LocalPlatformContext
 
@@ -52,6 +54,7 @@ fun SettingsScreen(
     onCoachMemory: () -> Unit,
     onAbout: () -> Unit,
     offlineImages: OfflineImages,
+    share: ShareDependencies,
     onReset: () -> Unit,
 ) {
     val t = LocalStrings.current
@@ -103,6 +106,9 @@ fun SettingsScreen(
 
         SectionTitle(t.app)
         ListRow(t.about, onClick = onAbout)
+
+        SectionTitle(t.templates)
+        SamplesRow(share)
 
         SectionTitle(t.data)
         OfflineImagesRow(offlineImages)
