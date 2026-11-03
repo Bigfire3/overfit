@@ -82,6 +82,30 @@ async function profileAndTz(ctx: Ctx): Promise<{ profile: J | null; tz: string }
   return { profile, tz: tzOf(profile) };
 }
 
+/**
+ * Name, age and current body weight as one line, sent with every tool answer so the chat always knows who it talks to.
+ * The app uploads the line as `summary` (same text as in all other AI paths, see aiProfileFacts in the app); older
+ * app versions without it get a line built from the raw fields. Missing values are left out; null if nothing is known.
+ */
+export function profileSummary(profile: J | null, nowMs = Date.now()): string | null {
+  if (!profile) return null;
+  if (typeof profile.summary === 'string' && profile.summary.trim()) return profile.summary.trim();
+  const parts: string[] = [];
+  if (typeof profile.name === 'string' && profile.name.trim()) parts.push(`Name: ${profile.name.trim()}`);
+  if (typeof profile.birthYear === 'number') {
+    const age = new Date(nowMs).getUTCFullYear() - profile.birthYear;
+    if (age >= 13 && age <= 110) parts.push(`Age: ${age}`);
+  }
+  const weights = Array.isArray(profile.bodyweight) ? (profile.bodyweight as J[]).filter((w) => typeof w?.kg === 'number' && typeof w?.date === 'string') : [];
+  const last = weights.sort((a, b) => String(a.date).localeCompare(String(b.date))).at(-1);
+  if (last) {
+    const lb = profile.unit === 'lb';
+    const v = Math.round((lb ? (last.kg as number) * 2.20462262 : (last.kg as number)) * 10) / 10;
+    parts.push(`Body weight: ${v} ${lb ? 'lb' : 'kg'} (as of ${last.date})`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
 function summaryOut(s: WorkoutSummary, tz: string, detail = false) {
   return {
     workoutId: s.id,
@@ -540,8 +564,13 @@ export async function callTool(name: string, args: J, env: Env, cfg: Config, who
   const ctx: Ctx = { env, cfg, who, data: new ChatData(env, cfg, who.accountId) };
   try {
     const r = await tool.run(args ?? {}, ctx);
-    if (Array.isArray((r as ToolContent).content)) return r as ToolContent;
-    return { content: [{ type: 'text', text: JSON.stringify(r) }], structuredContent: r as J };
+    const user = profileSummary(await ctx.data.doc<J>('profile', 'me'));
+    if (Array.isArray((r as ToolContent).content)) {
+      const c = r as ToolContent;
+      return user && !c.isError ? { ...c, content: [{ type: 'text', text: `User: ${user}` }, ...c.content] } : c;
+    }
+    const out = user ? { user, ...(r as J) } : (r as J);
+    return { content: [{ type: 'text', text: JSON.stringify(out) }], structuredContent: out };
   } catch (e) {
     if (e instanceof ToolError) return { content: [{ type: 'text', text: e.message }], isError: true };
     throw e;

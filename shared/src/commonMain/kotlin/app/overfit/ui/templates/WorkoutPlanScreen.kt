@@ -30,6 +30,7 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.TextButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
+import app.overfit.ui.main.RunningWorkoutChoice
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import app.overfit.workout.WorkoutFormat
@@ -50,6 +51,7 @@ fun WorkoutPlanScreen(
     onBack: () -> Unit,
     onStart: (Template) -> Unit,
     onToRunning: () -> Unit,
+    onEndRunning: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
 ) {
@@ -67,8 +69,7 @@ fun WorkoutPlanScreen(
         header = { BackHeader(t.back, onBack) },
         footer = {
             if (workoutRunning) {
-                Text(t.otherWorkoutRunning, style = Theme.type.caption, tone = Tone.Muted)
-                PrimaryButton(t.continueWorkout, onToRunning)
+                RunningWorkoutChoice(onToRunning, onEndRunning)
             } else {
                 PrimaryButton(t.startThisWorkout, { w?.let(onStart) }, enabled = w != null)
             }

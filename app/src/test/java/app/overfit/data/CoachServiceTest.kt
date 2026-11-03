@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.datetime.toLocalDateTime
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -366,5 +367,87 @@ class CoachServiceTest {
         data.resetAll()
         assertTrue(coach.reviews.first().isEmpty())
         assertNull(dao.currentMemory())
+    }
+
+    // --- Per exercise ------------------------------------------------------------------------
+
+    private val day = 86_400_000L
+    private val base = 1_760_000_000_000L
+
+    private fun dateOf(ms: Long) =
+        kotlin.time.Instant.fromEpochMilliseconds(ms).toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date.toString()
+
+    /** One bench workout (2 sets of [weight] × 8, all done) started on day [dayIndex]; [finished] = false leaves it running. */
+    private suspend fun benchWorkout(id: String, dayIndex: Int, weight: Double, finished: Boolean = true) {
+        val bench = requireNotNull(data.exercises.get("wg:bench-press"))
+        val tid = data.templates.save(Template(0, "Push", null, listOf(TemplateExercise(bench, 60, null, List(2) { PlannedSet(weight, 8) }))))
+        var w = Workout.fromTemplate(requireNotNull(data.templates.get(tid)), base + dayIndex * day, id = id)
+        w.exercises.forEach { e -> e.sets.forEach { w = w.completeSet(it.id, base + dayIndex * day + 1000) } }
+        if (finished) data.workouts.finish(w, base + dayIndex * day + 60_000) else data.workouts.save(w)
+        templateId = tid
+    }
+
+    @Test
+    fun comparisonsUseTheLastEarlierFinishedWorkoutOnly() = runBlocking {
+        data.seedCatalog()
+        benchWorkout("old", 0, 60.0)
+        benchWorkout("running", 3, 90.0, finished = false) // not finished: never "last time"
+        benchWorkout("cur", 7, 65.0)
+        benchWorkout("newer", 14, 100.0) // later than the current one: never "last time"
+
+        val c = coach.comparisons("cur").single()
+        assertEquals("wg:bench-press", c.exerciseId)
+        assertEquals(app.overfit.coach.Verdict.BETTER, c.verdict)
+        val last = requireNotNull(c.last)
+        assertEquals(dateOf(base), last.date)
+        assertEquals(60.0, last.bestSet!!.weightKg!!, 0.0)
+        assertEquals(dateOf(base + 7 * day), c.today.date)
+        assertEquals(2, c.today.setsDone)
+
+        // The oldest workout has nothing before it (newer and running ones are ignored).
+        val first = coach.comparisons("old").single()
+        assertNull(first.last)
+        assertNull(first.verdict)
+        // The newer one compares against "cur" (the latest before it), not against "old".
+        assertEquals(dateOf(base + 7 * day), coach.comparisons("newer").single().last!!.date)
+        // Unknown session
+        assertTrue(coach.comparisons("nope").isEmpty())
+    }
+
+    @Test
+    fun comparisonsMergeCoachFeedbackById() = runBlocking {
+        data.seedCatalog()
+        benchWorkout("old", 0, 60.0)
+        benchWorkout("cur", 7, 65.0)
+        val fb = listOf(app.overfit.coach.ExerciseFeedback("wg:bench-press", app.overfit.coach.Verdict.SAME, "ok", null))
+        val c = coach.comparisons("cur", fb).single()
+        assertEquals(app.overfit.coach.Verdict.SAME, c.verdict)
+        assertEquals(app.overfit.coach.Verdict.BETTER, c.localVerdict)
+    }
+
+    @Test
+    fun sessionPromptHasPerExerciseSectionAndStoredReviewKeepsExerciseReviews() = runBlocking {
+        data.seedCatalog()
+        sessionId = "cur"
+        benchWorkout("old", 0, 60.0)
+        benchWorkout("cur", 7, 65.0)
+        answers = mutableListOf(
+            """{"rating":8,"summary":"Gut","exercise_reviews":[{"exercise_id":"wg:bench-press","verdict":"better","comment":"Mehr Gewicht","next":{"weight_kg":67.5,"reps":8,"duration_sec":null}}],"positives":[],"improvements":[],"tips":[],"photo_feedback":null,"next_session":null,"memory":null}""",
+        )
+        val id = coach.requestSessionReview(sessionId)
+        coach.sendPending()
+
+        val user = fake.prompts.single().user
+        assertTrue(user, user.contains("## Per exercise"))
+        assertTrue(user, user.contains("[wg:bench-press]: today best 65kg×8"))
+        assertTrue(user, user.contains("last ${dateOf(base)}: best 60kg×8"))
+        assertTrue(user, user.contains("by the numbers: better"))
+
+        val review = requireNotNull(coach.review(id).first()!!.review)
+        val er = review.exerciseReviews.single()
+        assertEquals("wg:bench-press", er.exerciseId)
+        assertEquals(app.overfit.coach.Verdict.BETTER, er.verdict)
+        assertEquals("Mehr Gewicht", er.comment)
+        assertEquals(app.overfit.coach.SuggestedSet(67.5, 8, null), er.next)
     }
 }

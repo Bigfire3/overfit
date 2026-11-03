@@ -41,8 +41,11 @@ object CoachParser {
             photoFeedback = obj.field("photo_feedback")?.text()?.takeIf { it.isNotBlank() },
             nextSession = (obj.field("next_session") as? JsonObject)?.let(::plan),
             memory = obj.field("memory")?.text()?.takeIf { it.isNotBlank() },
+            exerciseReviews = (obj.field("exercise_reviews") as? JsonArray).orEmpty()
+                .mapNotNull { (it as? JsonObject)?.let(::exerciseReview) }
+                .distinctBy { it.exerciseId },
         )
-        val empty = review.summary.isBlank() && review.tips.isEmpty() && review.positives.isEmpty() &&
+        val empty = review.summary.isBlank() && review.tips.isEmpty() && review.exerciseReviews.isEmpty() && review.positives.isEmpty() &&
             review.improvements.isEmpty() && review.nextSession == null
         return if (empty) ParseResult.Invalid("empty") else ParseResult.Ok(review)
     }
@@ -54,17 +57,30 @@ object CoachParser {
         return PlanSuggestion(exercises, obj.field("note")?.text()?.takeIf { it.isNotBlank() })
     }
 
+    private fun exerciseReview(obj: JsonObject): ExerciseFeedback? {
+        val id = (obj.field("exercise_id") ?: obj.field("id"))?.text()?.trim().orEmpty()
+        if (id.isEmpty()) return null
+        val verdict = when (obj.field("verdict")?.text()?.lowercase()) {
+            "better", "besser", "improved", "up" -> Verdict.BETTER
+            "same", "gleich", "equal", "unchanged" -> Verdict.SAME
+            "worse", "schlechter", "down" -> Verdict.WORSE
+            else -> null
+        }
+        val next = (obj.field("next") as? JsonObject)?.let(::set)
+        return ExerciseFeedback(id, verdict, obj.field("comment")?.text()?.takeIf { it.isNotBlank() }, next)
+    }
+
+    private fun set(o: JsonObject): SuggestedSet? = SuggestedSet(
+        weightKg = o.field("weight_kg")?.number()?.let { (it * 100).roundToInt() / 100.0 },
+        reps = o.field("reps")?.number()?.roundToInt()?.takeIf { it in 0..1000 },
+        durationSec = o.field("duration_sec")?.number()?.roundToInt()?.takeIf { it in 0..86_400 },
+    ).takeUnless { it.weightKg == null && it.reps == null && it.durationSec == null }
+
     private fun exercise(obj: JsonObject): SuggestedExercise? {
         val id = (obj.field("exercise_id") ?: obj.field("id"))?.text()?.trim().orEmpty()
         if (id.isEmpty()) return null
         val sets = (obj.field("sets") as? JsonArray).orEmpty().mapNotNull { s ->
-            val o = s as? JsonObject ?: return@mapNotNull null
-            val set = SuggestedSet(
-                weightKg = o.field("weight_kg")?.number()?.let { (it * 100).roundToInt() / 100.0 },
-                reps = o.field("reps")?.number()?.roundToInt()?.takeIf { it in 0..1000 },
-                durationSec = o.field("duration_sec")?.number()?.roundToInt()?.takeIf { it in 0..86_400 },
-            )
-            set.takeUnless { it.weightKg == null && it.reps == null && it.durationSec == null }
+            (s as? JsonObject)?.let(::set)
         }.take(MAX_SETS)
         return SuggestedExercise(
             exerciseId = id,

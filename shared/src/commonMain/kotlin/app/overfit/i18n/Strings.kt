@@ -143,6 +143,13 @@ data class Strings(
 
     // Workout (phase 2)
     val continueWorkout: String,
+    /** Workout minimized: top button, bar above the tab bar, conflict with a second workout. */
+    val minimizeWorkout: String,
+    val openWorkout: String,
+    val miniSet: (exercise: String, number: Int, total: Int) -> String,
+    val runningWorkoutTitle: String,
+    val toRunningWorkout: String,
+    val endRunningWorkout: String,
     val emptyWorkout: String,
     val emptyWorkoutHint: String,
     val defaultWorkoutName: String,
@@ -356,6 +363,12 @@ val German = Strings(
     offlineImagesDone = { done, total -> "$done von $total gespeichert" },
 
     continueWorkout = "Training fortsetzen",
+    minimizeWorkout = "Minimieren",
+    openWorkout = "Training öffnen",
+    miniSet = { exercise, number, total -> "$exercise · Satz $number/$total" },
+    runningWorkoutTitle = "Es läuft schon ein Training",
+    toRunningWorkout = "Zum laufenden Training",
+    endRunningWorkout = "Laufendes beenden",
     emptyWorkout = "Leer starten",
     emptyWorkoutHint = "Ohne Übungen. Übungen fügst du unterwegs hinzu.",
     defaultWorkoutName = "Training",
@@ -562,6 +575,12 @@ val English = Strings(
     offlineImagesDone = { done, total -> "$done of $total stored" },
 
     continueWorkout = "Resume workout",
+    minimizeWorkout = "Minimize",
+    openWorkout = "Open workout",
+    miniSet = { exercise, number, total -> "$exercise · set $number/$total" },
+    runningWorkoutTitle = "A workout is already running",
+    toRunningWorkout = "Go to running workout",
+    endRunningWorkout = "End running workout",
     emptyWorkout = "Start empty",
     emptyWorkoutHint = "No exercises yet. Add them as you go.",
     defaultWorkoutName = "Workout",

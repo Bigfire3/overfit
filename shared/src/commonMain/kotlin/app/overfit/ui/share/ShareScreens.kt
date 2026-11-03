@@ -75,6 +75,8 @@ class ShareDependencies(
     val inbox: ImportInbox,
     /** Lives as long as the app: work that must finish even when its screen leaves the composition. */
     val scope: kotlinx.coroutines.CoroutineScope,
+    /** "About me" line (name, age, weight) in the app language for the AI prompt; null when nothing is known. */
+    val aiProfile: () -> String? = { null },
 )
 
 fun ShareFailure.message(t: ShareStrings): String = when (this) {
@@ -87,7 +89,11 @@ fun ShareFailure.message(t: ShareStrings): String = when (this) {
 }
 
 /** Copies the AI prompt (in the app language) for ChatGPT, Claude or Gemini. */
-fun copyAiPrompt(platform: PlatformShare, t: ShareStrings) = platform.copyText(t.aiTemplatePrompt(AiPrompt.EXAMPLE))
+fun copyAiPrompt(share: ShareDependencies, t: ShareStrings) = share.platform.copyText(aiTemplateText(t, share.aiProfile()))
+
+/** The AI template prompt with the profile line on top. */
+fun aiTemplateText(t: ShareStrings, profileHeader: String?): String =
+    app.overfit.domain.withAiProfile(profileHeader, t.aiTemplatePrompt(AiPrompt.EXAMPLE))
 
 // ---------------------------------------------------------------------------------------------
 // Import
@@ -191,7 +197,7 @@ fun ImportScreen(
             }
             ListRow(
                 if (aiCopied) s.aiTemplateCopied else s.aiTemplateCopy,
-                onClick = { copyAiPrompt(share.platform, s); aiCopied = true },
+                onClick = { copyAiPrompt(share, s); aiCopied = true },
             )
             Column(Modifier.padding(vertical = Space.m)) { Text(s.importFileHint, style = Theme.type.caption, tone = Tone.Muted) }
         }
@@ -401,6 +407,6 @@ fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit, showSampl
     val s = LocalStrings.current.share
     var aiCopied by remember { mutableStateOf(false) }
     ListRow(s.importTitle, onClick = onImport)
-    ListRow(if (aiCopied) s.aiTemplateCopied else s.aiTemplateCopy, onClick = { copyAiPrompt(share.platform, s); aiCopied = true })
+    ListRow(if (aiCopied) s.aiTemplateCopied else s.aiTemplateCopy, onClick = { copyAiPrompt(share, s); aiCopied = true })
     if (showSamples) SamplesRow(share)
 }

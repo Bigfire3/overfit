@@ -492,6 +492,15 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - **iOS-CI pausiert:** macOS-Minuten kosten 10x und waren am 3.11. rund 90 % der Actions-Kosten. `ios.yml` läuft nur noch
   per „Run workflow“. Ersatz: Die Android-CI kompiliert `iosMain` (`:shared:compileKotlinIosSimulatorArm64`, Linux).
   Gemergt wird bei grüner Android-CI; die iOS-CI vor einem iOS-Release oder nach größeren iOS-Änderungen von Hand starten.
+
+## Workout minimieren (Session L, 3.11.)
+- **Minimiert = reiner UI-Zustand, kein Controller-Zustand.** `WorkoutRoute` ist ein normales Navigationsziel; „minimiert“ heißt: das Training läuft (`WorkoutController.state.workout != null`), aber `WorkoutRoute` ist nicht oben. Die Leiste (`MiniWorkoutBar`) sitzt im `AppScaffold` über der Tab-Leiste und erscheint damit auf allen Hauptscreens. Der WorkoutController, Pausentimer, Benachrichtigungen und Haptik sind unverändert.
+- Minimieren-Knopf (Pfeil nach unten) und System-Zurück machen dasselbe: `popBackStack` auf den Screen darunter (Standardverhalten der Navigation, kein eigener BackHandler nötig). Beenden/Verwerfen bleiben die bestehenden Doppeltipp-Aktionen im Training.
+- Tipp oder Wischen nach oben auf die Leiste → `NavHostController.openWorkout()`: zurück zum Training, falls auf dem Stack, sonst oben drauf (kein doppelter Eintrag).
+- **Benachrichtigung:** Die Tap-Intents (Pausentimer läuft / Pause vorbei) tragen `EXTRA_OPEN_WORKOUT`; `MainActivity` zählt `AppDependencies.openWorkoutRequests` hoch, die UI öffnet daraufhin das maximierte Training. Nach Prozess-Neustart stellt die bestehende Wiederherstellung das Training ohnehin maximiert wieder her.
+- **Zweites Training:** Läuft eins, zeigt der Start-Tab statt „Training starten“ die Wahl „Zum laufenden Training“ / „Laufendes beenden“ (Bestätigungsmuster, Button wechselt Text). „Beenden“ heißt wie sonst auch: Training abschließen und speichern (Beenden-Flow), nicht verwerfen – umkehrbar und ohne Datenverlust. Danach startet man das neue Training vom Start-Tab.
+
+
 - **Lizenz (Entscheidung Fabian, 3.11.):** Apache-2.0 ersetzt durch „Alle Rechte vorbehalten“. Der Code darf öffentlich
   einsehbar sein (z. B. damit die CI für ein öffentliches Repo kostenlos läuft), aber ohne Erlaubnis nicht kopiert,
   verändert oder weiterverwendet werden. Drittbestandteile behalten ihre Lizenzen (Workout-Guide-Grafiken CC BY-SA 4.0,
@@ -516,3 +525,27 @@ Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templat
 ### Zur Prüfung durch Fabian
 - Auch **Verwerfen** übernimmt die Struktur (ein leer gestartetes, verworfenes Training mit Übungen erscheint als Workout). Begründung: „nichts darf verloren gehen“. Wer das nicht will, löscht das Workout. Alternative: beim Verwerfen nichts übernehmen.
 - Benennt man das Training um (im Training oder beim Beenden), heißt auch das Workout so.
+
+## KI-Kontext, Auswertung je Übung, Gemini (3.11., Session N)
+- **Ein Profil-Block für alle KI-Wege:** `aiProfileFacts` (domain/ModelContext.kt) baut „Name · Alter · Körpergewicht (Stand …)“ und wird überall verwendet: Coach (eigener Key und Fuel, im dynamischen System-Block), „Kontext kopieren“, KI-Vorlage (Teilen/Erstellen), Gem-/GPT-Anleitung (als „Über mich“-Zeile oben) und der Chat-Sync. Fehlende Werte fallen weg, ein unplausibles Alter (außerhalb 13–110) auch. Die Beschriftung folgt der App-Sprache, damit ein eingefügter deutscher Prompt deutsch bleibt. Der Coach-Prompt bleibt englisch. Diese Texte sind KI-Eingaben, keine UI, deshalb stehen sie wie die übrigen Prompt-Regeln im Code und nicht in Strings.kt.
+- **MCP:** Die App lädt die Zeile als `summary` im Profil-Dokument hoch. Das Backend stellt sie als `user` an den Anfang **jeder** Tool-Antwort (bei Foto-Antworten als erste Textzeile). Bei älteren App-Versionen ohne `summary` baut das Backend die Zeile selbst aus Name, Geburtsjahr und Gewicht. Es gibt keine eigene Kontext-Ressource. Die Tool-Antwort ist der Weg, der in Claude, ChatGPT und Gemini sicher ankommt.
+- **Auswertung je Übung ohne Schemaänderung:** Die Zahlen (bester Satz, Sätze, Volumen, e1RM, Wdh., Zeit, Deltas, Einordnung nach Zahlen) rechnet die App beim Anzeigen deterministisch aus der Datenbank (`ExerciseReviews.compare`, „letztes Mal“ = letztes beendetes Training davor mit derselben Übung). Gespeichert wird nur die KI-Antwort (`exercise_reviews` im bestehenden `reviewJson`). Room bleibt deshalb auf dem bisherigen Stand, v6 wird nicht gebraucht.
+- **Einordnung:** Bei Gewichtsübungen entscheidet das e1RM (Epley, 1–12 Wdh.), sonst Wdh. bzw. Sekunden. „Gleich“ heißt bei Gewichtsübungen unter 1 % Unterschied, sonst weniger als 1 Wdh. bzw. 1 s. Ist das Top-Ergebnis gleich, zählen mehr als ±5 % Volumen als besser bzw. schlechter. Die KI startet mit diesem Wert und darf ihn begründet korrigieren. Angezeigt wird die KI-Einordnung, ohne KI die lokale.
+- **Schema:** `exercise_reviews: [{exercise_id, verdict: better|same|worse, comment, next: Satz|null}]` ist im strikten Schema Pflicht. `summary` ist bei Trainings nur noch 1–2 Sätze, positives/improvements/tips höchstens 2 übergreifende Punkte. Alte Auswertungen ohne das Feld zeigen trotzdem die lokalen Zahlen je Übung.
+- **Gemini über den OpenAI-kompatiblen Endpunkt** (`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`, Key als Bearer) statt der nativen API: derselbe Code wie OpenAI/OpenRouter (Bilder als `image_url`-Data-URL, Structured Output über `response_format: json_schema`). Gemini kann laut Doku `anyOf`, `enum`, `additionalProperties` und `["…","null"]`, unser strenges Schema passt also. Fällt Structured Output doch mit 400 aus, wiederholt der Coach die Anfrage wie bei OpenRouter ohne Schema, und der tolerante Parser liest die Antwort. Die Key-Prüfung läuft über `GET …/openai/models`, kostet also keine Tokens. Google meldet einen ungültigen Key mit **400** `API_KEY_INVALID`: Bei der Key-Prüfung zählt 400 als ungültig, beim Coach wird 400 mit API_KEY_INVALID zu AUTH. `max_tokens` liegt bei 16 000, weil Gemini die Denk-Tokens mitzählt.
+- **Standardmodell `gemini-3.6-flash`:** In Googles Modellliste (3.11.) die neueste Flash-Version mit dem Badge „Stable“. `gemini-3.8-flash` steht dort als „New“ ohne GA-Angabe. Das Modell lässt sich in den Coach-Einstellungen ändern.
+
+### Zur Prüfung durch Fabian
+- Standardmodell Gemini: `gemini-3.6-flash` (stabil) oder schon `gemini-3.8-flash`?
+- Gem-/GPT-Anleitung: Die „Über mich“-Zeile steht fest in der Anleitung und veraltet, wenn sich das Gewicht ändert. Aktuell bleibt sie über „Kontext kopieren“.
+
+- **iOS-CI wieder an (3.11., Fabian):** Seit das Repo öffentlich ist, sind auch macOS-Runner kostenlos. `ios.yml` läuft
+  wieder für PRs nach main, Pushes auf main und per Hand; Merge-Bedingung ist wieder Android- und iOS-CI grün.
+  Der zusätzliche iOS-Kompilierschritt in der Android-CI bleibt als schnelle Vorprüfung.
+- **Lizenz MIT (3.11., Fabian):** „Alle Rechte vorbehalten“ wieder aufgehoben. Jeder soll ohne Fabians Erlaubnis mit dem
+  Code arbeiten können, deshalb MIT: kurz, bekannt, erlaubt Nutzung, Änderung und Weitergabe, auch kommerziell.
+  Drittbestandteile behalten ihre Lizenzen (Workout-Guide-Grafiken CC BY-SA 4.0, Inter OFL, Bibliotheken).
+  Beiträge laufen über Fork und Pull Request (`CONTRIBUTING.md`); Fabian bzw. die Koordination entscheidet über den
+  Merge. Direkten Schreibzugriff für Fremde gibt es nicht, weil Workflows sonst an die Signatur-Secrets kämen.
+- **Fremde PRs und Secrets:** GitHub gibt Workflows aus Fork-PRs keine Secrets. Der signierte Release-Job läuft ohnehin
+  nur auf main. Fork-PRs bauen und testen also ohne Schlüssel.

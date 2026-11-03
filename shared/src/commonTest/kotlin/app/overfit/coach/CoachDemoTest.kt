@@ -1,6 +1,7 @@
 package app.overfit.coach
 
 import app.overfit.domain.Language
+import app.overfit.domain.SetValues
 import app.overfit.domain.TrackingType
 import app.overfit.i18n.coachStringsFor
 import app.overfit.workout.entry
@@ -45,5 +46,30 @@ class CoachDemoTest {
     @Test
     fun nullTemplateGivesNoPlan() {
         assertNull(CoachDemo.review("Free", null, t).nextSession)
+    }
+
+    private fun comparison(id: String, type: TrackingType, best: SetValues, verdict: Verdict?): ExerciseComparison {
+        val stats = ExerciseStats("2026-11-03", best, 3, 0.0, null, best.reps, best.durationSec, 1.0)
+        return ExerciseComparison(id, "Ex $id", type, stats, null, verdict)
+    }
+
+    @Test
+    fun comparisonsBecomeExerciseReviewsWithLocalVerdict() {
+        val list = listOf(
+            comparison("a", TrackingType.WEIGHT_REPS, SetValues(80.0, 8, null), Verdict.BETTER),
+            comparison("b", TrackingType.REPS, SetValues(null, 10, null), Verdict.WORSE),
+            comparison("c", TrackingType.TIME, SetValues(null, null, 60), null),
+        )
+        val r = CoachDemo.review("Push", null, t, list).exerciseReviews
+        assertEquals(listOf("a", "b", "c"), r.map { it.exerciseId })
+        assertEquals(listOf(Verdict.BETTER, Verdict.WORSE, Verdict.SAME), r.map { it.verdict })
+        assertEquals(listOf(SuggestedSet(82.5, 8, null), SuggestedSet(null, 10, null), SuggestedSet(null, null, 65)), r.map { it.next })
+        assertEquals(t.demoExerciseComment(Verdict.BETTER), r[0].comment)
+        assertEquals(t.demoExerciseComment(null), r[2].comment)
+    }
+
+    @Test
+    fun noComparisonsMeansNoExerciseReviews() {
+        assertEquals(emptyList(), CoachDemo.review("Push", null, t).exerciseReviews)
     }
 }

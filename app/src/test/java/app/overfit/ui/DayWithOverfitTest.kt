@@ -236,6 +236,18 @@ class DayWithOverfitTest {
         val workoutId = deps.workout.state.value.workout!!.id
         val setsBefore = deps.workout.state.value.workout!!.completedSets
 
+        // --- Minimize: browse the app while the workout keeps running, reopen from the bar -------
+        compose.onNodeWithContentDescription("Minimieren").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        assertNotNull(deps.workout.state.value.workout)
+        tab("Verlauf")
+        tab("Übungen")
+        compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        tab("Start")
+        compose.onNode(hasContentDescription("Training öffnen", substring = true)).performClick()
+        waitFor("Nächsten Satz loggen")
+        assertEquals(workoutId, deps.workout.state.value.workout!!.id)
+
         // --- App restart in the middle: the workout continues ------------------------------
         compose.waitUntil(10_000) { runBlocking { data.workouts.status(workoutId) } == SessionStatus.ACTIVE }
         process++

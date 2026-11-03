@@ -37,6 +37,7 @@ data class SessionRecord(
 data class CoachReview(
     /** 1–10. */
     val rating: Int?,
+    /** Short overall verdict; the details are in [exerciseReviews]. */
     val summary: String,
     val positives: List<String>,
     val improvements: List<String>,
@@ -45,6 +46,8 @@ data class CoachReview(
     val nextSession: PlanSuggestion?,
     /** Complete new version of the coach memory; null/blank = unchanged. */
     val memory: String?,
+    /** Verdict, comment and target for next time per exercise (SESSION; empty in older reviews). */
+    val exerciseReviews: List<ExerciseFeedback> = emptyList(),
 )
 
 /** Suggested plan for the next session of the template: the complete exercise list in order. */

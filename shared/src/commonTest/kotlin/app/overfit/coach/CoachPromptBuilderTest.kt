@@ -158,4 +158,22 @@ class CoachPromptBuilderTest {
         assertEquals("20kg×45s", f(planned(20.0, null, 45), TrackingType.WEIGHT_TIME))
         assertEquals("? reps", f(planned(), TrackingType.REPS))
     }
+
+    @Test
+    fun comparisonsAppearAsPerExerciseSection() {
+        val stats = ExerciseStats("2026-10-15", SetValues(80.0, 8, null), 2, 1200.0, 101.3, 8, null, 101.3)
+        val c = ExerciseComparison("wg:bench", "Bench Press", TrackingType.WEIGHT_REPS, stats, stats.copy(date = "2026-10-08"), Verdict.SAME)
+        val u = CoachPromptBuilder.build(ctx().copy(comparisons = listOf(c))).user
+        assertTrue(u.contains("## Per exercise"), u)
+        assertTrue(u.contains("Bench Press [wg:bench]: today best 80kg×8"), u)
+        assertTrue(u.contains("last 2026-10-08"), u)
+        assertTrue(u.contains("by the numbers: same"), u)
+        assertFalse(CoachPromptBuilder.build(ctx()).user.contains("Per exercise"))
+    }
+
+    @Test
+    fun outputRulesMentionExerciseReviews() {
+        assertTrue(CoachPromptBuilder.OUTPUT_RULES.contains("exercise_reviews"))
+        assertTrue(CoachPromptBuilder.build(ctx()).staticSystem.contains("exercise_reviews"))
+    }
 }

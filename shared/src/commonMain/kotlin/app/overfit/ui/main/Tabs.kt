@@ -2,9 +2,18 @@ package app.overfit.ui.main
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextAlign
+import app.overfit.ui.components.TextButton
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -49,6 +58,7 @@ fun StartScreen(
     today: LocalDate,
     running: Workout?,
     onOpenRunning: () -> Unit,
+    onEndRunning: () -> Unit,
     onNew: () -> Unit,
     onOpenWorkout: (Long) -> Unit,
     share: ShareDependencies,
@@ -63,7 +73,7 @@ fun StartScreen(
     Screen(
         scroll = true,
         footer = if (running != null) {
-            { PrimaryButton(t.continueWorkout, onClick = onOpenRunning) }
+            { RunningWorkoutChoice(onOpenRunning, onEndRunning) }
         } else {
             null
         },
@@ -125,4 +135,23 @@ fun lastDoneText(t: Strings, lastStartedAt: Long?, today: LocalDate): String {
     if (lastStartedAt == null) return t.neverDone
     val date = Instant.fromEpochMilliseconds(lastStartedAt).toLocalDateTime(TimeZone.currentSystemDefault()).date
     return t.lastDone(date.daysUntil(today).coerceAtLeast(0))
+}
+
+/**
+ * A workout is running: only "go to it" or "end it" (end = finish and save, confirm pattern),
+ * never a second one in parallel. Used on the Training tab, "+" and the workout page.
+ */
+@Composable
+fun ColumnScope.RunningWorkoutChoice(onOpenRunning: () -> Unit, onEndRunning: () -> Unit) {
+    val t = LocalStrings.current
+    var confirmEnd by remember { mutableStateOf(false) }
+    LaunchedEffect(confirmEnd) { if (confirmEnd) { delay(4000); confirmEnd = false } }
+    Text(t.runningWorkoutTitle, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
+    PrimaryButton(t.toRunningWorkout, onClick = onOpenRunning)
+    TextButton(
+        if (confirmEnd) t.finishConfirm else t.endRunningWorkout,
+        { if (confirmEnd) { confirmEnd = false; onEndRunning() } else confirmEnd = true },
+        Modifier.align(Alignment.CenterHorizontally),
+        tone = if (confirmEnd) Tone.Default else Tone.Muted,
+    )
 }

@@ -16,6 +16,7 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
+import app.overfit.ui.main.RunningWorkoutChoice
 import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.share.TemplateImportRows
 import app.overfit.ui.theme.Space
@@ -33,9 +34,19 @@ fun NewWorkoutScreen(
     onCreate: () -> Unit,
     onStartEmpty: () -> Unit,
     onImport: () -> Unit,
+    onOpenRunning: () -> Unit = {},
+    onEndRunning: () -> Unit = {},
 ) {
     val t = LocalStrings.current
-    Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
+    Screen(
+        scroll = true,
+        header = { BackHeader(t.back, onBack) },
+        footer = if (workoutRunning) {
+            { RunningWorkoutChoice(onOpenRunning, onEndRunning) }
+        } else {
+            null
+        },
+    ) {
         Title(t.newWorkout)
         Column(Modifier.padding(top = Space.l)) {
             Hairline()

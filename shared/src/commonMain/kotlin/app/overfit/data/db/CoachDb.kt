@@ -137,6 +137,15 @@ interface CoachDao {
     @Query("SELECT * FROM workout_session WHERE status = 'FINISHED' AND startedAt >= :since ORDER BY startedAt DESC LIMIT :limit")
     suspend fun finishedSince(since: Long, limit: Int): List<SessionWithExercises>
 
+    /** The last finished session before [before] that contains [exerciseId] (per-exercise review, "last time"). */
+    @Transaction
+    @Query(
+        """SELECT * FROM workout_session WHERE status = 'FINISHED' AND id != :excludeId AND startedAt < :before
+           AND id IN (SELECT sessionId FROM session_exercise WHERE exerciseId = :exerciseId)
+           ORDER BY startedAt DESC LIMIT 1""",
+    )
+    suspend fun lastFinishedWith(exerciseId: String, before: Long, excludeId: String): SessionWithExercises?
+
     @Query("SELECT * FROM workout_session WHERE status = 'FINISHED' ORDER BY startedAt DESC LIMIT 1")
     fun observeLatestFinished(): Flow<WorkoutSessionEntity?>
 

@@ -7,6 +7,7 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ProvidersTest {
     private fun providers(status: HttpStatusCode, seen: MutableList<io.ktor.client.request.HttpRequestData>? = null) =
@@ -41,5 +42,26 @@ class ProvidersTest {
         val seen = mutableListOf<io.ktor.client.request.HttpRequestData>()
         providers(HttpStatusCode.OK, seen).get(ProviderId.OPENROUTER).validateKey("sk-or-x")
         assertEquals("Bearer sk-or-x", seen.single().headers["Authorization"])
+    }
+
+    @Test
+    fun geminiIsListedAndMapsStatusCodes() = runTest {
+        assertTrue(ProviderId.GEMINI in providers(HttpStatusCode.OK).all.map { it.id })
+        assertEquals(KeyValidation.OK, providers(HttpStatusCode.OK).get(ProviderId.GEMINI).validateKey("k"))
+        // Google answers an invalid key with 400 API_KEY_INVALID.
+        assertEquals(KeyValidation.INVALID, providers(HttpStatusCode.BadRequest).get(ProviderId.GEMINI).validateKey("k"))
+        assertEquals(KeyValidation.INVALID, providers(HttpStatusCode.Unauthorized).get(ProviderId.GEMINI).validateKey("k"))
+        assertEquals(KeyValidation.NETWORK, providers(HttpStatusCode.InternalServerError).get(ProviderId.GEMINI).validateKey("k"))
+        // 400 stays a network/other problem for the other providers
+        assertEquals(KeyValidation.NETWORK, providers(HttpStatusCode.BadRequest).get(ProviderId.OPENAI).validateKey("k"))
+    }
+
+    @Test
+    fun geminiRequestGoesToOpenAiCompatibleModelsWithBearer() = runTest {
+        val seen = mutableListOf<io.ktor.client.request.HttpRequestData>()
+        providers(HttpStatusCode.OK, seen).get(ProviderId.GEMINI).validateKey("AIza-x")
+        val request = seen.single()
+        assertEquals("https://generativelanguage.googleapis.com/v1beta/openai/models", request.url.toString())
+        assertEquals("Bearer AIza-x", request.headers["Authorization"])
     }
 }

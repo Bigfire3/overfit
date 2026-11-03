@@ -56,6 +56,21 @@ class CoachStrings(
     val improvements: String,
     val tips: String,
     val photoFeedback: String,
+    // Per exercise
+    val perExercise: String,
+    val verdictBetter: String,
+    val verdictSame: String,
+    val verdictWorse: String,
+    val verdictFirst: String,
+    val todayLabel: String,
+    val lastTimeLabel: (date: String) -> String,
+    val setsCount: (Int) -> String,
+    val volumeLabel: String,
+    val deltaE1rm: (signed: String) -> String,
+    val deltaVolume: (signed: String) -> String,
+    val deltaReps: (signed: String) -> String,
+    val deltaSeconds: (signed: String) -> String,
+    val nextTimeLine: (String) -> String,
     val nextSession: String,
     val planNoChanges: String,
     val planAcceptAll: String,
@@ -109,6 +124,8 @@ class CoachStrings(
     val demoImprovements: List<String>,
     val demoTips: List<String>,
     val demoReason: String,
+    /** Demo comment per exercise (null = first time). */
+    val demoExerciseComment: (app.overfit.coach.Verdict?) -> String,
     val demoMemory: String,
 )
 
@@ -158,6 +175,20 @@ val GermanCoach = CoachStrings(
     improvements = "Besser machen",
     tips = "Tipps",
     photoFeedback = "Foto",
+    perExercise = "Je Übung",
+    verdictBetter = "Besser",
+    verdictSame = "Gleich",
+    verdictWorse = "Schlechter",
+    verdictFirst = "Erstes Mal",
+    todayLabel = "Heute",
+    lastTimeLabel = { "Letztes Mal ($it)" },
+    setsCount = { if (it == 1) "1 Satz" else "$it Sätze" },
+    volumeLabel = "Volumen",
+    deltaE1rm = { "$it e1RM" },
+    deltaVolume = { "$it Volumen" },
+    deltaReps = { "$it Wdh." },
+    deltaSeconds = { "$it s" },
+    nextTimeLine = { "Nächstes Mal: $it" },
     nextSession = "Nächstes Mal",
     planNoChanges = "Keine Änderungen am Plan.",
     planAcceptAll = "Alle annehmen",
@@ -213,6 +244,14 @@ Regeln:
     demoImprovements = listOf("Letzter Satz der ersten Übung fiel ab: Gewicht dort halten"),
     demoTips = listOf("Vor schweren Sätzen 1–2 Aufwärmsätze mit 50–70 %", "Notiere dir, wie sich der letzte Satz angefühlt hat"),
     demoReason = "Alle Sätze geschafft – kleine Steigerung.",
+    demoExerciseComment = {
+        when (it) {
+            app.overfit.coach.Verdict.BETTER -> "Stärker als letztes Mal – genau so weiter."
+            app.overfit.coach.Verdict.SAME -> "Auf dem Niveau vom letzten Mal; nächstes Mal ein kleiner Schritt mehr."
+            app.overfit.coach.Verdict.WORSE -> "Etwas schwächer als letztes Mal – Schlaf und Pausen prüfen, Gewicht halten."
+            null -> "Erstes Mal erfasst – das ist ab jetzt dein Vergleichswert."
+        }
+    },
     demoMemory = "",
 )
 
@@ -262,6 +301,20 @@ val EnglishCoach = CoachStrings(
     improvements = "To improve",
     tips = "Tips",
     photoFeedback = "Photo",
+    perExercise = "Per exercise",
+    verdictBetter = "Better",
+    verdictSame = "Same",
+    verdictWorse = "Worse",
+    verdictFirst = "First time",
+    todayLabel = "Today",
+    lastTimeLabel = { "Last time ($it)" },
+    setsCount = { if (it == 1) "1 set" else "$it sets" },
+    volumeLabel = "Volume",
+    deltaE1rm = { "$it e1RM" },
+    deltaVolume = { "$it volume" },
+    deltaReps = { "$it reps" },
+    deltaSeconds = { "$it s" },
+    nextTimeLine = { "Next time: $it" },
     nextSession = "Next time",
     planNoChanges = "No changes to the plan.",
     planAcceptAll = "Accept all",
@@ -317,6 +370,14 @@ Rules:
     demoImprovements = listOf("The last set of the first exercise dropped off: keep the weight there"),
     demoTips = listOf("Do 1–2 warm-up sets at 50–70 % before heavy sets", "Note how the last set felt"),
     demoReason = "All sets done – small step up.",
+    demoExerciseComment = {
+        when (it) {
+            app.overfit.coach.Verdict.BETTER -> "Stronger than last time – keep it up."
+            app.overfit.coach.Verdict.SAME -> "Same level as last time; take a small step up next time."
+            app.overfit.coach.Verdict.WORSE -> "A bit weaker than last time – check sleep and rest, keep the weight."
+            null -> "First time logged – this is your baseline from now on."
+        }
+    },
     demoMemory = "",
 )
 
