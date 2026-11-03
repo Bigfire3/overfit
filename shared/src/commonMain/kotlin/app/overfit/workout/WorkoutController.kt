@@ -61,6 +61,8 @@ class WorkoutController(
         val workout: Workout? = null,
         /** "Last time" per exercise ID: completed sets of the last finished workout with it. */
         val lastTime: Map<String, List<SetValues>> = emptyMap(),
+        /** The workout that was just finished (opens the finish flow); null after a discard. */
+        val finishedId: String? = null,
     )
 
     private val _state = MutableStateFlow(State())
@@ -133,6 +135,7 @@ class WorkoutController(
     }
 
     private fun begin(w: Workout) {
+        _state.value = _state.value.copy(finishedId = null)
         alerts.requestPermission()
         set(w)
     }
@@ -141,16 +144,26 @@ class WorkoutController(
     suspend fun finish() {
         val w = workout ?: return
         val endedAt = clock()
-        clear()
         // Runs in the controller's scope: the caller's screen closes as soon as the workout is
         // gone from the state, which must not cancel the write.
-        scope.launch {
+        val job = scope.launch {
             writeLock.withLock {
                 pendingSave = null
                 store.finish(w.copy(rest = null), endedAt)
             }
-        }.join()
+        }
+        finishJob = job
+        clear(finishedId = w.id)
+        job.join()
     }
+
+    private var finishJob: Job? = null
+
+    /** Waits until the last finished workout is stored (the finish flow reads it right after). */
+    suspend fun awaitFinished() { finishJob?.join() }
+
+    /** The finish flow was opened; a later return to the workout screen should not open it again. */
+    fun consumeFinished() { _state.value = _state.value.copy(finishedId = null) }
 
     /** Throws the running workout away. */
     suspend fun discard() {
@@ -164,12 +177,12 @@ class WorkoutController(
         }.join()
     }
 
-    private fun clear() {
+    private fun clear(finishedId: String? = null) {
         restJob?.cancel()
         restJob = null
         alerts.cancel()
         // "Last time" changes with this workout; reload it for the next one.
-        _state.value = State(loaded = true)
+        _state.value = State(loaded = true, finishedId = finishedId)
     }
 
     // --- Changes -------------------------------------------------------------------------------

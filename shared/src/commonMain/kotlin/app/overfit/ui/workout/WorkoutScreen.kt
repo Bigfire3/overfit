@@ -85,11 +85,22 @@ fun WorkoutScreen(
     onAddExercises: () -> Unit,
     onReplaceExercise: (entryId: String) -> Unit,
     onClosed: () -> Unit,
+    /** After "Finish": opens the finish flow (summary, feeling, note, photos) for this workout. */
+    onFinished: (workoutId: String) -> Unit = { onClosed() },
 ) {
     val t = LocalStrings.current
     val state by controller.state.collectAsStateWithLifecycle()
     val workout = state.workout
-    LaunchedEffect(state.loaded, workout == null) { if (state.loaded && workout == null) onClosed() }
+    LaunchedEffect(state.loaded, workout == null) {
+        if (!state.loaded || workout != null) return@LaunchedEffect
+        val finished = state.finishedId
+        if (finished != null) {
+            controller.consumeFinished()
+            onFinished(finished)
+        } else {
+            onClosed()
+        }
+    }
     if (workout == null) return
 
     val scope = rememberCoroutineScope()
