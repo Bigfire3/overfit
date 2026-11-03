@@ -10,9 +10,30 @@
 | 4 | KI-Coach | offen |
 | 5 | Feinschliff | offen |
 | 6 | Store-Release (App Store, Play Store) | offen |
-| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
-| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
+| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
+
+## Nacht 3.11. – Fuel & Spot in der App (Session D)
+Fertig:
+- Geräte-Identität (Keystore / Secure Enclave), signierte Anfragen nach `docs/backend-api.md`, `FuelApi` (Ktor) mit Re-Registrierung und Zeitkorrektur, Fehlercodes
+- Profil → **Fuel**: Saldo („Fuel · 4,20 €“), verfallendes Guthaben, Pakete 5/10 € („Bald im Store“), Buchungen, Wiederherstellungscode (erzeugen, kopieren, auf neuem Handy eingeben)
+- **Spot**: „Freund spotten“ (Name, QR mit rotierendem Token, Haarlinien-Fortschritt), „Ich wurde gespottet“ (Android: QR scannen oder Link einfügen; iOS: Kamera-App öffnet den Link), Reveal mit Haptik
+- **Demo** (ohne Server): Profil → Fuel → „Demo ansehen“; Backend-URL per CI-Variable `OVERFIT_BACKEND_URL`, versteckter Override (7× Version in „Über“)
+- Fuel als Option im KI-Zugang (`FuelProvider`); Tests: SHA/Signatur/Testvektor, Beträge, Reveal, Fuel-Client (MockEngine), QR, UI-Durchlauf Demo
+
+### Von Fabian zu tun (Fuel/Spot)
+1. Backend deployen (siehe oben), dann GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL anlegen. Ohne sie zeigt die App „startet bald“ + Demo.
+2. Play-/Apple-Konten für echte Käufe (Play Billing / StoreKit) und Geräteprüfung (Play Integrity Cloud-Projekt, App Attest); Server-Prüfer ergänzen (Tokenformat siehe DECISIONS).
+3. Optional: Web-Seite für Spot-Links ohne installierte App (QR enthält `overfit://spot#…`).
+
+### Bitte auf dem Handy testen (Fuel/Spot)
+1. Profil → „Fuel · startet bald“ öffnen → Text „Fuel startet bald“ → **Demo ansehen**
+2. Demo: „Fuel · 4,20 €“, Pakete mit „Bald im Store“, Buchungen (Verbrauch, Aufladung, Spot), Wiederherstellungscode erzeugen + kopieren
+3. **Freund spotten:** QR erscheint, Haarlinie läuft ab, alle ~30 s neuer Code; Namen eintragen
+4. **Ich wurde gespottet:** beliebigen Link/Code einfügen → Einlösen → Bildschirm schwarz, zwei Herzschlag-Pulse, Zahl zählt 0,00 → 1,00 €, „Spot von Fabian“, kräftiger Puls; Tippen schließt
+5. „Demo beenden“ → Fuel zeigt wieder „startet bald“. Version in „Über“ 7× tippen → Abschnitt „Entwickler“ mit Backend-URL
+6. Profil → KI verbinden: erste Zeile „Fuel“ wählbar
 
 ## Phase 8: Vorlagen teilen und importieren (Session B)
 - Format `docs/share-format.md`: JSON → Raw Deflate → Base64url im Fragment (`https://bigfire3.github.io/overfit/t#…`,
@@ -35,8 +56,6 @@
    https-Links ohne App im Leeren. Die App öffnet unabhängig davon `overfit://`-Links und `.overfit`-Dateien.
 2. iOS Universal Links (https-Link öffnet direkt die App) brauchen eine Domain, die dir gehört, plus Associated Domains
    und `apple-app-site-association`. Später mit eigener Domain; bis dahin: `overfit://`-Link und Web-Seite mit Knopf.
-| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
-| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
 
 ## Nacht 3.11. – Backend Fuel/Spot + Web-Fallback (Session C)
 Fertig (kein App-Code angefasst):

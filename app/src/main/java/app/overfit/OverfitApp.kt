@@ -9,6 +9,6 @@ import app.overfit.ui.AppDependencies
  */
 class OverfitApp : Application() {
     val dependencies: AppDependencies by lazy {
-        androidDependencies(this, "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+        androidDependencies(this, "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", BuildConfig.OVERFIT_BACKEND_URL)
     }
 }
