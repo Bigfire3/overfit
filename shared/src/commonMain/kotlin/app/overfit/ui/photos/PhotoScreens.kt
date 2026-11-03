@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -138,6 +139,7 @@ fun PhotosScreen(
         }
         if (loaded) {
             DiaryStats(historyList.size, photoList.size, streak)
+            if (days.values.any { it.sauna }) DiaryLegend()
             Spacer(Modifier.height(Space.s))
             WeekdayRow(weekStart)
             Hairline()
@@ -173,6 +175,30 @@ private fun DiaryStats(workouts: Int, photos: Int, streakWeeks: Int) {
         if (streakWeeks > 0) Text(p.statStreak(streakWeeks), style = Theme.type.label, tone = Tone.Muted)
     }
 }
+
+/** Filled dot = workout, ring = sauna. Only shown once a sauna day exists. */
+@Composable
+private fun DiaryLegend() {
+    val p = LocalStrings.current.photos
+    Row(Modifier.fillMaxWidth().padding(bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).background(Theme.colors.foreground, CircleShape))
+        Spacer(Modifier.width(Space.xs))
+        Text(p.legendWorkout, style = Theme.type.caption, tone = Tone.Muted)
+        Spacer(Modifier.width(Space.m))
+        SaunaRing(8.dp, 1.5.dp)
+        Spacer(Modifier.width(Space.xs))
+        Text(p.legendSauna, style = Theme.type.caption, tone = Tone.Muted)
+    }
+}
+
+/** Sauna marker: a hollow ring (the workout is the filled dot). [fill] keeps it readable on a photo. */
+@Composable
+private fun SaunaRing(size: androidx.compose.ui.unit.Dp, stroke: androidx.compose.ui.unit.Dp, color: Color = Theme.colors.foreground, fill: Color = Color.Transparent) {
+    Box(Modifier.testTag(SAUNA_MARKER_TAG).size(size).background(fill, CircleShape).border(stroke, color, CircleShape))
+}
+
+/** Test tag of the sauna ring in a calendar day. */
+const val SAUNA_MARKER_TAG = "diary-sauna"
 
 @Composable
 private fun WeekdayRow(weekStart: kotlinx.datetime.DayOfWeek) {
@@ -231,7 +257,8 @@ private fun DayCell(
     val p = LocalStrings.current.photos
     val photo = day?.photos?.lastOrNull()
     val training = day != null && day.workouts.isNotEmpty()
-    val desc = p.dayDescription(date.dayOfMonth, day?.photos?.size ?: 0, training)
+    val sauna = day != null && day.sauna
+    val desc = p.dayDescription(date.dayOfMonth, day?.photos?.size ?: 0, training, sauna)
     val shape = RoundedCornerShape(8.dp)
     val picked = photo != null && photo.photo.id in selected
     Column(
@@ -260,14 +287,22 @@ private fun DayCell(
                 ) { Text(p.photoCount(n), style = Theme.type.caption, tone = Tone.Inverse) }
                 if (selecting && picked) Box(Modifier.fillMaxSize().border(2.dp, Theme.colors.foreground, shape))
                 // Photo and workout on the same day: the photo wins, a small dot keeps the workout visible.
-                if (training) Box(
-                    Modifier.align(Alignment.TopStart).padding(4.dp).size(10.dp)
-                        .background(Theme.colors.inverseBackground, CircleShape),
-                )
+                if (training) Row(Modifier.align(Alignment.TopStart).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Box(Modifier.size(10.dp).background(Theme.colors.inverseBackground, CircleShape))
+                    // Sauna: hollow ring next to the dot, filled with the page colour so it stays visible on the photo.
+                    if (sauna) SaunaRing(10.dp, 2.dp, Theme.colors.inverseBackground, Theme.colors.background)
+                }
             }
             // Workout without a photo: a clearly filled dot in the middle of the tile.
+            // Sauna afterwards: a hollow ring below the dot.
             training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(18.dp).background(Theme.colors.foreground, CircleShape))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(18.dp).background(Theme.colors.foreground, CircleShape))
+                    if (sauna) {
+                        Spacer(Modifier.height(4.dp))
+                        SaunaRing(14.dp, 2.dp)
+                    }
+                }
             }
             else -> Spacer(Modifier.weight(1f))
         }

@@ -78,6 +78,7 @@ object ChatDocs {
             put("endedAt", r.endedAt?.let { JsonPrimitive(it) } ?: JsonNull)
             w.note?.takeIf { it.isNotBlank() }?.let { put("note", it) }
             r.feeling?.let { put("feeling", it) }
+            if (r.sauna) put("sauna", true)
             put("exercises", buildJsonArray { w.exercises.forEach { add(workoutExercise(it)) } })
         })
     }

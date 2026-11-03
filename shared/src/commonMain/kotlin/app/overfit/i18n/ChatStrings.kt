@@ -104,6 +104,8 @@ class ChatStrings(
     val ctxSets: (Int) -> String,
     val ctxNoWorkouts: String,
     val ctxFeeling: (Int) -> String,
+    /** Marker in the workout line of the context: sauna right after the workout. */
+    val ctxSauna: String,
     val ctxTask: (example: String) -> String,
     val gemInstructions: (example: String) -> String,
 
@@ -241,6 +243,7 @@ val ChatGerman = ChatStrings(
     ctxSets = { if (it == 1) "1 Satz" else "$it Sätze" },
     ctxNoWorkouts = "Noch keine abgeschlossenen Trainings.",
     ctxFeeling = { "Gefühl $it/5" },
+    ctxSauna = "danach Sauna",
     ctxTask = { example ->
         """Antworte auf Deutsch. Wenn du mir ein neues Workout vorschlägst, gib es als genau einen ```json-Block im Overfit-Format aus, damit ich es in der App importieren kann:
 
@@ -392,6 +395,7 @@ val ChatEnglish = ChatStrings(
     ctxSets = { if (it == 1) "1 set" else "$it sets" },
     ctxNoWorkouts = "No finished workouts yet.",
     ctxFeeling = { "Feeling $it/5" },
+    ctxSauna = "sauna afterwards",
     ctxTask = { example ->
         """Answer in English. If you suggest a new workout, output it as exactly one ```json block in the Overfit format so I can import it in the app:
 

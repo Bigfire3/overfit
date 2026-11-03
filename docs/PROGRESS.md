@@ -15,13 +15,13 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
-## Hotfix: kaputte Übungsbilder (Session AK, 3.11.)
+## Hotfix: kaputte Übungsbilder (Hotfix-Session Bilder, 3.11.)
 **Erledigt:** Seit 0.1.257 waren fast alle Workout-Guide-Bilder (Standbilder und Animation) verzerrt. Ursache: Das Runden der
 Pfaddaten im Import hat kompakte Zahlen wie `8.002.392` zu `8.4` verschmolzen. Import jetzt mit echtem Pfad-Parser, 2 Nachkommastellen,
 Rückprüfung jeder Datei; alle 906 Frames neu erzeugt. Regressionstest `ExerciseSvgIntegrityTest` (parst alle Dateien, prüft viewBox,
 rendert 15 Frames und vergleicht mit den Originalen). Details in DECISIONS.md.
 
-### Bitte auf dem Handy testen (Session AK)
+### Bitte auf dem Handy testen (Hotfix Bilder)
 1. Tab „Übungen“: Die Strichgrafiken sind wieder vollständige Figuren (keine Flecken, Dreiecke oder fehlenden Bilder), auch im Picker,
    im Workout-Editor und im laufenden Training.
 2. Übung antippen (z. B. Klimmzug, Ab Wheel): Das große Bild bewegt sich ruhig 1→2→3→2→1, jeder Frame ist eine saubere Figur.
@@ -939,3 +939,15 @@ Offen / Hinweise:
 3. „Einladung einlösen“ → Einlösen: schwarz, zwei Pulse, Zahl zählt 0,00 → 1,00 €, darunter „Einladung von Fabian“, kräftiger Puls
 4. Guthaben → Buchungen: Eintrag „Einladungsbonus“; beim Einladenden „Einladungsbonus (Freund eingeladen)“ nach der ersten Auswertung des Freundes
 5. Ein alter Link `overfit://spot#…` (aus der Zwischenablage eingefügt) funktioniert weiter; nirgends steht mehr „Spot“
+
+## Session AK – Sauna-Häkchen nach dem Training (3.11.)
+- Erledigt: Häkchen „Sauna“ im Abschluss-Screen (Standard aus) und nachträglich in der Trainingsdetail-Ansicht; DB v8 mit Migration und Test; Kalender zeigt Sauna-Tage mit hohlem Ring (Legende, sobald es einen gibt); Coach-Auswertung, KI-Chat-Kontext und KI-Chat-Sync (Backend `list_workouts`) bekommen die Sauna; Backup führt das Feld mit (alte Backups = keine Sauna). Details in docs/DECISIONS.md.
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Sauna)
+1. Training beenden → im Abschluss-Screen unter „Gefühl“ steht „Sauna“ mit leerem Kästchen; antippen → schwarz gefülltes Kästchen mit Haken → „Speichern“
+2. Tab „Fotos“: Am Tag des Trainings unter dem Punkt ein hohler Ring, oben „● Training ○ Sauna“ als Legende; an einem Tag mit Foto sitzt der Ring neben dem kleinen Punkt oben links
+3. Verlauf → das Training öffnen → „Sauna“ ist angehakt; abhaken → zurück zum Kalender: der Ring ist weg (und die Legende, falls es der einzige Sauna-Tag war)
+4. Coach-Auswertung für ein Training mit Sauna starten (oder KI-Chat fragen „Wann war ich zuletzt in der Sauna?“) → der Coach kennt die Sauna
+5. „Kontext kopieren“ (Coach-Tab bzw. KI-Chat-Einstellungen) → in einen Editor einfügen: Zeile des Trainings endet mit „· danach Sauna“
+6. Backup exportieren und wieder einspielen → Sauna-Häkchen bleiben erhalten

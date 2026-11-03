@@ -16,7 +16,7 @@ function req(path: string, e: Env, init?: RequestInit) {
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1, 17, 0); // 1.9.2026
 
-function workout(id: string, dayOffset: number, benchKg: number, opts: { running?: boolean; templateId?: string } = {}) {
+function workout(id: string, dayOffset: number, benchKg: number, opts: { running?: boolean; templateId?: string; sauna?: boolean } = {}) {
   const startedAt = T0 + dayOffset * DAY;
   return {
     kind: 'workout',
@@ -28,6 +28,7 @@ function workout(id: string, dayOffset: number, benchKg: number, opts: { running
       startedAt,
       endedAt: opts.running ? null : startedAt + 3_600_000,
       feeling: 4,
+      ...(opts.sauna ? { sauna: true } : {}),
       note: 'Geheime Notiz',
       exercises: [
         {
@@ -62,7 +63,7 @@ async function setup(opts: { photos?: boolean } = {}) {
         data: { name: 'Push', exercises: [{ exerciseId: 'wg:bench-press', name: 'Bench Press', trackingType: 'WEIGHT_REPS', restSec: 150, sets: [{ kg: 80, reps: 5 }] }] },
       },
       workout('w1', 0, 80),
-      workout('w2', 3, 82.5),
+      workout('w2', 3, 82.5, { sauna: true }),
       workout('w3', 7, 85, { running: true }),
     ],
   });
@@ -363,6 +364,9 @@ describe('KI-Chat: MCP-Server', () => {
     const list = (await tool(e, t, 'list_workouts', { limit: 10 })).structuredContent;
     expect(list.workouts.map((w: any) => w.workoutId)).toEqual(['w3', 'w2', 'w1']);
     expect(list.workouts[1]).toMatchObject({ setsDone: 4, setsPlanned: 4, volumeKg: 82.5 * 14, durationMin: 60, start: '2026-09-04 19:00' });
+    // Sauna after the workout: true when the app sent it, false when the field is missing.
+    expect(list.workouts[1].sauna).toBe(true);
+    expect(list.workouts[2].sauna).toBe(false);
     const ranged = (await tool(e, t, 'list_workouts', { from: '2026-09-02', to: '2026-09-05' })).structuredContent;
     expect(ranged.workouts.map((w: any) => w.workoutId)).toEqual(['w2']);
     const cur = (await tool(e, t, 'get_current_workout')).structuredContent;

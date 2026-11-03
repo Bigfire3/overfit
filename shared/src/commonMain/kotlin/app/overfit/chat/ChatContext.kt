@@ -98,6 +98,7 @@ object ChatContext {
             add(w.name)
             r.endedAt?.let { add("${((it - w.startedAt) / 60_000).coerceAtLeast(0)} min") }
             r.feeling?.let { add(t.ctxFeeling(it)) }
+            if (r.sauna) add(t.ctxSauna)
         }.joinToString(" · ")
         val sb = StringBuilder("- $title\n")
         for (e in w.exercises) {

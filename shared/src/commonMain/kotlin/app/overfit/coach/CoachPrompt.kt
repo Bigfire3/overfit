@@ -82,6 +82,7 @@ object CoachPromptBuilder {
             appendLine(ctx.instructions.trim())
             appendLine()
             appendLine(OUTPUT_RULES)
+            appendLine(SAUNA_NOTE)
             appendLine("Example of the shape: ${CoachSchema.example}")
             appendLine()
             appendLine("Exercise IDs you may use in next_session (id | name):")
@@ -162,6 +163,7 @@ object CoachPromptBuilder {
             "\"${s.name}\" ${start.date} ${pad(start.hour)}:${pad(start.minute)}",
             s.durationMin?.let { "$it min" },
             s.feeling?.let { "feeling $it/5" },
+            "sauna: yes".takeIf { s.sauna },
         )
         appendLine(head.joinToString(", "))
         s.note?.takeIf { it.isNotBlank() }?.let { appendLine("Note: ${it.trim()}") }
@@ -259,6 +261,10 @@ object CoachPromptBuilder {
 
     private const val MAX_EXERCISES = 8
     private const val MAX_POINTS = 8
+
+    /** Explains the "sauna: yes" marker in workout headers (static, so the cache prefix stays stable). */
+    const val SAUNA_NOTE = "A workout line ending in \"sauna: yes\" means the user went to the sauna right after that workout. " +
+        "Take it into account for recovery and hydration; it is not training volume."
 
     const val OUTPUT_RULES = """Answer with exactly one JSON object and nothing else (no Markdown, no text around it). Fields:
 - rating: integer 1–10 for the workout (for a progress review: for the progress).
