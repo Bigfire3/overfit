@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -24,6 +25,11 @@ import androidx.compose.ui.test.printToString
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.ai.Providers
+import app.overfit.ai.ProviderId
+import app.overfit.coach.CoachErrorKind
+import app.overfit.coach.CoachException
+import app.overfit.coach.CoachReply
+import app.overfit.coach.FakeCoachTransport
 import app.overfit.data.AppData
 import app.overfit.data.AppStore
 import app.overfit.data.DeviceDefaults
@@ -80,12 +86,19 @@ class DayWithOverfitTest {
     private val haptics = RecordingHaptics()
     private val alerts = RecordingRestAlerts()
     private val providers = Providers(HttpClient(MockEngine { respond("{}") }))
+    // Coach: offline first (the request waits in the queue), online after the "app restart".
+    private var online = false
+    private val coachAnswer = """{"rating":8,"summary":"Starkes Training","positives":["Sauber"],"improvements":[],"tips":["Mehr schlafen"],"photo_feedback":null,"next_session":{"exercises":[{"exercise_id":"wg:bench-press","is_new":false,"rest_sec":90,"sets":[{"weight_kg":62.5,"reps":8,"duration_sec":null},{"weight_kg":62.5,"reps":8,"duration_sec":null}],"reason":"Alle Sätze geschafft"}],"note":null},"memory":"Ziel: Kraft."}"""
+    private val coachTransport = FakeCoachTransport { _, _ ->
+        if (!online) throw CoachException(CoachErrorKind.NETWORK, "offline") else CoachReply(coachAnswer, coachAnswer)
+    }
     private var process by mutableIntStateOf(0)
     private lateinit var deps: AppDependencies
 
     private fun newProcess() = AppDependencies(
         store, providers, data, versionName = "0.1.test", share = share,
         today = { LocalDate(2026, 11, 3) }, haptics = haptics, restAlerts = alerts, kv = kv,
+        coachTransport = { coachTransport },
     ).also { deps = it }
 
     private fun shown(text: String, substring: Boolean = false) =
@@ -111,7 +124,17 @@ class DayWithOverfitTest {
         try { node.performScrollTo() } catch (_: AssertionError) {}
         node.performClick()
     }
-    private fun tab(name: String) { compose.onNode(hasText(name, substring = false) and hasClickAction()).performClick() }
+    private fun tab(name: String) {
+        val tabNode = hasText(name, substring = false) and hasClickAction()
+        // Sub-screens hide the tab bar: step back until it is there (screens settle asynchronously).
+        repeat(4) {
+            if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
+            if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) back()
+            compose.waitForIdle()
+        }
+        compose.waitUntil(10_000) { compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(tabNode).performClick()
+    }
     private fun back() { compose.onNodeWithContentDescription("Zurück").performClick() }
     private fun templates() = runBlocking { data.templates.templates.first() }
 
@@ -222,6 +245,8 @@ class DayWithOverfitTest {
         assertEquals(setsBefore, deps.workout.state.value.workout!!.completedSets)
         waitFor("erledigt", substring = true)
 
+        store.connectAi(ProviderId.ANTHROPIC, "sk-test") // the coach needs access; "Später einrichten" skipped it
+
         // --- Finish: summary, feeling, note, photo (fake: no camera in Robolectric), save ----
         click("Beenden")
         click("Beenden? Nochmal tippen")
@@ -252,6 +277,31 @@ class DayWithOverfitTest {
         // Photos tab shows the photo
         tab("Fotos")
         waitFor("Foto-Tagebuch")
+
+        // --- Coach: the review request waits offline, goes out on the next app start ---------
+        tab("Verlauf")
+        waitFor("Push")
+        compose.onAllNodes(hasText("Push"))[0].performClick()
+        waitFor("Coach-Auswertung")
+        click("Coach-Auswertung")
+        waitFor("Wartet auf Verbindung")
+        online = true
+        process++ // app restart → the queue is processed
+        waitFor("Hallo, Fabi")
+        tab("Verlauf")
+        waitFor("Push")
+        compose.onAllNodes(hasText("Push"))[0].performClick()
+        waitFor("Coach-Auswertung")
+        click("Coach-Auswertung")
+        waitFor("8/10")
+        waitFor("Mehr schlafen")
+        waitFor("Alle annehmen")
+        click("Alle annehmen")
+        waitFor("Plan übernommen. Die Vorlage ist angepasst.")
+        compose.waitUntil(10_000) {
+            templates().any { t -> runBlocking { data.templates.get(t.id) }?.exercises?.any { e -> e.sets.firstOrNull()?.weightKg == 62.5 } == true }
+        }
+        back(); back()
 
         // --- AI template: copy the prompt, import a sample answer from the clipboard --------
         tab("Übungen")
@@ -285,7 +335,6 @@ class DayWithOverfitTest {
         waitFor("Tippen zum Schließen")
         click("Tippen zum Schließen")
         waitFor("Fuel · 4,20 €", substring = true)
-        back()
 
         // KI-Coach → Gemini → copy context: contains the profile and the finished workout
         tab("Profil")

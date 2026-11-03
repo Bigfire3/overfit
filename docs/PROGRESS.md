@@ -8,12 +8,99 @@
 | 2 | Workout-Modus, Pausentimer | erledigt |
 | 4 | KI-Coach | erledigt (Session G): Auswertung, Plan-Diff, Gedächtnis, Fortschritt, Warteschlange, Demo |
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
-| 5 | Feinschliff | offen |
+| 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); Feinschliff laufend |
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Morgen-Testliste für Fabian (3.11.)
+Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Fuel/Spot); die Demo in 36–38 braucht keinen Server.
+Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).
+
+**Installieren und starten**
+1. github.com am Handy einloggen → Releases → „Overfit latest“ → `overfit.apk` laden und installieren (Play Protect: „Trotzdem installieren“)
+2. Onboarding: Name, Alter, Gewicht (kg/lb umschaltbar), KI: „Später einrichten“ → Start-Tab zeigt „Hallo, <Name>“
+3. Profil: Sprache Deutsch/English umschalten (alle Tabs prüfen), Hell/Dunkel/System, wieder Deutsch
+
+**Vorlagen (Push/Pull/Legs)**
+4. Start → „Beispielvorlagen hinzufügen“ → Push, Pull, Legs erscheinen; Profil → Beispielvorlagen nochmal → „schon da“, nichts doppelt
+5. Übungen → Katalog: suchen („Klimmzug“ findet Pull-up), Filter, Übung öffnen, Erfassungsart ändern, „Eigene Übung“ anlegen
+6. Übungen → Vorlagen → Push öffnen: Sätze/Pause ändern, Übung ziehen (zwei Striche), ersetzen, Speichern
+
+**Trainieren**
+7. Start → „Training starten“ → Push. Benachrichtigungen erlauben (Android 13+)
+8. Satz abhaken → leichte Vibration, Pausenleiste; antippen (groß/klein), −15 s, +15 s, Überspringen
+9. Werte ändern („92,5“, „±“), Satz hinzufügen/duplizieren/löschen, Übung hinzufügen/ersetzen/entfernen/umsortieren (ziehen)
+10. Pause starten, Bildschirm sperren: Countdown in der Benachrichtigung, am Ende drei Pulse; +15 s/Überspringen in der Benachrichtigung.
+    Falls Profil „Pausenende sekundengenau → Erlauben“ zeigt: erlauben
+11. App aus den letzten Apps wischen, neu öffnen → Training (und Pause) läuft weiter
+12. Profil → Vibration „Aus“ → Abhaken vibriert nicht; wieder „An“
+
+**Beenden, Verlauf, Fotos**
+13. „Beenden“ zweimal tippen → Zusammenfassung (Dauer, Sätze, Volumen); Gefühl 1–5, Notiz schreiben
+14. „Foto aufnehmen“ (Kamera erlauben) und „Aus Fotos wählen“ → Vorschau; eins entfernen; Android-Zurück-Taste speichert Notiz/Gefühl
+15. „Speichern“ → Start. Gleiches Training nochmal mit mehr Gewicht → „Neue Bestwerte“ nennt die Übung
+16. Verlauf-Tab: Training öffnen → Sätze, Notiz, Fotos; Foto → Vollbild; „Als Vorlage übernehmen“; Übung → „Fortschritt“
+17. Fotos-Tab: Zeitachse, „Vergleichen“ → zwei Fotos nebeneinander; Foto löschen (zweimal tippen); Fotos nicht in der Galerie
+
+**Coach (mit eigenem Key oder Fuel; ohne Key nur Demo)**
+18. Profil → KI verbinden → Anthropic + eigener Key (oder Fuel). Kein Key? Dann Punkt 24 (Demo)
+19. Training beenden: im Abschnitt „Coach“ ist „Senden“ gewählt → „Speichern“ → nach 10–40 s Auswertung (Verlauf → Training → „Coach-Auswertung“
+    oder Start → „Coach“)
+20. „Nächstes Mal“: einzelne Änderungen abwählen → „N übernehmen“ / „Alle annehmen“ → Vorlage öffnen: Werte geändert; Start zeigt „Letzte Coach-Tipps“
+21. Flugmodus an → Training beenden und senden → „Wartet auf Verbindung“; Flugmodus aus, App schließen/öffnen → Auswertung kommt von selbst
+22. Profil → Coach → „Fortschritt bewerten“; Profil → Coach-Gedächtnis ansehen/ändern/Versionen/löschen (zweimal tippen)
+23. Profil → KI-Coach → Coach-Einstellungen: Modell, Fotos an Coach (Standard aus), Anweisungen ändern/zurücksetzen
+24. KI trennen → Verlauf → Training → „Coach-Auswertung“ → „Kein KI-Zugang“ → „Demo-Auswertung ansehen“ (als Demo markiert)
+
+**Teilen und Importieren**
+25. Vorlage → „Teilen“: QR, „Link teilen“ (WhatsApp/Notizen), „Link kopieren“; QR mit zweitem Handy scannen → Web-Seite/„In Overfit öffnen“
+26. Übungen → Vorlagen → „Vorlage importieren“: „QR-Code scannen“ (Kamera erlauben), „Aus Zwischenablage importieren“ → Vorschau → „Übernehmen“
+27. Verlauf → Training → „Teilen“ (Schalter „Mit Ist-Werten“) → Link kopieren → importieren: wird eine Vorlage
+28. „Als Datei teilen“ → `.overfit` antippen → Overfit öffnet die Vorschau
+29. „KI-Vorlage kopieren“ → in ChatGPT/Claude/Gemini einfügen, Fragen beantworten, ```json-Antwort kopieren → „Aus Zwischenablage importieren“
+30. Leere Zwischenablage / beliebiger Text → verständliche Fehlermeldung
+31. Start ganz unten: „Duo · bald“ → Erklärtext, keine Eingabe
+
+**KI-Chat, Kontext kopieren**
+32. Profil → KI-Coach → Gemini (oder Claude/ChatGPT): „Kontext kopieren“ → in Notizen einfügen: Profil, letzte Trainings, ```json-Block
+33. „Gem-/GPT-Anleitung kopieren“ → einfügen und lesen
+34. Mit Backend: „KI-Chat verbinden“ → Zustimmen → Kopplungscode, Connector im Chat anlegen, „Plane mir ein Push-Training“ → Eingang auf dem Start-Tab → Vorschau → Übernehmen
+35. „Trennen“ und „KI-Chat trennen“ (zweimal tippen) → Chat hat keinen Zugriff mehr
+
+**Fuel und Spot**
+36. Profil → „Fuel · startet bald“ → „Demo ansehen“: „Fuel · 4,20 €“, Pakete („Bald im Store“), Buchungen, Wiederherstellungscode
+37. „Freund spotten“: QR mit rotierendem Code, Name; „Ich wurde gespottet“: beliebigen Link einfügen → Einlösen → schwarz, zwei Pulse,
+    Zahl zählt 0,00 → 1,00 €, „Spot von Fabian“, kräftiger Puls; Tippen schließt
+38. „Demo beenden“ → Fuel zeigt wieder „startet bald“. (Echtes Fuel/Spot erst mit Backend, Punkt 1 unten)
+
+**Backup und Löschen**
+39. Profil → „Backup exportieren“ → in Dateien/Drive sichern (Datei lässt sich als ZIP öffnen, kein API-Key drin)
+40. Profil → „Alle Daten löschen“ (zweimal tippen) → Onboarding; durchklicken, Profil → „Backup importieren“ → Datei wählen → Vorschau → „Alle Daten ersetzen“ (zweimal)
+    → Verlauf, Fotos, Vorlagen, Coach-Gedächtnis, Name wieder da
+41. Update-Test: später ein neues APK aus „latest“ drüberinstallieren → alle Daten bleiben
+
+### Von Fabian zu tun (nach Wichtigkeit, dedupliziert)
+Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
+1. **Cloudflare-Backend deployen** (Schritte und Secrets in `backend/README.md`): Konto, `wrangler login`, `wrangler d1 create overfit` (ID in
+   `wrangler.jsonc`), Migrationen (inkl. `0002_chat.sql`), Secrets `ANTHROPIC_API_KEY`, `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY`
+   (32 Zufallsbytes Base64url, nie ändern), R2 aktivieren + `wrangler r2 bucket create overfit-chat-photos`, `npm run deploy`. Danach
+   GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL. Ohne das zeigt die App „startet bald“ + Demo
+   (Fuel, Spot, KI-Chat-Verbindung bleiben dann lokal/ohne Server)
+2. **GitHub Pages aktivieren** (Repo → Settings → Pages → Source „GitHub Actions“; oder Actions → „Web veröffentlichen“ → Run workflow):
+   Web-Fallback `https://bigfire3.github.io/overfit/` und Teilen-Seite `/t` für Links ohne App
+3. **KI-Chat-Connectoren eintragen** (nach 1.): Claude → Connectors → Custom Connector, ChatGPT → Entwicklermodus → Connector,
+   Gemini → Eigene Apps, jeweils `https://<worker>/mcp`; Schritte stehen in der App unter Profil → KI-Coach
+4. **Zu prüfen (Annahmen von Session G):** Standardmodelle OpenAI `gpt-5` und OpenRouter `anthropic/claude-sonnet-5.5` sind geraten – in
+   Profil → KI-Coach → Coach-Einstellungen mit echtem Key ausprobieren und ggf. korrigieren; „Zur Prüfung durch Fabian“ in `docs/DECISIONS.md` lesen
+5. **Datenschutzerklärung vor dem Store-Start** um KI-Chat-Verbindung (Art. 9 DSGVO, Opt-in) und Daten an Chat-Anbieter ergänzen
+6. **Store-Konten (Phase 6/7):** Google-Play-Console und Apple-Developer-Konto, Play Billing / StoreKit, Play Integrity (Cloud-Projekt), App Attest,
+   Server-Prüfer in `backend/src/verifiers.ts`. Store-Texte DE/EN liegen als Entwurf in `docs/store/store-listing.md`
+7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Spot-Links
+   ohne installierte App
+8. iOS: Kamera, Fotoauswahl, Dateiauswahl und Haptik sind nur in der iOS-CI gebaut, nicht auf einem echten iPhone getestet
 
 ## Nacht 3.11. – KI-Chat-Verbindungen, Teil 2: App-Seite (Session H, Phase 10b)
 Fertig:
