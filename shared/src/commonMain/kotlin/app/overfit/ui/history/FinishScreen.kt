@@ -82,7 +82,12 @@ fun FinishScreen(
     var seeded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(data) {
         val d = data ?: return@LaunchedEffect
-        if (!seeded) { seeded = true; feeling = d.finished.feeling; note = d.finished.note.orEmpty() }
+        if (!seeded) {
+            // Only fill what the user has not touched yet: the screen is usable before the data has loaded.
+            seeded = true
+            if (feeling == null) feeling = d.finished.feeling
+            if (note.isEmpty()) note = d.finished.note.orEmpty()
+        }
     }
     var saving by remember { mutableStateOf(false) }
 

@@ -6,7 +6,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -220,12 +222,36 @@ class DayWithOverfitTest {
         assertEquals(setsBefore, deps.workout.state.value.workout!!.completedSets)
         waitFor("erledigt", substring = true)
 
-        // --- Finish -------------------------------------------------------------------------
+        // --- Finish: summary, feeling, note, photo (fake: no camera in Robolectric), save ----
         click("Beenden")
         click("Beenden? Nochmal tippen")
-        waitFor("Training starten")
+        waitFor("Training beendet")
         compose.waitUntil(10_000) { runBlocking { data.workouts.status(workoutId) } == SessionStatus.FINISHED }
-        assertEquals(1, runBlocking { data.workouts.get(workoutId) }!!.completedSets.coerceAtLeast(1))
+        compose.onNodeWithContentDescription("Gefühl 4 von 5").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Gefühl 4 von 5").assertIsSelected()
+        compose.onAllNodes(hasSetTextAction())[0].performTextInput("Stark heute")
+        runBlocking { data.workouts.addPhoto(workoutId, byteArrayOf(1, 2, 3, 4), takenAt = 1_000L) }
+        click("Speichern")
+        waitFor("Training starten")
+        compose.waitUntil(10_000) { runBlocking { data.workouts.getFinished(workoutId)?.note } == "Stark heute" }
+        val finished = runBlocking { data.workouts.getFinished(workoutId) }!!
+        assertEquals(4, finished.feeling)
+        assertEquals(1, finished.photos.size)
+
+        // --- History: list, detail with note; share the workout and import it as a template -
+        tab("Verlauf")
+        waitFor("Push")
+        compose.onAllNodes(hasText("Push"))[0].performClick()
+        waitFor("Stark heute")
+        click("Teilen")
+        waitFor("Link kopieren")
+        click("Link kopieren")
+        val workoutLink = share.clipboard.orEmpty()
+        assertTrue(workoutLink, workoutLink.isNotBlank())
+        back(); back()
+        // Photos tab shows the photo
+        tab("Fotos")
+        waitFor("Foto-Tagebuch")
 
         // --- AI template: copy the prompt, import a sample answer from the clipboard --------
         tab("Übungen")
@@ -294,16 +320,24 @@ class DayWithOverfitTest {
         tab("Start")
         waitFor("Hi, Fabi")
         tab("History")
-        waitFor("No workouts yet", substring = true) // the real history arrives with phase 3
+        waitFor("Push")
         tab("Profile")
         click("Deutsch")
         waitFor("Einstellungen")
 
-        // Delete everything → back to onboarding, database empty
+        // Backup round trip: export → delete everything (UI) → restore = same data
+        val beforeTemplates = templates().map { it.name }
+        val backupBytes = runBlocking { deps.backup.export() }
         click("Alle Daten löschen")
         click("Wirklich alles löschen?")
         waitFor("Dein Name")
         compose.waitUntil(10_000) { templates().isEmpty() }
         assertEquals("", store.state.value.profile.name)
+        assertTrue(runBlocking { data.workouts.history.first() }.isEmpty())
+        runBlocking { deps.backup.restore(deps.backup.preview(backupBytes).getOrThrow()) }
+        assertEquals(beforeTemplates, templates().map { it.name })
+        assertEquals("Fabi", store.state.value.profile.name)
+        assertEquals(1, runBlocking { data.workouts.history.first() }.size)
+        assertEquals(1, runBlocking { data.workouts.getFinished(workoutId) }!!.photos.size)
     }
 }
