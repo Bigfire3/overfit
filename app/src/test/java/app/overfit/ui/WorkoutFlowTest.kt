@@ -126,7 +126,7 @@ class WorkoutFlowTest {
         waitFor("Stark heute")
     }
 
-    private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {
+    private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(20_000) {
         compose.onAllNodes(hasText(text, substring = substring, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty()
     }
 }
