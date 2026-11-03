@@ -23,6 +23,7 @@
 - Einfache, klar abgegrenzte Aufgaben an die Subagents in .claude/agents/ (kmp-worker, test-writer: Sonnet 5.5, effort medium). Sind die Agent-Dateien in der laufenden Session nicht verfügbar, nutze das Agent-Tool mit Modell Sonnet und effort medium.
 - Bei dir bleiben: Architektur, Datenmodell + Migrationen, Workout-State, Pausentimer/Hintergrund-Logik, KI-Schnittstelle, Reviews der Subagent-Ergebnisse.
 - Maximal 2 Subagents parallel.
+- **Gegencheck mit Sonnet (Fabian: „Überprüfe dich mit Sonnet am Agenten immer gegen.“):** Vor jedem Merge prüft ein frischer Sonnet-Subagent die Änderung unabhängig. Er bekommt Aufgabe und Diff, nicht die eigene Schlussfolgerung, sucht Fehler und prüft das Ergebnis selbst nach, bei UI und Bildern mit Screenshots bzw. gerenderten Bildern. Befunde abarbeiten und im PR bzw. Bericht nennen.
 
 ## Sparregeln
 - Nur Dateien lesen, die du brauchst. Keine kompletten Verzeichnis-Dumps.
