@@ -21,8 +21,8 @@ Nicht im Onboarding: Sprache (Gerät/Einstellungen), Ziel, Größe, Erfahrung, E
 ## KI-Zugang
 - Zuerst nur eigener API-Key (BYOK). Anbieter austauschbar hinter `LlmProvider` (aktuell OpenRouter, Anthropic, OpenAI). Aufrufe direkt vom Gerät per HTTP (Ktor).
 - Später **Credits** für Nutzer ohne eigenen Key: eigenes Backend als zweite `LlmProvider`-Implementierung. Auf iOS ist dafür In-App-Purchase Pflicht (App Store Guideline 3.1.1), auf Android Google Play Billing. Mit eigenem Key bleibt die App komplett kostenlos. Details unten unter „Coach-Guthaben“.
-- **Fünf Wege zur KI** (Einstellungsseite „KI-Coach“): eigener API-Key, Fuel, und als Chat-Verbindung Claude, ChatGPT,
-  Gemini – dort nutzt man das eigene Chat-Abo, ohne Key und ohne Fuel (Details unter „KI-Chat-Verbindungen“).
+- **Fünf Wege zur KI** (Einstellungsseite „KI-Coach“): eigener API-Key, Guthaben, und als Chat-Verbindung Claude, ChatGPT,
+  Gemini – dort nutzt man das eigene Chat-Abo, ohne Key und ohne Guthaben (Details unter „KI-Chat-Verbindungen“).
 - Jede Anfrage bekommt einen kleinen Profil-Block (Name, Alter aus Geburtsjahr, neuestes Gewicht mit Datum, Antwortsprache, Einheiten, heutiges Datum).
 
 ## Tech-Stack
@@ -168,7 +168,7 @@ Später als Spielerei: NFC-Einladung.
 
 Ziel: Wer schon ein Claude-, ChatGPT- oder Gemini-Abo hat, kann dort im normalen Chat mit seinen Overfit-Daten arbeiten –
 Trainings auswerten, über das Training „philosophieren“, den Fortschritt bewerten und neue Vorlagen anlegen – ohne
-eigenen API-Key und ohne Fuel. Die angelegte Vorlage öffnet man danach in der App und trainiert sie einfach.
+eigenen API-Key und ohne Guthaben. Die angelegte Vorlage öffnet man danach in der App und trainiert sie einfach.
 
 ### Plattformen (Stand Nov. 2026)
 - **Claude:** Custom Connectors = Remote-MCP-Server (Streamable HTTP) mit OAuth 2.1 + PKCE; Client-Registrierung per DCR oder
@@ -196,8 +196,8 @@ eigenen API-Key und ohne Fuel. Die angelegte Vorlage öffnet man danach in der A
 - **Tools:** Profil/Ziele/Gedächtnis, Vorlagen, Trainingsliste und -detail, laufendes Training, trainierte Übungen,
   Fortschritt je Übung (Top-Satz, e1RM, Volumen, Bestwerte, Veränderung), Katalogsuche (gültige IDs), Fotos (nur mit
   Freigabe, als Bild), Vorlage anlegen/ändern, Notiz hinterlegen. Vertrag: `docs/backend-api.md`.
-- **Fünf Wege nebeneinander:** Der In-App-Coach (Phase 4) läuft weiter über eigenen Key oder Fuel. Die Chat-Verbindung ist
+- **Fünf Wege nebeneinander:** Der In-App-Coach (Phase 4) läuft weiter über eigenen Key oder Guthaben. Die Chat-Verbindung ist
   zusätzlich; Auswertungen aus dem Chat landen als Notiz am Training, nicht als In-App-Coach-Bewertung.
 
 ## Monetarisierung
-Siehe [docs/monetization.md](docs/monetization.md) (Fuel im Store und im Web, später Pro-Abo, Programme, Trainer-Version).
+Siehe [docs/monetization.md](docs/monetization.md) (Guthaben im Store und im Web, später Pro-Abo, Programme, Trainer-Version).

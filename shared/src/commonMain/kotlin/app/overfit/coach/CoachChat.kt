@@ -40,6 +40,9 @@ data class ChatMessage(
     val costMicro: Long?,
     val errorKind: CoachErrorKind?,
     val demo: Boolean,
+    /** Credit: model ID that answered, and the chosen model if a replacement answered. */
+    val servedModel: String? = null,
+    val fallbackFrom: String? = null,
 )
 
 /** Answer of the model, split into the visible text and an optional workout in the share format v1. */
@@ -268,7 +271,7 @@ class CoachChatService(
             dao.upsertMessage(
                 row.copy(
                     text = parsed.text, workoutJson = parsed.workoutJson, status = ChatMessageStatus.DONE.name,
-                    costMicro = reply.costMicro, errorKind = null,
+                    costMicro = reply.costMicro, servedModel = reply.servedModel, fallbackFrom = reply.fallbackFrom, errorKind = null,
                 ),
             )
         } catch (e: CancellationException) {
@@ -326,4 +329,6 @@ private fun CoachChatMessageEntity.toMessage() = ChatMessage(
     costMicro = costMicro,
     errorKind = errorKind?.let { k -> CoachErrorKind.entries.firstOrNull { it.name == k } },
     demo = demo,
+    servedModel = servedModel,
+    fallbackFrom = fallbackFrom,
 )

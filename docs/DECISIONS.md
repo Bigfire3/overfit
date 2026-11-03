@@ -803,6 +803,42 @@ Prüfung des Codes (Start, Vordergrund, Fuel-Konto, Registrierung, `/v1/config`,
   `FuelProvider` merkt sich `/v1/config` 10 Minuten. Die Config wird nur geladen, wenn Fuel der KI-Zugang ist; die Garantie „eigener Key =
   null Backend-Anfragen“ bleibt (OwnKeyPrivacyTest).
 
+## Ehrliche Begriffe und volle Kostentransparenz (Session Y, 3.11.)
+Auslöser (Fabian): „Ich möchte nicht die Begriffe Standard oder Pro oder Lite verwenden. Das klingt nach Abzocke. Verwende einfach die Namen der Modelle … und kommuniziere die Kosten.“ Außerdem: „Fuel“ heißt künftig „Guthaben“ (EN „Credit“), schlicht und in Euro.
+
+### Grundsatz (gilt für alle künftigen Sessions)
+1. **Kein Marketing-Name für Modelle.** In der UI, auf der Webseite, in Store-Texten und Doku stehen die echten Modellnamen mit Anbieter („Gemini 3.6 Flash (Google)“, „Claude Sonnet 5.5 (Anthropic)“, „Llama 3.1 8B (Cloudflare)“), nie „Standard“, „Pro“, „Lite“ o. Ä.
+2. **Preise sind immer sichtbar:** vor der Wahl (geschätzt, pro Auswertung, Chat-Nachricht und „Mit KI ausfüllen“), nach der Antwort (echt, mit Modell).
+3. **Die Marge steht offen** in docs/monetization.md („Marge (offen)“): 8 % Aufschlag auf den Listenpreis, Store-Gebühr 15 %, daraus ≈ 6,3 % vom Kaufpreis.
+4. Wenn ein anderes Modell antwortet als das gewählte, sagt die App es: „Gemini 3.6 Flash war nicht erreichbar, Claude Sonnet 5.5 hat geantwortet, berechnet wurde der Preis von Gemini 3.6 Flash.“
+
+### Umbenennung Fuel → Guthaben
+- Sichtbar überall: UI (DE „Guthaben“, EN „Credit“), README, SPEC, Store-Texte, backend/README, docs, Workflow-Meldungen. Komposita: „Guthaben aufladen“, „Guthaben · 4,20 €“, „Mit Guthaben nutzen“, „Guthaben öffnen“. Spot bleibt Spot (1 € Guthaben je Einladung).
+- **Bezeichner im Code bleiben** (`Fuel*`-Klassen, Paket `app.overfit.fuel`, `ui/fuel`, String-Felder `fuel*`, `FuelStrings`): Das Umbenennen berührt ~60 Dateien, Room-Tabellen/Backups und Tests ohne Nutzen für Nutzer und birgt Merge-Konflikte mit den parallelen Sessions U und Z. Nutzer sehen sie nie.
+- **Store-Produkt-IDs bleiben** `overfit.fuel.5` / `overfit.fuel.10` (bei Apple/Google registriert, Änderung = neue Produkte, nicht sichtbar).
+- Die Web-Kaufseite (Session Z) nutzt „Guthaben“ bereits.
+
+### Modellnamen statt Stufen
+- Stufen-IDs (`standard`, `pro`, `lite`) bleiben **intern** (Protokoll App ↔ Backend, gespeicherte Einstellung, Ledger-Spalte `tier`); die UI zeigt sie nie.
+- `GET /v1/config` liefert je Stufe `displayName`, `vendor`, `label`, `thinkingTokens`, Preise, dazu `usageProfiles` (typische Token je Aufgabe). Die App liest die Namen von dort; die statische Tabelle `fuel/ModelNames.kt` benennt nur gespeicherte Modell-IDs in alten Buchungen und Antworten und dient als Rückfall bei altem Backend.
+- Auswahl im Coach: „Modell für deinen Coach“ als Liste der verfügbaren Modelle; pro Modell „Auswertung ca. 1,5 ct · Chat-Nachricht ca. 1,1 ct“, darunter „Mit deinem Guthaben (4,20 €) reicht das für etwa 278 Auswertungen.“ und „„Mit KI ausfüllen“ nutzt immer Llama 3.1 8B (Cloudflare), ca. 0,04 ct je Übung.“
+- Unter jeder Coach-Antwort und Chat-Antwort: „Modell · echte Kosten · Guthaben“. Buchungen zeigen das Modell statt der Stufe; bei Ausweichung steht „Ersatzmodell, berechnet wurde der Preis von …“.
+- Antwort-Meta (`overfit`) trägt zusätzlich `modelName`, `vendor`, `requestedModel*`; die App speichert `servedModel`/`fallbackFrom` an Review und Chat-Nachricht (Room v7, AutoMigration 6→7, Migrationstest).
+
+### Kostenschätzung (Methode, berechnet statt geraten)
+Schätzung = ⌈(Eingabe-Token × Eingabepreis + (Ausgabe-Token + Thinking) × Ausgabepreis) / 1 Mio. × (1 + Aufschlag)⌉ in µ€, Integer-Rechnung wie das Backend (`CostEstimate.kt`, unit-getestet). Preise aus der Preistabelle (`/v1/config`), Aufschlag `markupBp`. Typische Token-Mengen aus den **echten Prompts**, gemessen an den Bausteinen der App (Zeichen, ÷ 3,3 Zeichen je Token, bewusst hoch gerundet, ohne Cache-Rabatt):
+- **Coach-Auswertung:** System (Anweisungen ≈ 1,1k + Ausgaberegeln 1,8k + Beispiel 0,6k Zeichen) + Übungsliste des Katalogs (302 Einträge, 11,5k Zeichen) + Schema ≈ 1,5k + Profil ≈ 0,6k + Nutzernachricht (Gedächtnis ≈ 2,5k, heutiges Training ≈ 2,5k, Vorlage ≈ 0,8k, frühere Einheiten ≈ 2,5k, Verläufe ≈ 1,5k) ⇒ ≈ 27 000 Zeichen ⇒ **≈ 8 200 Token ein**; Antwort (JSON mit Bewertung, Übungen, nächster Einheit, Gedächtnis) ≈ **1 400 Token aus**.
+- **Chat-Nachricht:** System ≈ 15k Zeichen (Regeln, Share-Beispiel, Übungsliste) + Schema ≈ 1,5k + Kontext ≈ 3k + Verlauf (≈ 6 Nachrichten) ≈ 2,4k + Frage ⇒ **≈ 6 700 ein / 500 aus**.
+- **Mit KI ausfüllen:** System ≈ 1,8k + Schema ≈ 0,9k + Eingabe ≈ 0,2k ⇒ **≈ 900 ein / 120 aus** (immer Llama 3.1 8B).
+- **Gemini-Thinking:** zählt als Ausgabe; Aufschlag von ≈ 1 000 Token bei Coach und Chat (`thinkingTokens`, Stufe `medium`).
+- Die echten Mengen schwanken (lange Gedächtnisse, viele Übungen). Die echten Kosten stehen unter jeder Antwort; die Schätzung ist als „ca.“ gekennzeichnet. Ändern sich Prompts deutlich, werden `USAGE_PROFILES` (backend/src/providers.ts) und `DEFAULT_USAGE_PROFILES` (App, Rückfall für alte Backends) neu gemessen.
+
+### Protokollierung von Anfragen mit Körperfotos
+- **Recherche (Cloudflare-Doku, AI Gateway → Logging, 3.11.):** Der Header `cf-aig-collect-log-payload: false` überspringt das Speichern von Anfrage und Antwort, die Metadaten (Tokens, Kosten, Modell, Anbieter, Dauer, Status) werden weiter protokolliert. `cf-aig-collect-log: false` unterdrückt dagegen den ganzen Eintrag, und das war bisher unser Verhalten bei Foto-Anfragen (Kosten und Tokens fehlten im Gateway).
+- **Entscheidung:** Foto-Anfragen senden jetzt `cf-aig-collect-log-payload: false` statt `cf-aig-collect-log: false`. Es werden weiterhin keine Fotos, Prompts oder Antworten gespeichert; Kosten und Verbrauch erscheinen im Gateway. Zusätzlich `cf-aig-metadata` `{ tier, photo, fallback }` bei jeder Anfrage (nur Markierungen, keine Inhalte). Für Workers AI läuft dieselbe Metadaten-Angabe über die `gateway`-Option; diese Stufe nimmt keine Bilder.
+- **Eigener Weg unabhängig vom Gateway:** Das Ledger in D1 hält je Verbrauchsbuchung Modell, Tokens, berechneten Betrag und (neu, Migration 0004) `cost_micro` (Anbieterkosten zum Listenpreis ohne Aufschlag), `fallback`, `photo`; Stufe (`tier`) war schon da. `GET /v1/admin/usage?from=&to=` (ADMIN_SECRET ≥ 16 Zeichen, auch in Produktion; sonst 404) gruppiert nach Modell/Stufe/Ausweichung/Foto und liefert Anzahl, Tokens, berechnet, Anbieterkosten und Marge (= berechnet − Anbieterkosten). Dazu `backend/scripts/usage-report.mjs` als Tabelle.
+- **Datenschutz:** Die Auswertung enthält nur Zahlen und Ja/Nein-Markierungen, nie Prompt, Antwort, Foto, Konto- oder Geräte-IDs. Ein Foto-Flag verrät nur „diese Anfrage enthielt ein Foto“, nicht welches; es gibt keine Verbindung zu einer Person im Bericht (aggregiert). Alte Buchungen behalten `cost_micro = NULL` (Marge unbekannt) statt geschätzter Werte.
+
 ## Guthaben im Web, Testmodus (Session Z, 3.11.)
 - **Anbieter: Paddle (Billing) als Merchant of Record, zuerst nur Sandbox.** Paddle übernimmt EU-USt, Belege, Erstattungen und
   Chargebacks; die Sandbox ist für ein Einzelkonto sofort und kostenlos nutzbar (keine Domain- oder Kontoprüfung, Default Payment
@@ -814,10 +850,11 @@ Prüfung des Codes (Start, Vordergrund, Fuel-Konto, Registrierung, `/v1/config`,
   stehen im Backend (`WEB_PACKAGES`). Paddle hat keine eigene gehostete Seite; der Default Payment Link zeigt auf `/guthaben/`.
 - **Pakete 5/10/20 € statt 2/5/10 €:** Die Fixgebühr von 0,50 € frisst bei 2 € ein Viertel des Preises. 5 € bleibt der kleinste
   Einstieg, 20 € für Vielnutzer.
-- **1:1-Guthaben (5 € = 5 €), Endpreise inkl. USt.** Weicht bewusst von der Store-Formel ab (Fabians Vorgabe: ehrlich, Marge in den
-  Modellpreisen). Folge: Mit heutigem Aufschlag 8 % verliert jeder echte Web-Kauf Geld (USt + Paddle). Im Testmodus egal; vor dem
-  Live-Start muss der Aufschlag auf ≈ 35–40 % (Rechnung in docs/monetization.md). Nicht jetzt geändert, weil das auch die
-  App-Preise (Store, Coach-Kosten) verschiebt und eine Geldentscheidung ist.
+- **1:1-Guthaben (5 € = 5 €), Endpreise inkl. USt.** Fabians Vorgabe, so im Testmodus umgesetzt. Nachgerechnet mit der Marge aus
+  Session Y (8 % Aufschlag ≈ 6,3 % vom Kaufpreis): USt und Paddle-Gebühr (23–31 % des Preises) liegen weit darüber, jedes Paket
+  verlöre im Live-Betrieb Geld (5 €: −1,18 €, 10 €: −1,86 €, 20 €: −3,21 €). Vorschlag in docs/monetization.md („Rechnung Web-Kauf“):
+  Aufteilung offen zeigen (Guthaben = Preis − USt − Paddle-Gebühr), Mindestpaket 10 €, keine versteckten Aufschläge. Nicht umgesetzt,
+  weil es Fabians 1:1-Vorgabe ändert und im Testmodus kein Geld fließt; vor dem Live-Start zu entscheiden.
 - **Kauflink = Zufallstoken mit Hash in D1 statt HMAC-signiertem Token.** Einmaligkeit und Ablauf muss der Server ohnehin
   speichern; ein signierter Token brächte nichts dazu, würde aber die Konto-ID in die URL tragen. Token im Fragment (`#t=`), damit er
   weder in Logs noch im Referer landet. 15 Minuten, bis zu 5 Checkouts (Paket wechseln, Abbruch), nach der ersten Zahlung verbraucht.

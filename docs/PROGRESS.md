@@ -10,7 +10,7 @@
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
 | 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); Feinschliff laufend |
 | 6 | Store-Release (App Store, Play Store) | offen |
-| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Stufen Standard/Pro/Lite mit Gemini, Claude, Workers AI über AI Gateway (Session X); Web-Kauf mit Guthaben-Codes im Testmodus (Paddle-Sandbox, Session Z); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Paddle-Sandbox, Session Z); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte, Margenentscheidung) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
@@ -58,6 +58,25 @@ juristische Prüfung und die Margenentscheidung.
    in der App Guthaben → „Code einlösen“ → Code eingeben → „5,00 € Guthaben gutgeschrieben.“ Zweites Mal: „schon eingelöst“.
 6. Erstattung: Paddle-Sandbox → Transactions → Kauf öffnen → Refund (voll) → nach Freigabe sinkt der Saldo um 5 € (nie unter 0),
    Buchung „Erstattung“.
+## Ehrliche Begriffe und volle Kostentransparenz (Session Y, 3.11.)
+**Erledigt:**
+- **„Fuel“ heißt jetzt „Guthaben“** (EN „Credit“) in UI, README, SPEC, Store-Texten, backend/README, API-Doku und Workflow-Meldungen. Code-Bezeichner (`Fuel*`) und Store-Produkt-IDs bleiben (Begründung in DECISIONS.md).
+- **Echte Modellnamen statt Standard/Pro/Lite:** Coach → Einstellungen → „Modell für deinen Coach“ listet „Gemini 3.6 Flash (Google)“ und „Claude Sonnet 5.5 (Anthropic)“ mit geschätzten Kosten je Auswertung und Chat-Nachricht (in Cent), dazu „Mit deinem Guthaben (…) reicht das für etwa N Auswertungen“ und der Preis von „Mit KI ausfüllen“ (Llama 3.1 8B (Cloudflare)). Namen, Anbieter, Preise und typische Token-Mengen kommen aus `GET /v1/config`; Rechenweg in DECISIONS.md „Kostenschätzung“.
+- **Unter jeder Antwort** (Coach-Auswertung und Chat): Modell · echte Kosten · Guthaben. Buchungen zeigen das Modell. Bei Ausweichung steht, welches Modell geantwortet hat und dass der Preis des gewählten berechnet wurde.
+- **Foto-Anfragen im AI Gateway:** laut Doku geht „nur Metadaten“ (`cf-aig-collect-log-payload: false`): keine Inhalte, aber Tokens/Kosten/Modell/Dauer/Status erscheinen. Umgestellt.
+- **Inhaltsfreie Auswertung:** Migration `0004` (Anbieterkosten, Ausweichung, Foto je Buchung), `GET /v1/admin/usage?from=&to=` (ADMIN_SECRET), Skript `backend/scripts/usage-report.mjs`. Marge in docs/monetization.md offen beschrieben.
+- Room v7 (AutoMigration 6→7: `servedModel`, `fallbackFrom`), Migrationstest. Tests: Kostenschätzung, Formatierung, Modellnamen, Transport/Ausweichung, Backend (Config-Namen, Admin-Usage, Gateway-Header, Ausweichungs-Meta), UI-Tests auf „Guthaben“ umgestellt; OwnKeyPrivacyTest grün.
+
+**Offen:**
+- Beim Deploy: Migration `0004` wird vom Deploy-Workflow wie die anderen angewendet. Für `usage-report.mjs` muss `ADMIN_SECRET` im Worker gesetzt sein.
+- Die Schätzwerte (Token je Aufgabe) sind aus den Prompt-Bausteinen berechnet; bei großen Prompt-Änderungen neu messen.
+
+**Bitte auf dem Handy testen (Session Y):**
+1. Profil → Guthaben: Titel „Guthaben“, „Guthaben aufladen“, Demo ansehen → Buchungen: Modellnamen (kein Standard/Pro), die oberste Buchung nennt das Ersatzmodell
+2. Coach → Einstellungen (mit Guthaben als KI): „Modell für deinen Coach“, beide Modelle mit Cent-Kosten, „reicht für etwa N Auswertungen“, Auswahl umschalten (Haken wandert)
+3. Eine Auswertung bzw. Chat-Frage mit Guthaben: unter der Antwort „Modell · Kosten · Guthaben“
+4. „Mit KI ausfüllen“ bei einer eigenen Übung: nennt Llama 3.1 8B in den Einstellungen mit Preis
+5. Nirgends mehr „Fuel“, „Standard“ (als Modell), „Pro“, „Lite“ sichtbar
 
 ## Fuel mit mehreren KI-Anbietern und AI Gateway (Session X, 3.11.)
 **Erledigt:**

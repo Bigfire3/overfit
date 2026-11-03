@@ -387,7 +387,7 @@ private fun MessageItem(m: ChatMessage, onImportWorkout: (String) -> Unit, onRet
                 val w = m.workout
                 if (w != null && m.workoutJson != null) WorkoutCard(w) { onImportWorkout(m.workoutJson) }
                 if (m.demo) Text(h.chatDemoHint, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-                m.costMicro?.let { Text(h.chatCost(formatCost(it, f.language)), Modifier.padding(top = Space.xs), style = Theme.type.caption, tone = Tone.Faint) }
+                m.costMicro?.let { AnswerCostLine(app.overfit.i18n.LocalCoachStrings.current, f.language, it, null, m.servedModel, m.fallbackFrom) }
             }
         }
     }

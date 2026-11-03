@@ -41,6 +41,10 @@ export interface UsageEntry {
   cacheRead: number;
   cacheWrite: number;
   output: number;
+  /** Anbieterkosten (µ€, Listenpreis ohne Aufschlag) des tatsächlich genutzten Modells; null = unbekannt. */
+  providerCostMicro: number | null;
+  fallback: boolean;
+  photo: boolean;
 }
 
 /** Hold auflösen und `costMicro` (höchstens der Hold-Betrag) von den Posten abbuchen; verfallende zuerst. */
@@ -72,9 +76,9 @@ export async function settle(
   const charged = charge - left;
   stmts.push(
     env.DB.prepare(
-      `INSERT INTO ledger (account_id, ts, type, amount_micro, model, tier, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, ref)
-       VALUES (?, ?, 'usage', ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(accountId, now(), -charged, usage.model, usage.tier, usage.input, usage.cacheRead, usage.cacheWrite, usage.output, holdId),
+      `INSERT INTO ledger (account_id, ts, type, amount_micro, model, tier, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, ref, cost_micro, fallback, photo)
+       VALUES (?, ?, 'usage', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(accountId, now(), -charged, usage.model, usage.tier, usage.input, usage.cacheRead, usage.cacheWrite, usage.output, holdId, usage.providerCostMicro, usage.fallback ? 1 : 0, usage.photo ? 1 : 0),
   );
   await env.DB.batch(stmts);
   return charged;

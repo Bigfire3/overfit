@@ -86,7 +86,7 @@ export async function ledgerPage(env: Env, accountId: string, url: URL) {
   const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER) || Number.MAX_SAFE_INTEGER;
   const rows = await env.DB.prepare(
     `SELECT id, ts, type, amount_micro AS amountMicro, model, tier, source, input_tokens AS inputTokens,
-            cache_read_tokens AS cacheReadTokens, cache_write_tokens AS cacheWriteTokens, output_tokens AS outputTokens
+            cache_read_tokens AS cacheReadTokens, cache_write_tokens AS cacheWriteTokens, output_tokens AS outputTokens, fallback
      FROM ledger WHERE account_id = ? AND id < ? ORDER BY id DESC LIMIT ?`,
   )
     .bind(accountId, before, limit)

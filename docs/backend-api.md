@@ -1,4 +1,4 @@
-# Overfit-Backend: API-Vertrag (Fuel, Spot, KI-Chat-Verbindung)
+# Overfit-Backend: API-Vertrag (Guthaben, Spot, KI-Chat-Verbindung)
 
 Grundlage für die App-Anbindung. Implementierung: `backend/` (Cloudflare Worker + D1). Basis-URL: `https://<worker-domain>`, alle Pfade unter `/v1`.
 Das Backend speichert **keine Trainingsinhalte und keine Fotos** (Anfragen werden nur durchgeleitet), sondern Konto-ID, Saldo, Buchungen (Modell, Token, Betrag) und Spot-Zuordnungen. **Einzige Ausnahme:** die freiwillige KI-Chat-Verbindung (unten), die der Nutzer ausdrücklich einschaltet; Abschalten löscht alles.
@@ -119,20 +119,30 @@ Jeder Fehler: passender HTTP-Status und
   "models": { "gemini-3.6-flash": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 }, "claude-sonnet-5-5": { … }, "@cf/meta/llama-3.1-8b-instruct": { … } },
   "defaultTier": "standard",
   "tiers": {
-    "standard": { "available": true, "model": "gemini-3.6-flash", "images": true, "fallback": "pro", "price": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 } },
+    "standard": { "available": true, "model": "gemini-3.6-flash", "displayName": "Gemini 3.6 Flash", "vendor": "Google", "label": "Gemini 3.6 Flash (Google)", "thinkingTokens": 1000, "images": true, "fallback": "pro", "price": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 } },
     "pro": { "available": false, "model": "claude-sonnet-5-5", "images": true, "fallback": "standard", "price": { … } },
     "lite": { "available": true, "model": "@cf/meta/llama-3.1-8b-instruct", "images": false, "fallback": "standard", "price": { … } }
   },
+  "usageProfiles": { "coach": { "inputTokens": 8200, "outputTokens": 1400 }, "chat": { "inputTokens": 6700, "outputTokens": 500 }, "autofill": { "inputTokens": 900, "outputTokens": 120 } },
   "packages": [ { "productId": "overfit.fuel.10", "priceMicro": 10000000, "creditMicro": 7870370 } ],
   "spot": { "starterMicro": 1000000, "rewardMicro": 1000000, "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
 }
 ```
 `mode`: `production` oder `test`. **`test` = Testserver** (`DEPLOY_MODE=test`): keine Geräteprüfung beim Spot-Einlösen (Token `test:<geräte-id>`,
-ein Spot je Gerät), neues Konto bekommt Test-Startguthaben (Buchungstyp `test_credit`), niedrige Limits; die App zeigt unter Fuel „Testserver“.
+ein Spot je Gerät), neues Konto bekommt Test-Startguthaben (Buchungstyp `test_credit`), niedrige Limits; die App zeigt unter Guthaben „Testserver“.
 Produktion kennt kein `test:`-Token. Nur der exakte Wert `test` schaltet den Testbetrieb frei.
 Modellpreise in µ€ je 1 Mio. Token ohne Aufschlag (für Kostenschätzung in der App), jeweils der heute gültige Preis.
+`displayName`/`vendor`/`label`: echter Modellname und Anbieter für die UI (kein Marketingname). `usageProfiles`: typische Token-Mengen je
+Aufgabe (gemessen, docs/DECISIONS.md „Kostenschätzung“); die App rechnet damit aus Preis, Aufschlag und `thinkingTokens` die geschätzten Kosten.
 `tiers.<stufe>.available`: Stufe ist konfiguriert (`standard` braucht `GEMINI_API_KEY`, `pro` `ANTHROPIC_API_KEY`, `lite` das
 Workers-AI-Binding). Die App bietet nur verfügbare Stufen an. `productId` entspricht der Produkt-ID im Play-/App-Store.
+
+### `GET /v1/admin/usage?from=&to=` (inhaltsfreie Nutzung)
+`Authorization: Bearer <ADMIN_SECRET>` (nur mit gesetztem ADMIN_SECRET, auch in Produktion; sonst 404). `from`/`to` ISO-Datum (`to` exklusiv,
+Standard: letzte 30 Tage). Antwort `{ from, to, currency, unit, totals: { requests, photoRequests, fallbackRequests, inputTokens, outputTokens,
+chargedMicro, providerCostMicro, marginMicro }, groups: [ { model, tier, fallback, photo, requests, inputTokens, cacheReadTokens, cacheWriteTokens,
+outputTokens, chargedMicro, providerCostMicro, marginMicro } ] }`. `providerCostMicro` = Listenpreis ohne Aufschlag für das tatsächlich genutzte
+Modell, `marginMicro` = berechnet − Anbieterkosten (bei Buchungen vor Migration 0004: `null`). Nie Prompts, Antworten oder Fotos.
 
 ### `POST /v1/admin/credit` (nur Testserver)
 `Authorization: Bearer <ADMIN_SECRET>`, Body `{ "amountMicro": 5000000, "all": true }` oder `{ "amountMicro": …, "accountId": "…" }`
@@ -165,7 +175,7 @@ Body: `{ "publicKey": "<base64url>" }`. → `201` (neu) oder `200` (schon regist
 Body `{ "displayName": "Fabian" }` (≤ 24 Zeichen, `null` oder `""` löscht). → `{ "displayName": "Fabian" }`. Der Name wird nur beim Einlösen eines Spots an den Eingeladenen ausgeliefert (freiwillig).
 
 ### `GET /v1/account/ledger?limit=50&before=<id>`
-`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|spot_bonus|spot_reward", "amountMicro": -6956, "model": "gemini-3.6-flash", "tier": "standard", "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv. Bei `usage`: `model` = tatsächlich genutztes Modell, `tier` = angefragte und abgerechnete Stufe (alte Buchungen: `null`).
+`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|spot_bonus|spot_reward", "amountMicro": -6956, "model": "gemini-3.6-flash", "tier": "standard", "fallback": false, "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv. Bei `usage`: `model` = tatsächlich genutztes Modell, `tier` = angefragte und abgerechnete Stufe (alte Buchungen: `null`).
 
 ## Wiederherstellungscode (Umzug aufs neue Handy)
 
@@ -204,11 +214,11 @@ Antwort `200`: Anthropic-Format (`content`, `stop_reason` mit `end_turn` | `max_
 **plus** Feld `overfit`:
 ```json
 { "id": "msg_…", "model": "gemini-3.6-flash", "content": [ … ], "stop_reason": "end_turn", "usage": { … },
-  "overfit": { "costMicro": 2609, "balanceMicro": 7863414, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "gemini-3.6-flash", "fallback": false } }
+  "overfit": { "costMicro": 2609, "balanceMicro": 7863414, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "gemini-3.6-flash", "modelName": "Gemini 3.6 Flash", "vendor": "Google", "requestedModel": "gemini-3.6-flash", "requestedModelName": "Gemini 3.6 Flash", "requestedVendor": "Google", "fallback": false } }
 ```
-und Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Fuel · 7,86 €“ und die Kosten der Auswertung daraus. Bilder
+und Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Guthaben · 7,86 €“ und die Kosten der Auswertung daraus. Bilder
 werden bei der Reservierung pauschal (3000 Token je Bild) gezählt, nicht nach Base64-Länge. Zeitlimit je Anbieter 100 s, für die ganze
-Anfrage samt Ausweichen 140 s. Anfragen mit Bildern werden im AI Gateway nicht protokolliert.
+Anfrage samt Ausweichen 140 s. Anfragen mit Bildern bekommen `cf-aig-collect-log-payload: false` (das Gateway speichert keine Inhalte, nur Metadaten). Bei `fallback: true` zeigt die App, welches Modell tatsächlich geantwortet hat (`model`) und dass der Preis von `requestedModel` berechnet wurde.
 
 ## Kauf
 
@@ -289,7 +299,7 @@ Gerät: 60 Anfragen/min, `/v1/messages`: 10/min, Registrierung: 20/h je IP, Kauf
 
 ## KI-Chat-Verbindung (Claude, ChatGPT, Gemini per MCP)
 
-Freiwillig und getrennt von Fuel: Die App lädt Trainingsdaten hoch, ein KI-Chat liest sie über den Remote-MCP-Server
+Freiwillig und getrennt von Guthaben: Die App lädt Trainingsdaten hoch, ein KI-Chat liest sie über den Remote-MCP-Server
 `https://<worker-domain>/mcp` und legt Vorlagen und Notizen in einen **Eingang**, den die App abholt. Alles hängt am Konto der
 anonymen Geräte-Identität (Wiederherstellungscode nimmt es mit). Inhalte liegen AES-256-GCM-verschlüsselt (Schlüssel je
 Konto aus einem Server-Geheimnis abgeleitet; keine Ende-zu-Ende-Verschlüsselung, weil der Server die Daten für den Chat

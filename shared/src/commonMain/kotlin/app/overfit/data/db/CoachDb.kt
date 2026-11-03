@@ -47,6 +47,9 @@ data class CoachReviewEntity(
     /** Fuel: what the request cost and the balance afterwards (micro-euro). */
     val costMicro: Long?,
     val balanceMicro: Long?,
+    /** Credit: model ID that answered, and the chosen model if a replacement answered (the chosen model's price was charged). */
+    val servedModel: String? = null,
+    val fallbackFrom: String? = null,
     /** The user allowed body photos for this request. */
     @ColumnInfo(defaultValue = "0") val withPhotos: Boolean = false,
 )

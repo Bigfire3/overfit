@@ -13,8 +13,8 @@ import {
   setProfile,
 } from './account';
 import { handleMessages } from './messages';
-import { DEFAULT_TIER, TIER_NAMES, TIERS, tierAvailable } from './providers';
-import { handleAdminCredit } from './admin';
+import { DEFAULT_TIER, TIER_NAMES, TIERS, USAGE_PROFILES, tierAvailable } from './providers';
+import { handleAdminCredit, handleAdminUsage } from './admin';
 import { handleVerifyPurchase } from './purchases';
 import { createChallenge, createSpotToken, redeemSpot } from './spot';
 import { packageCreditMicro } from './money';
@@ -105,9 +105,21 @@ function publicConfig(env: Env, cfg: Config) {
     tiers: Object.fromEntries(
       TIER_NAMES.map((t) => [
         t,
-        { available: tierAvailable(env, t), model: TIERS[t].model, images: TIERS[t].images, fallback: TIERS[t].fallback, price: cfg.prices[TIERS[t].model] },
+        {
+          available: tierAvailable(env, t),
+          model: TIERS[t].model,
+          displayName: TIERS[t].displayName,
+          vendor: TIERS[t].vendor,
+          label: `${TIERS[t].displayName} (${TIERS[t].vendor})`,
+          thinkingTokens: TIERS[t].thinkingTokens,
+          images: TIERS[t].images,
+          fallback: TIERS[t].fallback,
+          price: cfg.prices[TIERS[t].model],
+        },
       ]),
     ),
+    /** Typische Token-Mengen je Aufgabe (gemessen, DECISIONS.md „Kostenschätzung“) für die Kostenanzeige der App. */
+    usageProfiles: USAGE_PROFILES,
     packages: Object.entries(cfg.packages).map(([productId, p]) => ({
       productId,
       priceMicro: p.priceMicro,
@@ -161,6 +173,11 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   if (path === '/v1/admin/credit') {
     await rateLimit(env, `admin:${clientIp(req)}`, 20, 3600);
     return handleAdminCredit(req, env, cfg, new Uint8Array(await req.arrayBuffer()));
+  }
+
+  if (path === '/v1/admin/usage') {
+    await rateLimit(env, `admin:${clientIp(req)}`, 20, 3600);
+    return handleAdminUsage(req, env, url);
   }
 
   if (path === '/v1/devices' && method === 'POST') {

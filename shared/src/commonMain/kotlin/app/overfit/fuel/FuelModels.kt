@@ -35,6 +35,8 @@ data class LedgerEntry(
     val cacheReadTokens: Long = 0,
     val cacheWriteTokens: Long = 0,
     val outputTokens: Long = 0,
+    /** A replacement model answered (the price of the chosen model, [tier], was charged). */
+    val fallback: Boolean = false,
     /** Where credit came from: null = store/internal, `web` = bought on the web page, `code` = redeemed credit code. */
     val source: String? = null,
 )
@@ -65,7 +67,19 @@ data class FuelTierInfo(
     val model: String = "",
     val images: Boolean = false,
     val price: TierPrice = TierPrice(),
-)
+    /** Real model name and provider, e.g. "Gemini 3.6 Flash" / "Google" (never a marketing name). */
+    val displayName: String = "",
+    val vendor: String = "",
+    /** Typical thinking tokens per coach request (counted as output), only for the cost estimate. */
+    val thinkingTokens: Int = 0,
+) {
+    /** "Gemini 3.6 Flash (Google)"; falls back to the known names of the model ID. */
+    val label: String get() = if (displayName.isNotEmpty()) "$displayName ($vendor)" else modelLabel(model)
+}
+
+/** Typical token amounts of one task (measured on the real prompts, backend `USAGE_PROFILES`). */
+@Serializable
+data class UsageProfile(val inputTokens: Long = 0, val outputTokens: Long = 0)
 
 /** Buying credit on the web page (`/v1/config` → `webPurchase`). Off unless the server says otherwise. */
 @Serializable
@@ -100,6 +114,8 @@ data class FuelConfig(
     val defaultTier: String = "standard",
     /** standard | pro | lite → availability and price. Empty = old backend (only the model `claude-sonnet-5-5`). */
     val tiers: Map<String, FuelTierInfo> = emptyMap(),
+    /** coach | chat | autofill → typical tokens, for the cost estimate. Empty = old backend. */
+    val usageProfiles: Map<String, UsageProfile> = emptyMap(),
     val packages: List<FuelPackage> = emptyList(),
     val webPurchase: WebPurchaseConfig = WebPurchaseConfig(),
     val spot: SpotConfig = SpotConfig(),
@@ -126,7 +142,15 @@ data class SpotRedeemResult(
 data class RecoveryCode(val code: String)
 
 /** Answer of POST /v1/messages: the unchanged Anthropic JSON plus what the call cost. */
-data class FuelMessageResult(val body: JsonElement, val costMicro: Long, val balanceMicro: Long)
+data class FuelMessageResult(
+    val body: JsonElement,
+    val costMicro: Long,
+    val balanceMicro: Long,
+    /** Model ID that really answered (null with an old backend). */
+    val servedModel: String? = null,
+    /** Model ID the user chose and whose price was charged; differs from [servedModel] on a fallback. */
+    val chosenModel: String? = null,
+)
 
 /** Proof that the device is genuine (Play Integrity token / App Attest object), bound to a server challenge. */
 data class Attestation(val platform: String, val token: String)

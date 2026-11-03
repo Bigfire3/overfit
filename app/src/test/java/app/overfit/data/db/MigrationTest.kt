@@ -207,6 +207,48 @@ class MigrationTest {
         }
     }
 
+    /**
+     * v6 → v7: nullable columns `servedModel` / `fallbackFrom` on the coach chat message (and review). Existing answers
+     * stay and read as "model unknown"; new answers store the model that really answered.
+     */
+    @Test
+    fun migration6to7KeepsChatAnswersAndAddsModelColumns() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v6 = helper.createDatabase(6)
+        v6.execSQL("INSERT INTO coach_chat (id, title, createdAt, updatedAt) VALUES ('c1', 'Frage', 10, 10)")
+        v6.execSQL(
+            "INSERT INTO coach_chat_message (id, chatId, fromUser, text, status, createdAt, workoutJson, photoIds, costMicro, errorKind, demo) " +
+                "VALUES ('m1', 'c1', 0, 'Antwort', 'DONE', 11, NULL, NULL, 1200, NULL, 0)",
+        )
+        v6.close()
+        helper.runMigrationsAndValidate(7, OverfitDatabase.MIGRATIONS.toList()).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val dao = db.coachChatDao()
+            val old = dao.messages("c1").single()
+            assertEquals(1200L, old.costMicro)
+            assertEquals(null, old.servedModel)
+            dao.upsertMessage(
+                CoachChatMessageEntity("m2", "c1", fromUser = false, text = "Neu", status = "DONE", createdAt = 12, costMicro = 900, servedModel = "claude-sonnet-5-5", fallbackFrom = "gemini-3.6-flash"),
+            )
+            val fresh = dao.messages("c1").first { it.id == "m2" }
+            assertEquals("claude-sonnet-5-5", fresh.servedModel)
+            assertEquals("gemini-3.6-flash", fresh.fallbackFrom)
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

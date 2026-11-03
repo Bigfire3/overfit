@@ -352,9 +352,9 @@ class DayWithOverfitTest {
         // --- Profile: Fuel demo + Spot reveal, KI-Coach context, Duo teaser ------------------
         tab("Profil")
         click("startet bald")
-        waitFor("Fuel startet bald")
+        waitFor("Guthaben startet bald")
         click("Demo ansehen")
-        waitFor("Fuel · 4,20 €")
+        waitFor("Guthaben · 4,20 €")
         click("Freund spotten")
         waitFor("Neuer Code in", substring = true)
         back()
@@ -365,7 +365,7 @@ class DayWithOverfitTest {
         assertTrue(HapticPattern.Reveal in haptics.played)
         waitFor("Tippen zum Schließen")
         click("Tippen zum Schließen")
-        waitFor("Fuel · 4,20 €", substring = true)
+        waitFor("Guthaben · 4,20 €", substring = true)
 
         // Coach tab → prompts show their text → copy context: contains the profile and the finished workout
         tab("Coach")

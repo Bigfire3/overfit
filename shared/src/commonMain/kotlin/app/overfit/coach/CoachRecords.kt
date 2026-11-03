@@ -56,6 +56,9 @@ data class ReviewItem(
     val model: String?,
     val rawResponse: String?,
     val isDemo: Boolean = false,
+    /** Credit: model ID that answered, and the chosen model if a replacement answered. */
+    val servedModel: String? = null,
+    val fallbackFrom: String? = null,
 )
 
 fun CoachReviewEntity.toItem(): ReviewItem = ReviewItem(
@@ -74,4 +77,6 @@ fun CoachReviewEntity.toItem(): ReviewItem = ReviewItem(
     providerId = providerId,
     model = model,
     rawResponse = rawResponse,
+    servedModel = servedModel,
+    fallbackFrom = fallbackFrom,
 )

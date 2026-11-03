@@ -37,12 +37,12 @@ AUSWERTUNG
 KI-COACH
 • Der Coach kennt dein Training und hat ein Gedächtnis für Ziele, Verletzungen und Vorlieben
 • Coach-Tab: dein persönlicher Trainer im Chat – Workout-Vorschläge, Auswertungen, Gedächtnis, Prompts mit sichtbarem Text
-• Eigener API-Key (Gemini, Claude, OpenAI, OpenRouter) oder Fuel, das Coach-Guthaben in der App
+• Eigener API-Key (Gemini, Claude, OpenAI, OpenRouter) oder Guthaben (in Euro, in der App aufladbar)
 • KI-Chat-Verbindung: nutze Claude, ChatGPT oder Gemini mit deinen echten Trainingsdaten
 
 TEILEN
 • Workouts und Trainings per Link, QR-Code oder Datei teilen
-• „Spot“: Freunde einladen, ihr bekommt beide 1 € Fuel
+• „Spot“: Freunde einladen, ihr bekommt beide 1 € Guthaben
 • Duo – gemeinsam trainieren: bald
 
 DEINE DATEN
@@ -84,12 +84,12 @@ REVIEW
 AI COACH
 • The coach knows your training and has a memory for goals, injuries and preferences
 • Coach tab: your personal trainer in chat – workout suggestions, reviews, memory, prompts with visible text
-• Your own API key (Gemini, Claude, OpenAI, OpenRouter) or Fuel, the coach credit inside the app
+• Your own API key (Gemini, Claude, OpenAI, OpenRouter) or credit (in euro, topped up inside the app)
 • AI chat connection: use Claude, ChatGPT or Gemini with your real training data
 
 SHARING
 • Share workouts and trainings as link, QR code or file
-• "Spot": invite friends, you both get €1 Fuel
+• "Spot": invite friends, you both get €1 credit
 • Duo – train together: coming soon
 
 YOUR DATA
