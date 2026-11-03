@@ -7,6 +7,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.platform.RestAlerts
 import app.overfit.data.images.OfflineImages
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.share.SamplesRow
+import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.components.pressableRow
 import coil3.compose.LocalPlatformContext
 
@@ -20,7 +22,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import app.overfit.ai.ProviderId
 import app.overfit.ai.Providers
+import app.overfit.fuel.FuelAccess
+import app.overfit.fuel.FuelSession
+import app.overfit.fuel.formatEuro
+import app.overfit.i18n.LocalFuelStrings
+import app.overfit.ui.fuel.Loaded
+import app.overfit.ui.fuel.rememberLoaded
 import app.overfit.data.AppState
 import app.overfit.data.AppStore
 import app.overfit.domain.Language
@@ -53,8 +62,11 @@ fun SettingsScreen(
     onConnect: () -> Unit,
     onCoachMemory: () -> Unit,
     onAbout: () -> Unit,
+    fuelSession: FuelSession,
+    onFuel: () -> Unit,
     offlineImages: OfflineImages,
     restAlerts: RestAlerts,
+    share: ShareDependencies,
     onReset: () -> Unit,
 ) {
     val t = LocalStrings.current
@@ -118,7 +130,8 @@ fun SettingsScreen(
         }
 
         SectionTitle(t.ai)
-        ListRow(providers.get(state.providerId).label, if (state.hasApiKey) t.connected else t.notConnected)
+        FuelRow(fuelSession, onFuel)
+        ListRow(providers.get(state.providerId).label, if (state.hasApiKey || state.providerId == ProviderId.FUEL) t.connected else t.notConnected)
         ListRow(if (state.hasApiKey) t.change else t.connect, onClick = onConnect)
         if (state.hasApiKey) ListRow(t.disconnect, tone = Tone.Muted, onClick = store::disconnectAi)
 
@@ -127,6 +140,9 @@ fun SettingsScreen(
 
         SectionTitle(t.app)
         ListRow(t.about, onClick = onAbout)
+
+        SectionTitle(t.templates)
+        SamplesRow(share)
 
         SectionTitle(t.data)
         OfflineImagesRow(offlineImages)
@@ -149,12 +165,16 @@ fun CoachMemoryScreen(onBack: () -> Unit) {
 }
 
 @Composable
-fun AboutScreen(versionName: String, onBack: () -> Unit) {
+fun AboutScreen(versionName: String, onBack: () -> Unit, fuel: FuelAccess? = null) {
     val t = LocalStrings.current
+    var taps by remember { mutableStateOf(0) }
+    val devUnlocked = fuel != null && taps >= DEV_TAPS
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         Title(t.appName)
         Spacer(Modifier.height(Space.s))
-        Text(t.aboutVersion(versionName), tone = Tone.Muted)
+        // Hidden developer option: tap the version seven times.
+        Text(t.aboutVersion(versionName), tone = Tone.Muted, modifier = Modifier.pressableRow { taps++ })
+        if (devUnlocked && fuel != null) DeveloperSection(fuel)
         Spacer(Modifier.height(Space.m))
         Text(t.aboutTagline)
 
@@ -168,6 +188,40 @@ fun AboutScreen(versionName: String, onBack: () -> Unit) {
         Spacer(Modifier.height(Space.m))
         Text(t.aboutLibrariesText, style = Theme.type.caption)
     }
+}
+
+private const val DEV_TAPS = 7
+
+/** Hidden developer settings: override of the Fuel/Spot backend URL. */
+@Composable
+private fun DeveloperSection(fuel: FuelAccess) {
+    val f = LocalFuelStrings.current
+    val active by fuel.url.collectAsStateWithLifecycle()
+    val override by fuel.overrideUrl.collectAsStateWithLifecycle()
+    var input by remember(override) { mutableStateOf(override) }
+    SectionTitle(f.devTitle)
+    Text(f.devUnlocked, style = Theme.type.caption, tone = Tone.Muted)
+    ListRow(f.devBackendUrl) {
+        RowInput(input, { input = it }, onCommit = { fuel.setOverride(input) })
+    }
+    Text(f.devBackendHint, style = Theme.type.caption, tone = Tone.Muted)
+    Spacer(Modifier.height(Space.s))
+    Text(if (active.isEmpty()) f.devNotConfigured else f.devActive(active), style = Theme.type.caption)
+}
+
+/** Profile → "Fuel · 4,20 €" (or "coming soon" / "Demo"). */
+@Composable
+private fun FuelRow(session: FuelSession, onClick: () -> Unit) {
+    val f = LocalFuelStrings.current
+    val demo by session.demo.collectAsStateWithLifecycle()
+    val service = session.current()
+    val (account, _) = rememberLoaded(service to demo) { service?.account() }
+    val value = when {
+        service == null -> f.fuelRowSoon
+        else -> ((account as? Loaded.Ready)?.value?.balanceMicro?.let { formatEuro(it, f.language) } ?: "") +
+            if (demo) " · ${f.fuelRowDemo}" else ""
+    }
+    ListRow(f.fuel, value.trim(), onClick = onClick)
 }
 
 /** "Download all images" with progress; tapping again only loads what is still missing. */

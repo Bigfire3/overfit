@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overfit</title>
+<meta name="description" content="Overfit – Strength and calisthenics log with an AI coach. Open source.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <div class="brand">Overfit</div>
+  <h1 data-i18n="h1">Train. Log. Get coached.</h1>
+  <p class="sub" data-i18n="sub">Strength and calisthenics log with rest timer and an AI coach. Open source, no accounts.</p>
+  <div class="actions">
+    <a class="btn primary" id="dl" href="https://github.com/Bigfire3/overfit/releases/latest/download/overfit.apk" data-i18n="dl">Download for Android</a>
+    <a class="btn secondary" href="https://github.com/Bigfire3/overfit" data-i18n="src">Source code on GitHub</a>
+  </div>
+  <footer data-i18n="foot">Got a training link? Open it on your phone – with Overfit installed it opens right in the app.</footer>
+</main>
+<script>
+(function () {
+  var de = (navigator.language || '').toLowerCase().indexOf('de') === 0;
+  var T = de ? { h1: 'Trainieren. Loggen. Coachen lassen.', sub: 'Kraft- und Calisthenics-Log mit Pausentimer und KI-Coach. Open Source, ohne Konto.', dl: 'Für Android herunterladen', src: 'Quellcode auf GitHub', foot: 'Du hast einen Trainingslink bekommen? Öffne ihn auf dem Handy – mit installiertem Overfit öffnet er direkt in der App.' } : null;
+  if (T) { document.documentElement.lang = 'de'; document.querySelectorAll('[data-i18n]').forEach(function (e) { e.textContent = T[e.getAttribute('data-i18n')]; }); }
+})();
+</script>
+</body>
+</html>

@@ -48,6 +48,12 @@ kotlin {
             // Notifications (NotificationCompat) and Dispatchers.Main for the workout controller.
             implementation(libs.androidx.core.ktx)
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.play.integrity)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.camerax.camera2)
+            implementation(libs.camerax.lifecycle)
+            implementation(libs.camerax.view)
+            implementation(libs.zxing.core)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
@@ -58,6 +64,10 @@ kotlin {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.ktor.client.mock)
+        }
+        // Prüft in den Android-Host-Tests, dass der eigene QR-Generator echte, lesbare QR-Codes erzeugt.
+        getByName("androidHostTest").dependencies {
+            implementation(libs.zxing.core)
         }
     }
 }

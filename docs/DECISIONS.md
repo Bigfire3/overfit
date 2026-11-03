@@ -246,3 +246,106 @@ Zuerst als native Android-Version gebaut (PR #17), dann nach der KMP-Entscheidun
 - **Pausenleiste** nie Vollbild: minimiert eine Leiste über dem Button „Nächsten Satz loggen“, erweitert ein höherer
   Bereich mit großem Countdown. Die Liste bleibt darüber bedienbar; Tippen auf „Nächste“ springt zur Übung.
 - **Offen:** „Bildschirm anlassen“, Ton zum Pausenende, RPE-Feld und Live Activity folgen später (Phase 5).
+
+## Phase 8: Trainings teilen (Session B)
+- **Deflate selbst geschrieben:** Die Kotlin-Standardbibliothek hat kein Deflate, und eine KMP-Bibliothek nur dafür wäre
+  zusätzliche Abhängigkeit auf beiden Plattformen. `Deflate.kt` (Raw Deflate, RFC 1951) schreibt einen Fixed-Huffman-Block
+  mit LZ77, liest aber alle Blocktypen (Test mit dynamischem Block von Python zlib). Die Web-Seite liest es mit
+  `DecompressionStream('deflate-raw')`. Ausgabegrenze 200 KB gegen Zip-Bomben.
+- **Format:** Zusätzlich zur SPEC `name` statt `id` pro Übung (für KI-Vorlagen), `note`, `restSec`, Sätze als
+  `{kg, reps, sec}`. `kind` ist ein String (`template` jetzt, `workout` später); unbekannte `kind` und höhere `v` werden
+  mit eigener Fehlermeldung abgelehnt. Der Leser ist tolerant bei Werten ("8-12", "82,5 kg") und streng bei der Struktur.
+  Details: `docs/share-format.md`.
+- **Auflösung:** `ref` → eigene Übung gleichen Namens, sonst neu; `id` → Katalog; `name` → exakter Treffer, sonst bester
+  Treffer der unscharfen Suche (DE/EN); sonst neue eigene Übung. Nicht zur Erfassungsart passende Satzwerte werden
+  verworfen (z. B. Gewicht bei Klimmzug mit „Wdh.“).
+- **QR-Code selbst geschrieben:** Reiner Kotlin-Generator (Byte-Modus, Fehlerkorrektur M, Version 1–30) in commonMain,
+  damit Android und iOS denselben Code zeichnen, ohne ZXing auf iOS. Gegen ZXing-Decoder getestet (Versionen 1–30,
+  inkl. Umlaute). QR nur bis 1.000 Zeichen Link, sonst Hinweis und Datei/Link.
+- **Scannen:** Android in der App mit CameraX + ZXing core (Apache-2.0, keine Play-Dienste). **iOS: kein In-App-Scanner,
+  die Kamera-App reicht**, weil der QR ein Link ist (`overfit://`-Link öffnet die App direkt, der https-Link den
+  Browser/die Web-Seite mit „In Overfit öffnen“). Grund: AVFoundation-Scanner lässt sich unter Linux nicht testen, und der
+  Nutzen gegenüber der Kamera-App ist klein. Die Import-Seite zeigt auf iOS einen Hinweis statt des Scan-Knopfs.
+- **Android-Links:** Intent-Filter für `https://bigfire3.github.io/overfit/t` **ohne** `autoVerify` (die Domain gehört
+  nicht der App; ohne Verifizierung fragt Android bzw. der Browser) sowie `overfit://`, `.overfit`-Dateien
+  (`application/x-overfit`, `content`/`file`). `launchMode=singleTop`, damit ein zweiter Link in der laufenden App
+  ankommt. iOS: URL-Schema `overfit` und Dokumenttyp `.overfit`; Universal Links bräuchten eine Domain, die Overfit
+  gehört (siehe PROGRESS).
+- **Eingang von außen:** `ImportInbox` (ein Text wartet auf den Import-Bildschirm). Die Plattform-Hüllen legen dort ab,
+  die UI öffnet den Import (nicht während des Onboardings).
+- **`PlatformShare`-Interface** statt expect/actual-Funktionen: Share-Sheet, Zwischenablage und Datei brauchen auf
+  Android einen `Context`, und Tests ersetzen es durch `NoopPlatformShare`.
+- **KI-Prompt:** Liegt in `ShareStrings` (DE/EN, App-Sprache), enthält ein Beispiel (`AiPrompt.EXAMPLE`), das in Tests
+  importiert wird. Übungen verlangt der Prompt per Name (englischer Alltagsname), weil Chat-Assistenten die
+  Katalog-IDs nicht kennen.
+- **Strings:** Die Teilen-Texte stehen in `i18n/ShareStrings.kt` (eigene Datei, DE+EN, fehlende Übersetzung = Compile-Fehler)
+  und hängen als `Strings.share` ein, um Merge-Konflikte in der großen `Strings.kt` klein zu halten.
+- **Beispielvorlagen:** `files/samples/{push,pull,legs}.json` in der gleichen Datei-Form wie der Export. „Hinzufügen“
+  ist idempotent über den Namen (Push/Pull/Legs), wer eine löscht, kann sie neu holen.
+- **Duo:** Nur ein Teaser-Eintrag „Duo · bald“ auf dem Startbildschirm und ein Text-Screen, keine Datenerhebung.
+## Produktentscheidungen Nacht 3.11.
+
+Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus, KI-Coach, App-Anbindung):
+
+- **Fuel:** Das Coach-Guthaben heißt „Fuel“ (DE und EN gleich) und wird in Euro angezeigt, z. B. „Fuel · 4,20 €“.
+- **Spot:** Das Einladungsprogramm heißt „Spot“ (wie der Trainingspartner, der beim Bankdrücken sichert). EN „Spot a friend“,
+  DE „Freund spotten“. Eingeladene bekommen 1 € Fuel, Einladende 1 € Fuel, sobald der Neue seine erste Coach-Auswertung gemacht hat.
+- **Reveal beim Einlösen eines Spots:** Bildschirm wird schwarz, zwei kurze Haptik-Pulse (Herzschlag), dann zählt eine große
+  Zahl in Inter mit tabellarischen Ziffern von 0,00 auf 1,00 € hoch, darunter „Spot von <Name>“; am Ende ein kräftiger Puls.
+  Bewusste Ausnahme von „keine Animationen“.
+- **Haptik:** leichter Tick beim Abhaken eines Satzes, drei kurze Pulse am Ende der Pause, das Reveal-Muster. Schalter
+  „Vibration“ im Profil (Standard an).
+- **Duo-Modus** (zwei Handys trainieren gemeinsam: synchrone Sätze, gemeinsamer Pausentimer) wird nur angeteasert: Eintrag
+  „Duo · bald“ mit kurzer Erklärung, keine Datenerhebung.
+- **Teilen/Import:** Format laut SPEC und `docs/share-format.md` (JSON, Raw Deflate, Base64url im URL-Fragment); Beispielvorlagen
+  Push, Pull, Legs in `samples/`.
+
+### Backend (Fuel & Spot) und Web-Fallback
+
+- **Cloudflare Worker + D1**, hand-gerollter Router ohne Framework. Tests mit Vitest in Miniflare. Wir nutzen
+  `@cloudflare/vitest-plugin` (der Nachfolger des umbenannten, als veraltet markierten `@cloudflare/vitest-pool-workers`;
+  gleiche Funktionalität). Atomarität ohne Durable Objects: Reservierung als einzelnes `INSERT … SELECT … WHERE saldo ≥ betrag`,
+  Abrechnung als D1-Batch (Transaktion).
+- **Beträge:** Integer in **Mikro-Euro** (1 € = 1 000 000), nicht Zehntel-Cent: Eine Auswertung kostet wenige Cent, aber einzelne
+  Anfragen nur Bruchteile davon; Mikro-Euro vermeidet Rundungsfehler bei Tokenpreisen. Rechnen mit BigInt, immer aufrunden zugunsten
+  des Betreibers (Kosten) bzw. abrunden (Paket-Gutschrift). Anzeige rundet die App auf Cent.
+- **Preise in Euro, nicht USD:** `PRICE_TABLE` enthält µ€ je 1 Mio. Token (Listenpreis × Wechselkurs, vom Betreiber gepflegt, Standard
+  0,92 €/$ nur für Sonnet 5.5). Kein Live-Wechselkurs: ein Fehler dort würde direkt Geld kosten; der Aufschlag deckt Schwankungen.
+- **Signatur:** ECDSA P-256, kanonischer String `OVERFIT-V1\nMETHODE\nPFAD?QUERY\nTS\nNONCE\nSHA256(Body)`, ±5 min, Nonce-Tabelle
+  gegen Replay. Server akzeptiert Roh- und DER-Signaturen sowie Roh- und SPKI-Schlüssel, damit Android Keystore und CryptoKit
+  ohne Umwandlung funktionieren. Geräte-ID = SHA-256 des Rohschlüssels. Details: `docs/backend-api.md`.
+- **Guthaben-Posten (`lots`):** Käufe verfallen nie, Startguthaben/Belohnung nach 180 Tagen. Abgebucht wird zuerst, was zuerst
+  verfällt. „Nur für Coach-Anfragen“ ergibt sich daraus, dass `/v1/messages` die einzige Ausgabe ist.
+- **Wiederherstellung:** Code mit 120 Bit (Hash in der DB), Umzug meldet alle anderen Geräte des Kontos ab (gestohlenes altes
+  Handy verliert Zugriff) und entwertet den Code.
+- **Spot-Token:** HMAC-signiert (kein Server-Zustand bis zum Einlösen), 45 s gültig, einmalig über Tabelle `spot_tokens_used`.
+  Attestierung läuft über eine serverseitige, an das Gerät gebundene Challenge. Gerätekennung der Attestierung ist UNIQUE
+  (einmal pro Gerät, übersteht Neuinstallation). Das globale Monatsbudget rechnet jeden Spot mit Startguthaben + Belohnung
+  (die Belohnung wird dem Einladenden auch bei erschöpftem Budget immer gutgeschrieben, nur neue Einlösungen werden gestoppt).
+- **Mock-Modi nur mit `DEV_MODE=true`:** Ein versehentlich gesetztes `ATTESTATION_MODE=mock` in Produktion hat keine Wirkung.
+- **Echte Store-/Attestierungsprüfer fehlen noch** (brauchen Konten und Zugangsdaten): Schnittstellen und Mocks sind fertig,
+  Produktion antwortet 503, bis sie nachgezogen sind. Das Anthropic-Proxying funktioniert allein mit `ANTHROPIC_API_KEY`.
+- **Reservierung:** Eingabe-Token werden als UTF-8-Bytes/2 geschätzt (konservativ), Bilder pauschal mit 3000 Token, dazu
+  `max_tokens` × Ausgabepreis, alles mit Aufschlag; `max_tokens` ist auf 8192 begrenzt. Ist die Eingabe-Schätzung zu niedrig, wird
+  höchstens der reservierte Betrag abgebucht (Verlust beim Betreiber, nie Überziehen des Kontos).
+- **Web-Fallback** unter `https://bigfire3.github.io/overfit/` (Pages-Workflow, Quelle `web/`). `t/index.html` liest nur,
+  alles clientseitig (Fragment verlässt nie den Browser), Namen werden ausschließlich per `textContent` eingefügt. Inter wird erst
+  im Workflow aus den App-Ressourcen kopiert, damit keine zweite Kopie im Repo liegt. **Einschränkung:** Android App Links /
+  iOS Universal Links brauchen `/.well-known/…` im Wurzelverzeichnis der Domain; unter `bigfire3.github.io/overfit/` ist das nicht
+  möglich. Bis eine eigene Domain steht, hilft der Button „In Overfit öffnen“ (`overfit://t#…`).
+
+## Fuel & Spot in der App (Nacht 3.11., Session D)
+- **Texte in eigener Datei:** `i18n/FuelStrings.kt` (DE + EN, fehlende Übersetzung = Compile-Fehler wie bei `Strings`), damit paralleles Arbeiten an `Strings.kt` nicht kollidiert. Kann später in `Strings.kt` einfließen.
+- **Geräte-Identität:** `DeviceKey` (expect-ähnlich über Interface + Plattformklassen): Android Keystore (EC P-256, nicht exportierbar, StrongBox wenn möglich), iOS Secure Enclave mit Keychain-Softwareschlüssel als Rückfall (Simulator). Signatur DER (der Server akzeptiert beides). Öffentlicher Schlüssel wird immer als 65-Byte-Rohpunkt gesendet. SHA-256 ist reines Kotlin (keine Plattformabhängigkeit), abgesichert mit Standardvektoren; die Signatur ist gegen einen mit WebCrypto erzeugten Testvektor geprüft (`SignatureVectorTest`).
+- **Backend-URL:** Build-Zeit `OVERFIT_BACKEND_URL` (Repository-Variable → Android `BuildConfig`, iOS `Info.plist` über XcodeGen); Entwickler-Override durch 7× Tippen auf die Version in „Über“ (nur im Speicher entsperrt, Wert dauerhaft in `KeyValueStore`). Leer = „Fuel startet bald“ + Demo.
+- **Fuel als KI-Zugang:** `ProviderId.FUEL` + `FuelProvider` (nutzt keinen Key, „Validierung“ = Konto abrufbar). Er steht in der Auswahl vor den Key-Anbietern; „Fuel verwenden“ öffnet den Fuel-Bildschirm. Ein vorhandener eigener Key bleibt gespeichert. Phase 4 ruft `FuelProvider.messages(bodyJson)` auf (liefert Kosten und neuen Saldo).
+- **Demo:** `DemoFuelService` implementiert dieselbe `FuelService`-Schnittstelle lokal; alle Screens laufen darauf, Banner „Demo“, keine echten Daten.
+- **Anzeige von Beträgen:** DE „4,20 €“, EN „€4.20“ (kaufmännisch gerundet). Kosten unter 1 Cent mit 4 Nachkommastellen, damit sie nicht wie 0 aussehen.
+- **Spot-Link im QR:** `overfit://spot#<token>` (Token im Fragment), wie bei Trainings auf iOS: die Kamera-App öffnet den Link direkt in Overfit (landet über `ImportInbox` bei „Ich wurde gespottet“, Code vorbelegt, Einlösen per Tippen); Android scannt zusätzlich in der App (Scanner und QR-Darstellung aus Session B, mein eigener Encoder entfällt). Keine Web-Seite nötig.
+- **Attestierung:** Android Play Integrity (Nonce = base64url(SHA-256(challenge))), iOS App Attest (clientDataHash = SHA-256(challenge); Token = JSON `{"keyId","attestation"(base64url)}`). Das Format gegenüber dem späteren Server-Prüfer ist damit festgelegt und muss dort so gelesen werden. Ohne Support/Konfiguration → `attestation_unavailable` + freundliche Meldung.
+- **Reveal:** schwarzer Vollbildschirm (immer schwarz/weiß, unabhängig vom Theme), Haptik `Reveal` (zwei Pulse), 1,1 s Schwarz, Zahl zählt 2,4 s ease-out hoch (Inter, tabellarische Ziffern), am Ende `RevealFinish`; Tippen schließt erst nach dem Ende.
+- **Haptics:** API 1:1 von Session A übernommen (`Haptics`, `HapticPattern`, `AndroidHaptics`, `IosHaptics`); beim Merge identisch.
+
+### Zur Prüfung durch Fabian
+- Spot-QR enthält `overfit://spot#…` (ohne installierte App passiert beim Scannen nichts; eine Web-Seite dafür wäre möglich).
+- Name „Fuel · 4,20 €“ in EN als „€4.20“ formatiert (DE „4,20 €“).

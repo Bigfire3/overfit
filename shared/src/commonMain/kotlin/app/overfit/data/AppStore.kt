@@ -102,6 +102,9 @@ class AppStore(
         edit { it.copy(providerId = providerId) }
     }
 
+    /** Use Fuel (backend credit) as the coach's AI access; an existing own key stays stored. */
+    fun useFuel() = edit { it.copy(providerId = ProviderId.FUEL) }
+
     fun disconnectAi() {
         secrets.delete()
         _state.update { it.copy(hasApiKey = false) }

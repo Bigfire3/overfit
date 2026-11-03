@@ -10,6 +10,11 @@ import app.overfit.ui.AppDependencies
  */
 class OverfitApp : Application(), HasAppDependencies {
     override val dependencies: AppDependencies by lazy {
-        androidDependencies(this, "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", restIcon = R.drawable.ic_stat_rest)
+        androidDependencies(
+            this,
+            "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            BuildConfig.OVERFIT_BACKEND_URL,
+            restIcon = R.drawable.ic_stat_rest,
+        )
     }
 }

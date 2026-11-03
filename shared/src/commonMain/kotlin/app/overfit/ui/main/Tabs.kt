@@ -11,7 +11,10 @@ import app.overfit.domain.formatWeight
 import app.overfit.domain.latestWeight
 import app.overfit.i18n.LocalStrings
 import app.overfit.domain.TemplateSummary
+import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
+import app.overfit.ui.share.ShareDependencies
+import app.overfit.ui.share.SamplesRow
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.PrimaryButton
@@ -33,6 +36,8 @@ fun StartScreen(
     onStartWorkout: () -> Unit,
     onOpenTemplate: (Long) -> Unit,
     onNewTemplate: () -> Unit,
+    share: ShareDependencies,
+    onDuo: () -> Unit,
 ) {
     val t = LocalStrings.current
     val latest = latestWeight(state.weights)
@@ -57,11 +62,17 @@ fun StartScreen(
         }
 
         SectionTitle(t.templates)
-        if (templates != null && templates.isEmpty()) Text(t.templatesEmpty, tone = Tone.Muted)
+        if (templates != null && templates.isEmpty()) {
+            Text(t.templatesEmpty, tone = Tone.Muted)
+            SamplesRow(share)
+        }
         templates?.forEach { TemplateRow(it) { onOpenTemplate(it.id) } }
         if (templates != null) ListRow(t.newTemplate, onClick = onNewTemplate) { LineIcon(Icon.Plus) }
         SectionTitle(t.coachTips)
         Text(t.coachTipsEmpty, tone = Tone.Muted)
+        Spacer(Modifier.height(Space.xl))
+        Hairline()
+        ListRow(t.share.duoSoon, onClick = onDuo, tone = Tone.Muted)
     }
 }
 

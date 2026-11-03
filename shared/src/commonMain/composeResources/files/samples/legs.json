@@ -1,0 +1,125 @@
+{
+ "v": 1,
+ "kind": "template",
+ "name": "Legs",
+ "note": "Beine und Waden – Hypertrophie (Beispielwerte, an dich anpassen)",
+ "exercises": [
+  {
+   "id": "wg:squat",
+   "restSec": 180,
+   "sets": [
+    {
+     "kg": 80,
+     "reps": 6
+    },
+    {
+     "kg": 80,
+     "reps": 6
+    },
+    {
+     "kg": 80,
+     "reps": 6
+    },
+    {
+     "kg": 80,
+     "reps": 6
+    }
+   ],
+   "note": "Tiefe so, dass die Form stabil bleibt"
+  },
+  {
+   "id": "wg:romanian-deadlift",
+   "restSec": 150,
+   "sets": [
+    {
+     "kg": 70,
+     "reps": 8
+    },
+    {
+     "kg": 70,
+     "reps": 8
+    },
+    {
+     "kg": 70,
+     "reps": 8
+    }
+   ]
+  },
+  {
+   "id": "wg:leg-press",
+   "restSec": 120,
+   "sets": [
+    {
+     "kg": 140,
+     "reps": 12
+    },
+    {
+     "kg": 140,
+     "reps": 12
+    },
+    {
+     "kg": 140,
+     "reps": 12
+    }
+   ]
+  },
+  {
+   "id": "wg:seated-leg-curl",
+   "restSec": 75,
+   "sets": [
+    {
+     "kg": 40,
+     "reps": 12
+    },
+    {
+     "kg": 40,
+     "reps": 12
+    },
+    {
+     "kg": 40,
+     "reps": 12
+    }
+   ]
+  },
+  {
+   "id": "wg:leg-extension",
+   "restSec": 75,
+   "sets": [
+    {
+     "kg": 40,
+     "reps": 12
+    },
+    {
+     "kg": 40,
+     "reps": 12
+    },
+    {
+     "kg": 40,
+     "reps": 12
+    }
+   ]
+  },
+  {
+   "id": "wg:seated-calf-raise",
+   "restSec": 60,
+   "sets": [
+    {
+     "kg": 30,
+     "reps": 15
+    },
+    {
+     "kg": 30,
+     "reps": 15
+    },
+    {
+     "kg": 30,
+     "reps": 15
+    },
+    {
+     "kg": 30,
+     "reps": 15
+    }
+   ]
+  }
+ ]
+}

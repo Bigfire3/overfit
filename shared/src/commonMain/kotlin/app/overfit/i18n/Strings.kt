@@ -16,6 +16,7 @@ data class Strings(
     val next: String,
     val back: String,
     val comingSoon: String,
+    val share: ShareStrings,
 
     // Onboarding
     val nameTitle: String,
@@ -209,6 +210,7 @@ private val GERMAN_MONTHS = listOf("Jan.", "Feb.", "März", "Apr.", "Mai", "Juni
 private val ENGLISH_MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 val German = Strings(
+    share = ShareGerman,
     next = "Weiter",
     back = "Zurück",
     comingSoon = "Folgt in einer späteren Version",
@@ -398,6 +400,7 @@ val German = Strings(
 )
 
 val English = Strings(
+    share = ShareEnglish,
     next = "Continue",
     back = "Back",
     comingSoon = "Coming in a later version",
