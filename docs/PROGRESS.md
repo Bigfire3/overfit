@@ -15,6 +15,32 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Feedback-Runde 3: UI (Session AE, 3.11.)
+**Erledigt** (enthält PR #56: Push/Pull/Legs ab dem ersten Start, keine „Beispiel-Workouts hinzufügen“-Zeile mehr):
+- Übergänge: Ursache (700-ms-Standardüberblendung, Leisten springen, Doppel-Taps wirken) behoben; Tabs sofort, sonst kurzes Fade-through,
+  Taps während des Wechsels gesperrt. Details in DECISIONS.md.
+- Teilen/Löschen/Bearbeiten als Icons oben rechts (Workout, Training im Verlauf, eigene Übung, Foto); im Bearbeiten-Modus weder Teilen
+  noch Löschen. Workout-Screen: unten „Starten“, darunter gleich groß „Bearbeiten“.
+- Keine unterstrichenen Buttons mehr (`SmallButton`); Bestätigungs-Buttons ohne Rahmen, nur einer scharf, Tipp woanders entschärft.
+- Duo-Teaser und „Letzte Coach-Tipps“ entfernt; „Über overfit“: eigene MIT-Lizenz + Repo-Link, Bibliotheken getrennt (Apache 2.0).
+- Workout-Editor und Workout-Modus im Block-Layout (Fabians Screenshot): Übung als graue Fläche mit Bild, „?“, ⋮-Menü; Sätze als eigene
+  Zeilen mit großen Feldern; Satz nach links wischen löscht, mit „Rückgängig“.
+- Tests: `UiFeedbackTest` (Bestätigen, Wischen, Editor + Rückgängig, Übergang, Tab-Wechsel), bestehende Tests angepasst.
+
+### Bitte auf dem Handy testen (Session AE)
+1. Zwischen Screens wechseln (Workout öffnen, zurück, Verlauf → Training): kurzes ruhiges Ausblenden/Einblenden, kein Springen, kein
+   Flackern. Tabs wechseln sofort. Schnell doppelt auf „Zurück“ tippen: nur ein Screen zurück. Zurück-Wischgeste ausprobieren.
+2. Workout öffnen: oben rechts Teilen- und Mülleimer-Icon; Mülleimer → rote Pille „Wirklich löschen?“, darunter Hinweis zum Verlauf.
+   Unten großes „Starten“, darunter großes „Bearbeiten“.
+3. „Bearbeiten“: Kopf mit Name + Stift und „Bearbeitungsmodus“, kein Teilen/Löschen. Übungen als graue Blöcke (Chevron klappt, ⋮ mit
+   Ersetzen/Verschieben/Entfernen, „?“ am Bild öffnet Details). Satz nach links wischen → rot, löscht; „Rückgängig“ unten holt ihn zurück.
+4. Training starten: gleiche Blöcke und Satzzeilen, Satz wischen löscht, Haken weiter rechts.
+5. Irgendeinen roten oder grünen Bestätigungs-Button antippen (z. B. „Beenden“, „Training verwerfen“): kein Rahmen; danach woanders
+   tippen → zurückgesetzt; einen zweiten Bestätigungs-Button antippen → der erste setzt zurück.
+6. Kleine Buttons (Pausentimer −15 s/+15 s/Überspringen, Coach, Guthaben „Erneut versuchen“ …) sind graue Pillen, nichts unterstrichen.
+7. Verlauf → Training: Teilen/Löschen oben rechts. Fotos → Foto öffnen: Teilen/Löschen oben rechts. Eigene Übung: Stift + Mülleimer oben.
+8. Training-Tab: kein Duo, keine Coach-Tipps. Profil → Über overfit: „Open Source unter der MIT-Lizenz“, Link zum Repo, Bibliotheken separat.
+
 ## Einladung intern, Guthaben vs. echte Euro, Bonus als Auswertungen (Session AD, 3.11.)
 **Erledigt:**
 - **„Spot“ intern entfernt:** API `/v1/invite/*`, Env `INVITE_*`, D1-Migration `0007_invite.sql` (Tabellen, Index, Ledger-Typen umbenannt,
@@ -283,7 +309,7 @@ Erledigt:
 **Erledigt:** Button-Hierarchie (Primary/Secondary/Tertiary/Destructive/Confirm), 48/40-dp-Höhen, Chevron + Pressed-State für klickbare Zeilen, Chips/Segmente auf `surface`, schlankere Workout-Ansicht (ein Kopf, kompakter Fuß, 48-dp-Haken in Grün), Bestätigungsmuster mit Farbe überall, Diary zeigt mindestens 4 Monate inkl. leere. Vorher/Nachher-Screenshots: `docs/screenshots/before|after` (Test `ScreenshotTest`, nur mit `SCREENSHOT_DIR=…`). Mängelliste in DECISIONS.md.
 
 ### Bitte auf dem Handy testen: UI-Feinschliff
-1. Training-Tab: Workout-Zeilen und Coach/Duo haben Chevron; beim Drücken färbt sich die Zeile grau.
+1. Training-Tab: Workout-Zeilen und Coach/Duo (beide entfernt 3.11., Fabian) haben Chevron; beim Drücken färbt sich die Zeile grau.
 2. Workout öffnen: „Bearbeiten“ und „Teilen“ sind graue Buttons.
 3. Training starten: Kopf ist eine schmale Zeile (Minimieren, Name + Uhr, „Beenden“). Mehr Platz für Sätze, oben kaum Leerraum.
 4. Satz abhaken: großer Kreis, danach grün. „Beenden“ antippen: Button wird grün mit „Beenden? Nochmal tippen“, Name weicht kurz.
@@ -423,7 +449,7 @@ Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft di
 28. „Als Datei teilen“ → `.overfit` antippen → Overfit öffnet die Vorschau
 29. „KI-Vorlage kopieren“ → in ChatGPT/Claude/Gemini einfügen, Fragen beantworten, ```json-Antwort kopieren → „Aus Zwischenablage importieren“
 30. Leere Zwischenablage / beliebiger Text → verständliche Fehlermeldung
-31. Start ganz unten: „Duo · bald“ → Erklärtext, keine Eingabe
+31. (entfernt 3.11., Fabian; später evtl.) Start ganz unten: „Duo · bald“ → Erklärtext, keine Eingabe
 
 **KI-Chat, Kontext kopieren**
 32. Profil → KI-Coach → Gemini (oder Claude/ChatGPT): „Kontext kopieren“ → in Notizen einfügen: Profil, letzte Trainings, ```json-Block
@@ -647,7 +673,7 @@ Fertig:
 - „KI-Vorlage kopieren“: Prompt in App-Sprache für ChatGPT/Claude/Gemini; Antwort danach aus der Zwischenablage importieren
 - Beispielvorlagen Push/Pull/Legs (je 6 Übungen, Katalog-IDs): im leeren Vorlagen-Zustand auf Start, in Übungen →
   Vorlagen und im Profil „Beispielvorlagen hinzufügen“ (idempotent)
-- „Duo · bald“ auf dem Startbildschirm → Teaser-Screen
+- (entfernt 3.11., Fabian; später evtl.) „Duo · bald“ auf dem Startbildschirm → Teaser-Screen
 - Tests: Deflate, Format, Parser, Mapper, AI-Prompt (Common); QR gegen ZXing; Samples laden, Teilen→Import
   ergibt dieselbe Vorlage, Import-Flows in der UI (Robolectric)
 - iOS: kein In-App-QR-Scanner (Kamera-App öffnet den `overfit://`-Link), Begründung in DECISIONS.md
@@ -796,7 +822,7 @@ Offen / Hinweise:
    kopieren → „Aus Zwischenablage importieren“ → Vorschau zeigt Übungen (neu = eigene Übung) → „Übernehmen“
 7. Vorlage → „Teilen“ → „Als Datei teilen“ → `.overfit` an sich selbst mailen/in Dateien speichern, antippen → Overfit
    öffnet die Vorschau
-8. Startbildschirm ganz unten: „Duo · bald“ → Erklärtext
+8. (entfernt 3.11., Fabian; später evtl.) Startbildschirm ganz unten: „Duo · bald“ → Erklärtext
 9. Zwischenablage leer oder Text ohne Training → verständliche Fehlermeldung
 
 ## Bitte auf dem Handy testen: App-Icon „of“ (Session W)

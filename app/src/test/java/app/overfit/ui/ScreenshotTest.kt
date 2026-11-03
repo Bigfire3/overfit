@@ -1,5 +1,6 @@
 package app.overfit.ui
 
+import kotlinx.coroutines.runBlocking
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
@@ -116,9 +117,10 @@ class ScreenshotTest {
             today = { LocalDate(2026, 11, 3) }, haptics = RecordingHaptics(), restAlerts = RecordingRestAlerts(), kv = kv,
         )
         compose.setContent { OverfitApp(deps) }
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         shot("training-leer")
-        click("Beispiel-Workouts hinzufügen")
+        // The sample workouts normally arrive at the first start; here they are added after the empty-state shot.
+        runBlocking { data.importer.addSamples() }
         waitFor("Legs")
         shot("training")
 
@@ -126,11 +128,17 @@ class ScreenshotTest {
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
         waitFor("Starten")
         shot("workout-detail")
-        // Share
-        click("Teilen")
+        // Share (icon top right)
+        compose.onNodeWithContentDescription("Teilen").performClick()
         waitFor("Link kopieren")
         shot("teilen")
         back()
+        // Edit mode: blocks per exercise, set rows
+        click("Bearbeiten")
+        waitFor("Bearbeitungsmodus")
+        shot("workout-bearbeiten")
+        back()
+        waitFor("Starten")
         // Run it
         click("Starten")
         waitFor("Nächsten Satz loggen")
@@ -147,12 +155,12 @@ class ScreenshotTest {
         compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
         shot("beenden")
         click("Speichern")
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         tab("Verlauf")
         waitFor("Push")
         shot("verlauf")
         compose.onAllNodes(hasText("Push"))[0].performClick()
-        waitFor("Teilen")
+        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Teilen").fetchSemanticsNodes().isNotEmpty() }
         shot("verlauf-detail")
         back()
         tab("Fotos")
@@ -165,7 +173,7 @@ class ScreenshotTest {
         waitFor("Eigene Übung")
         shot("uebungskatalog")
         back()
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         compose.onNodeWithContentDescription("Neues Workout").performClick()
         waitFor("Workout importieren")
         shot("neues-workout-menue")

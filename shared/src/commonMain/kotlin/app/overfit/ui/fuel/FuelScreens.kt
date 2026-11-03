@@ -37,7 +37,7 @@ import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
@@ -52,14 +52,14 @@ fun epochToDate(ts: Long) = Instant.fromEpochSeconds(ts).toLocalDateTime(TimeZon
 @Composable
 private fun DemoBanner(session: FuelSession, t: FuelStrings) {
     Text(t.demoBanner, style = Theme.type.caption, tone = Tone.Muted)
-    TextButton(t.demoExit, { session.endDemo() })
+    SmallButton(t.demoExit, { session.endDemo() })
     Spacer(Modifier.height(Space.m))
 }
 
 @Composable
 private fun ErrorBlock(t: FuelStrings, onRetry: () -> Unit) {
     Text(t.unreachable, tone = Tone.Muted)
-    TextButton(t.retry, onRetry, tone = Tone.Default)
+    SmallButton(t.retry, onRetry, tone = Tone.Default)
 }
 
 /** Profile → Fuel: balance, top-up packages, invitations, transactions, recovery. Not configured: "coming soon" + demo. */
@@ -281,7 +281,7 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
         when (val st = state) {
             is Loaded.Loading -> Text(t.loading, tone = Tone.Muted, modifier = Modifier.padding(top = Space.m))
             is Loaded.Failed -> ErrorBlock(t) { load(next) }
-            is Loaded.Ready -> if (next != null) TextButton(t.loadMore, { load(next) }, tone = Tone.Default)
+            is Loaded.Ready -> if (next != null) SmallButton(t.loadMore, { load(next) }, tone = Tone.Default)
         }
     }
 }
@@ -318,7 +318,7 @@ fun RecoveryScreen(session: FuelSession, onBack: () -> Unit, onRestored: () -> U
         if (shown != null) {
             Text(shown, style = Theme.type.title)
             Spacer(Modifier.height(Space.s))
-            TextButton(if (copied) t.recoveryCopied else t.recoveryCopy, {
+            SmallButton(if (copied) t.recoveryCopied else t.recoveryCopy, {
                 clipboard.setText(AnnotatedString(shown)); copied = true
             }, tone = Tone.Default)
         }
@@ -338,8 +338,8 @@ fun RecoveryScreen(session: FuelSession, onBack: () -> Unit, onRestored: () -> U
         BigInput(input, { input = it.uppercase().take(40); message = null }, t.restorePlaceholder)
         Spacer(Modifier.height(Space.m))
         message?.let { Text(it, style = Theme.type.caption); Spacer(Modifier.height(Space.m)) }
-        TextButton(t.restoreAction, {
-            if (service == null || input.isBlank() || busy) return@TextButton
+        SmallButton(t.restoreAction, {
+            if (service == null || input.isBlank() || busy) return@SmallButton
             busy = true
             scope.launch {
                 message = try {

@@ -128,7 +128,7 @@ class OwnKeyPrivacyTest {
         }
 
         // App start and "back in the foreground", also explicitly, plus the coach queue.
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         deps.chat.onForeground()
         deps.chat.onBackground()
         deps.coach.processQueue()

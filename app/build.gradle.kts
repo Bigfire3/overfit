@@ -93,6 +93,8 @@ dependencies {
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
+    // Component tests (Column, Row) build small hosts around design-system parts.
+    testImplementation(libs.compose.foundation)
     debugImplementation(platform(libs.androidx.compose.bom))
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

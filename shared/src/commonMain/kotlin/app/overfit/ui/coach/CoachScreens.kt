@@ -61,7 +61,7 @@ import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
@@ -362,7 +362,7 @@ private fun RawAnswer(raw: String?) {
     val c = LocalCoachStrings.current
     var show by remember { mutableStateOf(false) }
     Spacer(Modifier.height(Space.m))
-    TextButton(if (show) c.hideRaw else c.showRaw, onClick = { show = !show })
+    SmallButton(if (show) c.hideRaw else c.showRaw, onClick = { show = !show })
     if (show) Text(raw.take(6_000), style = Theme.type.caption, tone = Tone.Muted)
 }
 
@@ -441,7 +441,7 @@ private fun Result(
                 diff.unknownIds.forEach { Text(c.planUnknown(it), style = Theme.type.caption, tone = Tone.Muted) }
                 if (planOpen) {
                     Spacer(Modifier.height(Space.s))
-                    TextButton(c.planReject, onClick = onReject)
+                    SmallButton(c.planReject, onClick = onReject)
                 }
             }
         }
@@ -608,7 +608,7 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
         Spacer(Modifier.height(Space.s))
         TextArea(instructions, { instructions = it; saved = false }, "", Modifier.testTag("coach-instructions"))
         Row(Modifier.fillMaxWidth().padding(top = Space.s), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(c.instructionsReset, onClick = { instructions = defaultText; coach.settings.setInstructions(null); saved = true })
+            SmallButton(c.instructionsReset, onClick = { instructions = defaultText; coach.settings.setInstructions(null); saved = true })
             if (saved) Text(c.saved, style = Theme.type.caption, tone = Tone.Muted)
         }
     }
@@ -690,13 +690,6 @@ private fun FuelQuality(coach: CoachService, tier: String) {
         )
     }
     Text(c.modelEstimateNote((cfg.markupBp / 100).toString()), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Faint)
-}
-
-/** The latest coach tips for the start screen (empty until the first review). */
-@Composable
-fun latestCoachTips(coach: CoachService): List<String> {
-    val reviews by coach.reviews.collectAsState(initial = emptyList())
-    return reviews.firstOrNull { it.status == ReviewStatus.DONE && it.review != null }?.review?.tips.orEmpty().take(3)
 }
 
 private fun providerLabel(id: app.overfit.ai.ProviderId) = when (id) {

@@ -1,7 +1,7 @@
 # Store-Texte
 
 Gilt für App Store und Google Play. Stand: aktueller Funktionsumfang (siehe docs/PROGRESS.md). Limits: Play Titel 30, Kurzbeschreibung 80, Langbeschreibung 4000; App Store Untertitel 30, Beschreibung 4000.
-Marke: Wortmarke „overfit“ immer klein, Claim „personal training for everyone“ (30 Zeichen) in beiden Sprachen auf Englisch (siehe docs/DECISIONS.md). Keine Funktion bewerben, die es nicht gibt (Duo nur „bald“).
+Marke: Wortmarke „overfit“ immer klein, Claim „personal training for everyone“ (30 Zeichen) in beiden Sprachen auf Englisch (siehe docs/DECISIONS.md). Keine Funktion bewerben, die es nicht gibt (Duo entfernt 3.11., Fabian).
 
 ## Deutsch
 
@@ -43,7 +43,6 @@ KI-COACH
 TEILEN
 • Workouts und Trainings per Link, QR-Code oder Datei teilen
 • Freunde einladen (Empfehlungsprogramm): Einladungsbonus von 1 € Guthaben für dich und deinen Freund
-• Duo – gemeinsam trainieren: bald
 
 DEINE DATEN
 • Alles liegt lokal auf deinem Gerät, ohne Konto, ohne Werbung, ohne Tracking
@@ -90,7 +89,6 @@ AI COACH
 SHARING
 • Share workouts and trainings as link, QR code or file
 • Invite friends (referral program): referral bonus of €1 credit for you and your friend
-• Duo – train together: coming soon
 
 YOUR DATA
 • Everything stays on your device, no account, no ads, no tracking

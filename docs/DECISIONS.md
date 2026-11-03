@@ -282,7 +282,7 @@ Zuerst als native Android-Version gebaut (PR #17), dann nach der KMP-Entscheidun
   und hängen als `Strings.share` ein, um Merge-Konflikte in der großen `Strings.kt` klein zu halten.
 - **Beispielvorlagen:** `files/samples/{push,pull,legs}.json` in der gleichen Datei-Form wie der Export. „Hinzufügen“
   ist idempotent über den Namen (Push/Pull/Legs), wer eine löscht, kann sie neu holen.
-- **Duo:** Nur ein Teaser-Eintrag „Duo · bald“ auf dem Startbildschirm und ein Text-Screen, keine Datenerhebung.
+- **Duo:** (entfernt 3.11., Fabian; später evtl.) Nur ein Teaser-Eintrag „Duo · bald“ auf dem Startbildschirm und ein Text-Screen, keine Datenerhebung.
 ## Produktentscheidungen Nacht 3.11.
 
 Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus, KI-Coach, App-Anbindung):
@@ -295,7 +295,7 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
   Bewusste Ausnahme von „keine Animationen“.
 - **Haptik:** leichter Tick beim Abhaken eines Satzes, drei kurze Pulse am Ende der Pause, das Reveal-Muster. Schalter
   „Vibration“ im Profil (Standard an).
-- **Duo-Modus** (zwei Handys trainieren gemeinsam: synchrone Sätze, gemeinsamer Pausentimer) wird nur angeteasert: Eintrag
+- **Duo-Modus** (entfernt 3.11., Fabian; später evtl.) (zwei Handys trainieren gemeinsam: synchrone Sätze, gemeinsamer Pausentimer) wird nur angeteasert: Eintrag
   „Duo · bald“ mit kurzer Erklärung, keine Datenerhebung.
 - **Teilen/Import:** Format laut SPEC und `docs/share-format.md` (JSON, Raw Deflate, Base64url im URL-Fragment); Beispielvorlagen
   Push, Pull, Legs in `samples/`.
@@ -521,7 +521,7 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templates verstehe ich nicht … Alles soll gespeichert werden.“
 
 - **Begriff:** In der UI heißt ein gespeicherter Plan überall „Workout“ (DE und EN), eine laufende/abgeschlossene Einheit weiter „Training“ (DE) / „workout“ (EN). Intern bleiben `workout_template`, `Template`, `TemplateRepository` – keine Schemaänderung, keine Migration.
-- **Tab 1:** DE „Training“, EN „Workouts“ (im Englischen liest sich der Plural als Liste besser), Icon Blitz. Der Tab zeigt nur noch: laufendes Training oben („Läuft gerade“ + „Training fortsetzen“ als PrimaryButton), Liste der Workouts (Name, Übungen, „zuletzt vor N Tagen“), Coach-Tipps, Duo. Begrüßung und Gewicht sind raus (Gewicht steht im Profil). Der Übungen-Tab zeigt nur noch Übungen.
+- **Tab 1:** DE „Training“, EN „Workouts“ (im Englischen liest sich der Plural als Liste besser), Icon Blitz. Der Tab zeigt nur noch: laufendes Training oben („Läuft gerade“ + „Training fortsetzen“ als PrimaryButton), Liste der Workouts (Name, Übungen, „zuletzt vor N Tagen“), Coach-Tipps, Duo (Coach-Tipps und Duo entfernt 3.11., Fabian). Begrüßung und Gewicht sind raus (Gewicht steht im Profil). Der Übungen-Tab zeigt nur noch Übungen.
 - **„+“ oben rechts** öffnet eine eigene Seite (kein Bottom-Sheet, das Designsystem hat keins) mit „Workout erstellen“ (Editor, speichert, startet nicht) und „Leer starten“. Darunter unter „Weitere Wege“ Import, KI-Prompt und Beispiel-Workouts.
 - **Workout-Seite:** Tipp auf ein Workout öffnet eine Ansicht mit „Starten“ (PrimaryButton), „Bearbeiten“, „Teilen“. Import, Chat-Eingang, Coach und „Als Workout speichern“ im Verlauf führen ebenfalls dorthin statt in den Editor.
 - **Automatisch übernehmen (`WorkoutPlan`, `TemplateRepository.adopt`):** Endet ein Training (Beenden *und* Verwerfen), übernimmt sein Workout Übungsliste, Reihenfolge, Satzanzahl, Pausen und Namen – ohne Dialog. Ein leer gestartetes Training mit mindestens einer Übung wird ein neues Workout; die Sitzung bekommt dessen ID (für „zuletzt“, Coach). Zielwerte werden *nicht* aus den Ist-Werten kopiert: Sätze, die bleiben, behalten ihre geplanten Werte, neue Sätze/Übungen bekommen leere Ziele, die beim nächsten Start wie bisher aus der letzten Ausführung kommen.
@@ -962,3 +962,37 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - **Finanzbericht:** Gebühren sind geschätzt (Stripe-Mischung 2,5 % + 0,25 €, Store 15 % auf netto bei 19 % USt), weil Stripe und die
   Stores die echten Gebühren erst in Auszahlungsberichten nennen. Store-Erstattungen fließen noch nicht ein (keine Store-Webhooks).
 - **Kein Room-Update:** Ob eine gespeicherte Antwort geschenkt war, erkennt die App an Kosten 0 (Anzeige „geschenkte Auswertung“).
+
+## Duo-Teaser, Coach-Tipps auf dem Training-Tab, Lizenzhinweis (3.11., Fabian)
+- Duo-Teaser komplett entfernt (Screen, Route, Texte); Duo ggf. später. Ebenso „Letzte Coach-Tipps“ und die Coach-Zeile auf dem Training-Tab (Coach bleibt eigener Tab).
+- „Über“: oben „overfit ist Open Source unter der MIT-Lizenz“ mit Link zum Repo (LICENSE ist MIT); die Bibliotheken stehen getrennt mit „(Apache License 2.0)“, damit die Lizenzen nicht verwechselt werden.
+
+## Feedback-Runde 3: Übergänge, Kopfzeilen-Icons, Buttons, Bestätigen, Flächen statt Haarlinien (Session AE, 3.11.)
+- **Ursache der „verbuggten Übergänge“:** Der `NavHost` hatte keine eigenen Übergänge, also galt der Standard: 700 ms Überblendung
+  (alter und neuer Screen halbtransparent übereinander), auch zwischen Tabs. Dazu wechselten Tab-Leiste und Mini-Workout-Leiste sofort,
+  während die Überblendung noch lief (der ausblendende Screen sprang in der Höhe), und Taps während der 700 ms wirkten weiter: Doppel-Tipp
+  auf „Zurück“ poppte zwei Screens, Doppel-Tipp auf eine Zeile öffnete sie zweimal.
+- **Lösung, ein Übergang für alles (`ui/ScreenMotion.kt`):** Tab-Wechsel ohne Animation; alle anderen Wechsel ein kurzes Fade-through
+  (alter Screen 90 ms aus, dann neuer 150 ms ein), nie zwei halbtransparente Screens übereinander, nichts gleitet. `sizeTransform = null`.
+  Während ein solcher Wechsel läuft (`visibleEntries` > 1, nicht nur Tabs), schluckt eine Ebene über dem `NavHost` alle Taps.
+  Tests: `UiFeedbackTest` (Wechsel < 300 ms und schluckt den zweiten Tap, Tab-Wechsel < 50 ms).
+- **Icons oben rechts:** `BackHeader(actions = …)` mit `HeaderIconButton` (Teilen, Bearbeiten) und `HeaderDeleteButton` (Mülleimer → rote
+  Pille „Wirklich löschen?“, zweiter Tipp löscht). Gilt für Workout, Training im Verlauf, eigene Übung, Foto. Bearbeiten-Modi (Workout-Editor,
+  Übungsformular) zeigen weder Teilen noch Löschen; deshalb liegt „Workout löschen“ jetzt im Workout-Screen und „Übung löschen“ in den
+  Übungsdetails. Ausnahme Workout-Screen: „Bearbeiten“ als großer SecondaryButton unter „Starten“ (Fabians Vorgabe), kein Stift oben.
+  Hinweis „Trainings bleiben im Verlauf“ erscheint, solange Löschen scharf ist, statt „zuletzt …“.
+- **Keine unterstrichenen Buttons mehr:** `TertiaryButton`/`TextButton` entfernt, Ersatz `SmallButton` (kompakte graue Pille, so breit wie
+  der Text). Alle Verwendungen umgestellt; Listenzeilen mit Chevron bleiben Zeilen. `ConfirmButton(textOnly)` entfällt.
+- **Bestätigungs-Buttons:** ohne Rahmen. Zentral `ConfirmArming` (CompositionLocal) + `ConfirmArea` um die ganze App: höchstens einer scharf
+  (der nächste entschärft den vorigen), ein Tipp irgendwo anders entschärft (Pointer-Input im Initial-Pass am Root, nichts wird verbraucht;
+  ein Tipp innerhalb der Grenzen des scharfen Buttons zählt als Bestätigung). 4-s-Rücksetzung bleibt. Test in `UiFeedbackTest`.
+- **Flächen statt Haarlinien für Übungs-/Satzlisten (Editor und Workout-Modus):** `Block` (surface, 16 dp Radius) je Übung, `SetRowSurface`
+  (surfacePressed, 12 dp) je Satz, `SetField` (eigene Fläche, große Zahl, Einheit „KG“/„WDH.“), `BlockButton` („+ Satz hinzufügen“,
+  „+ Übung hinzufügen“), `MoreMenu` (⋮: Ersetzen, Nach oben/unten, Entfernen). Farben bleiben unsere Palette. Übrige Listen (Verlauf,
+  Einstellungen) behalten Haarlinien.
+- **Satz nach links wischen = löschen:** rote Fläche hinter der Zeile, ab 40 % Breite wird gelöscht, sonst federt die Zeile zurück.
+  Danach 5 s „Satz gelöscht · Rückgängig“ über dem Fuß; Rückgängig stellt nur her, solange seitdem nichts anderes geändert wurde (sonst
+  würde es neue Eingaben überschreiben). Screenreader bekommen „Satz n entfernen“ als Aktion. Der Drag liegt auf dem festen äußeren
+  Rahmen, nicht auf der gleitenden Zeile (sonst schrumpfen die Deltas). Das ×-Icon je Satz entfällt. Tests: Komponente + Editor.
+- **Editor-Kopf:** Name groß als Eingabe mit Stift daneben (fokussiert das Feld), darunter „Bearbeitungsmodus“; Übungsbild mit „?“ öffnet
+  die Übungsdetails. Langes Drücken auf den Übungskopf verschiebt weiter per Ziehen.

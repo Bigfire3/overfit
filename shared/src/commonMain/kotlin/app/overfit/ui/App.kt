@@ -86,7 +86,10 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
 import app.overfit.i18n.stringsFor
 import app.overfit.ui.ai.ConnectAiScreen
+import app.overfit.ui.components.ConfirmArea
 import app.overfit.ui.components.Hairline
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.Text
@@ -127,7 +130,6 @@ import app.overfit.ui.settings.AboutScreen
 import app.overfit.share.ImportInbox
 import app.overfit.share.NoopPlatformShare
 import app.overfit.share.PlatformShare
-import app.overfit.ui.share.DuoScreen
 import app.overfit.ui.share.ImportScreen
 import app.overfit.ui.share.ImportViewModel
 import app.overfit.ui.share.ShareDependencies
@@ -153,7 +155,6 @@ import app.overfit.ui.coach.CoachReviewScreen
 import app.overfit.ui.coach.CoachSessionScreen
 import app.overfit.ui.coach.CoachSettingsScreen
 import app.overfit.ui.coach.createCoach
-import app.overfit.ui.coach.latestCoachTips
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.overfit.ui.settings.SettingsScreen
 import app.overfit.ui.theme.OverfitTheme
@@ -304,7 +305,6 @@ class AppDependencies(
 @Serializable data class InviteRedeemRoute(val code: String = "")
 @Serializable data class InviteRevealRoute(val reviews: Int, val inviterName: String = "")
 @Serializable data object ImportRoute
-@Serializable data object DuoRoute
 @Serializable data class ShareRoute(val templateId: Long)
 @Serializable data class ExerciseDetailRoute(val id: String)
 /** Finish flow right after "Finish": summary, feeling, note, photos, coach slot. */
@@ -433,8 +433,20 @@ fun OverfitApp(deps: AppDependencies) {
                     nav.navigate(ImportRoute) { launchSingleTop = true }
                 }
             }
+            ConfirmArea(Modifier.fillMaxSize()) {
             AppScaffold(nav, workoutState.workout, deps.clock, onOpenWorkout = { nav.openWorkout() }) {
-                NavHost(nav, startDestination = start, modifier = Modifier.fillMaxSize()) {
+                NavHost(
+                    nav,
+                    startDestination = start,
+                    modifier = Modifier.fillMaxSize(),
+                    // One calm transition for the whole app (see DECISIONS "Übergänge"): tab switches are instant,
+                    // everything else a short fade-through. The default (700 ms crossfade) looked buggy.
+                    enterTransition = { ScreenMotion.enter(initialState.destination, targetState.destination) },
+                    exitTransition = { ScreenMotion.exit(initialState.destination, targetState.destination) },
+                    popEnterTransition = { ScreenMotion.enter(initialState.destination, targetState.destination) },
+                    popExitTransition = { ScreenMotion.exit(initialState.destination, targetState.destination) },
+                    sizeTransform = null,
+                ) {
                     composable<NameRoute> {
                         NameStep(state.profile.name, onNext = { deps.store.setName(it); nav.navigate(AgeRoute) })
                     }
@@ -488,9 +500,6 @@ fun OverfitApp(deps: AppDependencies) {
                             onExercises = { nav.navigate(ExercisesRoute) },
                             onOpenWorkout = { nav.navigate(WorkoutPlanRoute(it)) },
                             share = share,
-                            onDuo = { nav.navigate(DuoRoute) },
-                            coachTips = latestCoachTips(deps.coach),
-                            onCoach = { nav.selectTab(Tab.COACH) },
                             chatInboxCount = chatInbox.items.size,
                             chatInboxFull = chatInbox.full,
                             onChatInbox = { nav.navigate(ChatInboxRoute) },
@@ -532,6 +541,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onEndRunning = { deps.data.scope.launch { deps.workout.finish() }; nav.openWorkout() },
                             onEdit = { nav.navigate(TemplateEditorRoute(id)) },
                             onShare = { nav.navigate(ShareRoute(id)) },
+                            // App scope: the screen closes itself as soon as the workout is gone.
+                            onDelete = { deps.data.scope.launch { deps.data.templates.delete(id) } },
                         )
                     }
                     composable<WorkoutRoute> {
@@ -680,7 +691,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onClose = nav::popBackStack,
                             onAddExercises = { nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
-                            onShare = { nav.navigate(ShareRoute(id)) },
+                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it)) },
                         )
                     }
                     composable<ExercisePickerRoute> { entry ->
@@ -854,7 +865,6 @@ fun OverfitApp(deps: AppDependencies) {
                             language = state.language,
                         )
                     }
-                    composable<DuoRoute> { DuoScreen(onBack = nav::popBackStack) }
                     composable<CoachMemoryRoute> { CoachMemoryScreen(deps.coach, onBack = nav::popBackStack) }
                     composable<CoachRoute> {
                         CoachTabScreen(
@@ -941,6 +951,7 @@ fun OverfitApp(deps: AppDependencies) {
                     }
                 }
             }
+            }
         }
     }
 }
@@ -985,8 +996,18 @@ private fun AppScaffold(
     val destination = entry?.destination
     val current = Tab.entries.firstOrNull { tab -> destination?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
 
+    // While a screen change runs, taps are swallowed: a double tap no longer opens a screen twice or pops two screens.
+    val visible by nav.visibleEntries.collectAsStateWithLifecycle()
+    // Tab switches have no transition (ScreenMotion), so they never block: only a fade between other screens does.
+    val screens = visible.filter { it.destination !is androidx.navigation.NavGraph }
+    val transitioning = screens.size > 1 && !screens.all { e -> Tab.entries.any { e.destination.hasRoute(it.routeClass) } }
     Column(Modifier.fillMaxSize().background(Theme.colors.background)) {
-        Box(Modifier.weight(1f)) { content() }
+        Box(Modifier.weight(1f)) {
+            content()
+            if (transitioning) Box(Modifier.matchParentSize().testTag("nav-transition").pointerInput(Unit) {
+                awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
+            })
+        }
         // A running workout that is not on screen (minimized) sits above the tab bar on every main screen.
         if (current != null && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
         if (current != null) {

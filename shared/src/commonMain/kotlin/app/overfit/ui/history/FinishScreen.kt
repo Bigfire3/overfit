@@ -38,7 +38,7 @@ import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
@@ -173,8 +173,8 @@ fun FinishScreen(
             Spacer(Modifier.height(Space.s))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-            if (picker.canTakePhoto) TextButton(h.takePhoto, picker.takePhoto, tone = Tone.Default)
-            TextButton(h.pickPhoto, picker.pickFromLibrary, tone = Tone.Default)
+            if (picker.canTakePhoto) SmallButton(h.takePhoto, picker.takePhoto, tone = Tone.Default)
+            SmallButton(h.pickPhoto, picker.pickFromLibrary, tone = Tone.Default)
         }
         Text(h.photosPrivate, style = Theme.type.caption, tone = Tone.Faint)
 

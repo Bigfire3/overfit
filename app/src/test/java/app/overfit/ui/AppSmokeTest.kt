@@ -93,12 +93,11 @@ class AppSmokeTest {
 
         keyIsValid = true
         compose.onNodeWithText("Verbinden").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Letzte Coach-Tipps", ignoreCase = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForTrainingTab(timeoutMillis = 5_000)
 
         // Training tab (no profile hero anymore): empty state with the "+" button; the profile data is in the store.
         compose.onNodeWithContentDescription("Neues Workout").assertIsDisplayed()
         compose.onNodeWithText("Noch keine Workouts", substring = true).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().assertIsDisplayed()
         assertEquals("Fabi", store.state.value.profile.name)
         assertEquals(82.4, store.state.value.weights.last().kg, 0.001)
         assertEquals("sk-or-wrong", secrets.load())
@@ -136,7 +135,6 @@ class AppSmokeTest {
         compose.onNodeWithText("Settings").assertExists()
         compose.onNodeWithText("Profile").assertIsDisplayed()
         compose.onNode(hasText("Workouts") and hasClickAction()).performClick()
-        compose.onNode(hasText("Latest coach tips", ignoreCase = true)).performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("New workout").assertIsDisplayed()
     }
 
@@ -201,7 +199,7 @@ class AppSmokeTest {
 
         // Workout: back from the catalogue to the Training tab → "+" → create; name, one exercise from the picker, an extra set, save
         compose.onNodeWithContentDescription("Zurück").performClick()
-        waitFor("Letzte Coach-Tipps")
+        compose.waitForTrainingTab()
         compose.onNodeWithContentDescription("Neues Workout").performClick()
         waitFor("Workout erstellen")
         compose.onNodeWithText("Workout erstellen").performClick()
@@ -219,7 +217,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Speichern").performClick()
 
         // Saving closes the editor; the Training tab lists the workout with its exercise
-        waitFor("Letzte Coach-Tipps")
+        compose.waitForTrainingTab()
         compose.waitUntilState(5_000) { kotlinx.coroutines.runBlocking { data.templates.templates.first() }.size == 1 }
         compose.onNodeWithText("Push", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Bench Press", substring = true).assertIsDisplayed()
