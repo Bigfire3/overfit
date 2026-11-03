@@ -83,7 +83,7 @@ class WorkoutControllerTest {
         val e = env()
         e.c.awaitLoaded()
         assertTrue(e.c.startEmpty())
-        assertEquals("Training", e.w.name)
+        assertTrue(e.w.name.startsWith("Workout vom "))
         assertTrue(e.w.exercises.isEmpty())
     }
 
@@ -614,5 +614,49 @@ class WorkoutControllerTest {
         repeat(10) { i -> e.c.edit { it.withName("n$i") } }
         e.c.flush()
         assertEquals("n9", e.store.active!!.name)
+    }
+
+    // --- saved workout follows the workout ------------------------------------------------------
+
+    @Test
+    fun finishAndDiscard_passWorkoutToPlans_finishStoresReturnedTemplateId() = runTest {
+        val adopted = mutableListOf<Workout>()
+        val store = InMemoryWorkoutStore()
+        val c = WorkoutController(store, RecordingRestAlerts(), RecordingHaptics(), { WorkoutPrefs() }, backgroundScope, { testScheduler.currentTime },
+            plans = { w -> adopted += w; w.copy(templateId = 42) })
+        c.awaitLoaded()
+        assertTrue(c.startEmpty())
+        c.addExercises(listOf(bench))
+        c.finish()
+        assertEquals(1, adopted.size)
+        assertEquals(42L, store.finished.single().first.templateId)
+        assertEquals(listOf("bench"), store.finished.single().first.exercises.map { it.exercise.id })
+
+        assertTrue(c.startEmpty())
+        c.discard()
+        assertEquals(2, adopted.size)
+        assertTrue(c.startEmpty())
+        c.discard(keepStructure = false)
+        assertEquals(2, adopted.size)
+    }
+
+    @Test
+    fun failingPlans_stillFinish() = runTest {
+        val store = InMemoryWorkoutStore()
+        val c = WorkoutController(store, RecordingRestAlerts(), RecordingHaptics(), { WorkoutPrefs() }, backgroundScope, { testScheduler.currentTime },
+            plans = { error("db down") })
+        c.awaitLoaded()
+        assertTrue(c.startEmpty())
+        c.finish()
+        assertEquals(1, store.finished.size)
+        assertNull(store.finished.single().first.templateId)
+    }
+
+    @Test
+    fun startEmpty_defaultNameHasTheDate() = runTest {
+        val e = env()
+        e.c.awaitLoaded()
+        assertTrue(e.c.startEmpty())
+        assertTrue(e.w.name.startsWith("Workout vom "), e.w.name)
     }
 }

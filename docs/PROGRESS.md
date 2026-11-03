@@ -15,6 +15,19 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Tab „Training“: Workouts statt Vorlagen (Session O, 3.11.)
+Erledigt: Tab 1 heißt „Training“ (EN „Workouts“) und zeigt die eigenen Workouts mit „zuletzt vor N Tagen“; „+“ → „Workout erstellen“ oder „Leer starten“, darunter Import/KI-Prompt/Beispiele; Workout-Seite mit „Starten“, „Bearbeiten“, „Teilen“. „Vorlage“ ist aus allen Texten raus. Beim Beenden oder Verwerfen übernimmt das Workout die Struktur des Trainings automatisch, ein leer gestartetes Training wird ein Workout (Name im Beenden-Flow). Übungen-Tab nur noch Übungen. Tests: `WorkoutPlanTest`, `WorkoutControllerTest`, `RepositoryTest`, neuer `TrainingTabTest`, bestehende UI-Tests angepasst.
+Offen: Abstimmung mit Session L (Mini-Leiste, „Training beenden“ auf dem Tab) beim Zusammenführen.
+
+### Bitte auf dem Handy testen: Tab „Training“
+1. Erster Tab heißt „Training“ (Blitz-Icon). Leer: „Noch keine Workouts …“ und „Beispiel-Workouts hinzufügen“ → Push/Pull/Legs erscheinen mit „noch nie trainiert“
+2. „+“ oben rechts → „Workout erstellen“: Name, Übungen, Sätze → Speichern → steht in der Liste, kein Training gestartet
+3. „+“ → „Leer starten“ → Übungen hinzufügen, Sätze abhaken → „Beenden“ zweimal → oben Name „Workout vom 3. Nov.“ ändern (z. B. „Brust“) → Speichern → „Brust“ steht in der Liste mit „zuletzt heute“
+4. „Brust“ antippen → „Starten“ → Übungen sind da, Werte von eben vorausgefüllt
+5. Im Training eine Übung hinzufügen, einen Satz hinzufügen, umsortieren → Beenden → Workout öffnen: neue Struktur ist übernommen, ohne Nachfrage
+6. Workout öffnen → „Bearbeiten“ → „Workout löschen“ (zweimal tippen) → Verlauf zeigt die alten Trainings weiterhin
+7. Übungen-Tab: nur noch Katalog; nirgends steht mehr „Vorlage“ (auch Teilen, Import, Coach, KI-Chat), in Englisch nirgends „template“
+
 ## Morgen-Testliste für Fabian (3.11.)
 Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Fuel/Spot); die Demo in 36–38 braucht keinen Server.
 Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).
