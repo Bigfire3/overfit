@@ -261,7 +261,7 @@ class AppDependencies(
         haptics = haptics,
         prefs = {
             val s = store.state.value
-            WorkoutPrefs(s.settings.defaultRestSec, s.settings.vibration, s.profile.unit, s.language)
+            WorkoutPrefs(s.settings.defaultRestSec, s.settings.vibration, s.profile.unit, s.language, s.settings.restTicks)
         },
         scope = workoutScope,
         clock = clock,
