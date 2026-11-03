@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Erzeugt von tools/icon/build_icon.py -->
+<resources>
+    <color name="launcher_background">#FF000000</color>
+</resources>

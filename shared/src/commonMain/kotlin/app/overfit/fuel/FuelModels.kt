@@ -51,6 +51,8 @@ data class SpotConfig(
 
 @Serializable
 data class FuelConfig(
+    /** `test` = test server (no device check, test credit); anything else = production. */
+    val mode: String = "production",
     val markupBp: Int = 0,
     val storeFeeBp: Int = 0,
     val maxTokensCap: Int = 8192,

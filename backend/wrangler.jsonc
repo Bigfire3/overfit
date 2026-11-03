@@ -8,7 +8,8 @@
     {
       "binding": "DB",
       "database_name": "overfit",
-      // Nach `wrangler d1 create overfit` hier die echte ID eintragen (siehe README.md).
+      // Platzhalter: Der Deploy-Workflow (.github/workflows/backend-deploy.yml) setzt die echte ID zur Laufzeit in
+      // wrangler.generated.jsonc ein, sie wird nie committet. Von Hand: siehe README.md.
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }

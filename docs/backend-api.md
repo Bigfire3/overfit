@@ -111,13 +111,23 @@ Jeder Fehler: passender HTTP-Status und
 ### `GET /v1/config`
 ```json
 {
+  "mode": "production",
   "currency": "EUR", "unit": "micro-euro", "markupBp": 800, "storeFeeBp": 1500, "maxTokensCap": 8192,
   "models": { "claude-sonnet-5-5": { "in": 1840000, "cacheRead": 184000, "cacheWrite": 2300000, "out": 9200000 } },
   "packages": [ { "productId": "overfit.fuel.10", "priceMicro": 10000000, "creditMicro": 7870370 } ],
   "spot": { "starterMicro": 1000000, "rewardMicro": 1000000, "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
 }
 ```
+`mode`: `production` oder `test`. **`test` = Testserver** (`DEPLOY_MODE=test`): keine Geräteprüfung beim Spot-Einlösen (Token `test:<geräte-id>`,
+ein Spot je Gerät), neues Konto bekommt Test-Startguthaben (Buchungstyp `test_credit`), niedrige Limits; die App zeigt unter Fuel „Testserver“.
+Produktion kennt kein `test:`-Token. Nur der exakte Wert `test` schaltet den Testbetrieb frei.
 Modellpreise in µ€ je 1 Mio. Token (für Kostenschätzung in der App). `productId` entspricht der Produkt-ID im Play-/App-Store.
+
+### `POST /v1/admin/credit` (nur Testserver)
+`Authorization: Bearer <ADMIN_SECRET>`, Body `{ "amountMicro": 5000000, "all": true }` oder `{ "amountMicro": …, "accountId": "…" }`
+(`amountMicro` ≤ 10 000 000, „all“ höchstens 100 Konten). Antwort `{ "accounts", "credited", "totalMicro", "capMicro" }`.
+Alles Test-Guthaben zusammen (Startguthaben und Gutschriften) ist auf `TEST_CREDIT_CAP_MICRO` (20 €) begrenzt. Ohne `DEPLOY_MODE=test` oder
+ohne `ADMIN_SECRET` (≥ 16 Zeichen) antwortet der Pfad `404`, falsches Geheimnis `401`. Der Deploy-Workflow ruft das mit dem Eingabefeld `credit_eur` auf.
 
 ## Geräte & Konto
 

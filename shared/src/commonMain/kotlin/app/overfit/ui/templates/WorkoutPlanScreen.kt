@@ -67,13 +67,14 @@ fun WorkoutPlanScreen(
     Screen(
         scroll = true,
         header = { BackHeader(t.back, onBack) },
-        footer = {
+        // No footer until the workout is loaded: a visible but still disabled "Start" swallows early taps.
+        footer = if (w == null) null else ({
             if (workoutRunning) {
                 RunningWorkoutChoice(onToRunning, onEndRunning)
             } else {
-                PrimaryButton(t.startThisWorkout, { w?.let(onStart) }, enabled = w != null)
+                PrimaryButton(t.startThisWorkout, { onStart(w) })
             }
-        },
+        }),
     ) {
         if (w == null) return@Screen
         Title(w.name)

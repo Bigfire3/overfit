@@ -30,6 +30,12 @@ export interface Env {
   DEV_MODE?: string;
   ATTESTATION_MODE?: string;
   PURCHASE_MODE?: string;
+  /** `test` = Testbetrieb (siehe README); alles andere = Produktion. Nur der exakte Wert `test` schaltet etwas frei. */
+  DEPLOY_MODE?: string;
+  /** Geheimnis für `POST /v1/admin/credit` (nur im Testbetrieb). */
+  ADMIN_SECRET?: string;
+  TEST_STARTER_MICRO?: string;
+  TEST_CREDIT_CAP_MICRO?: string;
   MARKUP_BP?: string;
   STORE_FEE_BP?: string;
   SPOT_STARTER_MICRO?: string;
@@ -60,6 +66,12 @@ export interface Price {
 
 export interface Config {
   devMode: boolean;
+  /** Testbetrieb: keine Geräteprüfung, Test-Guthaben, niedrige Limits. Nie in Produktion. */
+  testMode: boolean;
+  /** Test-Startguthaben je neuem Konto (Mikro-Euro). */
+  testStarterMicro: number;
+  /** Obergrenze für alles Test-Guthaben zusammen (Startguthaben und Admin-Gutschriften). */
+  testCreditCapMicro: number;
   attestationMode: 'required' | 'mock';
   purchaseMode: 'required' | 'mock';
   anthropicBaseUrl: string;

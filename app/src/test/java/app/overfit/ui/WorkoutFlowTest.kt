@@ -108,13 +108,13 @@ class WorkoutFlowTest {
         compose.onNodeWithText("Beenden").performClick()
         compose.onNodeWithText("Beenden? Nochmal tippen").performClick()
         waitFor("Wie war das Training?")
-        compose.waitUntil(5_000) { runBlocking { data.workouts.status(id) } == SessionStatus.FINISHED }
+        compose.waitUntilState(5_000) { runBlocking { data.workouts.status(id) } == SessionStatus.FINISHED }
         // The name field comes first, the note field second.
         compose.waitUntil(5_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
         compose.onNodeWithText("Speichern").performClick()
         waitFor("Letzte Coach-Tipps")
-        compose.waitUntil(5_000) { runBlocking { data.workouts.getFinished(id)?.note } == "Stark heute" }
+        compose.waitUntilState(5_000) { runBlocking { data.workouts.getFinished(id)?.note } == "Stark heute" }
         val saved = requireNotNull(runBlocking { data.workouts.get(id) })
         assertEquals(2, saved.completedSets)
         assertEquals(60.0, saved.exercises.single().sets.first().actual.weightKg)

@@ -2,6 +2,4 @@
 <resources>
     <!-- Schwarz-Weiß-Design, keine Akzentfarbe (siehe docs/DECISIONS.md). -->
     <color name="background">#FF000000</color>
-    <color name="launcher_background">#FF000000</color>
-    <color name="launcher_foreground">#FFFFFFFF</color>
 </resources>

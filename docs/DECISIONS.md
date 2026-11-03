@@ -732,6 +732,16 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 | Statusleiste hell/dunkel | Edge-to-Edge, Theme | **neu:** Fenster-Stil folgt dem App-Theme | Lücke geschlossen |
 | App-Icon, Launch | adaptives Icon | **neu:** AppIcon + Launch-Farbe | Lücke geschlossen |
 | Sprache | System, in der App umschaltbar | gleich | gleich |
+## Wackel-Tests nach #39 (Session S, 3.11.)
+**Befund** (lokal reproduziert in der Gesamtsuite, etwa jeder zweite Lauf; die Klasse allein bleibt grün; mit Log-Ausgaben und State-Dump beim Timeout):
+1. `CustomExerciseFlowTest`: Nach „Speichern“ fand `waitFor("Turkish Get-up Neu")` den Namen sofort im Formular bzw. im Suchfeld des Pickers, obwohl das Speichern (Room-Write im `viewModelScope`, Rückkehr auf dem Main-Looper) noch lief. Die Prüfung danach kam zu früh. Der Umbau auf `waitUntil { state … }` (PR #41) lief in den Timeout, weil eine reine State-Bedingung unter Robolectric den Main-Looper nicht pumpt (erst `fetchSemanticsNodes` synchronisiert). Laut Log kam `onSaved` erst **nach** den 20 s, danach landete die Übung korrekt im Training. Die App hatte hier also keinen Fehler.
+2. `WorkoutFlowTest`, `ShareFlowTest` und alle anderen „Starten“-Tests: Der Footer mit „Starten“ war sichtbar, bevor das Workout aus Room geladen war, aber noch `enabled = false`. Ein Klick in diesem Fenster verpuffte (Test hängt nach „Starten“), und der Titel fehlte noch („Oberkörper A … is not displayed“).
+
+**Entscheidung:**
+- `WorkoutPlanScreen` zeigt den Footer erst, wenn das Workout geladen ist. Es gibt keinen toten Button mehr, auch nicht für schnelle Finger. Der Inhalt erscheint ohnehin erst dann.
+- Das Hinzufügen bzw. Ersetzen aus dem Picker läuft über `WorkoutController.addPicked` im Controller-Scope statt in `rememberCoroutineScope` des Workout-Screens. Das Ergebnis wird ohne Suspend-Punkt aus dem Relay genommen und übergeben, es geht also weder verloren noch wird es doppelt angewendet, wenn der Screen die Komposition verlässt (dieselbe Falle wie in #25).
+- Tests warten auf UI, die nur der Zielzustand zeigt (Kopf „1/5 erledigt“), und prüfen danach den State.
+- Wartet ein Test auf State oder Daten statt auf Text, nimmt er `waitUntilState` (app/src/test/.../ui/TestWaits.kt): Der Helfer holt vor jeder Prüfung den Semantik-Baum und pumpt damit den Main-Looper. Ein reines `waitUntil { deps.workout.state … }` läuft sonst in den Timeout, sobald die Arbeit auf `Dispatchers.Main` liegt (so geschehen in TrainingTabTest/DayWithOverfitTest, nachdem `addPicked` in den Controller-Scope gezogen war). Alle bestehenden State-Waits sind umgestellt.
 
 ## Marke und Claim (Session T)
 - **Wortmarke „overfit“ immer klein**, auch am Satzanfang und in Fließtexten (wie „eBay“): eine Schreibweise, kein Abwägen im Einzelfall. Geändert: App-Name (`appName`, Android-Label), „Über/About overfit“, Store-Texte, README, Web. Interne Namen (Paket `app.overfit`, Datei `.overfit`, `overfit://`) bleiben unverändert.
@@ -739,3 +749,57 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 - **Store-Titel** „overfit: Workout & KI-Coach“ / „overfit: Workout & AI Coach“ (je 27 Zeichen), Play-Kurzbeschreibung ≤ 80 geprüft.
 - **`aiSubtitle`:** „kein Abo nötig“ statt „kein Abo“, damit ein späteres optionales Pro-Abo nicht widerspricht (siehe docs/monetization.md).
 - **Onboarding:** Der erste Screen ist die Namensfrage, es gibt keinen Splash und keinen Markentext; nichts geändert (keine Funktionsänderung).
+
+## App-Icon „of“ (Session W)
+- **Konzept B, Fabian hat B5 gewählt (Standard):** „of“ in Inter ExtraBold, 58 % der Kante, Laufweite −4 %, unten links (linke Tintenkante bei 19 %, Grundlinie bei 77 % statt 16 %/80 % im Entwurf, damit „o“ und „f“ auch in der Kreismaske klar lesbar bleiben), weiß auf Schwarz. Masken-Vorschauen (Kreis, Squircle, abgerundet, iOS-Radius, Rechteck; dunkel, hell, monochrom) liegen unter `design/icon/previews/` und werden vom Skript mit erzeugt. Die anderen Varianten B1–B4 und B6 bleiben im Skript wählbar.
+- **Eine Quelle:** `tools/icon/build_icon.py` liest die Glyphen aus den Inter-OTFs (`tools/icon/fonts/`, OFL-Lizenz liegt dabei), wandelt „of“ in Pfade um (die Schrift steckt nicht im Icon) und erzeugt daraus `design/icon/overfit-icon.svg` (1024²) sowie alle Plattform-Dateien: Android (adaptive Icon: Vordergrund-Vector in der 66-dp-Sicherheitszone, Hintergrund `launcher_background` aus `values/launcher_colors.xml`, Monochrome-Layer für Android-13-Themed-Icons, Splash-Drawable), Play-Store-Icon `docs/store/icon-512.png`, iOS (`AppIcon` 1024 ohne Transparenz plus Dunkel- und Getönt-Variante für iOS 18, Launch-Logo), Web (`favicon.svg/.ico`, `apple-touch-icon.png`, 192/512). Abhängigkeiten nur für das Skript: `pip install fonttools cairosvg pillow`.
+- **Variante wechseln:** `python3 tools/icon/build_icon.py --variant B2` (B1–B6, dazu `--theme light` für weißen Grund oder frei `--weight 800 --size 0.5 --tracking -0.03 --dot`), danach die erzeugten Dateien committen. Die Spezifikation der Varianten steht im Dict `VARIANTS` im Skript.
+- **Kein Legacy-PNG:** minSdk ist 26, dort gibt es adaptive Icons immer; `mipmap-anydpi-v26` genügt.
+- **Android-Splash:** `values-v31` mit schwarzem Grund und kleinem weißem „of“ (`ic_splash`, bewusst immer B1-Schnitt, unabhängig von der Icon-Variante). Vor Android 12 bleibt das schwarze `windowBackground`.
+- **iOS Launch Screen:** `UILaunchScreen` mit schwarzem `LaunchBackground` und `LaunchLogo` (weißes „of“). Das ersetzt den Platzhalter aus #43 (dort weißer/schwarzer Grund je nach Modus); bei Konflikten gilt die Version aus dieser Session. Standard-iOS-Icon ist die gewählte Fassung (dunkel), die Dunkel-Variante bleibt immer schwarz/weiß-Schrift, „Getönt“ ist Graustufen auf Schwarz.
+- **Über-Screen:** hat kein Logo (nur Text), daher keine Änderung.
+- Der Android-Vordergrund wird per `clip-path` auf die sichtbaren 72 dp begrenzt, damit Varianten mit angeschnittener Schrift unter jeder Launcher-Maske wie im Master aussehen.
+
+## Deploy-Knopf und Datenschutz-Garantie für den eigenen Key (Session V, 3.11.)
+
+### Deploy-Workflow (`.github/workflows/backend-deploy.yml`)
+- **Ein Knopf, alles idempotent.** `workflow_dispatch` mit `mode` (test | production) und `credit_eur`. Reihenfolge: Voraussetzungen prüfen → Typprüfung und Tests →
+  D1 anlegen, falls es fehlt (ID per `wrangler d1 list --json`) → R2-Bucket anlegen (Fehler „already exists“ wird toleriert) → `wrangler.generated.jsonc` erzeugen
+  (`scripts/deploy-config.mjs`; die `database_id` steht nie in `wrangler.jsonc`, die erzeugte Datei ist gitignored) → Migrationen `--remote` → Deploy → Secrets
+  (`wrangler secret bulk`) → Health und `/v1/config` (Modus muss stimmen) → Zusammenfassung mit Worker-URL.
+- **Test und Produktion sind getrennte Instanzen** (`overfit-backend-test`/`overfit-test`/`overfit-chat-photos-test` gegen `overfit-backend`/`overfit`/`overfit-chat-photos`).
+  Begründung: „nie versehentlich in Produktion“ lässt sich am sichersten dadurch garantieren, dass Testdaten und Test-Guthaben in einer anderen Datenbank liegen. Preis:
+  Beim Wechsel auf Produktion ändert sich die Adresse, `OVERFIT_BACKEND_URL` muss neu gesetzt werden.
+- **Secrets:** Pflicht ist nur `ANTHROPIC_API_KEY` (aus GitHub oder schon im Worker). `SPOT_SIGNING_KEY` und `SYNC_ENCRYPTION_KEY` erzeugt der Workflow einmalig zufällig, wenn weder ein
+  GitHub-Secret noch ein Worker-Secret existiert (Fabian soll nichts im Terminal erzeugen müssen); bestehende Worker-Secrets werden nie überschrieben, `SYNC_ENCRYPTION_KEY` auch dann nicht.
+  Ein separates „OAuth-Geheimnis für MCP“ gibt es im Code nicht (die Anmeldung läuft über Kopplungscode, Tokens liegen gehasht in D1), also kein Secret dafür.
+  Optionale Store-Prüfer (`GOOGLE_PLAY_*`, `PLAY_INTEGRITY_*`, `APPLE_*`) werden nur übertragen, wenn gesetzt; sonst Hinweis in der Zusammenfassung. Werte werden im Log maskiert.
+- **`OVERFIT_BACKEND_URL`:** `GITHUB_TOKEN` darf keine Repo-Variablen schreiben (dafür gibt es keine Workflow-Berechtigung, nur ein PAT mit „Variables: write“). Ich habe bewusst keinen PAT-Weg
+  und keinen Umweg über Release-Assets eingebaut (mehr bewegliche Teile in android.yml und ios.yml, die Session U gerade anfasst). Die Zusammenfassung nennt die URL, den Link
+  zur Variablen-Seite und erkennt, wenn die Variable schon stimmt.
+- **Automatisches Deploy** bei Änderungen unter `backend/` auf main nur, wenn die Repo-Variable `BACKEND_DEPLOY_MODE` gesetzt ist und die Cloudflare-Secrets existieren (sonst Hinweis, kein Fehler).
+  Ohne diese bewusste Variable deployt nie etwas von allein, ein versehentliches Produktions-Deploy ist so ausgeschlossen.
+
+### Testbetrieb (`DEPLOY_MODE=test`)
+- Nur der exakte Wert `test` schaltet ihn ein, unabhängig von `DEV_MODE` (der bleibt `false`; die `mock:`-Token der Entwicklung gibt es dort weiter nicht).
+- Geräteprüfung entfällt: `testAttestationVerifier` akzeptiert `test:<geräte-id>` (Schlüssel `test-<id>`, also weiter höchstens ein Spot je Gerät). Die App nimmt diesen Weg nur, wenn die
+  Geräteprüfung nichts liefert (seitlich installiertes APK) **und** `/v1/config` `mode: "test"` meldet; Produktion lehnt `test:`-Token ab (Test).
+- Fuel nur über Test-Guthaben: neues Konto bekommt `TEST_STARTER_MICRO` (1 €), dazu `POST /v1/admin/credit` (Bearer `ADMIN_SECRET`, nur Testbetrieb, ≤ 10 € je Aufruf, „all“ ≤ 100 Konten).
+  Der Workflow ruft ihn mit `credit_eur` selbst auf und erzeugt `ADMIN_SECRET` bei jedem Lauf neu, Fabian muss also kein Geheimnis kennen und keine Konto-ID suchen.
+  Gesamtdeckel für alles Test-Guthaben: `TEST_CREDIT_CAP_MICRO` = 20 €. Kein Testkauf, weil die App ohne Store keinen Kaufweg hat.
+- Niedrige Limits im Testbetrieb: `MAX_TOKENS_CAP` 2048, 5 KI-Anfragen/Minute, 10 Registrierungen/Stunde/IP, 3 Spots je Einladendem, Spot-Budget 10 €.
+- Markiert: `/v1/config` → `"mode": "test"`, die App zeigt unter Fuel „Testserver“.
+
+### Garantie: eigener Key = null Anfragen an das Backend
+Prüfung des Codes (Start, Vordergrund, Fuel-Konto, Registrierung, `/v1/config`, Coach, Chat, KI-Übung, Teilen):
+- `ChatFeature.onForeground`/`onBackground` → `sync.flush()` und `inbox.refresh()` sind ohne eingeschaltete KI-Chat-Verbindung (`enabled`) wirkungslos. Die Chat-Screens laden erst bei `enabled`.
+- Coach, Coach-Chat, KI-Übung und Warteschlange sprechen über `Providers`/`CoachTransport` direkt mit dem Anbieter; nur `ProviderId.FUEL` geht über das Backend.
+- Teilen: `ShortCodeService` ist in der App noch `NoShortCodes`, der Kurz-Code-QR lädt also nichts hoch (und würde nur bei ausdrücklichem Einschalten laufen).
+- **Abweichung 1 (behoben):** Die Profilzeile „Fuel“ rief bei konfigurierter Backend-URL `account()` auf, also schon beim bloßen Öffnen des Profil-Tabs eine Geräteregistrierung und
+  einen Kontoabruf, auch mit eigenem Key. Jetzt lädt die Zeile nur, wenn Fuel der gewählte KI-Zugang ist (oder die Demo läuft).
+- **Abweichung 2 (behoben):** Der Fuel-Screen lud beim Öffnen sofort Konto und Config. Mit eigenem Key zeigt er jetzt zuerst einen Hinweis („Fuel ist optional … geht nichts über overfit-Server“) und
+  erst „Fuel ansehen“ verbindet sich mit dem Server. Spot, Wiederherstellung und Buchungen sind nur von dort erreichbar.
+- Test: `OwnKeyPrivacyTest` (Robolectric) konfiguriert eine Backend-URL und führt alle Requests aller `HttpClient`s durch eine zählende `MockEngine`. Start, Vordergrund/Hintergrund, Coach-Queue, alle Tabs, Coach-Chat,
+  Profil und der Fuel-Hinweis ergeben **0** Anfragen an den Backend-Host; als Gegenprobe erzeugt „Fuel ansehen“ danach Anfragen.
+- In der App (Coach-Tab → KI-Zugang, nur bei eigenem Key): „Deine Daten gehen direkt an <Anbieter>, nicht über overfit-Server.“ (DE/EN).
+- Bewusst nicht Teil der Garantie: Fuel, Spot, KI-Chat-Verbindung und Kurz-Code-QR – sie sind ausdrückliche Opt-ins und sprechen mit dem Backend.

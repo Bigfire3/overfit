@@ -32,6 +32,10 @@
 - Kurze Zwischenberichte, keine langen Zusammenfassungen.
 - Unklarheiten: vernünftige Annahme treffen, in docs/DECISIONS.md notieren, weitermachen. Nur bei echten Blockern fragen.
 
+## Tests
+- UI-Tests (Robolectric/Compose): nie `compose.waitUntil { state }` mit reiner State-Bedingung, das pumpt den Main-Looper nicht und führt zu wackeligen Tests. Stattdessen `compose.waitUntilState { … }` (`app/src/test/.../ui/TestWaits.kt`) oder auf sichtbaren Text warten. Vor einem Klick sicherstellen, dass der Inhalt geladen ist (nicht nur der Button sichtbar).
+- Tests nie abschalten, um grün zu werden. Ein wackeliger Test ist ein Fehler, den du findest und behebst.
+
 ## Lokal bauen in der Claude-Umgebung
 - Android SDK nach `~/android-sdk` installieren (cmdline-tools, `platforms;android-37.0`, `build-tools;36.0.0`), `local.properties` mit `sdk.dir`.
 - Maven Central antwortet hinter dem Proxy mit 429 → Gradle immer mit `-I tools/claude-env-maven-mirror.gradle.kts` aufrufen (Google-Mirror, auch für Robolectric).
