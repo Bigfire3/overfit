@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -197,12 +198,17 @@ fun ImportScreen(
 }
 
 @Composable
-private fun PreviewScreen(
+internal fun PreviewScreen(
     preview: ImportPreview,
     unit: WeightUnit,
     language: Language,
     busy: Boolean,
     onBack: () -> Unit,
+    acceptLabel: String? = null,
+    /** Extra content above the exercise list (e.g. the chat's message, the diff to the old template). */
+    intro: (@Composable ColumnScope.() -> Unit)? = null,
+    /** Extra actions below the primary button (e.g. "as new template", "discard"). */
+    footerExtra: (@Composable ColumnScope.() -> Unit)? = null,
     onAccept: () -> Unit,
 ) {
     val t = LocalStrings.current
@@ -210,7 +216,10 @@ private fun PreviewScreen(
     Screen(
         scroll = true,
         header = { BackHeader(t.back, onBack) },
-        footer = { PrimaryButton(s.importAccept, onAccept, loading = busy) },
+        footer = {
+            PrimaryButton(acceptLabel ?: s.importAccept, onAccept, loading = busy)
+            footerExtra?.invoke(this)
+        },
     ) {
         Text(s.previewTitle, tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
@@ -218,6 +227,7 @@ private fun PreviewScreen(
         Spacer(Modifier.height(Space.s))
         Text(s.previewCounts(preview.exercises.size, preview.exercises.count { it.isNew }), tone = Tone.Muted)
         preview.note?.let { Spacer(Modifier.height(Space.m)); Text(it, style = Theme.type.caption, tone = Tone.Muted) }
+        intro?.let { Spacer(Modifier.height(Space.m)); it(this) }
         Spacer(Modifier.height(Space.l))
         Hairline()
         preview.exercises.forEach { PreviewRow(it, unit, language) }

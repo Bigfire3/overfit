@@ -41,6 +41,8 @@ import androidx.navigation.compose.rememberNavController
 import app.overfit.ai.Providers
 import app.overfit.data.AppData
 import app.overfit.data.AppStore
+import app.overfit.data.KeyValueStore
+import app.overfit.chat.ChatFeature
 import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.FuelSession
@@ -56,6 +58,15 @@ import app.overfit.ui.fuel.SpotInviteScreen
 import app.overfit.ui.fuel.SpotRedeemScreen
 import app.overfit.ui.fuel.SpotRevealScreen
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import app.overfit.ui.chat.AiCoachScreen
+import app.overfit.ui.chat.ChatInboxScreen
+import app.overfit.ui.chat.ChatNotesScreen
+import app.overfit.ui.chat.ChatProvider
+import app.overfit.ui.chat.ChatProviderScreen
+import app.overfit.ui.chat.ChatViewModel
+import app.overfit.i18n.LocalChatStrings
+import app.overfit.i18n.chatStringsFor
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.toRoute
 import coil3.ImageLoader
@@ -136,8 +147,12 @@ class AppDependencies(
     workoutScope: CoroutineScope = MainScope(),
     /** Fuel/Spot backend (URL from the build, developer override); defaults to "not configured". */
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
+    /** Small key-value storage for the chat sync state (not secret). */
+    kv: KeyValueStore = InMemoryKeyValueStore(),
 ) {
     val fuelSession = FuelSession(fuel)
+    /** KI-Chat-Verbindung (Claude, ChatGPT, Gemini): sync, inbox, notes. */
+    val chat: ChatFeature = ChatFeature(fuel, data, store, kv, data.scope, clock)
     /** The running workout; created once per process, loads the stored workout right away. */
     val workout: WorkoutController = WorkoutController(
         store = data.workouts,
@@ -165,6 +180,10 @@ class AppDependencies(
 @Serializable data object PhotosRoute
 @Serializable data object SettingsRoute
 @Serializable data object ConnectRoute
+@Serializable data object AiCoachRoute
+@Serializable data class ChatProviderRoute(val provider: String)
+@Serializable data object ChatInboxRoute
+@Serializable data object ChatNotesRoute
 @Serializable data object CoachMemoryRoute
 @Serializable data object AboutRoute
 @Serializable data object FuelRoute
@@ -217,8 +236,14 @@ fun OverfitApp(deps: AppDependencies) {
             .build()
     }
     LaunchedEffect(Unit) { deps.data.seedCatalog() }
+    // KI-Chat: back in the foreground → send what is left and fetch the inbox; to the background → send a running workout now.
+    LifecycleResumeEffect(deps) {
+        deps.chat.onForeground()
+        onPauseOrDispose { deps.chat.onBackground() }
+    }
+    val chatInbox by deps.chat.inbox.state.collectAsStateWithLifecycle()
     OverfitTheme(state.settings.theme) {
-        CompositionLocalProvider(LocalStrings provides stringsFor(state.language), LocalFuelStrings provides fuelStringsFor(state.language)) {
+        CompositionLocalProvider(LocalStrings provides stringsFor(state.language), LocalFuelStrings provides fuelStringsFor(state.language), LocalChatStrings provides chatStringsFor(state.language)) {
             val nav = rememberNavController()
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
             // Pick up a running workout after the app was killed: once, as soon as it is loaded.
@@ -293,6 +318,9 @@ fun OverfitApp(deps: AppDependencies) {
                             onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
                             share = share,
                             onDuo = { nav.navigate(DuoRoute) },
+                            chatInboxCount = chatInbox.items.size,
+                            chatInboxFull = chatInbox.full,
+                            onChatInbox = { nav.navigate(ChatInboxRoute) },
                         )
                     }
                     composable<StartWorkoutRoute> {
@@ -407,6 +435,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onAbout = { nav.navigate(AboutRoute) },
                             fuelSession = deps.fuelSession,
                             onFuel = { nav.navigate(FuelRoute) },
+                            onAiCoach = { nav.navigate(AiCoachRoute) },
+                            onChatNotes = { nav.navigate(ChatNotesRoute) },
                             offlineImages = deps.data.offlineImages,
                             restAlerts = deps.restAlerts,
                             share = share,
@@ -426,6 +456,38 @@ fun OverfitApp(deps: AppDependencies) {
                             onUseFuel = { deps.store.useFuel(); nav.popBackStack(); nav.navigate(FuelRoute) },
                         )
                     }
+                    composable<AiCoachRoute> {
+                        AiCoachScreen(
+                            state = state,
+                            providers = deps.providers,
+                            chat = deps.chat,
+                            onBack = nav::popBackStack,
+                            onOwnKey = { nav.navigate(ConnectRoute) },
+                            onFuel = { nav.navigate(FuelRoute) },
+                            onProvider = { nav.navigate(ChatProviderRoute(it.name)) },
+                        )
+                    }
+                    composable<ChatProviderRoute> { entry ->
+                        ChatProviderScreen(
+                            provider = ChatProvider.of(entry.toRoute<ChatProviderRoute>().provider),
+                            chat = deps.chat,
+                            viewModel = viewModel { ChatViewModel(deps.chat, deps.data.scope, deps.clock) },
+                            platform = deps.share,
+                            today = deps.today(),
+                            clock = deps.clock,
+                            onBack = nav::popBackStack,
+                        )
+                    }
+                    composable<ChatInboxRoute> {
+                        ChatInboxScreen(
+                            chat = deps.chat,
+                            unit = state.profile.unit,
+                            language = state.language,
+                            onBack = nav::popBackStack,
+                            onTemplate = { id -> nav.popBackStack(); nav.navigate(TemplateEditorRoute(id)) },
+                        )
+                    }
+                    composable<ChatNotesRoute> { ChatNotesScreen(deps.chat, onBack = nav::popBackStack) }
                     composable<ImportRoute> {
                         ImportScreen(
                             viewModel = viewModel { ImportViewModel(deps.data.importer) },

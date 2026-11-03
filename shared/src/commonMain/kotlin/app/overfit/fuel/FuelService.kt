@@ -24,3 +24,11 @@ interface FuelService {
     /** Sends an Anthropic-style Messages request through Fuel (used by the coach in phase 4). */
     suspend fun messages(bodyJson: String): FuelMessageResult
 }
+
+/**
+ * Signed access to the backend for other features (KI-Chat-Verbindung): the device identity, signature, registration and
+ * clock correction of [FuelApi]. Returns the JSON body of a 2xx answer as text; any other answer throws [FuelException].
+ */
+interface SignedTransport {
+    suspend fun request(method: String, path: String, body: ByteArray? = null, contentType: String = "application/json"): String
+}
