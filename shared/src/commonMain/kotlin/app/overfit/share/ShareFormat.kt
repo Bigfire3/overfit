@@ -105,7 +105,7 @@ object ShareFormat {
         if (version < 1) return ShareParse.Fail(ShareFailure.INVALID)
         if (version > VERSION) return ShareParse.Fail(ShareFailure.TOO_NEW)
         val kind = root.str("kind") ?: KIND_TEMPLATE
-        if (kind != KIND_TEMPLATE) return ShareParse.Fail(ShareFailure.UNSUPPORTED_KIND)
+        if (kind != KIND_TEMPLATE && kind != KIND_WORKOUT) return ShareParse.Fail(ShareFailure.UNSUPPORTED_KIND)
         val name = root.str("name")?.trim().orEmpty().take(MAX_NAME)
         if (name.isEmpty()) return ShareParse.Fail(ShareFailure.INVALID)
         val exercises = (root["exercises"] as? JsonArray) ?: return ShareParse.Fail(ShareFailure.INVALID)

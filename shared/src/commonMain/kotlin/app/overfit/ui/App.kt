@@ -39,6 +39,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.overfit.ai.Providers
+import app.overfit.data.backup.BackupContributor
+import app.overfit.data.backup.BackupService
 import app.overfit.data.AppData
 import app.overfit.data.AppStore
 import app.overfit.data.KeyValueStore
@@ -95,8 +97,18 @@ import app.overfit.ui.templates.TemplateEditorScreen
 import app.overfit.ui.workout.StartWorkoutScreen
 import app.overfit.ui.workout.WorkoutScreen
 import app.overfit.ui.templates.TemplateEditorViewModel
-import app.overfit.ui.main.HistoryScreen
-import app.overfit.ui.main.PhotosScreen
+import app.overfit.ui.history.FinishScreen
+import app.overfit.ui.history.HistoryDetailScreen
+import app.overfit.ui.history.HistoryScreen
+import app.overfit.share.ShareMapper
+import app.overfit.ui.components.Chip
+import app.overfit.ui.photos.PhotosScreen
+import app.overfit.ui.photos.PhotoViewerScreen
+import app.overfit.ui.photos.PhotoCompareScreen
+import app.overfit.ui.settings.BackupImportScreen
+import app.overfit.platform.rememberFilePicker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import app.overfit.ui.main.StartScreen
 import app.overfit.ui.onboarding.AgeStep
 import app.overfit.ui.onboarding.NameStep
@@ -120,6 +132,9 @@ import app.overfit.coach.CoachTransport
 import app.overfit.i18n.LocalCoachStrings
 import app.overfit.i18n.coachStringsFor
 import app.overfit.ui.coach.CoachDemoScreen
+import app.overfit.ui.coach.CoachBackup
+import app.overfit.ui.coach.CoachFinishChoice
+import app.overfit.ui.coach.CoachFinishSection
 import app.overfit.ui.coach.CoachHomeScreen
 import app.overfit.ui.coach.CoachMemoryScreen
 import app.overfit.ui.coach.CoachNav
@@ -164,8 +179,8 @@ class AppDependencies(
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
     /** Small key-value storage for the chat sync state (not secret). */
     kv: KeyValueStore = InMemoryKeyValueStore(),
-    /** Downscaled body photos for the coach (platform). */
-    coachPhotos: CoachPhotoLoader = CoachPhotoLoader { null },
+    /** Body photos for the coach; null = the workout photos, downscaled (tests replace it). */
+    coachPhotos: CoachPhotoLoader? = null,
     /** Replaces the real providers (tests). */
     coachTransport: ((ProviderId) -> CoachTransport)? = null,
 ) {
@@ -182,6 +197,36 @@ class AppDependencies(
                 .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
         }
     }
+
+    /**
+     * Other features add their data to the backup here (coach memory, AI chat settings), see
+     * [BackupContributor]. Register before the UI starts.
+     */
+    val backupContributors = mutableListOf<BackupContributor>()
+
+    /** Backup file picked in the settings, waiting for the import preview ([BackupImportRoute]). */
+    val pendingBackup = MutableStateFlow<ByteArray?>(null)
+
+    /**
+     * Phase 4 (coach): content at the end of the finish flow, below note/feeling/photos and
+     * above "Save" – e.g. "Send to coach" / "Later". Empty until the coach is wired in.
+     */
+    var finishCoachSection: @Composable (workoutId: String) -> Unit = {}
+
+    /**
+     * Called (on the main thread) when the finish flow is saved: note, feeling and photos are
+     * stored. Phase 4 queues the coach review here, the AI chat sync can push the workout.
+     */
+    val workoutSavedListeners = mutableListOf<(workoutId: String) -> Unit>()
+
+    init {
+        // Coach (phase 4): choice at the end of the finish flow, review queued on "Save", memory/reviews in the backup.
+        val coachChoice = CoachFinishChoice()
+        finishCoachSection = { id -> CoachFinishSection(coach, coachChoice, id) }
+        workoutSavedListeners += { id -> if (coachChoice.send && coach.access() is app.overfit.coach.CoachAccess.Ready) coach.startSessionReview(id) }
+        backupContributors += CoachBackup(coach)
+    }
+    val backup = BackupService(data, store, versionName, clock) { backupContributors.toList() }
     /** The running workout; created once per process, loads the stored workout right away. */
     val workout: WorkoutController = WorkoutController(
         store = data.workouts,
@@ -230,6 +275,15 @@ class AppDependencies(
 @Serializable data object DuoRoute
 @Serializable data class ShareRoute(val templateId: Long)
 @Serializable data class ExerciseDetailRoute(val id: String)
+/** Finish flow right after "Finish": summary, feeling, note, photos, coach slot. */
+@Serializable data class FinishRoute(val workoutId: String)
+@Serializable data class HistoryDetailRoute(val workoutId: String)
+/** Share a finished workout (`kind: "workout"`); [withActual] = logged values instead of targets. */
+@Serializable data class WorkoutShareRoute(val workoutId: String, val withActual: Boolean = true)
+@Serializable data class PhotoViewerRoute(val photoId: String)
+@Serializable data class PhotoCompareRoute(val firstId: String, val secondId: String)
+/** Preview and confirm a backup import; the file waits in [AppDependencies.pendingBackup]. */
+@Serializable data object BackupImportRoute
 /** Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). */
 @Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "")
 /** Template editor; [templateId] 0 = new template. */
@@ -417,9 +471,62 @@ fun OverfitApp(deps: AppDependencies) {
                             onAddExercises = { pendingReplaceId = null; nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { pendingReplaceId = it; nav.navigate(ExercisePickerRoute(single = true)) },
                             onClosed = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
+                            onFinished = { id -> nav.navigate(FinishRoute(id)) { popUpTo(StartRoute) } },
                         )
                     }
-                    composable<HistoryRoute> { HistoryScreen() }
+                    composable<FinishRoute> { entry ->
+                        FinishScreen(
+                            workoutId = entry.toRoute<FinishRoute>().workoutId,
+                            workouts = deps.data.workouts,
+                            awaitFinished = deps.workout::awaitFinished,
+                            unit = state.profile.unit,
+                            language = state.language,
+                            appScope = deps.data.scope,
+                            coachSection = deps.finishCoachSection,
+                            onSaved = { id -> deps.workoutSavedListeners.toList().forEach { it(id) } },
+                            onClose = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
+                        )
+                    }
+                    composable<HistoryRoute> {
+                        val rows by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
+                        HistoryScreen(
+                            rows = rows,
+                            unit = state.profile.unit,
+                            language = state.language,
+                            onOpen = { nav.navigate(HistoryDetailRoute(it)) },
+                        )
+                    }
+                    composable<HistoryDetailRoute> { entry ->
+                        val id = entry.toRoute<HistoryDetailRoute>().workoutId
+                        val chatNotes by deps.chat.notes.notes.collectAsStateWithLifecycle()
+                        HistoryDetailScreen(
+                            workoutId = id,
+                            chatNotes = chatNotes.filter { it.workoutId == id },
+                            workouts = deps.data.workouts,
+                            templates = deps.data.templates,
+                            unit = state.profile.unit,
+                            language = state.language,
+                            appScope = deps.data.scope,
+                            onBack = nav::popBackStack,
+                            onOpenPhoto = { nav.navigate(PhotoViewerRoute(it)) },
+                            onTemplateCreated = { nav.navigate(TemplateEditorRoute(it)) },
+                            onShare = { nav.navigate(WorkoutShareRoute(id, withActual = true)) },
+                            onCoach = { nav.navigate(CoachSessionRoute(id)) },
+                        )
+                    }
+                    composable<WorkoutShareRoute> { entry ->
+                        val route = entry.toRoute<WorkoutShareRoute>()
+                        var withActual by rememberSaveable { mutableStateOf(route.withActual) }
+                        ShareScreen(
+                            viewModel = viewModel(key = "workout-share-${route.workoutId}-$withActual") {
+                                ShareViewModel({ deps.data.workouts.getFinished(route.workoutId)?.workout?.let { ShareMapper.fromWorkout(it, withActual) } })
+                            },
+                            platform = deps.share,
+                            onBack = nav::popBackStack,
+                            description = LocalStrings.current.history.shareWorkoutHint,
+                            extra = { Chip(LocalStrings.current.history.withActual, withActual, { withActual = !withActual }) },
+                        )
+                    }
                     composable<ExercisesRoute> {
                         val catalog = viewModel { CatalogViewModel(deps.data.exercises) }
                         ExercisesScreen(
@@ -438,6 +545,9 @@ fun OverfitApp(deps: AppDependencies) {
                         val id = entry.toRoute<ExerciseDetailRoute>().id
                         ExerciseDetailScreen(
                             viewModel = viewModel { ExerciseViewModel(id, deps.data.exercises) },
+                            workouts = deps.data.workouts,
+                            unit = state.profile.unit,
+                            language = state.language,
                             onBack = nav::popBackStack,
                             onEditCustom = { nav.navigate(CustomExerciseRoute(id = it)) },
                         )
@@ -479,8 +589,51 @@ fun OverfitApp(deps: AppDependencies) {
                             onPicked = { ids -> picked.result.value = ids; nav.popBackStack() },
                         )
                     }
-                    composable<PhotosRoute> { PhotosScreen() }
+                    composable<PhotosRoute> {
+                        val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
+                        PhotosScreen(
+                            photos = photos,
+                            onOpen = { nav.navigate(PhotoViewerRoute(it)) },
+                            onCompare = { a, b -> nav.navigate(PhotoCompareRoute(a, b)) },
+                        )
+                    }
+                    composable<PhotoViewerRoute> { entry ->
+                        val id = entry.toRoute<PhotoViewerRoute>().photoId
+                        val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
+                        PhotoViewerScreen(
+                            photos = photos,
+                            photoId = id,
+                            onBack = nav::popBackStack,
+                            onWorkout = { nav.navigate(HistoryDetailRoute(it)) },
+                            onDelete = { photoId ->
+                                deps.data.scope.launch {
+                                    deps.data.workouts.deletePhoto(photoId)
+                                    withContext(Dispatchers.Main) { nav.popBackStack() }
+                                }
+                            },
+                        )
+                    }
+                    composable<PhotoCompareRoute> { entry ->
+                        val route = entry.toRoute<PhotoCompareRoute>()
+                        val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
+                        PhotoCompareScreen(photos, route.firstId, route.secondId, onBack = nav::popBackStack)
+                    }
+                    composable<BackupImportRoute> {
+                        BackupImportScreen(
+                            backup = deps.backup,
+                            pending = deps.pendingBackup,
+                            workoutRunning = workoutState.workout != null,
+                            appScope = deps.data.scope,
+                            onBack = nav::popBackStack,
+                            onRestored = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
+                        )
+                    }
                     composable<SettingsRoute> {
+                        var exportingBackup by remember { mutableStateOf(false) }
+                        val pickBackup = rememberFilePicker { bytes ->
+                            deps.pendingBackup.value = bytes
+                            nav.navigate(BackupImportRoute)
+                        }
                         SettingsScreen(
                             state = state,
                             store = deps.store,
@@ -497,6 +650,18 @@ fun OverfitApp(deps: AppDependencies) {
                             offlineImages = deps.data.offlineImages,
                             restAlerts = deps.restAlerts,
                             share = share,
+                            exportingBackup = exportingBackup,
+                            onExportBackup = {
+                                exportingBackup = true
+                                deps.data.scope.launch {
+                                    val bytes = try { deps.backup.export() } catch (e: Exception) { null }
+                                    withContext(Dispatchers.Main) {
+                                        exportingBackup = false
+                                        if (bytes != null) deps.share.shareBytes(BackupService.fileName(deps.today().toString()), bytes, BackupService.MIME_TYPE)
+                                    }
+                                }
+                            },
+                            onImportBackup = pickBackup,
                             onReset = {
                                 deps.store.resetAll()
                                 deps.data.scope.launch { deps.workout.discard(); deps.data.resetAll() }

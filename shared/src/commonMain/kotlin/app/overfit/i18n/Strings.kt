@@ -17,6 +17,8 @@ data class Strings(
     val back: String,
     val comingSoon: String,
     val share: ShareStrings,
+    val history: HistoryStrings,
+    val photos: PhotoStrings,
 
     // Onboarding
     val nameTitle: String,
@@ -211,6 +213,8 @@ private val ENGLISH_MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "J
 
 val German = Strings(
     share = ShareGerman,
+    history = HistoryGerman,
+    photos = PhotoGerman,
     next = "Weiter",
     back = "Zurück",
     comingSoon = "Folgt in einer späteren Version",
@@ -401,6 +405,8 @@ val German = Strings(
 
 val English = Strings(
     share = ShareEnglish,
+    history = HistoryEnglish,
+    photos = PhotoEnglish,
     next = "Continue",
     back = "Back",
     comingSoon = "Coming in a later version",

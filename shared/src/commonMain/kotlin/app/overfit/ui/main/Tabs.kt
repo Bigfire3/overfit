@@ -102,7 +102,4 @@ private fun EmptyTab(title: String, body: String) {
 }
 
 @Composable
-fun HistoryScreen() = LocalStrings.current.let { EmptyTab(it.historyTitle, it.historyEmpty) }
-
-@Composable
 fun PhotosScreen() = LocalStrings.current.let { EmptyTab(it.photosTitle, it.photosEmpty) }

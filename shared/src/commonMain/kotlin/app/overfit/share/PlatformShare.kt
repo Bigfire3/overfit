@@ -12,6 +12,9 @@ interface PlatformShare {
     /** Shares [content] as a file named [fileName] through the share sheet. */
     fun shareFile(fileName: String, content: String)
 
+    /** Shares binary content (backup ZIP) as a file through the share sheet / "Save to Files". */
+    fun shareBytes(fileName: String, bytes: ByteArray, mimeType: String) = Unit
+
     fun copyText(text: String)
 
     /** Current clipboard text, if any. */

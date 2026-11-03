@@ -33,6 +33,9 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # Compose Multiplatform: allow 120 Hz on ProMotion devices.
         CADisableMinimumFrameDurationOnPhone: true
+        # Body photos after a workout (stored only inside the app, never in the photo library).
+        NSCameraUsageDescription: Overfit nimmt auf Wunsch ein Fortschrittsfoto nach dem Training auf. Es bleibt nur in der App. / Overfit takes an optional progress photo after a workout. It stays inside the app.
+        NSPhotoLibraryUsageDescription: Overfit übernimmt auf Wunsch ein Foto als Fortschrittsfoto. / Overfit can use a photo of your choice as a progress photo.
         # overfit://t#… opens the import screen.
         CFBundleURLTypes:
           - CFBundleURLName: app.overfit

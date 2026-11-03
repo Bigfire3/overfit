@@ -30,7 +30,7 @@ sealed interface CoachAccess {
     data class Ready(val providerId: ProviderId) : CoachAccess
 }
 
-/** Loads a body photo downscaled for the coach (≈1500 px long edge, JPEG). Null if missing/unreadable. */
+/** Loads a body photo (file name in the photo directory) downscaled for the coach (≈1500 px, JPEG). Null if missing. */
 fun interface CoachPhotoLoader {
     suspend fun load(path: String): ByteArray?
 }
@@ -285,13 +285,13 @@ class CoachService(
         val images = mutableListOf<CoachImage>()
         if (settings.state.value.sendPhotos) {
             val latest = when (row.kind) {
-                ReviewKind.SESSION -> ctx.current?.let { c -> c.photoPath?.let { c.startedAt to it } }
-                ReviewKind.PROGRESS -> dao.latestPhotoBefore(clock())?.let { it.startedAt to it.photoPath!! }
+                ReviewKind.SESSION -> ctx.current?.let { c -> dao.firstPhotoOf(c.id) }?.let { it.startedAt to it.fileName }
+                ReviewKind.PROGRESS -> dao.latestPhotoBefore(clock())?.let { it.startedAt to it.fileName }
             }
             if (latest != null) photos.load(latest.second)?.let { images += CoachImage(dateOf(latest.first), it) }
             if (images.isNotEmpty()) {
                 val compare = dao.latestPhotoBefore(latest!!.first - COMPARE_MS)
-                val bytes = compare?.photoPath?.let { photos.load(it) }
+                val bytes = compare?.fileName?.let { photos.load(it) }
                 if (compare != null && bytes != null) {
                     images += CoachImage(dateOf(compare.startedAt), bytes)
                     ctx = ctx.copy(comparisonPhotoDate = dateOf(compare.startedAt))
@@ -361,6 +361,18 @@ class CoachService(
 
     /** Deletes the memory with all versions. */
     suspend fun clearMemory() = dao.deleteMemory()
+
+    /** Backup: all reviews and memory versions. */
+    suspend fun exportAll(): Pair<List<CoachReviewEntity>, List<CoachMemoryEntity>> =
+        dao.allReviews() to dao.allMemory()
+
+    /** Backup import: replaces reviews and memory. */
+    suspend fun importAll(reviews: List<CoachReviewEntity>, memory: List<CoachMemoryEntity>) {
+        dao.deleteAll()
+        dao.deleteMemory()
+        reviews.forEach { dao.upsert(it) }
+        memory.forEach { dao.insertMemory(it) }
+    }
 
     /** "Delete all data". */
     suspend fun resetAll() {

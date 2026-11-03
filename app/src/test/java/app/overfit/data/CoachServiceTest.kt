@@ -329,6 +329,33 @@ class CoachServiceTest {
     }
 
     @Test
+    fun backupContributorRoundTrip() = runBlocking {
+        seedFinishedWorkout()
+        coach.requestSessionReview(sessionId)
+        coach.sendPending()
+        coach.saveMemory("Von Hand")
+        coach.settings.setSendPhotos(true)
+        val backup = app.overfit.ui.coach.CoachBackup(coach)
+        val exported = requireNotNull(backup.export())
+
+        data.resetAll()
+        assertTrue(coach.reviews.first().isEmpty())
+        assertFalse(coach.settings.state.value.sendPhotos)
+
+        backup.import(exported)
+        val reviews = coach.reviews.first()
+        assertEquals(1, reviews.size)
+        assertEquals(8, reviews.single().review?.rating)
+        assertEquals("Von Hand", dao.currentMemory()!!.text)
+        assertEquals(2, coach.memoryVersions.first().size)
+        assertTrue(coach.settings.state.value.sendPhotos)
+
+        backup.import(null) // backup without coach data → coach data empty
+        assertTrue(coach.reviews.first().isEmpty())
+        assertNull(dao.currentMemory())
+    }
+
+    @Test
     fun resetAllClearsCoachData() = runBlocking {
         seedFinishedWorkout()
         coach.requestSessionReview(sessionId)

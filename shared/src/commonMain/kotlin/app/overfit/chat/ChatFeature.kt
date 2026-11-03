@@ -34,6 +34,9 @@ class AppChatSource(
         return ChatDocs.profile(s.profile, s.weights, s.language, TimeZone.currentSystemDefault().id, now)
     }
     override fun memory(): String? = memory.invoke()
+    override suspend fun photos(): List<ChatPhotoRef> =
+        data.workouts.allPhotos().map { ChatPhotoRef(it.id, it.takenAt, it.sessionId) }
+    override suspend fun photoJpeg(id: String): ByteArray? = data.workouts.photoJpeg(id)
 }
 
 /**

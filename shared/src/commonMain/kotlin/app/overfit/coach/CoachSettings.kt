@@ -41,6 +41,7 @@ class CoachSettingsStore(private val kv: KeyValueStore) {
     }
     fun setSendPhotos(on: Boolean) = edit { it.copy(sendPhotos = on) }
     fun setInstructions(text: String?) = edit { it.copy(instructions = text?.takeIf { t -> t.isNotBlank() }) }
+    fun replace(settings: CoachSettings) = edit { settings }
     fun reset() { kv.remove(KEY); _state.value = CoachSettings() }
 
     companion object { const val KEY = "overfit.coach.v1" }

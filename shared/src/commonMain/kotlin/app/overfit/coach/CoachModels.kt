@@ -3,15 +3,18 @@ package app.overfit.coach
 import app.overfit.domain.WorkoutExercise
 
 /** What the coach evaluates: one finished workout or the progress over the last weeks. */
+@kotlinx.serialization.Serializable
 enum class ReviewKind { SESSION, PROGRESS }
 
 /**
  * Life cycle of a coach request. QUEUED requests are (re)sent automatically on app start and when the app comes
  * to the foreground; FAILED ones only by "Try again" (e.g. invalid key, no Fuel left, invalid answer twice).
  */
+@kotlinx.serialization.Serializable
 enum class ReviewStatus { QUEUED, SENDING, DONE, FAILED }
 
 /** What the user did with the plan suggestion. */
+@kotlinx.serialization.Serializable
 enum class PlanStatus { NONE, OPEN, ACCEPTED, PARTIAL, REJECTED }
 
 /** A finished workout as the coach sees it (read straight from the database). */

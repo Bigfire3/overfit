@@ -15,6 +15,7 @@ import app.overfit.data.AppData
 import app.overfit.data.AppStore
 import app.overfit.domain.buildProfileBlock
 import app.overfit.i18n.coachStringsFor
+import app.overfit.platform.prepareJpeg
 import kotlinx.datetime.LocalDate
 
 /**
@@ -27,7 +28,7 @@ internal fun createCoach(
     data: AppData,
     today: () -> LocalDate,
     clock: () -> Long,
-    photos: CoachPhotoLoader,
+    photos: CoachPhotoLoader?,
     transportOverride: ((ProviderId) -> CoachTransport)?,
 ): CoachService {
     val transports = mutableMapOf<ProviderId, CoachTransport>()
@@ -60,7 +61,7 @@ internal fun createCoach(
         },
         defaultInstructions = { coachStringsFor(it).defaultInstructions },
         scope = data.scope,
-        photos = photos,
+        photos = photos ?: CoachPhotoLoader { name -> data.workouts.photoFiles.read(name)?.let { prepareJpeg(it, maxEdge = 1500) } },
         clock = clock,
     )
 }

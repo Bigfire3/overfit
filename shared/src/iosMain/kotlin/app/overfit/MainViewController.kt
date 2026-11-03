@@ -11,6 +11,7 @@ import app.overfit.fuel.RequestSigner
 import app.overfit.platform.IosAttestor
 import app.overfit.platform.IosDeviceKey
 import app.overfit.platform.IosHaptics
+import app.overfit.platform.IosPhotoFiles
 import app.overfit.platform.IosKeyValueStore
 import app.overfit.platform.IosRestAlerts
 import app.overfit.platform.KeychainSecretStore
@@ -35,14 +36,13 @@ fun MainViewController(): UIViewController {
     val deps = AppDependencies(
         store = AppStore(kv, KeychainSecretStore(), deviceDefaults()),
         providers = Providers(createHttpClient()) { fuelAccess.service() },
-        data = AppData(buildDatabase(), kv),
+        data = AppData(buildDatabase(), kv, photoFiles = IosPhotoFiles()),
         versionName = "$version ($build)",
         haptics = IosHaptics(),
         restAlerts = IosRestAlerts(),
         fuel = fuelAccess,
         share = IosPlatformShare(),
         inbox = IosIncoming.inbox,
-        coachPhotos = app.overfit.platform.IosCoachPhotos(),
         kv = kv,
     )
     return ComposeUIViewController { OverfitApp(deps) }

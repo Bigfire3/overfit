@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.Flow
  * [sessionId] has no foreign key on purpose: like the session's templateId it is informational, and progress
  * reviews have none.
  */
+@kotlinx.serialization.Serializable
 @Entity(tableName = "coach_review", indices = [Index("sessionId"), Index("status"), Index("createdAt")])
 data class CoachReviewEntity(
     @PrimaryKey val id: String,
@@ -51,6 +52,7 @@ data class CoachReviewEntity(
 )
 
 /** One version of the coach memory; the newest row is the current text. */
+@kotlinx.serialization.Serializable
 @Entity(tableName = "coach_memory", indices = [Index("createdAt")])
 data class CoachMemoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -61,6 +63,9 @@ data class CoachMemoryEntity(
     /** Review that wrote this version (COACH). */
     val reviewId: String?,
 )
+
+/** A body photo (file in the app-private photo directory) and when its workout started. */
+data class CoachPhotoRow(val fileName: String, val startedAt: Long)
 
 @Dao
 interface CoachDao {
@@ -87,6 +92,12 @@ interface CoachDao {
 
     @Query("DELETE FROM coach_review WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("SELECT * FROM coach_review ORDER BY createdAt")
+    suspend fun allReviews(): List<CoachReviewEntity>
+
+    @Query("SELECT * FROM coach_memory ORDER BY createdAt, id")
+    suspend fun allMemory(): List<CoachMemoryEntity>
 
     @Query("DELETE FROM coach_review")
     suspend fun deleteAll()
@@ -130,8 +141,20 @@ interface CoachDao {
     fun observeLatestFinished(): Flow<WorkoutSessionEntity?>
 
     /** Newest photo of a finished workout started before [before] (comparison photo). */
-    @Query("SELECT * FROM workout_session WHERE status = 'FINISHED' AND photoPath IS NOT NULL AND startedAt <= :before ORDER BY startedAt DESC LIMIT 1")
-    suspend fun latestPhotoBefore(before: Long): WorkoutSessionEntity?
+    @Query(
+        """SELECT p.fileName AS fileName, s.startedAt AS startedAt FROM workout_photo p
+           JOIN workout_session s ON s.id = p.sessionId
+           WHERE s.status = 'FINISHED' AND s.startedAt <= :before
+           ORDER BY s.startedAt DESC, p.position LIMIT 1""",
+    )
+    suspend fun latestPhotoBefore(before: Long): CoachPhotoRow?
+
+    @Query(
+        """SELECT p.fileName AS fileName, s.startedAt AS startedAt FROM workout_photo p
+           JOIN workout_session s ON s.id = p.sessionId
+           WHERE p.sessionId = :sessionId ORDER BY p.position LIMIT 1""",
+    )
+    suspend fun firstPhotoOf(sessionId: String): CoachPhotoRow?
 
     @Query("UPDATE workout_session SET aiStatus = :status WHERE id = :sessionId")
     suspend fun setAiStatus(sessionId: String, status: AiStatus)

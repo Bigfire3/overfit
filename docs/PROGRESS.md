@@ -6,12 +6,12 @@
 | 0b | Kotlin Multiplatform, Schwarz-Weiß-Design, DE/EN, Onboarding, eigener API-Key, iOS-Hülle | erledigt |
 | 1 | Übungskatalog, eigene Übungen, Vorlagen | erledigt |
 | 2 | Workout-Modus, Pausentimer | erledigt |
-| 3 | Beenden-Flow, Foto, Verlauf, Backup | offen |
 | 4 | KI-Coach | erledigt (Session G): Auswertung, Plan-Diff, Gedächtnis, Fortschritt, Warteschlange, Demo |
+| 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
 | 5 | Feinschliff | offen |
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
-| 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
+| 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
@@ -72,20 +72,23 @@ Fertig:
   erreichbar über Profil → KI-Coach (Seite der fünf Wege) und Profil → Coach
 - Coach-Gedächtnis geht bei verbundener KI-Chat-Verbindung als `memory/coach` mit (Sync nach jeder Änderung)
 - Ohne KI-Zugang: Hinweis mit „KI verbinden“ / „Fuel nutzen“ und eine als Demo markierte Beispiel-Auswertung
-- Start: „Letzte Coach-Tipps“ aus der neuesten Auswertung, Zeile „Coach“; Profil → Coach
-- Room v4 (`coach_review`, `coach_memory`, nur neue Tabellen, Migrationstest)
+- Einstieg: am Ende des Beenden-Flows „An Coach senden: Senden / Später“ (Senden beim Speichern), Verlauf → Training →
+  „Coach-Auswertung“, Start: „Letzte Coach-Tipps“ + Zeile „Coach“, Profil → Coach
+- Backup enthält Coach-Gedächtnis (alle Versionen), Auswertungen und Coach-Einstellungen (keine Keys)
+- Room v4 (`coach_review`, `coach_memory`, nur neue Tabellen, Migrationstest 3→4)
 - Tests: Parser (kaputte/abweichende Antworten), Request-Aufbau, Plan-Diff + Anwenden, Provider gegen MockEngine,
   Warteschlange/Service mit Room, UI-Durchlauf mit Fake-Provider
 
 Offen / Hinweise:
 - Kein Senden bei geschlossener App (kein WorkManager), siehe DECISIONS
-- Coach-Tabellen sind noch nicht im Backup (Phase 3) enthalten
+- Fotos gehen nur mit Einwilligung mit (Profil → KI-Coach → Coach-Einstellungen), erstes Foto des Trainings + Vergleichsfoto ≥ 4 Wochen
 
 ## Bitte auf dem Handy testen: KI-Coach (Phase 4)
 1. Profil → KI verbinden → Anthropic + eigener Key (oder Fuel)
-2. Training aus einer Vorlage (z. B. Push) machen, ein paar Sätze abhaken, „Beenden“
-3. Start → Zeile „Coach“ → „Letztes Training auswerten“ → „An Coach senden“ → nach 10–40 s Bewertung, Tipps und
-   „Nächstes Mal“ mit Änderungen
+2. Training aus einer Vorlage (z. B. Push) machen, ein paar Sätze abhaken, „Beenden“ → unten im Abschnitt „Coach“ steht
+   „Senden“ ausgewählt → „Speichern“
+3. Verlauf → das Training → „Coach-Auswertung“ (oder Start → „Coach“ → „Letztes Training auswerten“) → nach 10–40 s
+   Bewertung, Tipps und „Nächstes Mal“ mit Änderungen
 4. Einzelne Änderungen abwählen (Kreis rechts) → „N übernehmen“ (oder „Alle annehmen“) → Vorlage öffnen: Werte geändert
 5. Start zeigt unter „Letzte Coach-Tipps“ die Tipps
 6. Flugmodus an → noch ein Training beenden und senden → „Wartet auf Verbindung“; Flugmodus aus, App schließen und
@@ -93,8 +96,39 @@ Offen / Hinweise:
 7. Profil → Coach → „Fortschritt bewerten“
 8. Profil → Coach-Gedächtnis: Text ansehen, ändern, Speichern; Versionen wiederherstellen; löschen (zweimal tippen)
 9. Profil → KI-Coach → Coach-Einstellungen: Modell, Fotos (Standard aus), Anweisungen ändern/zurücksetzen
-10. KI trennen → Coach → „Letztes Training auswerten“ → Hinweis „Kein KI-Zugang“ → „Demo-Auswertung ansehen“
+10. KI trennen → Verlauf → Training → „Coach-Auswertung“ → Hinweis „Kein KI-Zugang“ → „Demo-Auswertung ansehen“
+12. Backup exportieren, „Alle Daten löschen“, Backup importieren → Coach-Gedächtnis und Auswertungen wieder da
 11. Mit Fuel: unter der Auswertung „Fuel · 0,0x € · Saldo …“
+## Phase 3: Beenden-Flow, Fotos, Verlauf, Backup (Session F, Nacht 3.11.)
+Fertig:
+- Nach „Beenden“: Zusammenfassung (Dauer, Sätze, Volumen, Übungen, Abweichungen), neue Bestwerte (Gewicht, geschätztes 1RM,
+  Wdh., Zeit), Gefühl 1–5, Notiz, Körperfotos (Kamera / Foto-Auswahl, nur app-privat), Speichern. Platz für den Coach (Phase 4)
+- Verlauf-Tab: Liste, Detail mit allen Sätzen, Notiz, Gefühl, Fotos; „Als Vorlage übernehmen“, „Teilen“ (`kind: "workout"`,
+  mit/ohne Ist-Werte, nie Fotos/Notizen/Gefühl), Löschen. Übungsdetail: Fortschritt (Bestwerte, letzte Trainings, e1RM)
+- Fotos-Tab: Zeitachse nach Monat, Vollbild, zwei Fotos vergleichen, löschen
+- Profil → Backup: Export als eine ZIP-Datei (Teilen-Menü / „In Dateien sichern“), Import mit Vorschau und Bestätigung
+  („Alle Daten ersetzen“); ohne API-Key/Geräteschlüssel
+- Room v3 (Fotos) mit Migrationstest; `changes`/`dataChanged`-Flows und `photosOf()` für KI-Chat-Sync und Coach
+- Tests: Bestwerte/Zusammenfassung, ZIP (auch kaputte Dateien), Training teilen (Common); Migration 2→3, Backup-Rundlauf
+  (Export → Alles löschen → Import = gleiche Daten), alte/kaputte/neuere Backups, UI-Durchlauf Vorlage → 2 Sätze → Beenden →
+  Notiz → Verlauf (Robolectric)
+
+Offen / Hinweise:
+- Android-Zurück-Taste im Beenden-Screen schließt ohne Notiz/Gefühl zu speichern (Training selbst ist gespeichert)
+- Backup liegt beim Erstellen komplett im Speicher; bei sehr vielen Fotos später streamen
+- iOS-Kamera/Fotoauswahl/Dateiauswahl nur von der iOS-CI gebaut, nicht auf echtem iPhone getestet
+
+## Bitte auf dem Handy testen: Beenden, Verlauf, Fotos, Backup (Phase 3)
+1. Vorlage „Push“ starten, 2 Sätze abhaken (Gewicht beim zweiten erhöhen), „Beenden“ zweimal → Zusammenfassung erscheint
+2. Gefühl antippen, Notiz schreiben, „Foto aufnehmen“ (Kamera erlauben) und „Aus Fotos wählen“ → Vorschaubilder, eins entfernen
+3. „Speichern“ → Start. Gleiches Training nochmal mit mehr Gewicht → unter „Neue Bestwerte“ steht die Übung
+4. Verlauf-Tab: Training öffnen → Sätze, Notiz, Fotos; Foto antippen → Vollbild; „Als Vorlage übernehmen“ → Editor
+5. Im Verlauf-Detail „Teilen“ → Schalter „Mit Ist-Werten“, Link kopieren und über Übungen → Importieren wieder einfügen
+6. Übungen → Bankdrücken → Abschnitt „Fortschritt“ (Bestwerte, letzte Trainings)
+7. Fotos-Tab: Zeitachse, „Vergleichen“ → zwei Fotos wählen → nebeneinander; Foto löschen (zweimal tippen)
+8. Profil → „Backup exportieren“ → in Dateien/Drive sichern. Dann Profil → „Alle Daten löschen“, Onboarding kurz
+   durchklicken, Profil → „Backup importieren“ → Datei wählen → Vorschau → „Alle Daten ersetzen“ (zweimal) → alles wieder da
+   (Verlauf, Fotos, Vorlagen, Name). Fotos erscheinen nicht in der Galerie
 
 ## Phase 2: Workout-Modus und Pausentimer (Session A)
 Phase 2 abgeschlossen:

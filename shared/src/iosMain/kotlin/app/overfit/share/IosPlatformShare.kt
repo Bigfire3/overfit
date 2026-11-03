@@ -1,5 +1,7 @@
 package app.overfit.share
 
+import app.overfit.platform.toNSData
+
 import platform.Foundation.NSString
 import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSURL
@@ -20,6 +22,12 @@ class IosPlatformShare : PlatformShare {
     override fun shareFile(fileName: String, content: String) {
         val path = NSTemporaryDirectory().trimEnd('/') + "/" + fileName
         NSString.create(string = content).writeToFile(path, atomically = true, encoding = NSUTF8StringEncoding, error = null)
+        present(listOf(NSURL.fileURLWithPath(path)))
+    }
+
+    override fun shareBytes(fileName: String, bytes: ByteArray, mimeType: String) {
+        val path = NSTemporaryDirectory().trimEnd('/') + "/" + fileName
+        bytes.toNSData().writeToFile(path, atomically = true)
         present(listOf(NSURL.fileURLWithPath(path)))
     }
 

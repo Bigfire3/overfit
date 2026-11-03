@@ -45,6 +45,7 @@ import app.overfit.share.QrScanner
 import app.overfit.share.ShareFailure
 import app.overfit.share.ShareFormat
 import app.overfit.share.ShareMapper
+import app.overfit.share.SharedTraining
 import app.overfit.share.ShareParse
 import app.overfit.share.TemplateImporter
 import app.overfit.share.AiPrompt
@@ -272,7 +273,11 @@ private fun PreviewRow(line: PreviewExercise, unit: WeightUnit, language: Langua
 // ---------------------------------------------------------------------------------------------
 // Share
 
-class ShareViewModel(private val templateId: Long, private val templates: TemplateRepository) : ViewModel() {
+/** Link/QR/file for a template or a finished workout ([source] builds the shared training). */
+class ShareViewModel(private val source: suspend () -> SharedTraining?) : ViewModel() {
+    constructor(templateId: Long, templates: TemplateRepository) :
+        this({ templates.get(templateId)?.let { ShareMapper.fromTemplate(it) } })
+
     data class State(val name: String = "", val link: String? = null, val json: String? = null)
 
     private val _state = MutableStateFlow(State())
@@ -280,15 +285,22 @@ class ShareViewModel(private val templateId: Long, private val templates: Templa
 
     init {
         viewModelScope.launch {
-            val template = templates.get(templateId) ?: return@launch
-            val training = ShareMapper.fromTemplate(template)
-            _state.value = State(template.name, ShareFormat.toLink(training), ShareFormat.toJson(training))
+            val training = source() ?: return@launch
+            _state.value = State(training.name, ShareFormat.toLink(training), ShareFormat.toJson(training))
         }
     }
 }
 
 @Composable
-fun ShareScreen(viewModel: ShareViewModel, platform: PlatformShare, onBack: () -> Unit) {
+fun ShareScreen(
+    viewModel: ShareViewModel,
+    platform: PlatformShare,
+    onBack: () -> Unit,
+    /** Optional explanation below the title (e.g. what a shared workout contains). */
+    description: String? = null,
+    /** Optional extra controls below the description (e.g. a toggle). */
+    extra: (@Composable ColumnScope.() -> Unit)? = null,
+) {
     val t = LocalStrings.current
     val s = t.share
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -305,6 +317,14 @@ fun ShareScreen(viewModel: ShareViewModel, platform: PlatformShare, onBack: () -
         Text(s.shareTemplate, tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
         Title(state.name)
+        if (description != null) {
+            Spacer(Modifier.height(Space.s))
+            Text(description, style = Theme.type.caption, tone = Tone.Muted)
+        }
+        if (extra != null) {
+            Spacer(Modifier.height(Space.m))
+            extra()
+        }
         Spacer(Modifier.height(Space.l))
         if (link != null) {
             if (qrFits) {

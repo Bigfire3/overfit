@@ -10,6 +10,8 @@ import app.overfit.shared.resources.Res
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
 
 /** Training data: database, repositories, exercise catalogue and offline images. */
@@ -19,16 +21,27 @@ class AppData(
     readCatalog: suspend () -> ByteArray = { Res.readBytes(CatalogSeeder.RESOURCE_PATH) },
     readSample: suspend (String) -> ByteArray = { Res.readBytes("files/samples/$it.json") },
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    /** App-private photo folder (body photos, photo diary). */
+    photoFiles: PhotoFiles = InMemoryPhotoFiles(),
 ) {
     /** Lives as long as the app; for work that must not stop when a screen closes. */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val exercises = ExerciseRepository(database, clock)
     val templates = TemplateRepository(database, clock)
-    val workouts = WorkoutRepository(database, clock)
+    val workouts = WorkoutRepository(database, clock, photoFiles)
     val importer = TemplateImporter(exercises, templates, readSample)
     val catalog = CatalogSeeder(database, kv, readCatalog)
     val offlineImages = OfflineImages(scope, exercises)
     val coachSettings = CoachSettingsStore(kv)
+
+    /**
+     * Emits whenever any training data changes (workouts, sets, photos, templates, exercises),
+     * once right away too. For features that mirror the data elsewhere (AI chat sync).
+     */
+    val dataChanged: Flow<Unit> = database.invalidationTracker.createFlow(
+        "workout_session", "session_exercise", "set_entry", "workout_photo",
+        "workout_template", "template_exercise", "template_set", "exercise",
+    ).map { }
 
     /** Loads the bundled catalogue if it changed. Failures are not fatal (the list just stays empty). */
     suspend fun seedCatalog(): Result<Boolean> = runCatching { catalog.seedIfNeeded(clock()) }
@@ -43,6 +56,7 @@ class AppData(
             database.exerciseDao().deleteAll()
         }
         coachSettings.reset()
+        workouts.photoFiles.list().forEach { workouts.photoFiles.delete(it) }
         kv.remove(CatalogSeeder.KEY_VERSION)
         seedCatalog()
     }
