@@ -15,6 +15,23 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## 3.11. – KI-Kontext, Auswertung je Übung, Gemini (Session N)
+Erledigt:
+- **Profil überall:** Name, Alter und aktuelles Körpergewicht (Profil-Einheit) gehen über jeden KI-Weg mit: Coach (eigener Key und Fuel), „Kontext kopieren“, „KI-Vorlage kopieren“, Gem-/GPT-Anleitung (Zeile „Über mich“) und KI-Chat (jede MCP-Tool-Antwort beginnt mit `user`). Alle Wege nutzen eine gemeinsame Funktion (`aiProfileFacts`), fehlende Werte fallen weg.
+- **Auswertung je Übung:** kurzes Gesamtfazit oben, darunter je Übung heute gegen letztes Mal (bester Satz, Sätze, Volumen, e1RM bzw. Wdh./Zeit). Dazu farbige Deltas, ein Badge (Besser grün, Schlechter rot, Gleich grau), ein KI-Kommentar und „Nächstes Mal: kg × Wdh.“. Die Zahlen rechnet die App lokal, deshalb erscheinen sie auch offline, ohne KI und in der Demo. Keine Schemaänderung (Room bleibt v4, v6 nicht gebraucht).
+- „Neue Bestwerte“ beim Beenden zeigen das Plus grün, der Fortschritt je Übung zeigt Deltas zum vorherigen Training in Grün/Rot.
+- **Gemini als Anbieter:** eigener Google-AI-Studio-Key (`AIza…`), Key-Prüfung ohne Token-Kosten, Standardmodell `gemini-3.6-flash`, Structured Output über den OpenAI-kompatiblen Endpunkt (Begründung in DECISIONS.md).
+Offen: Optik auf dem Handy prüfen. Mit echtem Gemini-Key ist die Strecke nur über Tests (gemockte Antworten) geprüft.
+
+### Bitte auf dem Handy testen (Session N)
+1. Profil → KI verbinden → „Gemini“ → Key von aistudio.google.com/apikey einfügen → „Verbunden“. Ein falscher Key zeigt „ungültig“.
+2. Ein Training (z. B. Push) zweimal beenden, beim zweiten Mal bei einer Übung mehr Gewicht, bei einer weniger → „Senden“ → Coach-Auswertung: oben 1–2 Sätze, darunter „Je Übung“ mit Heute/Letztes Mal, grünem „Besser“, rotem „Schlechter“, grauem „Gleich“, Kommentar und „Nächstes Mal: … kg × …“.
+3. Flugmodus an, Training beenden und senden → „Wartet auf Verbindung“, darunter trotzdem „Je Übung“ mit den Zahlen.
+4. KI trennen → Verlauf → Training → Coach-Auswertung → „Demo-Auswertung ansehen“: je Übung mit Demo-Kommentar.
+5. Beenden-Zusammenfassung: „Neue Bestwerte“ mit grünem „+x“. Übungen → Übung → Fortschritt: Deltas grün/rot.
+6. Profil → KI-Coach → „Kontext kopieren“, „Gem-/GPT-Anleitung kopieren“ und Übungen → „KI-Vorlage kopieren“ jeweils in Notizen einfügen: oben Name, Alter und Gewicht.
+7. Mit Backend: im verbundenen Chat „Wer bin ich?“ fragen → Name, Alter und Gewicht kommen ohne weiteres Zutun.
+
 ## Morgen-Testliste für Fabian (3.11.)
 Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Fuel/Spot); die Demo in 36–38 braucht keinen Server.
 Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).
