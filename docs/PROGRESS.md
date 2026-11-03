@@ -12,8 +12,42 @@
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Session Z, seit Session AB über Stripe, Web 1:1, Store-Aufpreis offen, Aufschlag 28 %); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
-| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
+| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Einladung intern, Guthaben vs. echte Euro, Bonus als Auswertungen (Session AD, 3.11.)
+**Erledigt:**
+- **„Spot“ intern entfernt:** API `/v1/invite/*`, Env `INVITE_*`, D1-Migration `0007_invite.sql` (Tabellen, Index, Ledger-Typen umbenannt,
+  Daten erhalten, Migrationstest), Kotlin `Invite*`, Dateien `invite.ts`/`InviteLink.kt`/`InviteScreens.kt`. Nur `overfit://invite#…` wird gelesen.
+  Deploy übernimmt das alte Signier-Secret automatisch.
+- **Einladungsbonus = geschenkte Coach-Auswertungen:** Neuer 5, Einladender 5 (nach der ersten Anfrage des Freundes). Eigener Zähler,
+  nur für Coach-Auswertungen mit Gemini Flash, vor dem Guthaben verbraucht, Verfall nach 180 Tagen. Chat und Claude zahlen aus dem Guthaben.
+  Grenzen: 1000 Auswertungen/Monat global, harte Grenze 50 € echte KI-Kosten/Monat, 0,25 € je Anfrage; alte Grenzen bleiben.
+  Kosten: docs/monetization.md „Einladungsbonus“ (0,014 € je Auswertung, ab 2027 0,028 €).
+- **Missbrauchsschutz Kontoumzug:** Geschenkte Einladungs-Auswertungen des aufgegebenen Kontos verfallen, Gekauftes wandert mit (Test).
+- **Guthaben vs. echte Euro:** App zeigt „4,20 € Guthaben · 5 geschenkte Auswertungen“, darunter „Gekauft: … € Guthaben · geschenkt: … €
+  Guthaben“, Verfall je Posten, „Geschenktes wird zuerst verbraucht.“ Preise nur als „Preis: 10,00 €“ bzw. „6,99 € (inkl. Store-Gebühr)“.
+  Buchungen: „bezahlt / geschenkt / verbraucht / erstattet / verfallen“, geschenkte Auswertungen als „+5 Auswertungen“ / „−1 Auswertung“.
+- **Admin-Report** (`/v1/admin/usage` → `finance`, `scripts/usage-report.mjs`): Einnahmen je Kanal brutto und nach Gebühren, offenes
+  Guthaben gekauft/geschenkt, KI-Kosten, Rohgewinn. Geschenktes zählt nie als Einnahme.
+- Tests: Backend 134 (u. a. `invite.test.ts`, `migration0007.test.ts`, Finanzbericht), Shared/App-Tests angepasst; `OwnKeyPrivacyTest` grün.
+**Offen:** echte Einladung zwischen zwei Handys braucht weiter Attestierung (Store-Build) oder den Testserver.
+
+### Von Fabian zu tun (Session AD)
+1. **Actions → Backend deployen → Run workflow**, `mode` = test (spielt Migration 0007 ein). Sonst nichts: Secrets bleiben, das alte
+   Signier-Secret wird automatisch übernommen.
+2. Neues APK aus „Overfit latest“ installieren.
+
+### Bitte auf dem Handy testen (Session AD)
+1. **Profil → Guthaben:** oben „X € Guthaben“; falls du noch Euro-Einladungsboni oder Test-Gutschrift hast, darunter „Gekauft: … ·
+   geschenkt: …“ und „Geschenktes wird zuerst verbraucht.“
+2. **Buchungen:** jede Zeile sagt „bezahlt“, „geschenkt“ oder „verbraucht“ vor dem Datum; Beträge als „… € Guthaben“.
+3. **Freunde einladen:** Text „Ihr bekommt beide 5 Coach-Auswertungen geschenkt …“ und der Hinweis auf Gemini 3.6 Flash.
+4. **Einladung einlösen** (zweites Handy oder Demo): Reveal zählt bis **5** hoch, darunter „Coach-Auswertungen geschenkt“; danach im
+   Guthaben „… € Guthaben · 5 geschenkte Auswertungen“ und „5 Auswertungen gültig bis …“.
+5. **Auswertung mit Gemini 3.6 Flash** nach dem Einlösen: Kostenzeile „geschenkte Auswertung“, Zähler sinkt auf 4, Euro bleibt gleich.
+   Ein Chat kostet dagegen Guthaben. Der Einladende hat danach 5 geschenkte Auswertungen.
+6. **Coach-Tab und Einstellungen:** Zugang zeigt „… € Guthaben“ (mit geschenkten Auswertungen, falls vorhanden).
 
 ## Stripe statt Paddle, Store-Aufpreis offen, Aufschlag 28 % (Session AB, 3.11.)
 **Erledigt:**

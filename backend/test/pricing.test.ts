@@ -26,7 +26,7 @@ const webNet = (p: number, fee = STRIPE_MIX) => p - (p * fee.pct + fee.fixed);
 const storeNet = (p: number, vat: number) => (p / (1 + vat)) * (1 - STORE_FEE);
 /** Gewinn als Anteil am Netto: Guthaben wird zum Listenpreis × (1 + Aufschlag) verbraucht. */
 const profitShare = (credit: number, net: number, markupBp: number) => (net - credit / (1 + markupBp / 10_000) - INVITE_SHARE * net) / net;
-/** Nötiger Aufschlag für einen Zielgewinn: credit ÷ (1 + m) = net × (1 − Spot − Ziel). */
+/** Nötiger Aufschlag für einen Zielgewinn: credit ÷ (1 + m) = net × (1 − Rücklage − Ziel). */
 const neededMarkup = (credit: number, net: number, target: number) => credit / (net * (1 - INVITE_SHARE - target)) - 1;
 
 describe('Aufschlag deckt jeden Kanal und jedes Paket', () => {

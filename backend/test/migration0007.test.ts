@@ -3,7 +3,7 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Migration 0007 (spot → invite, geschenkte Auswertungen) auf einer eigenen Datenbank mit Testdaten im Stand von 0006:
+ * Migration 0007 (alte Namen → invite, geschenkte Auswertungen) auf einer eigenen Datenbank mit Testdaten im Stand von 0006:
  * keine Zeile geht verloren, Euro-Einladungsboni bleiben geschenktes Guthaben, Eindeutigkeit bleibt erhalten.
  */
 describe('D1-Migration 0007', () => {

@@ -22,7 +22,7 @@ Für `npm run dev` Secrets lokal in `backend/.dev.vars` (nicht committen):
 ```
 GEMINI_API_KEY=AIza...              # Gemini 3.6 Flash; oder GEMINI_BASE_URL=http://localhost:9999 mit eigenem Fake
 ANTHROPIC_API_KEY=sk-ant-...        # Claude Sonnet 5.5; oder ANTHROPIC_BASE_URL=…
-SPOT_SIGNING_KEY=irgendein-langer-zufallswert
+INVITE_SIGNING_KEY=irgendein-langer-zufallswert
 ATTESTATION_MODE=mock               # nur mit DEV_MODE=true wirksam
 PURCHASE_MODE=mock
 ```
@@ -70,7 +70,7 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    | `CLOUDFLARE_ACCOUNT_ID` | ja | Account-ID aus Schritt 4 |
    | `GEMINI_API_KEY` | mindestens einer der beiden KI-Keys (nur beim ersten Mal, danach merkt sich der Worker ihn) | Google-AI-Studio-Key für Gemini 3.6 Flash (aistudio.google.com/apikey → Create API key, Projekt mit Abrechnung; Ausgabenlimit im Google-Cloud-Projekt setzen) |
    | `ANTHROPIC_API_KEY` | optional, siehe oben | Anthropic-Key für Claude Sonnet 5.5 (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit). Fehlt er, ist Claude Sonnet nicht verfügbar und die App blendet es aus |
-   | `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY` | nein | werden, wenn nicht gesetzt, einmalig zufällig erzeugt und im Worker gespeichert. `SYNC_ENCRYPTION_KEY` nie ändern |
+   | `INVITE_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY` | nein | werden, wenn nicht gesetzt, einmalig zufällig erzeugt und im Worker gespeichert. `SYNC_ENCRYPTION_KEY` nie ändern. Fehlt `INVITE_SIGNING_KEY` als GitHub-Secret, übernimmt der Workflow das alte Secret `SPOT_SIGNING_KEY` (früherer Name) und löscht den alten Namen im Worker; nichts zu tun |
    | `ADMIN_SECRET` | nein | nur Testbetrieb; sonst bei jedem Lauf neu erzeugt |
    | `GOOGLE_PLAY_*`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_*` | nein | Store-Prüfer (siehe Tabelle unten); fehlen sie, überspringt der Workflow sie mit Hinweis |
 
@@ -115,7 +115,7 @@ Secrets (im Workflow oder von Hand):
    |---|---|---|
    | `GEMINI_API_KEY` | Google-AI-Studio-Key des Betreibers | Gemini 3.6 Flash (Google) |
    | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | Claude Sonnet 5.5 (Anthropic) |
-   | `SPOT_SIGNING_KEY` | Zufälliger String ≥ 32 Zeichen (`openssl rand -base64 48`); signiert Einladungs-Tokens und Challenges | Einladungen |
+   | `INVITE_SIGNING_KEY` | Zufälliger String ≥ 32 Zeichen (`openssl rand -base64 48`); signiert Einladungs-Tokens und Challenges | Einladungen |
    | `SYNC_ENCRYPTION_KEY` | Zufällige 32 Byte als Base64url; verschlüsselt alle KI-Chat-Daten (die OAuth-Anmeldung des MCP-Servers braucht kein eigenes Geheimnis). **Nie ändern** (sonst sind gespeicherte Daten unlesbar; die App lädt dann beim nächsten Sync neu hoch) | KI-Chat |
    | `ADMIN_SECRET` | ≥ 16 Zeichen, nur Testbetrieb (`POST /v1/admin/credit`) | Test-Guthaben |
    | `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_PACKAGE_NAME` (`app.overfit`) | Dienstkonto mit Play-Developer-API-Zugriff | Käufe Android |
@@ -175,11 +175,13 @@ den gleichen OAuth-Ablauf.
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `MARKUP_BP` | 2800 | Einziger Aufschlag auf alle Modellpreise (Basispunkte, 2800 = 28 %); Herleitung in docs/monetization.md. Web: Guthaben = Preis; Store: Guthaben laut `PACKAGES`, Store-Preis offen darüber |
-| `SPOT_STARTER_MICRO` / `SPOT_REWARD_MICRO` | 1 000 000 | Startguthaben (Eingeladener) / Belohnung (Einladender) |
-| `SPOT_TOKEN_TTL_SEC` | 45 | Gültigkeit des QR-Tokens |
-| `SPOT_MONTHLY_LIMIT_PER_INVITER` | 10 | Einladungen pro Einladendem und Monat |
-| `SPOT_GLOBAL_MONTHLY_BUDGET_MICRO` | 50 000 000 | Budget für alle Einladungsboni im Monat (jede Einladung = Start + Belohnung) |
-| `SPOT_EXPIRY_DAYS` / `REWARD_EXPIRY_DAYS` | 180 | Verfall der Boni |
+| `INVITE_STARTER_REVIEWS` / `INVITE_REWARD_REVIEWS` | 5 | Geschenkte Coach-Auswertungen für den Eingeladenen / den Einladenden (nach der ersten Coach-Anfrage des Eingeladenen) |
+| `INVITE_TOKEN_TTL_SEC` | 45 | Gültigkeit des QR-Tokens |
+| `INVITE_MONTHLY_LIMIT_PER_INVITER` | 10 | Einladungen pro Einladendem und Monat |
+| `INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS` | 1000 | Budget für alle Einladungsboni im Monat in Auswertungen (jede Einladung = Start + Belohnung) |
+| `INVITE_GIFT_MONTHLY_COST_CAP_MICRO` | 50 000 000 | Harte Obergrenze für die echten KI-Kosten geschenkter Auswertungen im Monat; danach zahlt das Guthaben |
+| `INVITE_GIFT_MAX_COST_MICRO` | 250 000 | Höchste Anbieterkosten (der Reservierung) je geschenkter Auswertung; darüber zahlt das Guthaben |
+| `INVITE_EXPIRY_DAYS` | 180 | Verfall der geschenkten Auswertungen |
 | `MAX_TOKENS_CAP` | 8192 | Obergrenze für `max_tokens` (begrenzt die Reservierung) |
 | `MAX_BODY_BYTES` | 8 388 608 | Größtes Request-Body (Fotos) |
 | `IMAGE_TOKENS_RESERVE` | 3000 | Pauschale Eingabe-Token je Bild bei der Reservierung |
@@ -281,7 +283,7 @@ Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `displayName`, `vendo
 
 `GET /v1/admin/usage?from=2026-11-01&to=2026-12-01` mit `Authorization: Bearer <ADMIN_SECRET>` (auch in Produktion, nur mit gesetztem
 ADMIN_SECRET) fasst das Ledger zusammen: je Modell, Stufe, Ausweichung und Foto-Anfrage Anzahl, Tokens, berechnet (€), Anbieterkosten
-und Marge. Es liest nur Zahlen, nie Prompts, Antworten oder Fotos. Als Tabelle:
+und Marge. Dazu ein `finance`-Block: Einnahmen je Kanal (Web, Google, Apple) mit geschätzten Gebühren, offenes Guthaben (gekauft, geschenkt, geschenkte Auswertungen), KI-Kosten (Guthaben, geschenkte Auswertungen) und Rohgewinn; Geschenktes zählt nie als Einnahme. Es liest nur Zahlen, nie Prompts, Antworten oder Fotos. Als Tabelle:
 
 ```bash
 ADMIN_SECRET=… node scripts/usage-report.mjs https://<worker-domain> 2026-11-01 2026-12-01
@@ -293,7 +295,7 @@ ADMIN_SECRET=… node scripts/usage-report.mjs https://<worker-domain> 2026-11-0
   Refresh-Rotation) · `pages.ts` Anmeldeseite · `sync.ts` Geräte-Endpunkte · `data.ts` Lesen + Kennzahlen · `vault.ts`
   AES-GCM · `catalog.ts` Übungskatalog (`catalog.gen.json` aus dem App-Katalog, neu erzeugen mit `node scripts/build-catalog.mjs`)
 - `src/index.ts` Router · `auth.ts` Signaturprüfung/Replay-Schutz · `ledger.ts` Saldo, Reservierung, Abrechnung ·
-  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `providers.ts` Stufen, Preise, Anbieter-Adapter · `purchases.ts` · `spot.ts` (Einladungen) · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-/Attestierungs-Schnittstellen)
-- Guthaben als „Posten“ (`lots`): Käufe verfallen nie, Boni nach 180 Tagen; Verbrauch zuerst verfallende Posten. Reservierung =
+  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `providers.ts` Stufen, Preise, Anbieter-Adapter · `purchases.ts` · `invite.ts` (Einladungen) · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-/Attestierungs-Schnittstellen)
+- Guthaben als „Posten“ (`lots`): Käufe verfallen nie, Geschenktes (Startguthaben) nach 180 Tagen; Verbrauch zuerst verfallende Posten. Einladungsboni sind ein eigener Zähler geschenkter Coach-Auswertungen (`review_gifts`), kein Euro-Guthaben; sie werden vor dem Guthaben verbraucht. Reservierung =
   ein atomares `INSERT … SELECT … WHERE saldo ≥ betrag` (D1 serialisiert Schreibzugriffe) – parallele Anfragen können nicht überziehen.
   Reservierungen älter als 15 min gelten als verwaist und zählen nicht mehr.

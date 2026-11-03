@@ -81,7 +81,7 @@ Jeder Fehler: passender HTTP-Status und
 | 400 | `upstream_rejected` | Anthropic hat die Anfrage abgelehnt, **nichts abgebucht** (`details.upstreamStatus`) |
 | 400 | `unknown_product` | Paket-ID unbekannt |
 | 400 | `invalid_recovery_code` | Format falsch |
-| 400 | `spot_token_invalid`, `spot_self`, `challenge_invalid` | Einladungscode kaputt / eigener Code / Challenge ungültig oder benutzt |
+| 400 | `invite_token_invalid`, `invite_self`, `challenge_invalid` | Einladungscode kaputt / eigener Code / Challenge ungültig oder benutzt |
 | 401 | `unauthorized`, `unknown_device`, `bad_signature`, `replay`, `timestamp_out_of_range` | Signatur-Probleme. `unknown_device` → neu registrieren (`POST /v1/devices`) |
 | 402 | `insufficient_funds` | Guthaben reicht nicht für die Reservierung (`details.requiredMicro`, `availableMicro`) |
 | 402 | `purchase_invalid` | Store bestätigt den Kauf nicht |
@@ -91,12 +91,12 @@ Jeder Fehler: passender HTTP-Status und
 | 403 | `photos_not_enabled` | Foto-Upload ohne Foto-Freigabe |
 | 409 | `chat_not_enabled` | KI-Chat-Verbindung nicht eingeschaltet (`POST /v1/chat/enable`) |
 | 413 | `sync_quota_exceeded`, `doc_too_large`, `photo_too_large` | Speichergrenze der KI-Chat-Verbindung (`details.maxDocs`/`maxBytes`/`maxPhotos`) |
-| 409 | `spot_token_used`, `spot_already_redeemed`, `spot_device_used` | Einladung schon eingelöst (Token / dieses Konto / dieses Gerät) |
-| 410 | `spot_token_expired` | QR-Code abgelaufen, neu scannen |
+| 409 | `invite_token_used`, `invite_already_redeemed`, `invite_device_used` | Einladung schon eingelöst (Token / dieses Konto / dieses Gerät) |
+| 410 | `invite_token_expired` | QR-Code abgelaufen, neu scannen |
 | 413 | `body_too_large` | Anfrage größer als `MAX_BODY_BYTES` (Standard 8 MB) |
 | 429 | `rate_limited` | Zu viele Anfragen (`details.retryAfterSec`) |
-| 429 | `spot_inviter_limit` | Einladender hat diesen Monat alle Einladungen vergeben |
-| 429 | `spot_budget_exhausted` | Globales Monatsbudget für Einladungsboni aufgebraucht |
+| 429 | `invite_inviter_limit` | Einladender hat diesen Monat alle Einladungen vergeben |
+| 429 | `invite_budget_exhausted` | Globales Monatsbudget für Einladungsboni aufgebraucht |
 | 500 | `internal_error` | |
 | 400 | `upstream_rejected` | KI-Anbieter lehnt die Anfrage ab (z. B. Schema), **nichts abgebucht**, kein Ausweichen |
 | 400 | `images_not_supported` | Bilder an eine Stufe ohne Bildverarbeitung (`lite`) |
@@ -125,7 +125,7 @@ Jeder Fehler: passender HTTP-Status und
   },
   "usageProfiles": { "coach": { "inputTokens": 8200, "outputTokens": 1400 }, "chat": { "inputTokens": 6700, "outputTokens": 500 }, "autofill": { "inputTokens": 900, "outputTokens": 120 } },
   "packages": [ { "productId": "overfit.fuel.10", "priceMicro": 10000000, "creditMicro": 7870370 } ],
-  "spot": { "starterMicro": 1000000, "rewardMicro": 1000000, "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
+  "invite": { "starterReviews": 5, "rewardReviews": 5, "giftTier": "standard", "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
 }
 ```
 `mode`: `production` oder `test`. **`test` = Testserver** (`DEPLOY_MODE=test`): keine Geräteprüfung beim Einlösen einer Einladung (Token `test:<geräte-id>`,
@@ -143,6 +143,11 @@ Standard: letzte 30 Tage). Antwort `{ from, to, currency, unit, totals: { reques
 chargedMicro, providerCostMicro, marginMicro }, groups: [ { model, tier, fallback, photo, requests, inputTokens, cacheReadTokens, cacheWriteTokens,
 outputTokens, chargedMicro, providerCostMicro, marginMicro } ] }`. `providerCostMicro` = Listenpreis ohne Aufschlag für das tatsächlich genutzte
 Modell, `marginMicro` = berechnet − Anbieterkosten (bei Buchungen vor Migration 0004: `null`). Nie Prompts, Antworten oder Fotos.
+Dazu `finance` (im Zeitraum, echte Euro): `{ environment, channels: [ { channel: web | google | apple, label, orders, grossMicro, feesMicro, netMicro,
+creditMicro } ], revenue: { grossMicro, feesMicro, netMicro }, openCredit: { purchasedMicro, giftedMicro, giftReviews }, aiCost: { totalMicro,
+creditMicro, giftReviewsMicro, giftReviewRequests, unknownCostRequests }, grossProfitMicro, assumptions, note }`. Gebühren sind geschätzt
+(Stripe 2,5 % + 0,25 €; Store 15 % auf den Preis ohne 19 % USt). `grossProfitMicro` = Netto-Einnahmen − KI-Kosten (ohne Fixkosten, Steuer).
+Geschenktes (Startguthaben, Admin-Gutschrift, Einladungsbonus) zählt nie als Einnahme. `scripts/usage-report.mjs` gibt den Block mit aus.
 Dazu `webRevenue` (unabhängig von `from`/`to`): `{ environment: sandbox | live, note, thresholds, years: [ { year, orders, totalMicro,
 euCrossBorderMicro, unknownCountryMicro, byCountry: [ { country, orders, totalMicro } ] } ], warnings: [ { code: eu_cross_border |
 small_business_prev_year | small_business_current_year, year, valueMicro, thresholdMicro, share, message } ] }`. Web-Umsatz = bezahlt minus
@@ -169,19 +174,24 @@ Body: `{ "publicKey": "<base64url>" }`. → `201` (neu) oder `200` (schon regist
   "deviceId": "…", // nur bei /v1/devices
   "accountId": "…",
   "balanceMicro": 1000000,
-  "expiring": [ { "amountMicro": 1000000, "expiresAt": 1777777777 } ],
+  "purchasedMicro": 800000,
+  "giftedMicro": 200000,
+  "expiring": [ { "amountMicro": 200000, "expiresAt": 1777777777 } ],
+  "giftReviews": { "remaining": 5, "expiring": [ { "count": 5, "expiresAt": 1777777777 } ] },
   "displayName": "Fabian",
   "hasRecoveryCode": true,
-  "spot": { "invitedThisMonth": 2, "monthlyLimit": 10, "redeemedStarter": false }
+  "invite": { "invitedThisMonth": 2, "monthlyLimit": 10, "redeemedStarter": false }
 }
 ```
-`balanceMicro` = nutzbares Guthaben (nicht verfallen) minus laufende Reservierungen. `expiring` = noch offene, verfallende Posten (Startguthaben/Belohnungen).
+`balanceMicro` = nutzbares Guthaben (nicht verfallen) minus laufende Reservierungen. `purchasedMicro` = gekauftes bzw. per Code eingelöstes Guthaben,
+`giftedMicro` = Geschenktes (Posten `test_credit`, `invite_bonus`, `invite_reward`; wird zuerst verbraucht). `expiring` = noch offene, verfallende Posten.
+`giftReviews` = geschenkte Coach-Auswertungen (eigener Zähler, siehe „Einladungen“). Dasselbe Konto-Objekt liefern `/v1/devices` und `/v1/recovery/restore`.
 
 ### `PUT /v1/account/profile`
 Body `{ "displayName": "Fabian" }` (≤ 24 Zeichen, `null` oder `""` löscht). → `{ "displayName": "Fabian" }`. Der Name wird nur beim Einlösen einer Einladung an den Eingeladenen ausgeliefert (freiwillig).
 
 ### `GET /v1/account/ledger?limit=50&before=<id>`
-`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|spot_bonus|spot_reward", "amountMicro": -6956, "model": "gemini-3.6-flash", "tier": "standard", "fallback": false, "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv. Bei `usage`: `model` = tatsächlich genutztes Modell, `tier` = angefragte und abgerechnete Stufe (alte Buchungen: `null`).
+`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|code_redeem|test_credit|invite_bonus|invite_reward|invite_expired|refund|chargeback", "category": "used", "reviews": null, "amountMicro": -6956, "model": "gemini-3.6-flash", "tier": "standard", "fallback": false, "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv. `reviews` = Auswertungen der Buchung (+n Gutschrift, −1 Verbrauch einer geschenkten Auswertung mit `amountMicro` 0, −n Verfall) oder `null` bei reinen Euro-Buchungen. `category`: `paid` | `gifted` | `used` | `refunded` | `expired`. Bei `usage`: `model` = tatsächlich genutztes Modell, `tier` = angefragte und abgerechnete Stufe (alte Buchungen: `null`).
 
 ## Wiederherstellungscode (Umzug aufs neue Handy)
 
@@ -189,13 +199,13 @@ Body `{ "displayName": "Fabian" }` (≤ 24 Zeichen, `null` oder `""` löscht). �
 Body leer. Erzeugt (oder ersetzt) den Code: `{ "code": "ABCD-EFGH-JKLM-NPQR-STUV-WXYZ" }` (120 Bit, Alphabet ohne 0/O/1/I/L). Der Server speichert nur einen Hash; Klartext wird **nur hier einmal** geliefert. Die App zeigt ihn an und lässt ihn sichern.
 
 ### `POST /v1/recovery/restore`
-Das **neue** Gerät registriert sich normal (`POST /v1/devices`, leeres Konto) und ruft dann auf: Body `{ "code": "…" }` (Groß-/Kleinschreibung, Bindestriche und Leerzeichen egal). Wirkung: das aufrufende Gerät übernimmt das Konto (Saldo, Buchungen), **alle anderen Geräte des Kontos werden abgemeldet**, ein Guthaben des vorübergehenden leeren Kontos wird übernommen, der Code wird ungültig (neuen erzeugen!). → Konto-Objekt. Fehler: `400/404 invalid_recovery_code`. Limit: 10 Versuche/Stunde je Gerät.
+Das **neue** Gerät registriert sich normal (`POST /v1/devices`, leeres Konto) und ruft dann auf: Body `{ "code": "…" }` (Groß-/Kleinschreibung, Bindestriche und Leerzeichen egal). Wirkung: das aufrufende Gerät übernimmt das Konto (Saldo, Buchungen), **alle anderen Geräte des Kontos werden abgemeldet**, ein Guthaben des vorübergehenden leeren Kontos wird übernommen, der Code wird ungültig (neuen erzeugen!). Geschenkte Einladungs-Auswertungen und alte Euro-Einladungsboni des verlassenen (aufrufenden) Kontos verfallen (Buchung `invite_expired`), gekauftes Guthaben zieht mit um. Eine Einladenden-Belohnung geht nie ans eigene Konto. → Konto-Objekt. Fehler: `400/404 invalid_recovery_code`. Limit: 10 Versuche/Stunde je Gerät.
 
 ## KI-Proxy
 
 ### `POST /v1/messages`
 Body: Anthropic-Messages-Request (`model`, `max_tokens`, `system`, `messages`, Bilder als Base64, `output_config.format` für Structured
-Output, `output_config.effort`). **`model` ist eine Stufe:** `standard` (Gemini Flash), `pro` (Claude Sonnet) oder `lite` (kleines Modell
+Output, `output_config.effort`, optional `overfit: { "purpose": "review" | "chat" | "other" }`, wird nie an den Anbieter weitergegeben). **`model` ist eine Stufe:** `standard` (Gemini Flash), `pro` (Claude Sonnet) oder `lite` (kleines Modell
 bei Workers AI, nur Text). Alte App-Versionen schicken `claude-sonnet-5-5` → wird als `pro` behandelt. Einschränkungen: `max_tokens` ≤
 `maxTokensCap`, **kein** `stream`. Limit: 10 Anfragen/Minute je Gerät.
 
@@ -216,13 +226,18 @@ Reservierung wird freigegeben. Ohne Nutzungsangabe wird die Reservierung berechn
 als die angefragte Stufe. Ablehnungen (4xx außer 408/429) weichen nicht aus (`400 upstream_rejected`). Bei jedem endgültigen Fehler
 wird die Reservierung vollständig freigegeben. Verbrauch → zuerst verfallende Posten (Startguthaben), dann Kauf-Guthaben.
 
+**Geschenkte Auswertungen:** Mit `overfit.purpose = "review"` auf der Stufe `standard` (Gemini Flash) wird zuerst eine geschenkte Coach-Auswertung
+verbraucht (Einladungsbonus), nicht Guthaben. Chat und andere Stufen zahlen immer aus Guthaben. Ist die Reservierung zum Anbieterpreis teurer als
+`INVITE_GIFT_MAX_COST_MICRO` (250 000 µ€) oder das Monatsbudget echter KI-Kosten für Geschenktes (`INVITE_GIFT_MONTHLY_COST_CAP_MICRO`) erreicht,
+zahlt das Guthaben. Bei einem Fehler wird die Auswertung zurückgegeben.
+
 Antwort `200`: Anthropic-Format (`content`, `stop_reason` mit `end_turn` | `max_tokens` | `refusal`, `usage`, `model` = genutztes Modell),
 **plus** Feld `overfit`:
 ```json
 { "id": "msg_…", "model": "gemini-3.6-flash", "content": [ … ], "stop_reason": "end_turn", "usage": { … },
-  "overfit": { "costMicro": 2609, "balanceMicro": 7863414, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "gemini-3.6-flash", "modelName": "Gemini 3.6 Flash", "vendor": "Google", "requestedModel": "gemini-3.6-flash", "requestedModelName": "Gemini 3.6 Flash", "requestedVendor": "Google", "fallback": false } }
+  "overfit": { "costMicro": 2609, "balanceMicro": 7863414, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "gemini-3.6-flash", "modelName": "Gemini 3.6 Flash", "vendor": "Google", "requestedModel": "gemini-3.6-flash", "requestedModelName": "Gemini 3.6 Flash", "requestedVendor": "Google", "fallback": false, "giftReview": false } }
 ```
-und Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Guthaben · 7,86 €“ und die Kosten der Auswertung daraus. Bilder
+`giftReview: true` = als geschenkte Auswertung abgerechnet (`costMicro` dann 0). Dazu Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Guthaben · 7,86 €“ und die Kosten der Auswertung daraus. Bilder
 werden bei der Reservierung pauschal (3000 Token je Bild) gezählt, nicht nach Base64-Länge. Zeitlimit je Anbieter 100 s, für die ganze
 Anfrage samt Ausweichen 140 s. Anfragen mit Bildern bekommen `cf-aig-collect-log-payload: false` (das Gateway speichert keine Inhalte, nur Metadaten). Bei `fallback: true` zeigt die App, welches Modell tatsächlich geantwortet hat (`model`) und dass der Preis von `requestedModel` berechnet wurde.
 
@@ -284,26 +299,27 @@ Posten `kind = code` (verfällt nicht), Buchung `type = code_redeem`, `source = 
 
 Buchungen (`/v1/account/ledger`) tragen dafür das Feld `source` (`null` | `web` | `code`).
 
-## Einladungen (Empfehlungsprogramm; Pfade und Felder heißen aus Kompatibilitätsgründen weiter `spot`)
+## Einladungen (Empfehlungsprogramm, Bonus = geschenkte Coach-Auswertungen)
 
 Ablauf: Einladender holt Token → zeigt QR (Token + Installationslink, alle ~30 s neu holen) → Neuer scannt → App holt Challenge → Play Integrity / App Attest mit der Challenge → Einlösen.
 
-### `POST /v1/spot/token` (Einladender)
-Body leer. → `{ "token": "<body>.<sig>", "expiresAt": 1762128045, "ttlSec": 45 }`. Server-signiert (HMAC), einmalig einlösbar, gültig `ttlSec` (Standard 45 s). QR-Inhalt wie in der App festgelegt, z. B. `https://<domain>/spot#<token>` (Token ist URL-sicher, besteht aus `[A-Za-z0-9_.-]`). Kein Limit außer dem allgemeinen.
+### `POST /v1/invite/token` (Einladender)
+Body leer. → `{ "token": "<body>.<sig>", "expiresAt": 1762128045, "ttlSec": 45 }`. Server-signiert (HMAC), einmalig einlösbar, gültig `ttlSec` (Standard 45 s). QR-Inhalt: `overfit://invite#<token>` (Token ist URL-sicher, besteht aus `[A-Za-z0-9_.-]`). Kein Limit außer dem allgemeinen.
 
-### `POST /v1/spot/challenge` (Eingeladener)
+### `POST /v1/invite/challenge` (Eingeladener)
 Body leer. → `{ "challenge": "<opaque>", "expiresAt": … }`. Gültig 5 min, an das Gerät gebunden, einmalig. Die App übergibt sie als Play-Integrity-`nonce` bzw. als App-Attest-`clientDataHash`-Grundlage (Details legt die App-Session mit dem Verifier fest).
 
-### `POST /v1/spot/redeem` (Eingeladener)
+### `POST /v1/invite/redeem` (Eingeladener)
 Body:
 ```json
-{ "token": "<aus dem QR>", "attestation": { "platform": "google"|"apple", "token": "<Integrity-Token | App-Attest-Objekt>", "challenge": "<von /spot/challenge>" } }
+{ "token": "<aus dem QR>", "attestation": { "platform": "google"|"apple", "token": "<Integrity-Token | App-Attest-Objekt>", "challenge": "<von /invite/challenge>" } }
 ```
 → `200`:
 ```json
-{ "grantedMicro": 1000000, "expiresAt": 1777777777, "inviter": { "displayName": "Fabian" }, "balanceMicro": 1000000 }
+{ "grantedReviews": 5, "expiresAt": 1777777777, "inviter": { "displayName": "Fabian" }, "balanceMicro": 0,
+  "giftReviews": { "remaining": 5, "expiring": [ { "count": 5, "expiresAt": 1777777777 } ] } }
 ```
-`inviter.displayName` ist `null`, wenn der Einladende keinen Namen gesetzt hat (Reveal zeigt dann „Einladung“ ohne Namen). Regeln: Token gültig & unbenutzt; einmal pro Konto **und** pro Gerät (Gerätekennung aus der Attestierung, übersteht Neuinstallation); höchstens 10 Einladungen/Monat je Einladendem; globales Monatsbudget (jede Einladung kostet Startguthaben + Belohnung); Startguthaben verfällt nach 180 Tagen, gilt nur für Coach-Anfragen und ist nicht auszahlbar. Der Einladende bekommt seine Gutschrift (1 €, ebenfalls 180 Tage gültig) automatisch bei der **ersten abgerechneten Coach-Anfrage** des Eingeladenen – ohne Meldung an den Eingeladenen. Ohne konfigurierte Attestierung: `503 attestation_unavailable` (sideloaded APKs bekommen kein Startguthaben).
+`inviter.displayName` ist `null`, wenn der Einladende keinen Namen gesetzt hat (Reveal zeigt dann „Einladung“ ohne Namen). Regeln: Token gültig & unbenutzt; einmal pro Konto **und** pro Gerät (Gerätekennung aus der Attestierung, übersteht Neuinstallation); höchstens 10 Einladungen/Monat je Einladendem; globales Monatsbudget (`INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS`, 1000; jede Einladung zählt Start + Belohnung). Der Eingeladene bekommt 5 geschenkte Coach-Auswertungen (`INVITE_STARTER_REVIEWS`), der Einladende 5 (`INVITE_REWARD_REVIEWS`) automatisch nach der **ersten erfolgreichen Coach-Anfrage** des Eingeladenen, ohne Meldung an den Eingeladenen. Die Auswertungen sind ein eigener Zähler (Tabelle `review_gifts`, kein Euro-Betrag), gelten nur für Coach-Auswertungen (`/v1/messages` mit `overfit.purpose = "review"`) auf der Stufe `standard`, werden vor dem Guthaben verbraucht, verfallen nach 180 Tagen und sind nicht auszahlbar. Chat und andere Stufen zahlen aus Guthaben. Kostenbremsen: `INVITE_GIFT_MAX_COST_MICRO` je Anfrage, `INVITE_GIFT_MONTHLY_COST_CAP_MICRO` im Monat (danach zahlt das Guthaben). Ohne konfigurierte Attestierung: `503 attestation_unavailable` (sideloaded APKs bekommen kein Startguthaben).
 
 ## Rate-Limits (Standardwerte, konfigurierbar)
 Gerät: 60 Anfragen/min, `/v1/messages`: 10/min, Registrierung: 20/h je IP, Kauf/Challenge/Einlösen/Restore: 10/h je Gerät (Einlösen/Restore zusätzlich 30/h je IP). Überschreitung → `429 rate_limited`.

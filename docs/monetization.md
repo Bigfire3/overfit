@@ -41,7 +41,7 @@ Bis Session AA trug ein einziger Aufschlag (69 %) auch den Store, den teuersten 
 - **Stores:** Apple und Google sind Verkäufer (Kommissionär), führen die USt des Käuferlands ab und nehmen **15 % vom Preis ohne USt**
   (Small-Business-Programme). Fabians Kleinunternehmerstatus ändert daran nichts. Store-Preise sind in allen Euro-Ländern gleich, die
   USt nicht: gerechnet mit **19 % (DE)** und **27 % (höchster EU-Satz)**.
-- **Startguthaben und Einladungsbonus: 10 % vom Netto** als Rücklage. **Zielgewinn 7 % vom Netto**, Untergrenze **5 %** (im Test festgeschrieben).
+- **Geschenktes (Startguthaben, Einladungsbonus): 10 % vom Netto** als Rücklage (der Einladungsbonus kostet seit Session AD weit weniger, siehe unten). **Zielgewinn 7 % vom Netto**, Untergrenze **5 %** (im Test festgeschrieben).
 - Guthaben wird vollständig zum Listenpreis × (1 + Aufschlag) verbraucht (ungünstigster Fall), Wechselkurs 0,92 €/$.
 
 **Formel:** Netto = Preis − USt − Gebühr. Gewinn = Netto − Guthaben ÷ (1 + Aufschlag) − 10 % × Netto.
@@ -94,14 +94,51 @@ Prozentwert, der alle Web-Pakete trägt.
 
 ### Aufschlag (offen, Transparenz)
 - **28 % Aufschlag** auf den Listenpreis der Anbieter, auf jede Anfrage, für **alle** Modelle und Kanäle gleich. Wofür: **Zahlungsgebühr**
-  (im Web 0,38–1,50 € je Kauf), **Gutschriften** für Startguthaben und Einladungsbonus, **Betrieb** und ein kleiner **Gewinn**
+  (im Web 0,38–1,50 € je Kauf), **Geschenktes** (Startguthaben, Einladungsbonus als Coach-Auswertungen), **Betrieb** und ein kleiner **Gewinn**
   (5–10 % vom Netto). USt fällt im Web nicht an (Kleinunternehmer); im Store tragen USt und Store-Gebühr der offene Aufpreis.
 - Im Web bleibt das Guthaben 1:1; im Store steht der Aufpreis bei jedem Paket („5 € Guthaben · 6,99 € (inkl. Store-Gebühr)“).
 - Die App sagt das unter „Guthaben“ und verlinkt „Wie setzen sich die Preise zusammen?“ auf `https://bigfire3.github.io/overfit/preise/`
   (DE+EN, je ein Beispiel Web und Store, ohne Werbesprache).
-- **Verfall:** Startguthaben und Einladungsbonus verfallen nach 180 Tagen, gekauftes Guthaben nie.
+- **Verfall:** Geschenktes (Startguthaben, Admin-Gutschrift, Einladungsbonus) verfällt nach 180 Tagen (Test-Gutschriften nach 60), gekauftes Guthaben nie.
+- **Gekauft vs. geschenkt:** Der Saldo ist getrennt; Geschenktes wird zuerst verbraucht. Die App zeigt Guthaben immer als „X € Guthaben“,
+  echtes Geld nur als Preis („Preis: 10,00 €“ bzw. „6,99 € (inkl. Store-Gebühr)“). Jede Buchung ist als bezahlt, geschenkt, verbraucht,
+  erstattet oder verfallen markiert.
 - **Ausweichung:** Antwortet ein anderes Modell als das gewählte, zahlt der Nutzer höchstens den Preis des gewählten; ist das Ersatzmodell teurer, trägt die Marge die Differenz (sie kann dann negativ sein). Die App sagt dem Nutzer, welches Modell geantwortet hat.
-- **Auswertung für den Betreiber:** `GET /v1/admin/usage` (docs/backend-api.md) zeigt je Modell Anbieterkosten, Berechnetes und Marge, ohne Inhalte, und den Web-Umsatz je Jahr und Land.
+- **Auswertung für den Betreiber:** `GET /v1/admin/usage` (docs/backend-api.md, Tabelle mit `scripts/usage-report.mjs`) zeigt je Modell
+  Anbieterkosten, Berechnetes und Marge, ohne Inhalte, den Web-Umsatz je Jahr und Land und seit Session AD einen Finanzteil in echten Euro:
+  Einnahmen je Kanal (Web/Stripe, Google Play, App Store) brutto und nach Gebühren (geschätzt: Stripe 2,5 % + 0,25 €, Store 15 % auf den
+  Preis ohne 19 % USt), offenes Guthaben gekauft/geschenkt, offene geschenkte Auswertungen, KI-Kosten (davon für geschenkte Auswertungen)
+  und Rohgewinn = Netto-Einnahmen − KI-Kosten. Geschenktes zählt nie als Einnahme.
+
+### Einladungsbonus: geschenkte Coach-Auswertungen (Session AD)
+Fabians Entscheidung: **der Neue bekommt 5 geschenkte Auswertungen, der Einladende 5**, statt Euro-Guthaben. Auslöser wie bisher: der Freund
+beim Einlösen, der Einladende nach der ersten erfolgreichen Coach-Anfrage des Freundes. Geschenkte Auswertungen sind ein eigener Zähler (kein
+Euro-Betrag), gelten nur für **Coach-Auswertungen mit dem günstigsten Bildmodell (Gemini Flash, Stufe standard)**, werden vor dem Guthaben
+verbraucht und verfallen nach 180 Tagen. Chat und andere Modelle zahlen aus dem Guthaben.
+
+**Echte Kosten je Auswertung** (Preistabelle `backend/src/providers.ts`, typische Auswertung 8 200 Token rein, 1 400 raus + 1 000 Thinking):
+
+| | bis 31.12.2026 (0,75 $ / 3,75 $ je MTok) | ab 1.1.2027 (doppelt) |
+|---|---|---|
+| Auswertung ohne Foto | 0,014 € | 0,028 € |
+| Auswertung mit 2 Fotos | 0,016 € | 0,031 € |
+| je erfolgreiche Einladung (5 + 5 Auswertungen) | 0,14–0,16 € | 0,28–0,31 € |
+| Worst Case je Person und Monat: 10 Einladungen × 5 = 50 Auswertungen als Einladender | 0,70–0,79 € | 1,39–1,57 € |
+| dazu deren 10 Freunde × 5 Auswertungen | 0,70–0,79 € | 1,39–1,57 € |
+
+**Grenzen** (alle in `backend/wrangler.jsonc`):
+- QR-Token 45 s und einmalig, Selbsteinladung gesperrt, je Konto und Gerät (Attestierung) eine Einlösung, 10 Einladungen pro Monat und Person.
+- **Globales Monatsbudget in Auswertungen:** `INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS = 1000` (jede Einlösung zählt 5 + 5), also bis zu 100
+  Einladungen im Monat, ≈ 14–31 € echte KI-Kosten.
+- **Harte Kostengrenze:** `INVITE_GIFT_MONTHLY_COST_CAP_MICRO = 50 000 000` (50 €): die echten KI-Kosten aller geschenkten Auswertungen im
+  Kalendermonat. Ist sie erreicht, zahlt das Guthaben, bis der Monat wechselt. Damit sind höchstens ~50 € im Monat möglich, auch wenn
+  Anfragen größer ausfallen als typisch.
+- **Je Anfrage:** Eine Anfrage, deren reservierte Höchstkosten zum Anbieterpreis über `INVITE_GIFT_MAX_COST_MICRO = 250 000` (0,25 €)
+  liegen, zählt nicht als geschenkte Auswertung.
+- **Kontoumzug:** Beim Wiederherstellen per Code verfallen geschenkte Einladungs-Auswertungen (und alte Euro-Einladungsboni) des
+  aufgegebenen Kontos; gekauftes Guthaben wandert mit. Das schließt die Schleife „neu installieren → eigene Einladung einlösen → per Code
+  zurück“. Eine Belohnung geht nie an das eigene Konto.
+- Bestehende Euro-Einladungsboni aus dem Testbetrieb bleiben als geschenktes Guthaben gültig, bis sie verbraucht sind oder verfallen.
 - Preise pflegt der Betreiber in `backend/src/providers.ts`, den Aufschlag in `backend/wrangler.jsonc` (`MARKUP_BP`), die Pakete in `backend/src/config.ts`.
 
 ## Guthaben im Web (Session Z, Testmodus; Stripe und Preise Session AB)
