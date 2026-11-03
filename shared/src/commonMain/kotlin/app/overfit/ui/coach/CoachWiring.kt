@@ -67,6 +67,8 @@ internal fun createCoach(
         photos = photos ?: CoachPhotoLoader { name -> data.workouts.photoFiles.read(name)?.let { prepareJpeg(it, maxEdge = 1500) } },
         clock = clock,
         fuelTiers = providers.fuel::tiers,
+        fuelConfig = providers.fuel::config,
+        fuelBalance = providers.fuel::balance,
     )
 }
 

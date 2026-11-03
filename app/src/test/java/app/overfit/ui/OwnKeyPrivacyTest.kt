@@ -145,16 +145,16 @@ class OwnKeyPrivacyTest {
         compose.runOnIdle { backDispatcher!!.onBackPressed() } // the chat covers the tab bar
         waitFor("Prompts & Vorlagen")
         compose.onNodeWithTag("tab:PROFILE").performClick()
-        waitFor("Fuel")
+        waitFor("Guthaben")
         compose.waitForIdle()
         assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)
 
-        // Opening Fuel only shows the opt-in; still nothing. Only "Fuel ansehen" talks to the server (control: the counter works).
-        compose.onNodeWithText("Fuel", useUnmergedTree = true).performScrollTo().performClick()
-        waitFor("Fuel ansehen")
+        // Opening Fuel only shows the opt-in; still nothing. Only "Guthaben ansehen" talks to the server (control: the counter works).
+        compose.onNodeWithText("Guthaben", useUnmergedTree = true).performScrollTo().performClick()
+        waitFor("Guthaben ansehen")
         compose.waitForIdle()
         assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)
-        compose.onNodeWithText("Fuel ansehen").performClick()
+        compose.onNodeWithText("Guthaben ansehen").performClick()
         compose.waitUntilState(15_000) { backendRequests.isNotEmpty() }
     }
 }

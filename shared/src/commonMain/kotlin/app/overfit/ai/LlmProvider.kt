@@ -13,6 +13,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
+import app.overfit.fuel.FuelConfig
 import app.overfit.fuel.FuelTierInfo
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeMark
@@ -115,7 +116,7 @@ const val GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta
  */
 class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
     override val id = ProviderId.FUEL
-    override val label = "Fuel"
+    override val label = "Guthaben"
     override val keyUrl = ""
     override val keyPlaceholder = ""
     override val usesKey = false
@@ -136,23 +137,35 @@ class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
         }
     }
 
-    private var cached: Triple<FuelService, Map<String, FuelTierInfo>, TimeMark>? = null
+    private var cached: Triple<FuelService, FuelConfig, TimeMark>? = null
 
-    /**
-     * Tiers of the backend (`/v1/config`, cached for 10 minutes). Null = unknown (no backend, no network); empty =
-     * old backend without tiers.
-     */
-    suspend fun tiers(): Map<String, FuelTierInfo>? {
+    /** `/v1/config` of the backend (cached for 10 minutes). Null = unknown (no backend, no network). */
+    suspend fun config(): FuelConfig? {
         val s = service() ?: return null
-        cached?.let { (svc, tiers, mark) -> if (svc === s && mark.elapsedNow() < 10.minutes) return tiers }
+        cached?.let { (svc, cfg, mark) -> if (svc === s && mark.elapsedNow() < 10.minutes) return cfg }
         return try {
-            s.config().tiers.also { cached = Triple(s, it, TimeSource.Monotonic.markNow()) }
+            s.config().also { cached = Triple(s, it, TimeSource.Monotonic.markNow()) }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             null
         }
     }
+
+    /** Current credit in µ€ (null = unknown). */
+    suspend fun balance(): Long? {
+        val s = service() ?: return null
+        return try {
+            s.account().balanceMicro
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Models of the backend (name, provider, price, availability). Null = unknown; empty = old backend without tiers. */
+    suspend fun tiers(): Map<String, FuelTierInfo>? = config()?.tiers
 
     /**
      * The `model` value to send for [wanted] (standard | pro | lite): the wanted tier when the backend offers it,

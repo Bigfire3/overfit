@@ -113,12 +113,14 @@ class FuelApiTest {
         val log = mutableListOf<HttpRequestData>()
         val api = api(log = log) { req ->
             if (req.url.encodedPath == "/v1/devices") HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
-            else HttpStatusCode.OK to """{"id":"msg_1","content":[],"overfit":{"costMicro":6956,"balanceMicro":7863414,"currency":"EUR"}}"""
+            else HttpStatusCode.OK to """{"id":"msg_1","content":[],"overfit":{"costMicro":6956,"balanceMicro":7863414,"currency":"EUR","model":"claude-sonnet-5-5","requestedModel":"gemini-3.6-flash","fallback":true}}"""
         }
         val body = """{"model":"claude-sonnet-5-5","max_tokens":100,"messages":[{"role":"user","content":"hi"}]}"""
         val r = api.messages(body)
         assertEquals(6_956, r.costMicro)
         assertEquals(7_863_414, r.balanceMicro)
+        assertEquals("claude-sonnet-5-5", r.servedModel)
+        assertEquals("gemini-3.6-flash", r.chosenModel)
         val sent = log.last()
         assertEquals(body, sent.body.toByteArray().decodeToString()) // byte-identical to what was hashed
         assertTrue(sent.headers[FuelHeaders.SIGNATURE] != null)

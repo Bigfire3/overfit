@@ -150,7 +150,7 @@ fun FuelScreen(
 private fun Balance(account: FuelAccount, language: Language, t: FuelStrings) {
     Spacer(Modifier.height(Space.m))
     Text(t.balanceLabel, style = Theme.type.caption, tone = Tone.Muted)
-    Text("Fuel · ${formatEuro(account.balanceMicro, language)}", style = Theme.type.title)
+    Text("${t.fuel} · ${formatEuro(account.balanceMicro, language)}", style = Theme.type.title)
     account.expiring.sumOf { it.amountMicro }.takeIf { it > 0 }?.let { amount ->
         val until = account.expiring.minOf { it.expiresAt }
         Spacer(Modifier.height(Space.xs))
@@ -212,11 +212,13 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
             val detail = buildString {
                 append(s.date(epochToDate(e.ts)))
                 if (e.type == "usage") {
-                    e.tier?.let { append(" · ").append(t.ledgerTier(it)) }
+                    e.model?.let { append(" · ").append(app.overfit.fuel.modelLabel(it)) }
                     append(" · ").append(t.ledgerTokens(e.inputTokens + e.cacheReadTokens + e.cacheWriteTokens, e.outputTokens))
                 }
             }
-            Text(detail, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(bottom = Space.s))
+            val chosen = if (e.type == "usage" && e.fallback) e.tier?.let { app.overfit.fuel.modelOfTier(it) }?.let { app.overfit.fuel.modelShortName(it) } else null
+            Text(detail, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(bottom = if (chosen == null) Space.s else Space.xs))
+            if (chosen != null) Text(t.ledgerFallback(chosen), style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(bottom = Space.s))
         }
         when (val st = state) {
             is Loaded.Loading -> Text(t.loading, tone = Tone.Muted, modifier = Modifier.padding(top = Space.m))

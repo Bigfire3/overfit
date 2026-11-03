@@ -34,13 +34,13 @@ val GermanExerciseForm = ExerciseFormStrings(
     aiFilling = "KI füllt aus …",
     aiFillHint = "Aus dem Namen: Erfassungsart, Muskeln, Equipment, Pause, Ausführung",
     aiFilled = "Von der KI ausgefüllt. Prüfe die Felder und ändere, was nicht passt.",
-    aiNoAccess = "Ohne KI-Zugang füllst du die Felder selbst aus. Mit eigenem Key oder Fuel (Profil → KI verbinden) " +
+    aiNoAccess = "Ohne KI-Zugang füllst du die Felder selbst aus. Mit eigenem Key oder Guthaben (Profil → KI verbinden) " +
         "erledigt das die KI aus dem Namen.",
     aiNeedName = "Erst den Namen eingeben",
     aiError = { kind ->
         when (kind) {
             CoachErrorKind.NETWORK, CoachErrorKind.TIMEOUT -> "Keine Verbindung. Nochmal versuchen oder selbst ausfüllen."
-            CoachErrorKind.NO_FUEL -> "Fuel reicht nicht. Bitte selbst ausfüllen."
+            CoachErrorKind.NO_FUEL -> "Guthaben reicht nicht. Bitte selbst ausfüllen."
             CoachErrorKind.AUTH -> "Der API-Key wurde abgelehnt. Prüfe ihn unter Profil → KI verbinden."
             CoachErrorKind.NO_ACCESS -> "Kein KI-Zugang eingerichtet."
             CoachErrorKind.RATE_LIMIT -> "Gerade zu viele Anfragen. Gleich nochmal versuchen."
@@ -64,13 +64,13 @@ val EnglishExerciseForm = ExerciseFormStrings(
     aiFilling = "AI is filling in …",
     aiFillHint = "From the name: tracking, muscles, equipment, rest, how to do it",
     aiFilled = "Filled in by the AI. Check the fields and change what does not fit.",
-    aiNoAccess = "Without AI access you fill in the fields yourself. With your own key or Fuel (Profile → Connect AI) " +
+    aiNoAccess = "Without AI access you fill in the fields yourself. With your own key or credit (Profile → Connect AI) " +
         "the AI does it from the name.",
     aiNeedName = "Enter the name first",
     aiError = { kind ->
         when (kind) {
             CoachErrorKind.NETWORK, CoachErrorKind.TIMEOUT -> "No connection. Try again or fill in yourself."
-            CoachErrorKind.NO_FUEL -> "Not enough Fuel. Please fill in yourself."
+            CoachErrorKind.NO_FUEL -> "Not enough credit. Please fill in yourself."
             CoachErrorKind.AUTH -> "The API key was rejected. Check it under Profile → Connect AI."
             CoachErrorKind.NO_ACCESS -> "No AI access set up."
             CoachErrorKind.RATE_LIMIT -> "Too many requests right now. Try again in a moment."

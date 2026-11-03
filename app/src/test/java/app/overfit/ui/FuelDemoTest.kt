@@ -63,11 +63,11 @@ class FuelDemoTest {
         compose.onNodeWithText("startet bald").performScrollTo().performClick()
 
         // Not configured: explanation + demo
-        compose.onNodeWithText("Fuel startet bald").assertExists()
+        compose.onNodeWithText("Guthaben startet bald").assertExists()
         compose.onNodeWithText("Demo ansehen").performClick()
 
         // Demo balance and packages
-        try { compose.waitUntil(5_000) { shown("Fuel · 4,20 €") } } catch (e: Throwable) { throw AssertionError(compose.onRoot().printToString(), e) }
+        try { compose.waitUntil(5_000) { shown("Guthaben · 4,20 €") } } catch (e: Throwable) { throw AssertionError(compose.onRoot().printToString(), e) }
         compose.onNodeWithText("Demo – lokale Beispieldaten, nichts davon ist echt.").assertExists()
         compose.onNodeWithText("Paket 5,00 €").performScrollTo().assertExists()
         assertTrue(shown("Bald im Store"))
@@ -75,6 +75,10 @@ class FuelDemoTest {
         // Ledger
         compose.onNodeWithText("Buchungen").performScrollTo().performClick()
         compose.waitUntil(5_000) { shown("Coach-Auswertung") }
+        // Real model names instead of tier names; a replacement model is said openly.
+        assertTrue(shown("Gemini 3.6 Flash (Google)", substring = true))
+        compose.onNodeWithText("Ersatzmodell, berechnet wurde der Preis von Gemini 3.6 Flash").performScrollTo().assertExists()
+        assertTrue(!shown("Standard", substring = true) && !shown("Lite", substring = true))
         compose.onNodeWithContentDescription("Zurück").performClick()
 
         // Spot invite shows a rotating code
