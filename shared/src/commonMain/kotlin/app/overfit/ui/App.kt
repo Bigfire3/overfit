@@ -312,7 +312,10 @@ fun OverfitApp(deps: AppDependencies) {
     val templates by deps.data.templates.templates.collectAsStateWithLifecycle(initialValue = null)
     val picked = remember { PickedExercises() }
     val workoutState by deps.workout.state.collectAsStateWithLifecycle()
-    val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox, deps.data.scope) }
+    val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox, deps.data.scope) {
+        val s = deps.store.state.value
+        app.overfit.domain.aiProfileHeader(s.profile, s.weights, deps.today(), s.language)
+    } }
     val incoming by deps.inbox.pending.collectAsStateWithLifecycle()
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)

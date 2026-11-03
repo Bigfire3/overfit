@@ -11,6 +11,8 @@ import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.SignedTransport
 import app.overfit.i18n.ChatStrings
 import app.overfit.share.AiPrompt
+import app.overfit.domain.aiProfileHeader
+import app.overfit.domain.withAiProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -112,5 +114,9 @@ class ChatFeature(
         return ChatContext.build(input, t, AiPrompt.EXAMPLE)
     }
 
-    fun gemText(t: ChatStrings): String = t.gemInstructions(AiPrompt.EXAMPLE)
+    /** Gem/GPT instructions with the profile line on top (name, age, weight as of copying). */
+    fun gemText(t: ChatStrings, today: LocalDate): String {
+        val s = store.state.value
+        return withAiProfile(aiProfileHeader(s.profile, s.weights, today, s.language), t.gemInstructions(AiPrompt.EXAMPLE))
+    }
 }
