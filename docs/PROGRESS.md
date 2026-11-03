@@ -10,7 +10,7 @@
 | 4 | KI-Coach | offen |
 | 5 | Feinschliff | offen |
 | 6 | Store-Release (App Store, Play Store) | offen |
-| 7 | Credits-System (Coach-Guthaben) | offen |
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
 
@@ -35,6 +35,41 @@
    https-Links ohne App im Leeren. Die App öffnet unabhängig davon `overfit://`-Links und `.overfit`-Dateien.
 2. iOS Universal Links (https-Link öffnet direkt die App) brauchen eine Domain, die dir gehört, plus Associated Domains
    und `apple-app-site-association`. Später mit eigener Domain; bis dahin: `overfit://`-Link und Web-Seite mit Knopf.
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
+| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
+
+## Nacht 3.11. – Backend Fuel/Spot + Web-Fallback (Session C)
+Fertig (kein App-Code angefasst):
+- `backend/`: Cloudflare Worker + D1, 42 Tests (Vitest/Miniflare, lokal ohne Cloudflare-Konto): anonyme Geräte-Identität
+  (ECDSA P-256, signierte Anfragen mit Nonce/Zeitstempel), Konto mit Saldo/Buchungen in Mikro-Euro, Wiederherstellungscode,
+  `POST /v1/messages` als Anthropic-Proxy (atomare Reservierung, Abrechnung nach `usage` + Aufschlag, Freigabe bei Fehlern),
+  Kauf-Verifikation (idempotent, Paket-Gutschrift = Preis × (1 − Store) / (1 + Aufschlag)), Spot (Token, Challenge, Einlösen,
+  Limits, Budget, Verfall, Belohnung bei der ersten Coach-Anfrage), Rate-Limits, einheitliches Fehlerformat
+- API-Vertrag mit exaktem Signatur-Schema: `docs/backend-api.md` (Grundlage für die App-Session)
+- `web/`: Fallback-Seite `t/index.html` (liest `#payload` laut `docs/share-format.md`, DE/EN, „In Overfit öffnen“, APK-Download)
+  und Startseite; Playwright-Rauchtest; Workflow `pages.yml` zum Veröffentlichen; `backend.yml` testet bei Änderungen
+- DECISIONS: „Produktentscheidungen Nacht 3.11.“ + Backend-Entscheidungen
+
+Offen: Echte Google-Play-/Apple-Prüfer für Käufe und Play Integrity/App Attest (Schnittstellen + Mocks fertig, Produktion
+antwortet bis dahin 503 `purchases_unavailable` / `attestation_unavailable`); App-Anbindung (`LlmProvider` „Fuel“, Spot-UI) nach `docs/backend-api.md`.
+
+### Von Fabian zu tun
+1. **GitHub Pages aktivieren:** Repo → Settings → Pages → Source „GitHub Actions“. Danach läuft `pages.yml` bei jedem Merge
+   mit Änderungen in `web/` (oder manuell: Actions → „Web veröffentlichen“ → Run workflow). Ergebnis: https://bigfire3.github.io/overfit/
+2. **Cloudflare-Backend deployen** (Schritte und alle Secrets in `backend/README.md`): Konto, `wrangler login`, `wrangler d1 create overfit`
+   (ID in `wrangler.jsonc`), Migrationen, `ANTHROPIC_API_KEY` und `SPOT_SIGNING_KEY` als Secrets, `npm run deploy`. Worker-URL
+   an die Session für die App-Anbindung geben.
+3. Später für Käufe/Spot in Produktion: Play-Console- und Apple-Developer-Konten (Phase 6), Dienstkonto/Schlüssel als Secrets
+   (Liste in `backend/README.md`), danach die echten Prüfer in `backend/src/verifiers.ts` ergänzen.
+4. Für Android App Links / iOS Universal Links wird eine eigene Domain mit `/.well-known/` gebraucht (unter
+   `github.io/overfit/` nicht möglich) – bis dahin öffnet der Button „In Overfit öffnen“.
+
+### Bitte auf dem Handy testen (Web-Fallback, nach Aktivieren von Pages)
+1. https://bigfire3.github.io/overfit/ öffnen: schlichte Startseite, Button „Für Android herunterladen“ führt zum Release „latest“
+2. Einen Teilen-Link aus der App (Session B) im Handy-Browser öffnen, z. B. `https://bigfire3.github.io/overfit/t#<payload>`:
+   Vorlage erscheint schwarz-weiß lesbar (Name, Übungen, Sätze, Pausen); Telefonsprache Deutsch → deutsche Texte
+3. „In Overfit öffnen“ antippen → die App öffnet sich (sobald der `overfit://`-Import aus Session B drin ist)
+4. Link ohne `#…` oder mit abgeschnittenem Payload öffnen → freundliche Fehlermeldung, kein Absturz
 
 ## Letzte Session
 Phase 1 abgeschlossen (erst nativ gebaut, dann auf KMP portiert):

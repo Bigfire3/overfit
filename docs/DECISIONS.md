@@ -233,3 +233,53 @@ Zuerst als native Android-Version gebaut (PR #17), dann nach der KMP-Entscheidun
 - **Beispielvorlagen:** `files/samples/{push,pull,legs}.json` in der gleichen Datei-Form wie der Export. „Hinzufügen“
   ist idempotent über den Namen (Push/Pull/Legs), wer eine löscht, kann sie neu holen.
 - **Duo:** Nur ein Teaser-Eintrag „Duo · bald“ auf dem Startbildschirm und ein Text-Screen, keine Datenerhebung.
+## Produktentscheidungen Nacht 3.11.
+
+Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus, KI-Coach, App-Anbindung):
+
+- **Fuel:** Das Coach-Guthaben heißt „Fuel“ (DE und EN gleich) und wird in Euro angezeigt, z. B. „Fuel · 4,20 €“.
+- **Spot:** Das Einladungsprogramm heißt „Spot“ (wie der Trainingspartner, der beim Bankdrücken sichert). EN „Spot a friend“,
+  DE „Freund spotten“. Eingeladene bekommen 1 € Fuel, Einladende 1 € Fuel, sobald der Neue seine erste Coach-Auswertung gemacht hat.
+- **Reveal beim Einlösen eines Spots:** Bildschirm wird schwarz, zwei kurze Haptik-Pulse (Herzschlag), dann zählt eine große
+  Zahl in Inter mit tabellarischen Ziffern von 0,00 auf 1,00 € hoch, darunter „Spot von <Name>“; am Ende ein kräftiger Puls.
+  Bewusste Ausnahme von „keine Animationen“.
+- **Haptik:** leichter Tick beim Abhaken eines Satzes, drei kurze Pulse am Ende der Pause, das Reveal-Muster. Schalter
+  „Vibration“ im Profil (Standard an).
+- **Duo-Modus** (zwei Handys trainieren gemeinsam: synchrone Sätze, gemeinsamer Pausentimer) wird nur angeteasert: Eintrag
+  „Duo · bald“ mit kurzer Erklärung, keine Datenerhebung.
+- **Teilen/Import:** Format laut SPEC und `docs/share-format.md` (JSON, Raw Deflate, Base64url im URL-Fragment); Beispielvorlagen
+  Push, Pull, Legs in `samples/`.
+
+### Backend (Fuel & Spot) und Web-Fallback
+
+- **Cloudflare Worker + D1**, hand-gerollter Router ohne Framework. Tests mit Vitest in Miniflare. Wir nutzen
+  `@cloudflare/vitest-plugin` (der Nachfolger des umbenannten, als veraltet markierten `@cloudflare/vitest-pool-workers`;
+  gleiche Funktionalität). Atomarität ohne Durable Objects: Reservierung als einzelnes `INSERT … SELECT … WHERE saldo ≥ betrag`,
+  Abrechnung als D1-Batch (Transaktion).
+- **Beträge:** Integer in **Mikro-Euro** (1 € = 1 000 000), nicht Zehntel-Cent: Eine Auswertung kostet wenige Cent, aber einzelne
+  Anfragen nur Bruchteile davon; Mikro-Euro vermeidet Rundungsfehler bei Tokenpreisen. Rechnen mit BigInt, immer aufrunden zugunsten
+  des Betreibers (Kosten) bzw. abrunden (Paket-Gutschrift). Anzeige rundet die App auf Cent.
+- **Preise in Euro, nicht USD:** `PRICE_TABLE` enthält µ€ je 1 Mio. Token (Listenpreis × Wechselkurs, vom Betreiber gepflegt, Standard
+  0,92 €/$ nur für Sonnet 5.5). Kein Live-Wechselkurs: ein Fehler dort würde direkt Geld kosten; der Aufschlag deckt Schwankungen.
+- **Signatur:** ECDSA P-256, kanonischer String `OVERFIT-V1\nMETHODE\nPFAD?QUERY\nTS\nNONCE\nSHA256(Body)`, ±5 min, Nonce-Tabelle
+  gegen Replay. Server akzeptiert Roh- und DER-Signaturen sowie Roh- und SPKI-Schlüssel, damit Android Keystore und CryptoKit
+  ohne Umwandlung funktionieren. Geräte-ID = SHA-256 des Rohschlüssels. Details: `docs/backend-api.md`.
+- **Guthaben-Posten (`lots`):** Käufe verfallen nie, Startguthaben/Belohnung nach 180 Tagen. Abgebucht wird zuerst, was zuerst
+  verfällt. „Nur für Coach-Anfragen“ ergibt sich daraus, dass `/v1/messages` die einzige Ausgabe ist.
+- **Wiederherstellung:** Code mit 120 Bit (Hash in der DB), Umzug meldet alle anderen Geräte des Kontos ab (gestohlenes altes
+  Handy verliert Zugriff) und entwertet den Code.
+- **Spot-Token:** HMAC-signiert (kein Server-Zustand bis zum Einlösen), 45 s gültig, einmalig über Tabelle `spot_tokens_used`.
+  Attestierung läuft über eine serverseitige, an das Gerät gebundene Challenge. Gerätekennung der Attestierung ist UNIQUE
+  (einmal pro Gerät, übersteht Neuinstallation). Das globale Monatsbudget rechnet jeden Spot mit Startguthaben + Belohnung
+  (die Belohnung wird dem Einladenden auch bei erschöpftem Budget immer gutgeschrieben, nur neue Einlösungen werden gestoppt).
+- **Mock-Modi nur mit `DEV_MODE=true`:** Ein versehentlich gesetztes `ATTESTATION_MODE=mock` in Produktion hat keine Wirkung.
+- **Echte Store-/Attestierungsprüfer fehlen noch** (brauchen Konten und Zugangsdaten): Schnittstellen und Mocks sind fertig,
+  Produktion antwortet 503, bis sie nachgezogen sind. Das Anthropic-Proxying funktioniert allein mit `ANTHROPIC_API_KEY`.
+- **Reservierung:** Eingabe-Token werden als UTF-8-Bytes/2 geschätzt (konservativ), Bilder pauschal mit 3000 Token, dazu
+  `max_tokens` × Ausgabepreis, alles mit Aufschlag; `max_tokens` ist auf 8192 begrenzt. Ist die Eingabe-Schätzung zu niedrig, wird
+  höchstens der reservierte Betrag abgebucht (Verlust beim Betreiber, nie Überziehen des Kontos).
+- **Web-Fallback** unter `https://bigfire3.github.io/overfit/` (Pages-Workflow, Quelle `web/`). `t/index.html` liest nur,
+  alles clientseitig (Fragment verlässt nie den Browser), Namen werden ausschließlich per `textContent` eingefügt. Inter wird erst
+  im Workflow aus den App-Ressourcen kopiert, damit keine zweite Kopie im Repo liegt. **Einschränkung:** Android App Links /
+  iOS Universal Links brauchen `/.well-known/…` im Wurzelverzeichnis der Domain; unter `bigfire3.github.io/overfit/` ist das nicht
+  möglich. Bis eine eigene Domain steht, hilft der Button „In Overfit öffnen“ (`overfit://t#…`).
