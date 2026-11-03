@@ -19,7 +19,7 @@
 **Erledigt:** Seit 0.1.257 waren fast alle Workout-Guide-Bilder (Standbilder und Animation) verzerrt. Ursache: Das Runden der
 Pfaddaten im Import hat kompakte Zahlen wie `8.002.392` zu `8.4` verschmolzen. Import jetzt mit echtem Pfad-Parser, 2 Nachkommastellen,
 Rückprüfung jeder Datei; alle 906 Frames neu erzeugt. Regressionstest `ExerciseSvgIntegrityTest` (parst alle Dateien, prüft viewBox,
-rendert 12 Frames und vergleicht mit den Originalen). Details in DECISIONS.md.
+rendert 15 Frames und vergleicht mit den Originalen). Details in DECISIONS.md.
 
 ### Bitte auf dem Handy testen (Session AK)
 1. Tab „Übungen“: Die Strichgrafiken sind wieder vollständige Figuren (keine Flecken, Dreiecke oder fehlenden Bilder), auch im Picker,

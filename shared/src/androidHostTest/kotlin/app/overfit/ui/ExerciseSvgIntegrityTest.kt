@@ -25,7 +25,7 @@ import kotlin.test.fail
  * have caught it:
  *  1. every file parses strictly (commands, argument counts, arc flags),
  *  2. the path stays inside the viewBox,
- *  3. a sample is rasterised and compared with the unrounded source frames (`svg-reference/`, verbatim from the pinned
+ *  3. a sample (5 exercises x 3 frames, see svg-reference/README.md) is rasterised and compared with the unrounded source frames (`svg-reference/`, verbatim from the pinned
  *     Workout Guide commit).
  */
 class ExerciseSvgIntegrityTest {
@@ -55,7 +55,7 @@ class ExerciseSvgIntegrityTest {
     @Test
     fun sampleRendersLikeTheUnroundedSource() {
         val refs = refDir.listFiles { f -> f.name.endsWith(".svg") }!!.sortedBy { it.name }
-        assertEquals(12, refs.size)
+        assertEquals(15, refs.size)
         for (ref in refs) {
             val (slug, frame) = Regex("(.+)-frame-(\\d)\\.svg").matchEntire(ref.name)!!.destructured
             val bundled = File(dir, if (frame == "1") "$slug.svg" else "$slug-$frame.svg")
