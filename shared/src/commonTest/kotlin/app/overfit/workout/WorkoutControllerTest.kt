@@ -11,6 +11,7 @@ import app.overfit.platform.RecordingRestAlerts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -472,6 +473,32 @@ class WorkoutControllerTest {
         advanceTimeBy(120_000)
         runCurrent()
         assertFalse(HapticPattern.RestEnd in e.haptics.played)
+        assertNull(e.store.active)
+    }
+
+    @Test
+    fun finish_completesEvenIfTheCallerIsCancelled() = runTest {
+        // The workout screen calls finish() from its own scope and closes as soon as the state is empty.
+        val e = env()
+        e.started()
+        val caller = launch { e.c.finish() }
+        runCurrent()
+        caller.cancel()
+        runCurrent()
+        assertNull(e.c.state.value.workout)
+        assertEquals(1, e.store.finished.size)
+    }
+
+    @Test
+    fun discard_completesEvenIfTheCallerIsCancelled() = runTest {
+        val e = env()
+        e.started()
+        e.c.flush()
+        assertNotNull(e.store.active)
+        val caller = launch { e.c.discard() }
+        runCurrent()
+        caller.cancel()
+        runCurrent()
         assertNull(e.store.active)
     }
 

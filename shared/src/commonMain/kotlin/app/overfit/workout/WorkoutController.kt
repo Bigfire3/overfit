@@ -140,21 +140,28 @@ class WorkoutController(
     /** Saves the workout as finished. Unchecked sets stay as they are (not done). */
     suspend fun finish() {
         val w = workout ?: return
+        val endedAt = clock()
         clear()
-        writeLock.withLock {
-            pendingSave = null
-            store.finish(w.copy(rest = null), clock())
-        }
+        // Runs in the controller's scope: the caller's screen closes as soon as the workout is
+        // gone from the state, which must not cancel the write.
+        scope.launch {
+            writeLock.withLock {
+                pendingSave = null
+                store.finish(w.copy(rest = null), endedAt)
+            }
+        }.join()
     }
 
     /** Throws the running workout away. */
     suspend fun discard() {
         val w = workout ?: return
         clear()
-        writeLock.withLock {
-            pendingSave = null
-            store.delete(w.id)
-        }
+        scope.launch {
+            writeLock.withLock {
+                pendingSave = null
+                store.delete(w.id)
+            }
+        }.join()
     }
 
     private fun clear() {

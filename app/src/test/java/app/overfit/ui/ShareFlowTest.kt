@@ -122,7 +122,10 @@ class ShareFlowTest {
         launchOnboarded()
         waitFor("Beispielvorlagen hinzufügen")
         compose.onNodeWithText("Beispielvorlagen hinzufügen").performScrollTo().performClick()
+        // The row disappears after the first template is saved; all three must still arrive.
         waitFor("Legs")
+        waitFor("Pull")
+        waitFor("Push")
         compose.onNodeWithText("Profil").performClick()
         compose.onNodeWithText("Beispielvorlagen hinzufügen").performScrollTo().performClick()
         waitFor("schon da")
