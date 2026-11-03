@@ -46,6 +46,10 @@ object ShareMapper {
                         trackingType = e.trackingType.name,
                         muscle = e.primaryMuscles.firstOrNull()?.key,
                         equipment = e.equipment?.key,
+                        primary = e.primaryMuscles.map { it.key },
+                        secondary = e.secondaryMuscles.map { it.key },
+                        restSec = e.defaultRestSec,
+                        note = e.note,
                     )
                 }.ref
             } else null
@@ -84,7 +88,7 @@ object ShareMapper {
 
     /**
      * Resolves every exercise against [catalog] (all active exercises, including own ones):
-     * `ref` → own exercise with the same name or new; `id` → catalogue entry; `name` → best fuzzy
+     * `ref` → own exercise with the same name, catalogue exercise with exactly that name, or new (with all shared fields); `id` → catalogue entry; `name` → best fuzzy
      * match (German or English) or new own exercise.
      */
     fun resolve(training: SharedTraining, catalog: List<Exercise>): ImportPreview {
@@ -95,21 +99,29 @@ object ShareMapper {
             val sets = se.sets
             val custom = se.ref?.let { customByRef[it] }
             val known: Exercise? = when {
-                se.ref != null && custom != null -> catalog.firstOrNull { it.isCustom && it.name.equals(custom.name, ignoreCase = true) }
+                // Own exercise of the sender: reuse an own exercise with the same name, else a catalogue one with exactly
+                // that name, so importing never creates a duplicate.
+                se.ref != null && custom != null -> catalog.firstOrNull { it.isCustom && it.name.trim().equals(custom.name.trim(), ignoreCase = true) }
+                    ?: findExact(custom.name, catalog)
                 se.ref != null -> null
-                else -> se.id?.let { byId[it] } ?: se.name?.let { findByName(it, catalog, index) }
+                else -> se.id?.let { byId[it] }
+                    ?: se.name?.let { findByName(it, catalog, index) }
+                    // Unknown catalogue ID (e.g. "fedb:Barbell_Curl" from before free-exercise-db was removed): exact name only.
+                    ?: se.id?.let { unknownId(it) }?.let { findExact(it, catalog) }
             }
             val create: CustomExerciseInput? = if (known != null) null else when {
                 custom != null -> CustomExerciseInput(
                     name = custom.name,
                     trackingType = parseTracking(custom.trackingType) ?: inferTracking(sets),
-                    restSec = se.restSec,
-                    muscle = Muscle.fromKey(custom.muscle ?: ""),
+                    restSec = custom.restSec ?: se.restSec,
+                    primary = custom.primary.mapNotNull(Muscle::fromKey),
                     equipment = Equipment.fromKey(custom.equipment),
+                    secondary = custom.secondary.mapNotNull(Muscle::fromKey),
+                    note = custom.note,
                 )
                 else -> se.name?.let {
-                    CustomExerciseInput(it, inferTracking(sets), se.restSec, null, null)
-                } ?: se.id?.let { unknownId(it) }?.let { CustomExerciseInput(it, inferTracking(sets), se.restSec, null, null) }
+                    CustomExerciseInput(it, inferTracking(sets), se.restSec)
+                } ?: se.id?.let { unknownId(it) }?.let { CustomExerciseInput(it, inferTracking(sets), se.restSec) }
             }
             if (known == null && create == null) return@map null
             val tracking = known?.trackingType ?: create!!.trackingType
@@ -134,6 +146,13 @@ object ShareMapper {
     private fun unknownId(id: String): String? =
         id.substringAfter(':').replace('_', ' ').replace('-', ' ').trim().takeIf { it.isNotEmpty() }
             ?.replaceFirstChar { it.uppercase() }
+
+    /** Same name ignoring case, spaces and punctuation ("Barbell Curl" = "Barbell-Curl"). */
+    private fun findExact(name: String, catalog: List<Exercise>): Exercise? {
+        val key = ExerciseSearch.tokenize(name).joinToString("")
+        return catalog.filter { ExerciseSearch.tokenize(it.name).joinToString("") == key }
+            .minByOrNull { if (it.source == ExerciseSource.CUSTOM) 0 else 1 }
+    }
 
     private fun findByName(name: String, catalog: List<Exercise>, index: List<ExerciseSearch.Indexed>): Exercise? {
         val q = name.trim()
@@ -165,17 +184,7 @@ object ShareMapper {
         exercises = preview.exercises.map { line ->
             val exercise = line.exercise ?: run {
                 val c = line.newExercise!!
-                Exercise(
-                    id = createdIds.getValue(c.name.lowercase()),
-                    name = c.name,
-                    source = ExerciseSource.CUSTOM,
-                    imageRef = null,
-                    primaryMuscles = listOfNotNull(c.muscle),
-                    secondaryMuscles = emptyList(),
-                    equipment = c.equipment,
-                    trackingType = c.trackingType,
-                    defaultRestSec = c.restSec,
-                )
+                c.toExercise(createdIds.getValue(c.name.lowercase()))
             }
             TemplateExercise(exercise, line.restSec, line.note, line.sets)
         },

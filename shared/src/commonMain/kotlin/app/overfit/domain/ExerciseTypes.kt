@@ -1,6 +1,9 @@
 package app.overfit.domain
 
-/** Where an exercise comes from. */
+/**
+ * Where an exercise comes from. [FREE_DB] is legacy: free-exercise-db was removed in database v5 (used ones became
+ * [CUSTOM]); the value only remains so old backups still parse (they are imported as custom exercises).
+ */
 enum class ExerciseSource { WORKOUT_GUIDE, FREE_DB, CUSTOM }
 
 /**

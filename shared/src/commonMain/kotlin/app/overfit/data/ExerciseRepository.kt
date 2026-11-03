@@ -32,9 +32,6 @@ class ExerciseRepository(
         return ids.mapNotNull { byId[it]?.toDomain() }
     }
 
-    /** Image URLs of all remote (free-exercise-db) pictures, for "download all images". */
-    suspend fun remoteImageUrls(): List<String> = dao.remoteImages().map { it.imageRef }
-
     /** New custom exercise; returns its ID. */
     @OptIn(ExperimentalUuidApi::class)
     suspend fun createCustom(input: CustomExerciseInput): String {
@@ -73,25 +70,43 @@ class ExerciseRepository(
     enum class DeleteResult { DELETED, ARCHIVED }
 }
 
+/** Everything a custom exercise consists of (form, AI autofill, share import). */
 data class CustomExerciseInput(
     val name: String,
     val trackingType: TrackingType,
     val restSec: Int?,
-    val muscle: Muscle?,
-    val equipment: Equipment?,
+    val primary: List<Muscle> = emptyList(),
+    val equipment: Equipment? = null,
+    val secondary: List<Muscle> = emptyList(),
+    val note: String? = null,
 ) {
     fun toEntity(id: String, createdAt: Long, now: Long) = ExerciseEntity(
         id = id,
         name = name.trim(),
         source = ExerciseSource.CUSTOM,
         imageRef = null,
-        primaryMuscles = listOfNotNull(muscle?.key),
-        secondaryMuscles = emptyList(),
+        primaryMuscles = primary.distinct().map { it.key },
+        secondaryMuscles = secondary.distinct().filter { it !in primary }.map { it.key },
         equipment = equipment?.key,
         trackingType = trackingType,
         defaultRestSec = restSec,
         createdAt = createdAt,
         updatedAt = now,
+        note = note?.trim()?.takeIf { it.isNotEmpty() },
+    )
+
+    /** The exercise as it will look once created (import preview, share). */
+    fun toExercise(id: String) = Exercise(
+        id = id,
+        name = name.trim(),
+        source = ExerciseSource.CUSTOM,
+        imageRef = null,
+        primaryMuscles = primary.distinct(),
+        secondaryMuscles = secondary.distinct().filter { it !in primary },
+        equipment = equipment,
+        trackingType = trackingType,
+        defaultRestSec = restSec,
+        note = note?.trim()?.takeIf { it.isNotEmpty() },
     )
 }
 
@@ -105,4 +120,5 @@ fun ExerciseEntity.toDomain() = Exercise(
     equipment = Equipment.fromKey(equipment),
     trackingType = trackingType,
     defaultRestSec = defaultRestSec,
+    note = note,
 )

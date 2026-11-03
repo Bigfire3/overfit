@@ -492,3 +492,38 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - **iOS-CI pausiert:** macOS-Minuten kosten 10x und waren am 3.11. rund 90 % der Actions-Kosten. `ios.yml` läuft nur noch
   per „Run workflow“. Ersatz: Die Android-CI kompiliert `iosMain` (`:shared:compileKotlinIosSimulatorArm64`, Linux).
   Gemergt wird bei grüner Android-CI; die iOS-CI vor einem iOS-Release oder nach größeren iOS-Änderungen von Hand starten.
+
+## Session K (3.11.) – Katalog ohne free-exercise-db, Übungen per KI, eigene Übungen im Workout
+
+- **free-exercise-db entfernt** (Fabian: Fotos passen nicht ins Design). Der Katalog besteht nur noch aus Workout Guide
+  (302 Übungen, SVGs, CC BY-SA 4.0 auf Basis von Everkinetic). Import-Skript, `exercises.json` und
+  `backend/src/catalog.gen.json` neu erzeugt. Weg sind auch „Alle Bilder offline laden“, das Laden von Übungsbildern
+  über HTTP (Coil-Ktor-Fetcher samt Abhängigkeit `coil-network-ktor3`) und der Attributionshinweis im „Über“-Screen.
+- **Migration v5 (manuell):** Benutzte `fedb:*`-Übungen (Vorlage, Training oder als ersetzte Übung) **behalten ihre ID**
+  und werden zu eigenen Übungen (`source = CUSTOM`, kein Bild → Initialen-Kachel). Kein Umschlüsseln: kein
+  Fremdschlüssel ändert sich, Backups, Coach-Texte und alte Teilen-Links mit `fedb:`-ID passen weiter. Unbenutzte
+  `fedb:*` werden gelöscht; der neue Katalog enthält sie nicht, also holt das Seeding sie nicht zurück. Dazu die neue
+  Spalte `exercise.note`. `ExerciseSource.FREE_DB` bleibt nur, damit alte Backups lesbar sind: beim Wiederherstellen
+  werden benutzte FREE_DB-Übungen zu eigenen (ohne Bild), unbenutzte übersprungen.
+- **Eigene Übungen sind vollständiger:** Haupt- und Hilfsmuskeln (mehrere), Equipment, Erfassungsart, Standard-Pause,
+  Ausführungsnotiz. Die Notiz steht in der Übungsdetailseite.
+- **„Mit KI ausfüllen“:** nutzt den Zugang des Coaches (`CoachService.ai`: gleicher Provider, eigener Key oder Fuel,
+  gleiches Modell). Neue Provider, die in die Coach-Transporte eingehängt werden (Session N: Gemini), gehen automatisch
+  mit, wenn sie `CoachPrompt.outputSchema`/`outputSchemaName`/`outputMaxTokens` statt fest `CoachSchema` verwenden.
+  Structured Output mit Enums aus den Muskel-/Equipment-Schlüsseln der App; der Parser verwirft trotzdem Unbekanntes,
+  begrenzt Muskeln und rundet die Pause auf 15 s. Bei HTTP 400 mit Structured Output einmal ohne (wie beim Coach).
+  Ohne KI-Zugang: kurzer Hinweis, manuelle Eingabe.
+- **„Meintest du …?“:** Beim Anlegen zeigt das Formular bis zu drei Treffer der normalen Übungssuche für den
+  eingegebenen Namen (ab 3 Zeichen). Antippen öffnet die vorhandene Übung bzw. nimmt sie im Picker.
+- **Neue Übung aus dem Picker** (Vorlagen-Editor und Workout-Modus): letzte Zeile „„…“ als neue Übung anlegen“ öffnet
+  dasselbe Formular. Nach dem Speichern kommt die Übung über `PickedExercises.created` in den Picker zurück, der sie
+  sofort (zusammen mit schon gewählten) an den Aufrufer gibt. WorkoutScreen und WorkoutRoute bleiben unverändert
+  (konfliktarm zu Session L); das Training läuft im App-weiten Controller weiter.
+- **Teilen eigener Übungen:** `custom[]` bekommt `primary`, `secondary`, `restSec`, `note`; `muscle` wird für alte
+  App-Versionen weiter geschrieben (abwärtskompatibel, Format-Version bleibt 1). Beim Import wird eine gleichnamige
+  eigene Übung (oder eine Katalogübung mit genau dem Namen) wiederverwendet, sonst eine vollständige eigene Übung angelegt.
+
+### Zur Prüfung durch Fabian
+- Die KI-Anfrage beim Ausfüllen kostet mit Fuel einen kleinen Betrag (eine kurze Sonnet-Anfrage, max. 1000 Tokens).
+- Ehemalige free-exercise-db-Übungen, die du benutzt hast, heißen weiter englisch (z. B. „Barbell Curl“) und haben
+  keine Muskeln außer den importierten; du kannst sie wie jede eigene Übung umbenennen.

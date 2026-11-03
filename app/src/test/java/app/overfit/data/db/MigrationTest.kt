@@ -196,4 +196,96 @@ class MigrationTest {
             v4.close()
         }
     }
+
+    /**
+     * v4 → v5: free-exercise-db removed. Used `fedb:*` exercises (template, workout, replaced exercise) become custom
+     * exercises with the same ID and no image; unused ones are deleted; Workout Guide and custom exercises stay as
+     * they are; the new `note` column is empty. Seeding the new catalogue afterwards does not bring `fedb:*` back.
+     */
+    @Test
+    fun migration4to5ConvertsUsedFreeDbExercisesAndDeletesUnusedOnes() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v4 = helper.createDatabase(4)
+        fun exercise(id: String, name: String, source: String, image: String?) = v4.execSQL(
+            "INSERT INTO exercise (id, name, source, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType, defaultRestSec, isArchived, createdAt, updatedAt) " +
+                "VALUES ('$id', '$name', '$source', ${image?.let { "'$it'" } ?: "NULL"}, 'biceps', 'forearms', 'barbell', 'WEIGHT_REPS', 75, 0, 1, 2)",
+        )
+        exercise("fedb:Barbell_Curl", "Barbell Curl", "FREE_DB", "https://raw.githubusercontent.com/x/Barbell_Curl/0.jpg")
+        exercise("fedb:Zercher_Squat", "Zercher Squat", "FREE_DB", "https://raw.githubusercontent.com/x/Zercher/0.jpg")
+        exercise("fedb:Old_Row", "Old Row", "FREE_DB", "https://raw.githubusercontent.com/x/Old_Row/0.jpg")
+        exercise("fedb:Unused", "Unused", "FREE_DB", "https://raw.githubusercontent.com/x/Unused/0.jpg")
+        exercise("wg:bench-press", "Bench Press", "WORKOUT_GUIDE", "catalog/wg/bench-press.svg")
+        exercise("custom:1", "Mine", "CUSTOM", null)
+        // Template uses the curl, a finished workout the squat and – as replaced exercise – the old row.
+        v4.execSQL("INSERT INTO workout_template (id, name, note, position, createdAt, updatedAt) VALUES (1, 'Arms', NULL, 0, 1, 2)")
+        v4.execSQL("INSERT INTO template_exercise (id, templateId, exerciseId, position, restSec, note) VALUES (1, 1, 'fedb:Barbell_Curl', 0, NULL, NULL)")
+        v4.execSQL("INSERT INTO template_set (id, templateExerciseId, position, targetWeightKg, targetReps, targetDurationSec) VALUES (1, 1, 0, 30.0, 10, NULL)")
+        v4.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt) " +
+                "VALUES ('w1', 'Legs', NULL, 'FINISHED', 1000, 5000, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 5000)",
+        )
+        v4.execSQL("INSERT INTO session_exercise (id, sessionId, exerciseId, position, restSec, note, origin, replacedExerciseId) VALUES ('se1', 'w1', 'fedb:Zercher_Squat', 0, 90, NULL, 'REPLACED', 'fedb:Old_Row')")
+        v4.execSQL(
+            "INSERT INTO set_entry (id, sessionExerciseId, position, targetWeightKg, targetReps, targetDurationSec, weightKg, reps, durationSec, completed, completedAt, rpe) " +
+                "VALUES ('s1', 'se1', 0, 60.0, 8, NULL, 62.5, 8, NULL, 1, 2000, NULL)",
+        )
+        v4.close()
+
+        // Validates the migrated schema against schemas/.../5.json.
+        helper.runMigrationsAndValidate(5, OverfitDatabase.MIGRATIONS.toList()).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val dao = db.exerciseDao()
+            listOf("fedb:Barbell_Curl", "fedb:Zercher_Squat", "fedb:Old_Row").forEach { id ->
+                val e = dao.get(id)
+                assertNotNull("$id is kept", e)
+                assertEquals(app.overfit.domain.ExerciseSource.CUSTOM, e!!.source)
+                assertNull("$id has no image (initials tile)", e.imageRef)
+                assertEquals(listOf("biceps"), e.primaryMuscles)
+                assertEquals(75, e.defaultRestSec)
+                assertNull(e.note)
+            }
+            assertEquals("Barbell Curl", dao.get("fedb:Barbell_Curl")!!.name)
+            assertNull("unused fedb exercise is deleted", dao.get("fedb:Unused"))
+            val bench = dao.get("wg:bench-press")!!
+            assertEquals(app.overfit.domain.ExerciseSource.WORKOUT_GUIDE, bench.source)
+            assertEquals("catalog/wg/bench-press.svg", bench.imageRef)
+            assertEquals(app.overfit.domain.ExerciseSource.CUSTOM, dao.get("custom:1")!!.source)
+            assertEquals(5, dao.count()) // 6 inserted, the unused fedb one deleted
+
+            // Template and workout still load with the converted exercises.
+            val template = db.templateDao().getWithExercises(1)!!
+            assertEquals("fedb:Barbell_Curl", template.exercises.single().exercise.id)
+            assertEquals(10, template.exercises.single().sets.single().targetReps)
+            val finished = app.overfit.data.WorkoutRepository(db).getFinished("w1")!!
+            assertEquals(62.5, finished.workout.exercises.single().sets.single().actual.weightKg)
+
+            // The note column is usable.
+            dao.upsert(dao.get("custom:1")!!.copy(note = "Langsam ablassen"))
+            assertEquals("Langsam ablassen", dao.get("custom:1")!!.note)
+
+            // Seeding the new catalogue (Workout Guide only) never brings free-exercise-db back.
+            val catalogFile = File("../shared/src/commonMain/composeResources/files/catalog/exercises.json")
+            val seeder = app.overfit.data.catalog.CatalogSeeder(db, app.overfit.data.InMemoryKeyValueStore()) { catalogFile.readBytes() }
+            seeder.seedIfNeeded(now = 10)
+            assertNull(dao.get("fedb:Unused"))
+            assertEquals(app.overfit.domain.ExerciseSource.CUSTOM, dao.get("fedb:Barbell_Curl")!!.source)
+            assertNotNull(dao.get("wg:squat"))
+            val all = dao.getActive()
+            assertEquals(0, all.count { it.source == app.overfit.domain.ExerciseSource.FREE_DB })
+            assertEquals(3, all.count { it.id.startsWith("fedb:") })
+        } finally {
+            db.close()
+        }
+    }
 }

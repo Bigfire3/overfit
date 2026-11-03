@@ -46,7 +46,7 @@ class AppDataTest {
         val catalogSize = db.exerciseDao().count()
         assertTrue(catalogSize > 0)
 
-        val customId = data.exercises.createCustom(CustomExerciseInput("Mine", TrackingType.WEIGHT_REPS, 60, null, null))
+        val customId = data.exercises.createCustom(CustomExerciseInput("Mine", TrackingType.WEIGHT_REPS, 60))
         val custom = data.exercises.get(customId)!!
         val sets = listOf(PlannedSet(weightKg = 50.0, reps = 5))
         data.templates.save(Template(0, "T", null, listOf(TemplateExercise(custom, null, null, sets))))

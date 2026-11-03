@@ -83,7 +83,7 @@ private fun ByteArray.base64() = Base64.encode(this)
  */
 fun anthropicBody(prompt: CoachPrompt, model: String, structured: Boolean): JsonObject = buildJsonObject {
     put("model", model)
-    put("max_tokens", CoachModels.MAX_TOKENS)
+    put("max_tokens", prompt.outputMaxTokens)
     putJsonArray("system") {
         add(buildJsonObject {
             put("type", "text"); put("text", prompt.staticSystem)
@@ -111,7 +111,7 @@ fun anthropicBody(prompt: CoachPrompt, model: String, structured: Boolean): Json
     val effort = SUPPORTS_EFFORT.containsMatchIn(model)
     if (structured || effort) putJsonObject("output_config") {
         if (effort) put("effort", "medium")
-        if (structured) putJsonObject("format") { put("type", "json_schema"); put("schema", CoachSchema.schema) }
+        if (structured) putJsonObject("format") { put("type", "json_schema"); put("schema", prompt.outputSchema) }
     }
 }
 
@@ -197,7 +197,7 @@ open class ChatCompletionsCoach(
 
     fun body(prompt: CoachPrompt, model: String, structured: Boolean): JsonObject = buildJsonObject {
         put("model", model)
-        if (providerId == ProviderId.OPENAI) put("max_completion_tokens", CoachModels.MAX_TOKENS) else put("max_tokens", CoachModels.MAX_TOKENS)
+        if (providerId == ProviderId.OPENAI) put("max_completion_tokens", prompt.outputMaxTokens) else put("max_tokens", prompt.outputMaxTokens)
         putJsonArray("messages") {
             add(buildJsonObject {
                 put("role", "system")
@@ -225,7 +225,7 @@ open class ChatCompletionsCoach(
         }
         if (structured) putJsonObject("response_format") {
             put("type", "json_schema")
-            putJsonObject("json_schema") { put("name", CoachSchema.NAME); put("strict", true); put("schema", CoachSchema.schema) }
+            putJsonObject("json_schema") { put("name", prompt.outputSchemaName); put("strict", true); put("schema", prompt.outputSchema) }
         }
     }
 

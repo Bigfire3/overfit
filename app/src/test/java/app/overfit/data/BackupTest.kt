@@ -6,6 +6,8 @@ import app.overfit.data.backup.BackupError
 import app.overfit.data.backup.BackupService
 import app.overfit.data.backup.Zip
 import app.overfit.data.db.OverfitDatabase
+import app.overfit.domain.ExerciseSource
+import app.overfit.domain.Muscle
 import app.overfit.domain.PlannedSet
 import app.overfit.domain.SetValues
 import app.overfit.domain.Template
@@ -56,7 +58,7 @@ class BackupTest {
         data.seedCatalog().getOrThrow()
         val bench = data.exercises.get("wg:bench-press")!!
         data.exercises.updateSettings(bench.id, TrackingType.WEIGHT_REPS, 150)
-        val custom = data.exercises.get(data.exercises.createCustom(CustomExerciseInput("Handstand", TrackingType.TIME, 60, null, null)))!!
+        val custom = data.exercises.get(data.exercises.createCustom(CustomExerciseInput("Handstand", TrackingType.TIME, 60)))!!
         val templateId = data.templates.save(
             Template(0, "Push", "n", listOf(TemplateExercise(bench, 120, null, listOf(PlannedSet(60.0, 8))), TemplateExercise(custom, null, null, listOf(PlannedSet(durationSec = 30))))),
         )
@@ -138,5 +140,39 @@ class BackupTest {
         backup.restore(backup.preview(minimal).getOrThrow())
         val w = data.workouts.getFinished("x")!!
         assertEquals(20.0, w.workout.exercises.single().sets.single().actual.weightKg)
+    }
+    @Test
+    fun legacyFreeDbExerciseUsedByTemplateBecomesCustomWithoutImage() = runTest {
+        data.seedCatalog().getOrThrow()
+        val json = """{"format":"overfit-backup","v":1,"createdAt":5,
+            "exercises":[
+              {"id":"fedb:Barbell_Curl","name":"Barbell Curl","source":"FREE_DB","imageRef":"https://example.com/curl.jpg","primaryMuscles":["biceps"],"trackingType":"WEIGHT_REPS"},
+              {"id":"fedb:Unused_Move","name":"Unused Move","source":"FREE_DB","imageRef":"https://example.com/unused.jpg","trackingType":"WEIGHT_REPS"}],
+            "templates":[{"id":1,"name":"Arme","exercises":[{"exerciseId":"fedb:Barbell_Curl","sets":[{"tKg":20,"tReps":10}]}]}]}"""
+        backup.restore(backup.preview(Zip.write(listOf(Zip.Entry("backup.json", json.encodeToByteArray())))).getOrThrow())
+
+        val curl = data.exercises.get("fedb:Barbell_Curl")!!
+        assertEquals(ExerciseSource.CUSTOM, curl.source)
+        assertEquals(null, curl.imageRef)
+        assertEquals("Barbell Curl", curl.name)
+        assertEquals(listOf(Muscle.BICEPS), curl.primaryMuscles)
+        assertEquals("fedb:Barbell_Curl", data.templates.get(data.templates.templates.first().first().id)!!.exercises.single().exercise.id)
+        assertEquals(null, data.exercises.get("fedb:Unused_Move"))
+    }
+
+    @Test
+    fun customExerciseNoteSurvivesExportAndRestore() = runTest {
+        data.seedCatalog().getOrThrow()
+        val id = data.exercises.createCustom(
+            CustomExerciseInput("Fliegende", TrackingType.WEIGHT_REPS, 75, primary = listOf(Muscle.CHEST), note = "Ellbogen eng"),
+        )
+        val file = backup.export()
+        data.resetAll()
+        assertEquals(null, data.exercises.get(id))
+        backup.restore(backup.preview(file).getOrThrow())
+        val back = data.exercises.get(id)!!
+        assertEquals("Ellbogen eng", back.note)
+        assertEquals(75, back.defaultRestSec)
+        assertEquals(ExerciseSource.CUSTOM, back.source)
     }
 }
