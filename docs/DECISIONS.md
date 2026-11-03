@@ -697,9 +697,9 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 - Wartet ein Test auf State oder Daten statt auf Text, nimmt er `waitUntilState` (app/src/test/.../ui/TestWaits.kt): Der Helfer holt vor jeder Prüfung den Semantik-Baum und pumpt damit den Main-Looper. Ein reines `waitUntil { deps.workout.state … }` läuft sonst in den Timeout, sobald die Arbeit auf `Dispatchers.Main` liegt (so geschehen in TrainingTabTest/DayWithOverfitTest, nachdem `addPicked` in den Controller-Scope gezogen war). Alle bestehenden State-Waits sind umgestellt.
 
 ## Marke und Claim (Session T)
-- **Wortmarke „overfit“ immer klein**, auch am Satzanfang und in Fließtexten (wie „eBay“): eine Schreibweise, kein Abwägen im Einzelfall. Geändert: App-Name (`appName`, Android-Label), „Über/About overfit“, Store-Texte, README, Web. Interne Namen (Paket `app.overfit`, Datei `.overfit`, `overfit://`) bleiben unverändert.
+- **Wortmarke „Overfit“ mit großem O** (Fabian, 3.11.: „Der erste Buchstabe des App-Namens soll groß sein.“). Ersetzt die frühere Entscheidung „immer klein“. Geändert: App-Name (`appName`, Android-Label), „Über/About Overfit“, Fließtexte in den Strings, Store-Texte, README, Web. iOS hatte schon `CFBundleDisplayName: Overfit`. Interne Namen (Paket `app.overfit`, Datei `.overfit`, `overfit://`, Prefs-Keys, Backup-Dateiname) bleiben klein.
 - **Claim „personal training for everyone“** in beiden Sprachen auf Englisch als Markenclaim (30 Zeichen = App-Store-Untertitel). Auf Deutsch zusätzlich eine erklärende Zeile („Dein Trainer in der Tasche …“) statt Übersetzung: ein Claim, überall wiedererkennbar, Store-Suche profitiert von englischem Begriff nicht, aber die Marke bleibt einheitlich.
-- **Store-Titel** „overfit: Workout & KI-Coach“ / „overfit: Workout & AI Coach“ (je 27 Zeichen), Play-Kurzbeschreibung ≤ 80 geprüft.
+- **Store-Titel** „Overfit: Workout & KI-Coach“ / „Overfit: Workout & AI Coach“ (je 27 Zeichen), Play-Kurzbeschreibung ≤ 80 geprüft.
 - **`aiSubtitle`:** „kein Abo nötig“ statt „kein Abo“, damit ein späteres optionales Pro-Abo nicht widerspricht (siehe docs/monetization.md).
 - **Onboarding:** Der erste Screen ist die Namensfrage, es gibt keinen Splash und keinen Markentext; nichts geändert (keine Funktionsänderung).
 
