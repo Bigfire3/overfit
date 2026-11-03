@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTextExactly
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToLog
@@ -47,7 +48,8 @@ class ShareFlowTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private val kv = InMemoryKeyValueStore()
+    // Tests that look at an empty app opt out of the first-start sample workouts (Push/Pull/Legs), as an existing install would.
+    private val kv = InMemoryKeyValueStore().apply { put(AppData.KEY_SAMPLES_SEEDED, "1") }
     private val store = AppStore(kv, InMemorySecretStore(), DeviceDefaults(Language.DE, WeightUnit.KG))
     private val database = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext()).build()
     private val data = AppData(
@@ -135,6 +137,24 @@ class ShareFlowTest {
         compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
         waitFor("schon da")
         assertEquals(3, runBlocking { data.templates.templates.first() }.size)
+    }
+
+    @Test
+    fun firstStartCreatesSamples_deletingKeepsThemGone() {
+        kv.remove(AppData.KEY_SAMPLES_SEEDED)
+        launchOnboarded()
+        waitFor("Legs"); waitFor("Pull"); waitFor("Push")
+        compose.waitUntil(10_000) { runBlocking { data.templates.templates.first() }.size == 3 }
+        val pull = runBlocking { data.templates.templates.first() }.first { it.name == "Pull" }
+        runBlocking { data.templates.delete(pull.id) }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Pull").fetchSemanticsNodes().isEmpty() }
+        // Next start: the flag is set, nothing comes back
+        assertEquals(0, runBlocking { data.seedSamplesOnce() }.getOrThrow())
+        assertEquals(listOf("Push", "Legs"), runBlocking { data.templates.templates.first() }.map { it.name })
+        // The explicit entry in the profile brings them back on request
+        compose.onNodeWithText("Profil").performClick()
+        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
+        waitFor("1 Beispiel-Workout")
     }
 
     @Test

@@ -596,6 +596,57 @@ Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templat
 - Ehemalige free-exercise-db-Übungen, die du benutzt hast, heißen weiter englisch (z. B. „Barbell Curl“) und haben
   keine Muskeln außer den importierten; du kannst sie wie jede eigene Übung umbenennen.
 
+## Teilen und Import verbessern, Beispiel-Workouts standardmäßig (3.11., Session Q)
+
+**.overfit-Dateien öffnen.** Import-Screen hat „Datei auswählen“ (vorhandenes `rememberFilePicker`: Android `OpenDocument`, iOS
+UIDocumentPicker). Android-Manifest: zusätzlich zu den VIEW-Filtern (Typ `application/x-overfit`, Pfadmuster `*.overfit`) jetzt
+VIEW für `application/octet-stream` (WhatsApp und Downloads liefern oft diesen Typ ohne Endung im `content://`-Pfad) und
+SEND für `application/x-overfit` und `application/octet-stream` („Teilen mit …“). Overfit prüft den Inhalt selbst und
+meldet „kein Overfit-Training“, falls die Datei etwas anderes ist (Preis: Overfit erscheint bei jeder unbekannten Datei in der
+Auswahl). `text/plain` wird bewusst nicht registriert (Overfit würde in jedem Teilen-Dialog stehen; Links öffnen über VIEW). Das
+Lesen steckt in `IncomingShare.textOf` (Robolectric-Test `IncomingShareTest`). iOS hatte UTI und Document Type schon
+(`iosApp/project.yml`). Backups sind `.zip`: Wählt man eines im Import, erscheint „Das ist ein Backup … unter Profil → Backup“.
+
+**Schalter „Gewichte und Wiederholungen mitsenden“.** Vorher „Mit Ist-Werten“ (Teilen eines abgeschlossenen Trainings). Jetzt klar
+benannt, ein Satz Erklärung mit Beispiel darunter (an: „Der Empfänger sieht … z. B. 80 kg × 8“, aus: „Nur Übungen und Satzanzahl“) und
+eine Vorschau „Das wird geteilt: 5 Übungen · 18 Sätze“ mit Beispielwert (auch bei Workouts ohne Schalter). Die Vorschau zeigt die
+Zahlen aus dem tatsächlich geteilten Inhalt.
+
+**QR-Größe: gemessen, entschieden.** Modulzahl je Seite (ohne Ruhezone), Beispiel-Workouts:
+
+| | Link in QR (JSON → Deflate → Base64url, Byte-Modus, ECC M) | `OF1:` (kompakt, Base45, Alphanumeric, ECC L) |
+|---|---|---|
+| Push | 93 × 93 (617 Zeichen) | 57 × 57 (367 Zeichen) |
+| Pull | 89 × 89 (544) | 53 × 53 (333) |
+| Legs | 85 × 85 (496) | 49 × 49 (262) |
+
+Beitrag der einzelnen Maßnahmen: (1) ECC L statt M (Bildschirm ist sauber, Fehlerkorrektur 7 % genügt), (2) Alphanumeric-Modus
+(5,5 statt 8 Bit je Zeichen) über Base45, (3) Binärform mit Katalog-ID als 24-Bit-Hash (statt `"wg:bench-press"` je Übung),
+Satz-Gruppen („4 × 80 kg × 8“) und Standardwerten weggelassen, (4) Raw Deflate nur, wenn es kleiner ist. Regressionstest
+`QrSizeTest` (≤ 57 Module). Verworfen: eigenes Spotify-artiges Strichcode-Format. Das Muster ist nur mit eigener Erkennung
+(Kamera, Entzerrung, Fehlerkorrektur) lesbar, die auf iOS fehlt und auf Android von ZXing nicht kommt; ein QR in Version 1
+(21 × 21) über den Kurz-Code erreicht dieselbe Kleinheit ohne eigenes Format.
+Optik: runde Module (Finder-Muster bleiben solide, damit jeder Scanner sie sicher findet), 200 dp statt 320 dp breit,
+weißer Grund mit Ruhezone 3 Module + abgerundeter Karte. Die Komponente `QrView(text)` ist generisch (Spot nutzt sie weiter, Duo später).
+Beim Prüfen gegen ZXing fand sich, dass die Maskenwahl des Generators schwächer als ISO war (manche Symbole ließen sich nicht lesen):
+Penalty-Regeln 1–4 sind jetzt wie in ZXing, der Test `QrCompareTest` vergleicht Symbol und Maskenwahl mit dem ZXing-Encoder.
+
+**Kurz-Code über das Backend.** Vorgebaut, soweit es ohne Backend geht: `ShortCodeService` (`NoShortCodes` als Standard),
+`qrTextFor(...)` (Kurz-Code, sonst voller Inhalt), `OFS:<ID>` im Import erkannt, Vertrag in docs/backend-api.md (`POST
+/v1/share/short`, `GET /v1/share/short/<id>`).
+
+**Beispiel-Workouts.** `AppData.seedSamplesOnce()` legt Push/Pull/Legs einmal an (Flag `samples_seeded_v1` im KeyValueStore, nach
+erfolgreichem Anlegen gesetzt), beim Erststart und einmalig bei bestehenden Installationen (dort ohne Duplikate, per Name).
+Gelöschte kommen nicht wieder, „Beispiel-Workouts hinzufügen“ (Leerzustand und Profil) bringt sie auf Wunsch zurück. „Alle Daten
+löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim nächsten App-Start). Läuft im App-Scope.
+
+### Zur Prüfung durch Fabian
+- **iPhone-Kamera öffnet den neuen QR nicht.** `OF1:` ist Text, kein Link. Auf iOS gibt es keinen In-App-Scanner (nur Android), das
+  Teilen per Link/Datei bleibt. Alternative wäre ein URL-QR `OVERFIT://T#<Base32>` (ca. 3–5 Module größer, iPhone-Kamera öffnet ihn
+  vermutlich); umkehrbar in `qrTextFor`. Auf iOS ist ein In-App-Scanner (AVFoundation) der saubere Weg.
+- Overfit erscheint wegen `application/octet-stream` in der „Öffnen mit“-Auswahl für unbekannte Dateien.
+- Bestehende Installationen bekommen Push/Pull/Legs einmalig, auch wenn jemand sie früher bewusst gelöscht hat.
+
 ## UI-Feinschliff (Session R, 3.11.)
 **Mängelliste aus den Screenshots** (`docs/screenshots/before/`, Test `ScreenshotTest`, hell + dunkel):
 1. Textaktionen („Beenden“, „Bearbeiten“, „Teilen“, „Satz hinzufügen“, „Ersetzen“) sahen aus wie Fließtext, nicht klickbar.

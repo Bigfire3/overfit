@@ -79,6 +79,26 @@ class ShareImportTest {
     }
 
     @Test
+    fun compactQrContentImportsWithCatalogueIds() = runTest {
+        importer.addSamples()
+        val original = templates.get(templates.templates.first().first { it.name == "Legs" }.id)!!
+        val text = app.overfit.share.QrPayload.encode(ShareMapper.fromTemplate(original))
+        val training = (ShareFormat.parseInput(text) as ShareParse.Ok).training
+        val preview = importer.preview(training)
+        assertTrue(preview.newExerciseNames.isEmpty())
+        val copy = templates.get(importer.accept(preview))!!
+        assertEquals(original.exercises.map { it.exercise.id }, copy.exercises.map { it.exercise.id })
+        assertEquals(original.exercises.map { it.sets }, copy.exercises.map { it.sets })
+    }
+
+    @Test
+    fun catalogueIdHashesAreUnique() = runTest {
+        val ids = exercises.exercises.first().map { it.id }.filter { it.startsWith("wg:") }
+        assertTrue(ids.size > 250)
+        assertEquals(ids.size, ids.map { app.overfit.share.QrPayload.idHash(it) }.toSet().size)
+    }
+
+    @Test
     fun customExercisesAreCreatedOnceAndMatchedByName() = runTest {
         val json = """{"v":1,"kind":"template","name":"Neu","exercises":[
             {"ref":"c1","sets":[{"sec":30}]},{"ref":"c2","sets":[{"kg":10,"reps":5}]}],

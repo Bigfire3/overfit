@@ -41,6 +41,7 @@ data class HistoryStrings(
     // Sharing a workout
     val shareWorkoutHint: String,
     val withActual: String,
+    val withActualHint: (on: Boolean) -> String,
 
     // Exercise progress
     val progress: String,
@@ -97,7 +98,8 @@ val HistoryGerman = HistoryStrings(
     workoutMissing = "Dieses Training gibt es nicht mehr.",
 
     shareWorkoutHint = "Teilt Übungen und Sätze – nie Fotos, Notizen oder Gefühl.",
-    withActual = "Mit Ist-Werten",
+    withActual = "Gewichte und Wiederholungen mitsenden",
+    withActualHint = { on -> if (on) "An: Der Empfänger sieht, was du geschafft hast (z. B. 80 kg × 8)." else "Aus: Nur Übungen und Satzanzahl, ohne Gewichte." },
 
     progress = "Fortschritt",
     bests = "Bestwerte",
@@ -153,7 +155,8 @@ val HistoryEnglish = HistoryStrings(
     workoutMissing = "This workout no longer exists.",
 
     shareWorkoutHint = "Shares exercises and sets – never photos, notes or feeling.",
-    withActual = "With actual values",
+    withActual = "Include weights and reps",
+    withActualHint = { on -> if (on) "On: The recipient sees what you lifted (e.g. 80 kg × 8)." else "Off: Only exercises and number of sets, no weights." },
 
     progress = "Progress",
     bests = "Personal bests",
