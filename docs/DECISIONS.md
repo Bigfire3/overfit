@@ -299,3 +299,41 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 ### Zur Prüfung durch Fabian
 - Spot-QR enthält `overfit://spot#…` (ohne installierte App passiert beim Scannen nichts; eine Web-Seite dafür wäre möglich).
 - Name „Fuel · 4,20 €“ in EN als „€4.20“ formatiert (DE „4,20 €“).
+
+## KI-Chat-Verbindungen (Phase 10a, Nacht 3.11., Session E)
+
+- **Ein Remote-MCP-Server für alle drei Plattformen** im bestehenden Worker unter `/mcp` (Streamable HTTP, zustandslos, Antwort
+  als `application/json`, kein SSE). Begründung: Claude (Custom Connectors), ChatGPT (Apps/Connectors, Entwicklermodus) und
+  Gemini („Eigene Apps“) sprechen heute alle Remote-MCP mit OAuth; ein Server deckt alle ab. Kein MCP-SDK: der hand-gerollte
+  Router bleibt ohne Abhängigkeiten, JSON-RPC-Teil ist klein (initialize, ping, tools/*, prompts/*, resources/list).
+- **OAuth 2.1 im selben Worker, Anmeldung per Kopplungscode:** RFC 8414/9728-Metadaten, Dynamic Client Registration (öffentliche
+  und vertrauliche Clients, weil ChatGPT je nach Version ein Secret anfordert), zusätzlich Client ID Metadata Documents (laut
+  aktueller MCP-Spezifikation der empfohlene Weg), PKCE S256 Pflicht, `resource` geprüft, Code 5 min einmalig, Access-Token 1 h,
+  Refresh-Token 90 Tage mit Rotation. Tokens/Codes nur als SHA-256 gespeichert. Anmeldeseite ohne JavaScript, `frame-ancestors
+  'none'`, zeigt Client-Name **und** Ziel-Host (gegen Phishing mit gefälschtem `client_name`). Kopplungscode 8 Zeichen aus 31
+  (~40 Bit), 10 min, einmalig, Fehlversuche 10 / 10 min je IP.
+- **Verschlüsselung at rest:** AES-256-GCM, Schlüssel per HKDF aus `SYNC_ENCRYPTION_KEY` + Konto-ID, AAD = Konto/Art/ID (Zeilen
+  lassen sich nicht vertauschen). Schützt gegen DB-/R2-Abzüge, nicht gegen den Betreiber – ehrlich so dokumentiert.
+  Ende-zu-Ende ist unmöglich, weil der Server die Daten für den Chat lesen muss.
+- **Dokument-Sync statt Datenbank-Spiegel:** Die App lädt pro Vorlage/Training ein JSON-Dokument (Last-Writer-Wins über
+  `updatedAt` in ms). Kennzahlen je Training (Volumen, Top-Satz, e1RM nach Epley bis 12 Wdh., längster Halt) berechnet der
+  Server beim Upload und legt sie verschlüsselt in eine eigene Spalte – Fortschrittsabfragen über Jahre bleiben so billig (CPU-
+  Limit der Worker), ohne alle Trainings zu entschlüsseln.
+- **Eingang statt direktem Schreiben:** Der Chat ändert nie direkt Daten der App. Vorlagen landen im Teilen-Format v1 im Eingang
+  (dieselbe Import-Vorschau wie beim Link), Notizen ebenso; jede Vorlage kommt zusätzlich als Import-Link zurück, damit der Weg
+  auch ohne Sync-Abruf und in Plattformen ohne Schreib-Tools funktioniert. Obergrenze 50 offene Einträge.
+- **Katalog im Worker:** Schlanke Kopie des App-Katalogs (`backend/src/catalog.gen.json`, ~90 KB, Skript
+  `backend/scripts/build-catalog.mjs`) für `search_exercise_catalog`, damit der Chat gültige IDs verwendet. Unbekannte IDs mit
+  Namen werden über den Namen importiert, eigene Übungen des Nutzers als `custom[]`.
+- **Gemini-/ChatGPT-Ersatzweg:** Wo kein Connector erlaubt ist, Gem/Custom GPT mit Anleitung + „Kontext kopieren“ + Rückweg
+  über den Teilen-Link (Session B). Keine Gemini-Extensions oder GPT-Actions als zweite API, um nur einen Server zu pflegen.
+
+### Zur Prüfung durch Fabian
+- **Bewusste Opt-in-Ausnahme von „kein Cloud-Sync / Backend speichert keine Trainingsinhalte“:** Nur nach „KI-Chat verbinden“
+  werden Trainingsdaten (Fotos nur mit eigenem Häkchen) verschlüsselt im Backend gespeichert; Abschalten löscht alles sofort.
+  Umkehrbar: Ohne Einschalten ändert sich nichts, der Endpunkt lässt sich serverseitig komplett entfernen. Für den Store-Start
+  braucht es dazu einen Absatz in der Datenschutzerklärung (Art. 9 DSGVO: Gesundheits-/Körperdaten → ausdrückliche
+  Einwilligung; die App holt sie mit dem Einschalt-Dialog ein) und die Info, dass die Daten an den gewählten Chat-Anbieter
+  gehen (dessen Bedingungen gelten).
+- Standard-Grenzen (5000 Dokumente / 25 MB, 300 Fotos à 3 MB, Refresh-Token 90 Tage) sind Schätzwerte; R2-Kosten bleiben im
+  kostenlosen Kontingent, solange es wenige Nutzer sind.

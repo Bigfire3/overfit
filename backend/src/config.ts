@@ -54,5 +54,14 @@ export function getConfig(env: Env): Config {
     rlMessagesPerMin: int(env.RL_MESSAGES_PER_MIN, 10, 1),
     rlRegisterPerHourIp: int(env.RL_REGISTER_PER_HOUR_IP, 20, 1),
     rlSensitivePerHour: int(env.RL_SENSITIVE_PER_HOUR, 10, 1),
+    publicBaseUrl: env.PUBLIC_BASE_URL ? env.PUBLIC_BASE_URL.replace(/\/+$/, '') : null,
+    shareBaseUrl: (env.SHARE_BASE_URL || 'https://bigfire3.github.io/overfit/t').replace(/\/+$/, ''),
+    chatMaxDocs: int(env.CHAT_MAX_DOCS, 5000, 1),
+    chatMaxBytes: int(env.CHAT_MAX_BYTES, 25 * 1024 * 1024, 1024),
+    chatMaxDocBytes: 256 * 1024,
+    chatMaxPhotos: int(env.CHAT_MAX_PHOTOS, 300, 0),
+    chatMaxPhotoBytes: int(env.CHAT_MAX_PHOTO_BYTES, 3 * 1024 * 1024, 1024),
+    chatInboxMax: int(env.CHAT_INBOX_MAX, 50, 1),
+    rlMcpPerMin: int(env.RL_MCP_PER_MIN, 120, 1),
   };
 }

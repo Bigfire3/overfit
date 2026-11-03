@@ -13,6 +13,8 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Körperfotos der KI-Chat-Verbindung (nur nach ausdrücklicher Freigabe in der App, verschlüsselt abgelegt).
+  "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "overfit-chat-photos" }],
   // Alle Beträge in Mikro-Euro (1 € = 1_000_000). Aufschläge in Basispunkten (100 = 1 %).
   "vars": {
     "MARKUP_BP": "800",

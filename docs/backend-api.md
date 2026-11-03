@@ -1,7 +1,7 @@
-# Overfit-Backend: API-Vertrag (Fuel & Spot)
+# Overfit-Backend: API-Vertrag (Fuel, Spot, KI-Chat-Verbindung)
 
 Grundlage für die App-Anbindung. Implementierung: `backend/` (Cloudflare Worker + D1). Basis-URL: `https://<worker-domain>`, alle Pfade unter `/v1`.
-Das Backend speichert **keine Trainingsinhalte und keine Fotos** (Anfragen werden nur durchgeleitet), sondern Konto-ID, Saldo, Buchungen (Modell, Token, Betrag) und Spot-Zuordnungen.
+Das Backend speichert **keine Trainingsinhalte und keine Fotos** (Anfragen werden nur durchgeleitet), sondern Konto-ID, Saldo, Buchungen (Modell, Token, Betrag) und Spot-Zuordnungen. **Einzige Ausnahme:** die freiwillige KI-Chat-Verbindung (unten), die der Nutzer ausdrücklich einschaltet; Abschalten löscht alles.
 
 ## Beträge
 
@@ -88,6 +88,9 @@ Jeder Fehler: passender HTTP-Status und
 | 403 | `attestation_failed` | Geräteprüfung fehlgeschlagen (`details.reason`) |
 | 404 | `invalid_recovery_code` | Kein Konto zu diesem Code; `not_found` bei unbekanntem Endpunkt |
 | 405 | `method_not_allowed` | |
+| 403 | `photos_not_enabled` | Foto-Upload ohne Foto-Freigabe |
+| 409 | `chat_not_enabled` | KI-Chat-Verbindung nicht eingeschaltet (`POST /v1/chat/enable`) |
+| 413 | `sync_quota_exceeded`, `doc_too_large`, `photo_too_large` | Speichergrenze der KI-Chat-Verbindung (`details.maxDocs`/`maxBytes`/`maxPhotos`) |
 | 409 | `spot_token_used`, `spot_already_redeemed`, `spot_device_used` | Spot schon eingelöst (Token / dieses Konto / dieses Gerät) |
 | 410 | `spot_token_expired` | QR-Code abgelaufen, neu scannen |
 | 413 | `body_too_large` | Anfrage größer als `MAX_BODY_BYTES` (Standard 8 MB) |
@@ -197,3 +200,106 @@ Gerät: 60 Anfragen/min, `/v1/messages`: 10/min, Registrierung: 20/h je IP, Kauf
 
 ## Lokaler Dev-Modus
 `wrangler dev --var DEV_MODE:true --var ATTESTATION_MODE:mock --var PURCHASE_MODE:mock` (siehe `backend/README.md`): Attestierungs- und Kauf-Token der Form `mock:<id>` werden akzeptiert (nur mit `DEV_MODE=true`; in Produktion werden die Mock-Modi ignoriert). `ANTHROPIC_BASE_URL` kann auf einen lokalen Fake zeigen.
+
+## KI-Chat-Verbindung (Claude, ChatGPT, Gemini per MCP)
+
+Freiwillig und getrennt von Fuel: Die App lädt Trainingsdaten hoch, ein KI-Chat liest sie über den Remote-MCP-Server
+`https://<worker-domain>/mcp` und legt Vorlagen und Notizen in einen **Eingang**, den die App abholt. Alles hängt am Konto der
+anonymen Geräte-Identität (Wiederherstellungscode nimmt es mit). Inhalte liegen AES-256-GCM-verschlüsselt (Schlüssel je
+Konto aus einem Server-Geheimnis abgeleitet; keine Ende-zu-Ende-Verschlüsselung, weil der Server die Daten für den Chat
+lesen muss). Fotos nur mit eigener Freigabe.
+
+### Ablauf in der App
+1. „KI-Chat verbinden“ → Hinweis + Häkchen „Körperfotos teilen“ (Standard aus) → `POST /v1/chat/enable`.
+2. Vollständiger Upload: `POST /v1/chat/sync` mit `reset: true` im ersten Paket, danach weitere Pakete (je ≤ 500 Einträge)
+   ohne `reset`. Bei Foto-Freigabe Fotos einzeln mit `PUT /v1/chat/photos/<id>`.
+3. Danach inkrementell: nach jeder Änderung (Satz abgehakt, Training beendet, Vorlage gespeichert, Profil/Gedächtnis
+   geändert) die geänderten Dokumente hochladen – gebündelt, höchstens alle ~10 s, laufendes Training mindestens beim
+   Beenden und beim Wechsel in den Hintergrund. Gelöschtes über `deletes`.
+4. „Mit Chat verbinden“ → `POST /v1/chat/pairing` → Code groß anzeigen (läuft nach 10 min ab, Countdown) + Anleitung je
+   Plattform. Sobald `GET /v1/chat` eine neue Verbindung zeigt: „Verbunden mit Claude“.
+5. Beim Öffnen der App (und beim Zurückkehren in den Vordergrund): `GET /v1/chat/inbox` → Vorschau → Übernehmen/Verwerfen →
+   `POST /v1/chat/inbox/ack` mit den erledigten IDs.
+6. Abschalten: `POST /v1/chat/disable` (löscht serverseitig alles, trennt alle Chats). Einzelne Chats trennen:
+   `POST /v1/chat/connections/revoke`.
+
+### `POST /v1/chat/enable`
+Body `{ "photos": false }`. Schaltet ein bzw. ändert nur die Foto-Freigabe (idempotent). `photos: false` bei bisher
+`true` **löscht alle hochgeladenen Fotos**. → Status (wie `GET /v1/chat`).
+
+### `GET /v1/chat` → Status
+```json
+{ "enabled": true, "photos": false, "enabledAt": 1762128000, "lastSyncAt": 1762128500,
+  "docs": { "profile": 1, "memory": 1, "template": 3, "workout": 42, "photo": 0 }, "bytes": 183422, "inboxPending": 1,
+  "connections": [ { "id": "g_…", "clientName": "Claude", "createdAt": 1762128100, "lastUsedAt": 1762128400 } ] }
+```
+Nicht eingeschaltet: `{ "enabled": false, … }`.
+
+### `POST /v1/chat/disable` → `{ "enabled": false, "deleted": true }`
+
+### `POST /v1/chat/sync`
+```json
+{ "reset": false,
+  "upserts": [ { "kind": "workout", "id": "<uuid>", "updatedAt": 1762128000123, "data": { … } } ],
+  "deletes": [ { "kind": "template", "id": "<uuid>" } ] }
+```
+→ `{ "applied": 1, "skipped": 0, "deleted": 1, "lastSyncAt": 1762128500 }`. `updatedAt` in **Millisekunden**; ein Upsert mit
+älterem `updatedAt` als gespeichert wird übersprungen (`skipped`). `reset: true` löscht vorher alle Dokumente (nicht die
+Fotos). Höchstens 500 Einträge je Anfrage, Dokument ≤ 256 KB, je Konto 5000 Dokumente / 25 MB (`413 sync_quota_exceeded`).
+IDs: `[A-Za-z0-9_.:-]{1,80}`. Unbekannte Felder in `data` sind erlaubt und werden an den Chat durchgereicht.
+
+**Dokumentarten** (`kind` / `id` / `data`). Gewichte immer in **kg**, Zeitpunkte in **ms**:
+
+| kind | id | data |
+|---|---|---|
+| `profile` | `me` | `{ "name", "birthYear", "unit": "kg"\|"lb", "language": "de"\|"en", "timeZone": "Europe/Berlin", "heightCm"?, "goals"?, "experience"?, "limitations"?, "notes"?, "bodyweight": [ { "date": "2026-09-01", "kg": 80.2 } ] }` |
+| `memory` | `coach` | `{ "text": "<Coach-Gedächtnis>" }` |
+| `template` | Vorlagen-UUID | `{ "name", "note"?, "exercises": [ { "exerciseId", "name", "trackingType", "restSec"?, "note"?, "sets": [ { "kg"?, "reps"?, "sec"? } ] } ] }` |
+| `workout` | Session-UUID | `{ "name", "templateId"?, "startedAt", "endedAt": <ms> \| null (läuft), "note"?, "feeling"? (1–5), "photoIds"?: [], "review"?: { "rating", "summary", "positives", "improvements", "tips" }, "exercises": [ { "exerciseId", "name", "trackingType", "origin"?: "planned"\|"added"\|"replaced", "replacedExerciseId"?, "note"?, "restSec"?, "sets": [ { "kg"?, "reps"?, "sec"?, "rpe"?, "completed": true, "completedAt"?, "planned"?: { "kg"?, "reps"?, "sec"? } } ] } ] }` |
+
+`exerciseId` = stabile Übungs-ID (`wg:…`, `fedb:…` oder UUID eigener Übungen), `name` = Anzeigename (für den Chat lesbar).
+Kennzahlen (Volumen, Top-Satz, e1RM nach Epley, längster Halt) berechnet der Server beim Upload selbst. Fotos,
+Notizen und Gefühl gehen nur in diese Verbindung, nie in Teilen-Links.
+
+### `PUT /v1/chat/photos/<photoId>?takenAt=<ms>&workoutId=<id>` / `DELETE /v1/chat/photos/<photoId>`
+Body = Bildbytes (JPEG oder PNG, ≤ 3 MB; App verkleinert auf ~1500 px lange Kante), `Content-Type: image/jpeg`. Signatur wie
+immer über den rohen Body; `takenAt` und `workoutId` stehen im signierten Query-String. Nur mit Foto-Freigabe
+(`403 photos_not_enabled`), höchstens 300 Fotos. → `{ "id", "takenAt", "workoutId", "mimeType", "size", "sha256" }`.
+
+### `POST /v1/chat/pairing` → `{ "code": "K7QM-3XWP", "expiresAt": 1762128600, "ttlSec": 600 }`
+8 Zeichen (ohne 0/O/1/I/L), einmalig, 10 min gültig, ein neuer Code ersetzt den alten. Eingabe auf der Anmeldeseite ist
+unabhängig von Groß-/Kleinschreibung, Bindestrich und Leerzeichen. Limit: 10/h je Gerät.
+
+### `GET /v1/chat/inbox`
+```json
+{ "items": [
+  { "id": "in_…", "kind": "template", "createdAt": 1762128400, "source": { "clientName": "Claude" },
+    "template": { "v": 1, "kind": "template", "name": "Push B", "exercises": [ … ], "custom": [ … ] },
+    "link": "https://bigfire3.github.io/overfit/t#<payload>", "replacesTemplateId": "<uuid>" | null, "message": "Begründung" | null },
+  { "id": "in_…", "kind": "note", "createdAt": 1762128450, "source": { "clientName": "ChatGPT" },
+    "note": { "title": "Auswertung" | null, "text": "Markdown", "workoutId": "<uuid>" | null, "rating": 8 | null } } ] }
+```
+`template` ist exakt das Teilen-Format v1 (`docs/share-format.md`) → dieselbe Import-Vorschau wie beim Link. Mit
+`replacesTemplateId` bietet die Vorschau „Vorlage aktualisieren“ (Diff zur bestehenden) neben „Als neue Vorlage“ an. Notizen
+mit `workoutId` erscheinen am Training im Verlauf, sonst in einer Liste „Notizen aus dem Chat“. Höchstens 50 offene Einträge.
+
+### `POST /v1/chat/inbox/ack` → Body `{ "ids": ["in_…"] }` → `{ "removed": 1 }`
+Auch für verworfene Einträge aufrufen.
+
+### `POST /v1/chat/connections/revoke`
+Body `{ "grantId": "g_…" }` oder `{ "all": true }` → `{ "revoked": 1 }`. Der Chat verliert sofort den Zugriff (Tokens gelöscht).
+
+### Chat-Seite (öffentlich, nicht für die App)
+- `POST /mcp` – MCP Streamable HTTP (JSON-RPC, Antwort `application/json`, zustandslos; `GET` → 405). Ohne/mit ungültigem
+  Token `401` + `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource"`.
+- `GET /.well-known/oauth-protected-resource` (RFC 9728), `GET /.well-known/oauth-authorization-server` (RFC 8414)
+- `POST /oauth/register` (Dynamic Client Registration, RFC 7591; `none`, `client_secret_post`, `client_secret_basic`;
+  Redirects nur `https` oder `http://localhost`). Alternativ Client ID Metadata Document (`client_id` = https-URL).
+- `GET/POST /oauth/authorize` – Anmeldeseite (DE/EN) mit Kopplungscode, PKCE `S256` Pflicht, `resource` (RFC 8707) optional.
+- `POST /oauth/token` – `authorization_code` (Code 5 min, einmalig) und `refresh_token` (rotierend). Access-Token 1 h,
+  Refresh-Token 90 Tage. `POST /oauth/revoke` (RFC 7009).
+
+**Tools:** `get_profile`, `list_templates`, `get_template`, `list_workouts`, `get_workout`, `get_current_workout`,
+`list_exercises`, `get_exercise_progress`, `search_exercise_catalog`, `list_photos`, `get_photo` (Bildinhalt),
+`create_template` (→ Eingang + Import-Link), `add_note` (→ Eingang). Dazu drei Prompts (`evaluate_last_workout`,
+`assess_progress`, `plan_next_workout`). Limit 120 MCP-Aufrufe/min je Verbindung.

@@ -11,6 +11,7 @@ import {
   verifyEcdsa,
 } from './crypto';
 import { now } from './ledger';
+import { cleanupOauth } from './chat/oauth';
 
 export const MAX_SKEW_SEC = 300;
 const enc = new TextEncoder();
@@ -107,5 +108,6 @@ export async function cleanup(env: Env): Promise<void> {
     env.DB.prepare('DELETE FROM nonces WHERE ts < ?').bind(t - 2 * MAX_SKEW_SEC),
     env.DB.prepare('DELETE FROM rate_limits WHERE window < ?').bind(t - 7200),
     env.DB.prepare('DELETE FROM holds WHERE created_at < ?').bind(t - 2 * 15 * 60),
+    ...cleanupOauth(env),
   ]);
 }
