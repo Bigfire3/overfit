@@ -62,7 +62,7 @@ private class PrivacyKey : DeviceKey {
 }
 
 /**
- * Guarantee: with an own API key and without switching on Fuel, Spot, the AI chat connection or a short-code QR,
+ * Guarantee: with an own API key and without switching on credit, invites, the AI chat connection or a short-code QR,
  * the app makes **zero** requests to the overfit backend. A backend URL is configured on purpose and every request
  * of every HttpClient (backend and providers) goes through one counting engine.
  */
@@ -85,7 +85,7 @@ class OwnKeyPrivacyTest {
         requests += "${req.url.host} ${req.method.value} ${req.url.encodedPath}"
         val body = if (req.url.host == backendHost) {
             when (req.url.encodedPath) {
-                "/v1/config" -> """{"currency":"EUR","unit":"micro-euro","markupBp":800,"storeFeeBp":1500,"models":{},"maxTokensCap":8192,"packages":[],"spot":{"starterMicro":1000000,"rewardMicro":1000000,"tokenTtlSec":45,"monthlyLimitPerInviter":10,"expiryDays":180}}"""
+                "/v1/config" -> """{"currency":"EUR","unit":"micro-euro","markupBp":800,"storeFeeBp":1500,"models":{},"maxTokensCap":8192,"packages":[],"invite":{"starterReviews":5,"rewardReviews":5,"tokenTtlSec":45,"monthlyLimitPerInviter":10,"expiryDays":180}}"""
                 "/v1/chat/inbox" -> """{"items":[]}"""
                 "/v1/chat" -> """{"enabled":false,"photos":false,"connections":[]}"""
                 else -> """{"deviceId":"d","balanceMicro":0,"expiring":[]}"""
@@ -128,7 +128,7 @@ class OwnKeyPrivacyTest {
         }
 
         // App start and "back in the foreground", also explicitly, plus the coach queue.
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         deps.chat.onForeground()
         deps.chat.onBackground()
         deps.coach.processQueue()
@@ -145,16 +145,16 @@ class OwnKeyPrivacyTest {
         compose.runOnIdle { backDispatcher!!.onBackPressed() } // the chat covers the tab bar
         waitFor("Prompts & Vorlagen")
         compose.onNodeWithTag("tab:PROFILE").performClick()
-        waitFor("Fuel")
+        waitFor("Guthaben")
         compose.waitForIdle()
         assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)
 
-        // Opening Fuel only shows the opt-in; still nothing. Only "Fuel ansehen" talks to the server (control: the counter works).
-        compose.onNodeWithText("Fuel", useUnmergedTree = true).performScrollTo().performClick()
-        waitFor("Fuel ansehen")
+        // Opening Fuel only shows the opt-in; still nothing. Only "Guthaben ansehen" talks to the server (control: the counter works).
+        compose.onNodeWithText("Guthaben", useUnmergedTree = true).performScrollTo().performClick()
+        waitFor("Guthaben ansehen")
         compose.waitForIdle()
         assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)
-        compose.onNodeWithText("Fuel ansehen").performClick()
+        compose.onNodeWithText("Guthaben ansehen").performClick()
         compose.waitUntilState(15_000) { backendRequests.isNotEmpty() }
     }
 }

@@ -23,7 +23,7 @@ private class FakeKey : DeviceKey {
 }
 
 private val json = headersOf(HttpHeaders.ContentType, "application/json")
-private const val ACCOUNT = """{"accountId":"a1","balanceMicro":4200000,"expiring":[{"amountMicro":1000000,"expiresAt":1777777777}],"displayName":"Fabian","hasRecoveryCode":false,"spot":{"invitedThisMonth":2,"monthlyLimit":10,"redeemedStarter":false}}"""
+private const val ACCOUNT = """{"accountId":"a1","balanceMicro":4200000,"expiring":[{"amountMicro":1000000,"expiresAt":1777777777}],"displayName":"Fabian","hasRecoveryCode":false,"invite":{"invitedThisMonth":2,"monthlyLimit":10,"redeemedStarter":false}}"""
 private fun err(code: String, details: String = "{}") = """{"error":{"code":"$code","message":"m","details":$details}}"""
 
 class FuelApiTest {
@@ -113,30 +113,33 @@ class FuelApiTest {
         val log = mutableListOf<HttpRequestData>()
         val api = api(log = log) { req ->
             if (req.url.encodedPath == "/v1/devices") HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
-            else HttpStatusCode.OK to """{"id":"msg_1","content":[],"overfit":{"costMicro":6956,"balanceMicro":7863414,"currency":"EUR"}}"""
+            else HttpStatusCode.OK to """{"id":"msg_1","content":[],"overfit":{"costMicro":6956,"balanceMicro":7863414,"currency":"EUR","model":"claude-sonnet-5-5","requestedModel":"gemini-3.6-flash","fallback":true}}"""
         }
         val body = """{"model":"claude-sonnet-5-5","max_tokens":100,"messages":[{"role":"user","content":"hi"}]}"""
         val r = api.messages(body)
         assertEquals(6_956, r.costMicro)
         assertEquals(7_863_414, r.balanceMicro)
+        assertEquals("claude-sonnet-5-5", r.servedModel)
+        assertEquals("gemini-3.6-flash", r.chosenModel)
         val sent = log.last()
         assertEquals(body, sent.body.toByteArray().decodeToString()) // byte-identical to what was hashed
         assertTrue(sent.headers[FuelHeaders.SIGNATURE] != null)
     }
 
     @Test
-    fun spotRedeemUsesChallengeAndAttestation() = runTest {
+    fun inviteRedeemUsesChallengeAndAttestation() = runTest {
         val log = mutableListOf<HttpRequestData>()
         val attestor = object : Attestor { override suspend fun attest(challenge: String) = Attestation("google", "tok-for-$challenge") }
         val api = api(attestor = attestor, log = log) { req ->
             when (req.url.encodedPath) {
                 "/v1/devices" -> HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
-                "/v1/spot/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1","expiresAt":1}"""
-                else -> HttpStatusCode.OK to """{"grantedMicro":1000000,"expiresAt":5,"inviter":{"displayName":"Fabian"},"balanceMicro":1000000}"""
+                "/v1/invite/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1","expiresAt":1}"""
+                else -> HttpStatusCode.OK to """{"grantedReviews":5,"expiresAt":5,"inviter":{"displayName":"Fabian"},"balanceMicro":0,"giftReviews":{"remaining":5,"expiring":[{"count":5,"expiresAt":5}]}}"""
             }
         }
-        val r = api.redeemSpot("tokenvalue123")
-        assertEquals(1_000_000, r.grantedMicro)
+        val r = api.redeemInvite("tokenvalue123")
+        assertEquals(5, r.grantedReviews)
+        assertEquals(5, r.giftReviews.remaining)
         assertEquals("Fabian", r.inviter.displayName)
         assertEquals(
             """{"token":"tokenvalue123","attestation":{"platform":"google","token":"tok-for-ch1","challenge":"ch1"}}""",
@@ -145,28 +148,28 @@ class FuelApiTest {
     }
 
     @Test
-    fun spotRedeemWithoutAttestationIsUnavailable() = runTest {
+    fun inviteRedeemWithoutAttestationIsUnavailable() = runTest {
         val api = api { req ->
             when (req.url.encodedPath) {
-                "/v1/spot/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1"}"""
+                "/v1/invite/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1"}"""
                 else -> HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
             }
         }
-        assertEquals("attestation_unavailable", assertFailsWith<FuelException> { api.redeemSpot("tokenvalue123") }.code)
+        assertEquals("attestation_unavailable", assertFailsWith<FuelException> { api.redeemInvite("tokenvalue123") }.code)
     }
 
     @Test
-    fun spotRedeemOnTheTestServerUsesATestTokenBoundToTheDevice() = runTest {
+    fun inviteRedeemOnTheTestServerUsesATestTokenBoundToTheDevice() = runTest {
         val log = mutableListOf<HttpRequestData>()
         val api = api(log = log) { req ->
             when (req.url.encodedPath) {
-                "/v1/spot/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1"}"""
+                "/v1/invite/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1"}"""
                 "/v1/config" -> HttpStatusCode.OK to """{"mode":"test"}"""
-                "/v1/spot/redeem" -> HttpStatusCode.OK to """{"grantedMicro":1000000,"expiresAt":5,"inviter":{"displayName":null},"balanceMicro":1000000}"""
+                "/v1/invite/redeem" -> HttpStatusCode.OK to """{"grantedReviews":5,"expiresAt":5,"inviter":{"displayName":null},"balanceMicro":0}"""
                 else -> HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
             }
         }
-        api.redeemSpot("tokenvalue123")
+        api.redeemInvite("tokenvalue123")
         val body = log.last().body.toByteArray().decodeToString()
         assertTrue(body.contains("\"token\":\"test:"), body)
     }

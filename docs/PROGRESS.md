@@ -10,10 +10,238 @@
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
 | 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); Feinschliff laufend |
 | 6 | Store-Release (App Store, Play Store) | offen |
-| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Session Z, seit Session AB über Stripe, Web 1:1, Store-Aufpreis offen, Aufschlag 28 %); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
-| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
+| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Feedback-Runde 4 (Session AF, 3.11.)
+**Erledigt:** Beispiele (Push/Pull/Legs) kommen nach „Daten löschen“ sofort zurück; kein schwarzer Screen mehr nach Workout löschen
+(doppelter Pop behoben); Kalender immer sichtbar, Trainingstage ohne Foto als gefüllter Punkt, bei Foto + Training kleiner Punkt;
+Gewichte nur noch Plus (± entfernt). Details in DECISIONS.md. Tests: `SamplesSeedTest`, `DiaryScreenTest`, `UiFeedbackTest` erweitert.
+
+### Bitte auf dem Handy testen (Session AF)
+1. Profil → Alle Daten löschen → Onboarding durchlaufen: Push, Pull, Legs sind sofort da. Ein Beispiel löschen, App neu starten: bleibt weg.
+2. Workout öffnen → Mülleimer → bestätigen: Du landest in der Workout-Liste, nicht auf schwarzem Screen. Auch Training im Verlauf, eigene Übung, Foto löschen.
+3. Fotos-Tab ohne Foto: Kalender ist da. Tag mit Training ohne Foto: gefüllter Punkt. Tag mit Foto + Training: Bild mit kleinem Punkt.
+4. Satz-Eingabe (Editor und Training): kein ±-Knopf, im Gewichtsfeld ist kein Minus möglich.
+5. Training starten (Weighted Pull-up, Englisch und Deutsch): Satzzeile einzeilig, Felder breit genug für „102.5“, Platzhalter „–“ statt senkrechtem „kg“, Zeit-Übung (Plank) ebenso.
+
+## Feedback-Runde 3: UI (Session AE, 3.11.)
+**Erledigt** (enthält PR #56: Push/Pull/Legs ab dem ersten Start, keine „Beispiel-Workouts hinzufügen“-Zeile mehr):
+- Übergänge: Ursache (700-ms-Standardüberblendung, Leisten springen, Doppel-Taps wirken) behoben; Tabs sofort, sonst kurzes Fade-through,
+  Taps während des Wechsels gesperrt. Details in DECISIONS.md.
+- Teilen/Löschen/Bearbeiten als Icons oben rechts (Workout, Training im Verlauf, eigene Übung, Foto); im Bearbeiten-Modus weder Teilen
+  noch Löschen. Workout-Screen: unten „Starten“, darunter gleich groß „Bearbeiten“.
+- Keine unterstrichenen Buttons mehr (`SmallButton`); Bestätigungs-Buttons ohne Rahmen, nur einer scharf, Tipp woanders entschärft.
+- Duo-Teaser und „Letzte Coach-Tipps“ entfernt; „Über overfit“: eigene MIT-Lizenz + Repo-Link, Bibliotheken getrennt (Apache 2.0).
+- Workout-Editor und Workout-Modus im Block-Layout (Fabians Screenshot): Übung als graue Fläche mit Bild, „?“, ⋮-Menü; Sätze als eigene
+  Zeilen mit großen Feldern; Satz nach links wischen löscht, mit „Rückgängig“.
+- Tests: `UiFeedbackTest` (Bestätigen, Wischen, Editor + Rückgängig, Übergang, Tab-Wechsel), bestehende Tests angepasst.
+
+### Bitte auf dem Handy testen (Session AE)
+1. Zwischen Screens wechseln (Workout öffnen, zurück, Verlauf → Training): kurzes ruhiges Ausblenden/Einblenden, kein Springen, kein
+   Flackern. Tabs wechseln sofort. Schnell doppelt auf „Zurück“ tippen: nur ein Screen zurück. Zurück-Wischgeste ausprobieren.
+2. Workout öffnen: oben rechts Teilen- und Mülleimer-Icon; Mülleimer → rote Pille „Wirklich löschen?“, darunter Hinweis zum Verlauf.
+   Unten großes „Starten“, darunter großes „Bearbeiten“.
+3. „Bearbeiten“: Kopf mit Name + Stift und „Bearbeitungsmodus“, kein Teilen/Löschen. Übungen als graue Blöcke (Chevron klappt, ⋮ mit
+   Ersetzen/Verschieben/Entfernen, „?“ am Bild öffnet Details). Satz nach links wischen → rot, löscht; „Rückgängig“ unten holt ihn zurück.
+4. Training starten: gleiche Blöcke und Satzzeilen, Satz wischen löscht, Haken weiter rechts.
+5. Irgendeinen roten oder grünen Bestätigungs-Button antippen (z. B. „Beenden“, „Training verwerfen“): kein Rahmen; danach woanders
+   tippen → zurückgesetzt; einen zweiten Bestätigungs-Button antippen → der erste setzt zurück.
+6. Kleine Buttons (Pausentimer −15 s/+15 s/Überspringen, Coach, Guthaben „Erneut versuchen“ …) sind graue Pillen, nichts unterstrichen.
+7. Verlauf → Training: Teilen/Löschen oben rechts. Fotos → Foto öffnen: Teilen/Löschen oben rechts. Eigene Übung: Stift + Mülleimer oben.
+8. Training-Tab: kein Duo, keine Coach-Tipps. Profil → Über overfit: „Open Source unter der MIT-Lizenz“, Link zum Repo, Bibliotheken separat.
+
+## Einladung intern, Guthaben vs. echte Euro, Bonus als Auswertungen (Session AD, 3.11.)
+**Erledigt:**
+- **„Spot“ intern entfernt:** API `/v1/invite/*`, Env `INVITE_*`, D1-Migration `0007_invite.sql` (Tabellen, Index, Ledger-Typen umbenannt,
+  Daten erhalten, Migrationstest), Kotlin `Invite*`, Dateien `invite.ts`/`InviteLink.kt`/`InviteScreens.kt`. Nur `overfit://invite#…` wird gelesen.
+  Deploy übernimmt das alte Signier-Secret automatisch.
+- **Einladungsbonus = geschenkte Coach-Auswertungen:** Neuer 5, Einladender 5 (nach der ersten Anfrage des Freundes). Eigener Zähler,
+  nur für Coach-Auswertungen mit Gemini Flash, vor dem Guthaben verbraucht, Verfall nach 180 Tagen. Chat und Claude zahlen aus dem Guthaben.
+  Grenzen: 1000 Auswertungen/Monat global, harte Grenze 50 € echte KI-Kosten/Monat, 0,25 € je Anfrage; alte Grenzen bleiben.
+  Kosten: docs/monetization.md „Einladungsbonus“ (0,014 € je Auswertung, ab 2027 0,028 €).
+- **Missbrauchsschutz Kontoumzug:** Geschenkte Einladungs-Auswertungen des aufgegebenen Kontos verfallen, Gekauftes wandert mit (Test).
+- **Guthaben vs. echte Euro:** App zeigt „4,20 € Guthaben · 5 geschenkte Auswertungen“, darunter „Gekauft: … € Guthaben · geschenkt: … €
+  Guthaben“, Verfall je Posten, „Geschenktes wird zuerst verbraucht.“ Preise nur als „Preis: 10,00 €“ bzw. „6,99 € (inkl. Store-Gebühr)“.
+  Buchungen: „bezahlt / geschenkt / verbraucht / erstattet / verfallen“, geschenkte Auswertungen als „+5 Auswertungen“ / „−1 Auswertung“.
+- **Admin-Report** (`/v1/admin/usage` → `finance`, `scripts/usage-report.mjs`): Einnahmen je Kanal brutto und nach Gebühren, offenes
+  Guthaben gekauft/geschenkt, KI-Kosten, Rohgewinn. Geschenktes zählt nie als Einnahme.
+- Tests: Backend 134 (u. a. `invite.test.ts`, `migration0007.test.ts`, Finanzbericht), Shared/App-Tests angepasst; `OwnKeyPrivacyTest` grün.
+**Offen:** echte Einladung zwischen zwei Handys braucht weiter Attestierung (Store-Build) oder den Testserver.
+
+### Von Fabian zu tun (Session AD)
+1. **Actions → Backend deployen → Run workflow**, `mode` = test (spielt Migration 0007 ein). Sonst nichts: Secrets bleiben, das alte
+   Signier-Secret wird automatisch übernommen.
+2. Neues APK aus „Overfit latest“ installieren.
+
+### Bitte auf dem Handy testen (Session AD)
+1. **Profil → Guthaben:** oben „X € Guthaben“; falls du noch Euro-Einladungsboni oder Test-Gutschrift hast, darunter „Gekauft: … ·
+   geschenkt: …“ und „Geschenktes wird zuerst verbraucht.“
+2. **Buchungen:** jede Zeile sagt „bezahlt“, „geschenkt“ oder „verbraucht“ vor dem Datum; Beträge als „… € Guthaben“.
+3. **Freunde einladen:** Text „Ihr bekommt beide 5 Coach-Auswertungen geschenkt …“ und der Hinweis auf Gemini 3.6 Flash.
+4. **Einladung einlösen** (zweites Handy oder Demo): Reveal zählt bis **5** hoch, darunter „Coach-Auswertungen geschenkt“; danach im
+   Guthaben „… € Guthaben · 5 geschenkte Auswertungen“ und „5 Auswertungen gültig bis …“.
+5. **Auswertung mit Gemini 3.6 Flash** nach dem Einlösen: Kostenzeile „geschenkte Auswertung“, Zähler sinkt auf 4, Euro bleibt gleich.
+   Ein Chat kostet dagegen Guthaben. Der Einladende hat danach 5 geschenkte Auswertungen.
+6. **Coach-Tab und Einstellungen:** Zugang zeigt „… € Guthaben“ (mit geschenkten Auswertungen, falls vorhanden).
+
+## Stripe statt Paddle, Store-Aufpreis offen, Aufschlag 28 % (Session AB, 3.11.)
+**Erledigt:**
+- **Stripe Checkout** (Testmodus) hinter `PaymentProvider` (`backend/src/payments/stripe.ts`), Paddle entfernt. Gehostete Checkout-Seite,
+  Zahlarten aus dem Stripe-Dashboard, kein Stripe Tax. Webhook mit eigener Signaturprüfung (WebCrypto, 300 s, mehrere `v1`, `livemode`-Abgleich):
+  `checkout.session.completed`/`async_payment_succeeded`, `charge.refunded` (kumulierte Teil-Erstattungen), `charge.dispute.created`,
+  idempotent. Codes laufen ebenfalls über Stripe. Migration `0006_stripe.sql` (nur neue Spalten: PaymentIntent, Land, bezahlter Betrag).
+- **Kleinunternehmer:** „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ (EN sinngemäß) auf Kaufseite, im Stripe-Checkout und in der
+  Bestätigung; optional Stripe-Rechnung mit Fußzeile (`STRIPE_INVOICES=on`). Schwellen-Hinweis in docs/monetization.md; `webRevenue` im
+  Admin-Usage-Report und in `scripts/usage-report.mjs` (Web-Umsatz je Jahr, Land, gesamt, Warnung ab 80 %).
+- **Preise je Kanal:** Web 1:1, Pakete **5/10/20/50 €** (10 € vorgewählt). Store mit offenem Aufpreis: **5 € Guthaben für 6,99 €, 10 € für 13,99 €**.
+  **`MARKUP_BP = 2800` (28 %)** statt 69 %. Rechnung mit Tabellen: docs/monetization.md „Rechnung (Session AB)“; `pricing.test.ts` prüft jedes
+  Paket ≥ 5 % vom Netto (Store bei 19 % und 27 % USt), keine Zahlart im Verlust, Preisstufen und den Aufschlag.
+- **App:** Guthaben zeigt je Kanal beide Werte: „5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)“ (App Store und Google Play) und unter „Im Web“
+  „10,00 € Guthaben · 10,00 €“ (nur wo „Im Web aufladen“ per Flag sichtbar ist). Texte ohne „69 %“, der Prozentwert kommt aus `/v1/config`.
+- **Webseite:** Kaufseite leitet auf Stripe weiter (Abbruch kehrt mit gemerktem Kauflink zurück), `web/preise/` mit Beispiel Web und Store.
+- **Deploy:** Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (Produktion: `STRIPE_LIVE_…`), Zusammenfassung nennt Webhook-URL und
+  Ereignisse; fehlen sie oder passt der Schlüssel nicht zum Modus, bleibt der Web-Kauf aus, mit Hinweis.
+- Tests: Backend 126 (web, pricing, revenue, money, transparency u. a.), `web/test/guthaben.mjs` (26 Prüfungen), `WebCreditTest`,
+  `FuelDemoTest`, `WebPurchaseTest`, `CostEstimateTest`; `OwnKeyPrivacyTest` unverändert.
+**Offen:** echter Lauf gegen Stripe im Testmodus (gemockt geprüft); Live: Kontoaktivierung, Rechtstexte, juristische Prüfung.
+
+### Von Fabian zu tun (Session AB, alles im Browser)
+Ausführlich mit Pfaden: backend/README.md → „Web-Kauf (Stripe, Testmodus)“.
+1. **dashboard.stripe.com/register** → Konto anlegen, E-Mail bestätigen. Oben **Testmodus** einschalten.
+2. **Einstellungen → Unternehmen → Öffentliche Unternehmensangaben:** Name `overfit`, Support-E-Mail, Website `https://bigfire3.github.io/overfit/`,
+   Statement descriptor `OVERFIT`.
+3. **Einstellungen → Billing → Rechnungsvorlage → Standard-Fußzeile:** `Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.` → Speichern.
+   **Einstellungen → Unternehmen → Kunden-E-Mails:** „Erfolgreiche Zahlungen“ an.
+4. **Einstellungen → Zahlungen → Zahlungsmethoden:** Karten an; optional Apple Pay, Google Pay, Link, Klarna, SEPA, EPS, iDEAL, Bancontact.
+5. **Entwickler → API-Schlüssel:** Geheimschlüssel `sk_test_…` kopieren.
+6. **Entwickler → Webhooks → Endpunkt/Ziel hinzufügen:** URL = Repo-Variable `OVERFIT_BACKEND_URL` + `/v1/webhooks/payment`; Ereignisse
+   `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, `charge.dispute.created` → Speichern →
+   Signaturgeheimnis `whsec_…` kopieren.
+7. **GitHub → Settings → Secrets and variables → Actions → New repository secret:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+   Die alten `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_CLIENT_TOKEN` und die Variable `PADDLE_ENV` löschen.
+8. **Actions → Backend deployen → Run workflow**, `mode` = test. Zusammenfassung: „Web-Kauf: An, Testmodus (Stripe)“, Webhook-URL = Schritt 6.
+9. **Actions → Web veröffentlichen (GitHub Pages) → Run workflow.**
+10. Neues APK aus „Overfit latest“ installieren, dann testen (unten).
+
+**Für echte Zahlungen später:** Stripe-Konto aktivieren (Einzelunternehmen, Identität, Bankkonto, Steuernummer, Kleinunternehmer), im
+Live-Modus Schritte 2–6 wiederholen, GitHub-Secrets `STRIPE_LIVE_SECRET_KEY` und `STRIPE_LIVE_WEBHOOK_SECRET`, Backend deployen mit
+`mode` = production; Impressum, Datenschutz, AGB/Widerruf (Platzhalter auf der Kaufseite), juristische Prüfung; Schwellen mit dem
+Steuerberater klären (`scripts/usage-report.mjs` warnt ab 80 %).
+
+### Bitte auf dem Handy testen (Session AB, nach den Schritten oben)
+1. Profil → Guthaben: unter „App Store und Google Play“ „5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)“ und „10,00 € Guthaben · 13,99 €
+   (inkl. Store-Gebühr)“; unter „Im Web“ 5/10/20/50 € je „… Guthaben · …“ 1:1. Darunter der Satz mit „28 % Aufschlag“.
+2. „Wie setzen sich die Preise zusammen?“ → Seite zeigt Web-Beispiel (10 € → 0,74 € Gewinn) und Store-Beispiel (6,99 €).
+3. Coach-Einstellungen → Modell: Schätzung ≈ 1,8 ct je Auswertung (Gemini 3.6 Flash), Hinweis nennt 28 %.
+4. „Im Web aufladen“ → Kaufseite: 5/10/20/50 €, 10 € vorgewählt, „Gemäß § 19 UStG …“, „Testmodus“. 5 € wählen → „Weiter zur Zahlung“ →
+   Stripe-Seite (Testmodus-Banner, §-19-Satz unter dem Bezahlknopf) → Karte `4242 4242 4242 4242`, Datum in der Zukunft, CVC beliebig →
+   „Danke! 5 € Guthaben …“ mit §-19-Satz → „Zurück zur App“ → Saldo +5,00 €, Buchung „Aufladung im Web“.
+5. Abbruch: auf der Stripe-Seite „Zurück“ → Kaufseite „Zahlung abgebrochen, es wurde nichts berechnet.“, weiter „Guthaben aufladen“.
+6. Erstattung: Stripe → Zahlungen → Kauf → Erstatten (z. B. 2 €) → Saldo −2 €, Buchung „Erstattung“; Rest erstatten → nochmal −3 € (nie unter 0).
+7. Am Rechner Kaufseite ohne App → Code kaufen → Code in der App einlösen (wie Session Z).
+
+## Marge bei 1:1-Guthaben (Session AA, 3.11.)
+**Erledigt:**
+- Rechnung in docs/monetization.md („Rechnung“, mit Tabellen): USt 19 %, Paddle 5 % + 0,50 € (an paddle.com/pricing geprüft), Store 15 % auf Netto nach USt, Einladungsboni/Startguthaben als 10 % vom Netto, Zielgewinn 7 %. Ergebnis **`MARKUP_BP = 6900` (69 %)**, ein Wert für alle Modelle; Store ist der Engpass.
+- **Web-Pakete 10/20/50 €** (5 € hätte den Aufschlag auf 74,5 % gehoben); Store-Pakete `overfit.fuel.5`/`.10` bleiben. **Gutschrift überall = Preis**, Store-Formel (doppelter Aufschlag, ohne USt) entfernt, `STORE_FEE_BP` entfällt.
+- App: Kostenschätzungen kommen weiter aus `/v1/config` (jetzt mit 69 %); unter Guthaben ein ehrlicher Satz plus Link „Wie setzen sich die Preise zusammen?“ → `web/preise/` (DE+EN).
+- Tests: `backend/test/pricing.test.ts` (Break-even je Kanal/Paket, Schätzung), Config-, Kauf- und Abrechnungstests angepasst.
+
+**Bitte auf dem Handy testen (nach Merge, neue APK):**
+1. Profil → Guthaben: Pakete zeigen „Paket 5 € → 5 € Guthaben“, darunter der Satz zum 69-%-Aufschlag und der Link „Wie setzen sich die Preise zusammen?“ → öffnet die Seite (erst nach dem Pages-Deploy erreichbar).
+2. Coach-Einstellungen → Modell: Schätzung „≈ 2,4 ct“ je Auswertung (Gemini 3.6 Flash), Hinweistext nennt 69 %.
+3. „Im Web aufladen“ (nur Testmodus/Sideload): Kaufseite zeigt 10/20/50 €.
+
+## Guthaben im Web kaufen, Testmodus (Session Z, 3.11.)
+**Erledigt:**
+- **Backend:** `POST /v1/purchase/web-link` (signiert, Token 15 min, einmalig), öffentliche Endpunkte der Kaufseite
+  (`/v1/web/session`, `/v1/web/checkout`, `/v1/web/orders/<id>`), `POST /v1/webhooks/payment` mit Paddle-Signaturprüfung,
+  idempotente Buchung (Quelle `web`, Paddle-Transaktions-ID), Rückerstattung/Chargeback bis höchstens 0 mit Vorfall-Markierung,
+  Guthaben-Codes (`POST /v1/codes/redeem`). `/v1/config` → `webPurchase` (an/aus, Testmodus, Kanäle, Pakete). Migration `0004_web_purchase.sql`.
+  Paddle hinter `PaymentProvider`. Pakete 5/10/20 €, **Guthaben = Preis** (Begründung und offene Margenfrage: DECISIONS, monetization.md).
+- **Webseite** `web/guthaben/`: Paketwahl, „Testmodus – keine echte Zahlung“, Paddle-Checkout, Erfolgsseite mit „Zurück zur App“
+  (`overfit://guthaben`), ohne App „Guthaben-Code kaufen“ (Code auf der Erfolgsseite), Rechtstexte als „folgt vor dem Start“ markiert.
+- **App:** Guthaben → „Im Web aufladen“ (öffnet den Kauflink im Browser; Kontostand lädt neu beim Zurückkommen und per Deep Link),
+  „Code einlösen“, neue Buchungsarten (Aufladung im Web, Code eingelöst, Erstattung, Rückbuchung). Knopf nur, wenn `/v1/config` ihn für
+  den Kanal freigibt: seitlich installierte APK an, Store-Builds (Play-Installer, iOS) aus.
+- **Deploy-Workflow:** Secrets `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_CLIENT_TOKEN` (fehlen sie, bleibt der Web-Kauf aus,
+  Hinweis in der Zusammenfassung); Zusammenfassung nennt Webhook-URL und Status. Pages-Workflow schreibt die Backend-Adresse in die Kaufseite.
+- Tests: `backend/test/web.test.ts` (Token, Signatur, Idempotenz, Rückerstattung, Chargeback, Codes, Config, Umzug),
+  `web/test/guthaben.mjs` (Kaufseite im Browser), `WebPurchaseTest` (common), `WebCreditTest` + `CreditReturnLinkTest` (Robolectric);
+  `OwnKeyPrivacyTest` unverändert grün.
+**Offen:** echter Lauf gegen die Paddle-Sandbox (nur gemockt geprüft); Live-Betrieb braucht Paddle-Live-Konto, Rechtstexte,
+juristische Prüfung und die Margenentscheidung.
+
+### Von Fabian zu tun (Session Z, alles im Browser)
+1. **sandbox-login.paddle.com/signup** → Sandbox-Konto anlegen (kostenlos, keine Prüfung).
+2. Paddle → **Checkout → Checkout settings** → *Default payment link*: `https://bigfire3.github.io/overfit/guthaben/` → Save.
+3. Paddle → **Developer tools → Authentication**: *API keys* → **New API key** (Name `overfit-test`, Recht *Transactions: Write*) → Wert kopieren.
+   Dann *Client-side tokens* → **New client-side token** → Wert kopieren.
+4. Paddle → **Developer tools → Notifications → New destination**: Typ *Webhook*, URL = deine Worker-Adresse (Repo-Variable
+   `OVERFIT_BACKEND_URL`) + `/v1/webhooks/payment`, Ereignisse `transaction.completed`, `adjustment.created`, `adjustment.updated` → Save →
+   Ziel öffnen → *Secret key* kopieren.
+5. GitHub → Settings → Secrets and variables → Actions → **New repository secret**: `PADDLE_API_KEY`, `PADDLE_CLIENT_TOKEN`, `PADDLE_WEBHOOK_SECRET`.
+6. Actions → **Backend deployen** → Run workflow → `mode` = test. Zusammenfassung: „Web-Kauf: An, Testmodus“ und die Webhook-URL (= Schritt 4).
+7. Actions → **Web veröffentlichen (GitHub Pages)** → Run workflow (Kaufseite bekommt die Backend-Adresse).
+8. Neues APK aus „Overfit latest“ installieren, dann testen (unten). Testkarte: `4242 4242 4242 4242`, Ablauf in der Zukunft, CVC `100`.
+
+### Bitte auf dem Handy testen (Session Z, nach den Schritten oben)
+1. Profil → Guthaben (Opt-in falls eigener Key) → unter „Aufladen“ steht „Im Web aufladen“ mit „Testmodus – keine echte Zahlung“.
+2. Antippen → Browser öffnet die Kaufseite: „Guthaben aufladen“, Testmodus-Hinweis, 5/10/20 € (10 € vorgewählt). 5 € wählen →
+   „Weiter zur Zahlung“ → Paddle-Fenster → Testkarte → bezahlen → „Danke! 5 € Guthaben sind auf deinem Konto.“
+3. „Zurück zur App“ → Guthaben-Screen öffnet sich, Saldo +5,00 €. Buchungen: „Aufladung im Web +5,00 €“.
+4. Gleichen Link nochmal öffnen (Browser-Verlauf): „Mit diesem Kauflink wurde schon bezahlt“ und Code-Kauf angeboten.
+5. Am Rechner `https://bigfire3.github.io/overfit/guthaben/` öffnen → „Guthaben-Code kaufen“ → bezahlen → Code wird angezeigt →
+   in der App Guthaben → „Code einlösen“ → Code eingeben → „5,00 € Guthaben gutgeschrieben.“ Zweites Mal: „schon eingelöst“.
+6. Erstattung: Paddle-Sandbox → Transactions → Kauf öffnen → Refund (voll) → nach Freigabe sinkt der Saldo um 5 € (nie unter 0),
+   Buchung „Erstattung“.
+## Ehrliche Begriffe und volle Kostentransparenz (Session Y, 3.11.)
+**Erledigt:**
+- **„Fuel“ heißt jetzt „Guthaben“** (EN „Credit“) in UI, README, SPEC, Store-Texten, backend/README, API-Doku und Workflow-Meldungen. Code-Bezeichner (`Fuel*`) und Store-Produkt-IDs bleiben (Begründung in DECISIONS.md).
+- **Echte Modellnamen statt Standard/Pro/Lite:** Coach → Einstellungen → „Modell für deinen Coach“ listet „Gemini 3.6 Flash (Google)“ und „Claude Sonnet 5.5 (Anthropic)“ mit geschätzten Kosten je Auswertung und Chat-Nachricht (in Cent), dazu „Mit deinem Guthaben (…) reicht das für etwa N Auswertungen“ und der Preis von „Mit KI ausfüllen“ (Llama 3.1 8B (Cloudflare)). Namen, Anbieter, Preise und typische Token-Mengen kommen aus `GET /v1/config`; Rechenweg in DECISIONS.md „Kostenschätzung“.
+- **Unter jeder Antwort** (Coach-Auswertung und Chat): Modell · echte Kosten · Guthaben. Buchungen zeigen das Modell. Bei Ausweichung steht, welches Modell geantwortet hat und dass der Preis des gewählten berechnet wurde.
+- **Foto-Anfragen im AI Gateway:** laut Doku geht „nur Metadaten“ (`cf-aig-collect-log-payload: false`): keine Inhalte, aber Tokens/Kosten/Modell/Dauer/Status erscheinen. Umgestellt.
+- **Inhaltsfreie Auswertung:** Migration `0004` (Anbieterkosten, Ausweichung, Foto je Buchung), `GET /v1/admin/usage?from=&to=` (ADMIN_SECRET), Skript `backend/scripts/usage-report.mjs`. Marge in docs/monetization.md offen beschrieben.
+- Room v7 (AutoMigration 6→7: `servedModel`, `fallbackFrom`), Migrationstest. Tests: Kostenschätzung, Formatierung, Modellnamen, Transport/Ausweichung, Backend (Config-Namen, Admin-Usage, Gateway-Header, Ausweichungs-Meta), UI-Tests auf „Guthaben“ umgestellt; OwnKeyPrivacyTest grün.
+
+**Offen:**
+- Beim Deploy: Migration `0004` wird vom Deploy-Workflow wie die anderen angewendet. Für `usage-report.mjs` muss `ADMIN_SECRET` im Worker gesetzt sein.
+- Die Schätzwerte (Token je Aufgabe) sind aus den Prompt-Bausteinen berechnet; bei großen Prompt-Änderungen neu messen.
+
+**Bitte auf dem Handy testen (Session Y):**
+1. Profil → Guthaben: Titel „Guthaben“, „Guthaben aufladen“, Demo ansehen → Buchungen: Modellnamen (kein Standard/Pro), die oberste Buchung nennt das Ersatzmodell
+2. Coach → Einstellungen (mit Guthaben als KI): „Modell für deinen Coach“, beide Modelle mit Cent-Kosten, „reicht für etwa N Auswertungen“, Auswahl umschalten (Haken wandert)
+3. Eine Auswertung bzw. Chat-Frage mit Guthaben: unter der Antwort „Modell · Kosten · Guthaben“
+4. „Mit KI ausfüllen“ bei einer eigenen Übung: nennt Llama 3.1 8B in den Einstellungen mit Preis
+5. Nirgends mehr „Fuel“, „Standard“ (als Modell), „Pro“, „Lite“ sichtbar
+
+## Fuel mit mehreren KI-Anbietern und AI Gateway (Session X, 3.11.)
+**Erledigt:**
+- **Stufen statt fester Anbieter:** `standard` = Gemini 3.6 Flash (Voreinstellung: Coach-Auswertung, Chat, Vorschläge), `pro` = Claude Sonnet 5.5, `lite` = Llama 3.1 8B bei Workers AI („Mit KI ausfüllen“). Die App schickt weiter das Anthropic-Format mit `model` = Stufe, das Backend übersetzt (Gemini native API mit JSON-Schema und Bildern, Workers AI über das `AI`-Binding, nur Text) und antwortet im Anthropic-Format. `lite` weist Bilder mit `400 images_not_supported` ab.
+- **Abrechnung:** Preistabelle in µ€ je MTok in `backend/src/providers.ts` (Workers AI aus Neurons umgerechnet, Gemini-Preiserhöhung zum 1.1.2027 hinterlegt). Reservieren/Abrechnen, Marge und Store-Gebühr unverändert. Jede Verbrauchsbuchung hat Modell und Stufe (Migration `0003_ledger_tier.sql`).
+- **Ausweichen:** Ausfall (5xx, 429, Zeitüberschreitung, Netzwerk) → `standard` ↔ `pro`, `lite` → `standard`. Der Nutzer zahlt nie mehr als die gewählte Stufe.
+- **AI Gateway:** alle Anbieter-Aufrufe laufen über `overfit` bzw. `overfit-test` (Protokolle, Kosten, Rate-Limit 600/min). Fotos-Anfragen werden nicht protokolliert. Der Deploy-Workflow prüft die Token-Rechte und legt das Gateway idempotent an; fehlen Rechte, bricht er mit Anleitung ab.
+- **Secrets:** neu `GEMINI_API_KEY`; `ANTHROPIC_API_KEY` ist optional (fehlt er, gibt es kein Pro). Mindestens einer ist Pflicht.
+- **App:** Coach-Tab → Coach-Einstellungen → „Coach-Qualität: Standard / Pro“ mit Preishinweis (nur mit Fuel; Pro nur, wenn der Server es anbietet). „Mit KI ausfüllen“ nutzt mit Fuel `lite`. Eigener Key: unverändert, null Backend-Anfragen (OwnKeyPrivacyTest grün).
+- Tests: `backend/test/tiers.test.ts` (jede Stufe, Fehler, Ausweichen, Rückerstattung, Gateway, Config, Preistabelle), App: `CoachTransportTest` (Stufenauflösung, Cache), `ExerciseAutofillTest`.
+**Offen:** Echte Läufe gegen Gemini, Workers AI und das Gateway sind nur gemockt geprüft; der erste Deploy-Lauf zeigt, ob alles passt.
+
+### Von Fabian zu tun (Session X)
+1. **Cloudflare-Token erweitern:** dash.cloudflare.com → Profil → My Profile → API Tokens → beim bestehenden Deploy-Token **Edit** → unter Permissions zwei Zeilen ergänzen: **Account · Workers AI · Read** und **Account · AI Gateway · Edit** → Continue to summary → Update Token. Der Wert bleibt gleich, kein GitHub-Secret ändern. (Neuer Token: alle sechs Rechte, siehe `backend/README.md`.)
+2. **Gemini-Key:** aistudio.google.com/apikey → Create API key (Projekt mit Abrechnung, Ausgabenlimit im Google-Cloud-Projekt setzen) → GitHub → Settings → Secrets and variables → Actions → New repository secret `GEMINI_API_KEY`.
+3. `ANTHROPIC_API_KEY` kann bleiben (dann gibt es Pro) oder fehlen (nur Standard und Lite).
+4. Actions → **Backend deployen** → Run workflow → `mode` = test. Die Zusammenfassung nennt Gateway und verfügbare Stufen.
+5. Kosten und Protokolle: dash.cloudflare.com → AI → AI Gateway → `overfit-test`.
+
+### Bitte auf dem Handy testen (Session X, nach dem Deploy)
+1. Fuel als KI-Zugang, Coach-Tab → Coach-Einstellungen: „Coach-Qualität“ mit Standard (vorgewählt) und Pro, darunter der Preishinweis („Pro kostet … etwa das 3-Fache“). Ohne Anthropic-Key steht dort nur „Mit Fuel antwortet Gemini Flash (Standard).“
+2. Workout auswerten lassen (Standard): Auswertung kommt, Kosten ≈ 1–2 ct. Dann Pro wählen, nochmal: Kosten höher (≈ 4 ct). Fuel → Buchungen zeigt beide Abbuchungen.
+3. Coach-Chat mit Standard: Antwort kommt, Kosten darunter. Mit Körperfoto (Foto-Freigabe an): Antwort bezieht sich aufs Foto.
+4. Eigene Übung → „Mit KI ausfüllen“: Felder werden gefüllt, Kosten im Bruchteil-Cent-Bereich.
+5. Eigener Key statt Fuel: alles wie vorher, Coach-Einstellungen zeigen das Modellfeld statt „Coach-Qualität“.
 
 ## Deploy-Knopf und Datenschutz-Garantie (Session V, 3.11.)
 **Erledigt:**
@@ -25,8 +253,8 @@
 
 ### Von Fabian zu tun: Backend im Browser deployen (Details: `backend/README.md`)
 1. cloudflare.com → Konto anlegen (Free). Dashboard → **Workers & Pages** → workers.dev-Subdomain wählen. **R2 Object Storage** aktivieren (Free).
-2. **Account ID** kopieren (Workers & Pages, rechts). **API-Token**: Profil → API Tokens → Create Custom Token mit *Workers Scripts: Edit*, *D1: Edit*, *Workers R2 Storage: Edit*, *Account Settings: Read* → kopieren.
-3. GitHub → Settings → Secrets and variables → Actions → Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ANTHROPIC_API_KEY`.
+2. **Account ID** kopieren (Workers & Pages, rechts). **API-Token**: Profil → API Tokens → Create Custom Token mit *Workers Scripts: Edit*, *D1: Edit*, *Workers R2 Storage: Edit*, *Account Settings: Read*, *Workers AI: Read*, *AI Gateway: Edit* → kopieren.
+3. GitHub → Settings → Secrets and variables → Actions → Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `GEMINI_API_KEY` und/oder `ANTHROPIC_API_KEY` (Session X).
 4. Actions → **Backend deployen** → Run workflow → `mode` = test → in der Zusammenfassung die Worker-URL kopieren.
 5. Settings → Secrets and variables → Actions → **Variables** → `OVERFIT_BACKEND_URL` = diese URL.
 6. Nächsten App-Build abwarten (Merge nach main oder Actions → Android → Run workflow), APK aus „Overfit latest“ installieren.
@@ -36,7 +264,7 @@ Kosten: Cloudflare Free reicht; KI-Kosten nur bei Fuel (Test: höchstens 20 € 
 ### Bitte auf dem Handy testen (Session V)
 1. Eigener Key (Profil → KI verbinden), Backend-URL gesetzt: Coach-Tab → „KI-Zugang“ zeigt „Eigener Key · …“ und darunter „Deine Daten gehen direkt an <Anbieter>, nicht über overfit-Server.“
 2. Profil → „Fuel“ zeigt keinen Saldo; Tippen zeigt „Fuel ist optional …“ mit „Fuel ansehen“; erst das verbindet mit dem Server.
-3. Mit Testserver: Fuel ansehen → „Testserver“-Hinweis, 1,00 € Saldo; „Fuel nutzen“ im Coach → Antwort kostet Cent-Beträge. Spot einlösen klappt ohne Store-Konto.
+3. Mit Testserver: Fuel ansehen → „Testserver“-Hinweis, 1,00 € Saldo; „Fuel nutzen“ im Coach → Antwort kostet Cent-Beträge. Einladung einlösen klappt ohne Store-Konto.
 
 ## main wieder grün: Wackel-Tests nach #39 (Session S, 3.11.)
 **Erledigt:**
@@ -125,7 +353,7 @@ Erledigt:
 **Erledigt:** Button-Hierarchie (Primary/Secondary/Tertiary/Destructive/Confirm), 48/40-dp-Höhen, Chevron + Pressed-State für klickbare Zeilen, Chips/Segmente auf `surface`, schlankere Workout-Ansicht (ein Kopf, kompakter Fuß, 48-dp-Haken in Grün), Bestätigungsmuster mit Farbe überall, Diary zeigt mindestens 4 Monate inkl. leere. Vorher/Nachher-Screenshots: `docs/screenshots/before|after` (Test `ScreenshotTest`, nur mit `SCREENSHOT_DIR=…`). Mängelliste in DECISIONS.md.
 
 ### Bitte auf dem Handy testen: UI-Feinschliff
-1. Training-Tab: Workout-Zeilen und Coach/Duo haben Chevron; beim Drücken färbt sich die Zeile grau.
+1. Training-Tab: Workout-Zeilen und Coach/Duo (beide entfernt 3.11., Fabian) haben Chevron; beim Drücken färbt sich die Zeile grau.
 2. Workout öffnen: „Bearbeiten“ und „Teilen“ sind graue Buttons.
 3. Training starten: Kopf ist eine schmale Zeile (Minimieren, Name + Uhr, „Beenden“). Mehr Platz für Sätze, oben kaum Leerraum.
 4. Satz abhaken: großer Kreis, danach grün. „Beenden“ antippen: Button wird grün mit „Beenden? Nochmal tippen“, Name weicht kurz.
@@ -219,7 +447,7 @@ Erledigt: Minimieren-Knopf im Workout (Pfeil runter) und System-Zurück minimier
 5. Minimiert in anderen Tab, Bildschirm sperren, Benachrichtigung tippen → maximiertes Training. App aus den letzten Apps wischen und neu öffnen → Training maximiert
 
 ## Morgen-Testliste für Fabian (3.11.)
-Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Fuel/Spot); die Demo in 36–38 braucht keinen Server.
+Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Guthaben/Einladungen); die Demo in 36–38 braucht keinen Server.
 Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).
 
 **Installieren und starten**
@@ -265,7 +493,7 @@ Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft di
 28. „Als Datei teilen“ → `.overfit` antippen → Overfit öffnet die Vorschau
 29. „KI-Vorlage kopieren“ → in ChatGPT/Claude/Gemini einfügen, Fragen beantworten, ```json-Antwort kopieren → „Aus Zwischenablage importieren“
 30. Leere Zwischenablage / beliebiger Text → verständliche Fehlermeldung
-31. Start ganz unten: „Duo · bald“ → Erklärtext, keine Eingabe
+31. (entfernt 3.11., Fabian; später evtl.) Start ganz unten: „Duo · bald“ → Erklärtext, keine Eingabe
 
 **KI-Chat, Kontext kopieren**
 32. Profil → KI-Coach → Gemini (oder Claude/ChatGPT): „Kontext kopieren“ → in Notizen einfügen: Profil, letzte Trainings, ```json-Block
@@ -273,11 +501,11 @@ Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft di
 34. Mit Backend: „KI-Chat verbinden“ → Zustimmen → Kopplungscode, Connector im Chat anlegen, „Plane mir ein Push-Training“ → Eingang auf dem Start-Tab → Vorschau → Übernehmen
 35. „Trennen“ und „KI-Chat trennen“ (zweimal tippen) → Chat hat keinen Zugriff mehr
 
-**Fuel und Spot**
+**Guthaben und Einladungen**
 36. Profil → „Fuel · startet bald“ → „Demo ansehen“: „Fuel · 4,20 €“, Pakete („Bald im Store“), Buchungen, Wiederherstellungscode
-37. „Freund spotten“: QR mit rotierendem Code, Name; „Ich wurde gespottet“: beliebigen Link einfügen → Einlösen → schwarz, zwei Pulse,
-    Zahl zählt 0,00 → 1,00 €, „Spot von Fabian“, kräftiger Puls; Tippen schließt
-38. „Demo beenden“ → Fuel zeigt wieder „startet bald“. (Echtes Fuel/Spot erst mit Backend, Punkt 1 unten)
+37. „Freunde einladen“ (Profil → Guthaben): QR mit rotierendem Code (`overfit://invite#…`), Name; „Einladung einlösen“: beliebigen Link einfügen → Einlösen → schwarz, zwei Pulse,
+    Zahl zählt 0,00 → 1,00 €, „Einladung von Fabian“, kräftiger Puls; Tippen schließt
+38. „Demo beenden“ → Fuel zeigt wieder „startet bald“. (Echtes Guthaben/Einladungen erst mit Backend, Punkt 1 unten)
 
 **Backup und Löschen**
 39. Profil → „Backup exportieren“ → in Dateien/Drive sichern (Datei lässt sich als ZIP öffnen, kein API-Key drin)
@@ -291,7 +519,7 @@ Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
    `wrangler.jsonc`), Migrationen (inkl. `0002_chat.sql`), Secrets `ANTHROPIC_API_KEY`, `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY`
    (32 Zufallsbytes Base64url, nie ändern), R2 aktivieren + `wrangler r2 bucket create overfit-chat-photos`, `npm run deploy`. Danach
    GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL. Ohne das zeigt die App „startet bald“ + Demo
-   (Fuel, Spot, KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
+   (Guthaben, Einladungen, KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
 2. **GitHub Pages aktivieren** (Repo → Settings → Pages → Source „GitHub Actions“; oder Actions → „Web veröffentlichen“ → Run workflow):
    Web-Fallback `https://bigfire3.github.io/overfit/` und Teilen-Seite `/t` für Links ohne App
 3. **KI-Chat-Connectoren eintragen** (nach 1.): Claude → Connectors → Custom Connector, ChatGPT → Entwicklermodus → Connector,
@@ -301,7 +529,7 @@ Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
 5. **Datenschutzerklärung vor dem Store-Start** um KI-Chat-Verbindung (Art. 9 DSGVO, Opt-in) und Daten an Chat-Anbieter ergänzen
 6. **Store-Konten (Phase 6/7):** Google-Play-Console und Apple-Developer-Konto, Play Billing / StoreKit, Play Integrity (Cloud-Projekt), App Attest,
    Server-Prüfer in `backend/src/verifiers.ts`. Store-Texte DE/EN liegen als Entwurf in `docs/store/store-listing.md`
-7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Spot-Links
+7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Einladungs-Links
    ohne installierte App
 8. iOS: Kamera, Fotoauswahl, Dateiauswahl und Haptik sind nur in der iOS-CI gebaut, nicht auf einem echten iPhone getestet
 
@@ -457,24 +685,24 @@ Offen / Hinweise:
    derselben Übung zeigt „Letztes Mal: …“
 9. Training starten und „Training abbrechen“ (zweimal) → verworfen
 
-## Nacht 3.11. – Fuel & Spot in der App (Session D)
+## Nacht 3.11. – Guthaben & Einladungen in der App (Session D)
 Fertig:
 - Geräte-Identität (Keystore / Secure Enclave), signierte Anfragen nach `docs/backend-api.md`, `FuelApi` (Ktor) mit Re-Registrierung und Zeitkorrektur, Fehlercodes
 - Profil → **Fuel**: Saldo („Fuel · 4,20 €“), verfallendes Guthaben, Pakete 5/10 € („Bald im Store“), Buchungen, Wiederherstellungscode (erzeugen, kopieren, auf neuem Handy eingeben)
-- **Spot**: „Freund spotten“ (Name, QR mit rotierendem Token, Haarlinien-Fortschritt), „Ich wurde gespottet“ (Android: QR scannen oder Link einfügen; iOS: Kamera-App öffnet den Link), Reveal mit Haptik
+- **Einladungen**: „Freunde einladen“ (Name, QR mit rotierendem Token, Haarlinien-Fortschritt), „Einladung einlösen“ (Android: QR scannen oder Link einfügen; iOS: Kamera-App öffnet den Link), Reveal mit Haptik
 - **Demo** (ohne Server): Profil → Fuel → „Demo ansehen“; Backend-URL per CI-Variable `OVERFIT_BACKEND_URL`, versteckter Override (7× Version in „Über“)
 - Fuel als Option im KI-Zugang (`FuelProvider`); Tests: SHA/Signatur/Testvektor, Beträge, Reveal, Fuel-Client (MockEngine), QR, UI-Durchlauf Demo
 
-### Von Fabian zu tun (Fuel/Spot)
+### Von Fabian zu tun (Guthaben/Einladungen)
 1. Backend deployen (siehe oben), dann GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL anlegen. Ohne sie zeigt die App „startet bald“ + Demo.
 2. Play-/Apple-Konten für echte Käufe (Play Billing / StoreKit) und Geräteprüfung (Play Integrity Cloud-Projekt, App Attest); Server-Prüfer ergänzen (Tokenformat siehe DECISIONS).
-3. Optional: Web-Seite für Spot-Links ohne installierte App (QR enthält `overfit://spot#…`).
+3. Optional: Web-Seite für Einladungs-Links ohne installierte App (QR enthält `overfit://invite#…`, alte `overfit://spot#…` werden weiter gelesen).
 
-### Bitte auf dem Handy testen (Fuel/Spot)
+### Bitte auf dem Handy testen (Guthaben/Einladungen)
 1. Profil → „Fuel · startet bald“ öffnen → Text „Fuel startet bald“ → **Demo ansehen**
-2. Demo: „Fuel · 4,20 €“, Pakete mit „Bald im Store“, Buchungen (Verbrauch, Aufladung, Spot), Wiederherstellungscode erzeugen + kopieren
-3. **Freund spotten:** QR erscheint, Haarlinie läuft ab, alle ~30 s neuer Code; Namen eintragen
-4. **Ich wurde gespottet:** beliebigen Link/Code einfügen → Einlösen → Bildschirm schwarz, zwei Herzschlag-Pulse, Zahl zählt 0,00 → 1,00 €, „Spot von Fabian“, kräftiger Puls; Tippen schließt
+2. Demo: „Fuel · 4,20 €“, Pakete mit „Bald im Store“, Buchungen (Verbrauch, Aufladung, Einladungsbonus), Wiederherstellungscode erzeugen + kopieren
+3. **Freunde einladen:** QR erscheint, Haarlinie läuft ab, alle ~30 s neuer Code; Namen eintragen
+4. **Einladung einlösen:** beliebigen Link/Code einfügen → Einlösen → Bildschirm schwarz, zwei Herzschlag-Pulse, Zahl zählt 0,00 → 1,00 €, „Einladung von Fabian“, kräftiger Puls; Tippen schließt
 5. „Demo beenden“ → Fuel zeigt wieder „startet bald“. Version in „Über“ 7× tippen → Abschnitt „Entwickler“ mit Backend-URL
 6. Profil → KI verbinden: erste Zeile „Fuel“ wählbar
 
@@ -489,7 +717,7 @@ Fertig:
 - „KI-Vorlage kopieren“: Prompt in App-Sprache für ChatGPT/Claude/Gemini; Antwort danach aus der Zwischenablage importieren
 - Beispielvorlagen Push/Pull/Legs (je 6 Übungen, Katalog-IDs): im leeren Vorlagen-Zustand auf Start, in Übungen →
   Vorlagen und im Profil „Beispielvorlagen hinzufügen“ (idempotent)
-- „Duo · bald“ auf dem Startbildschirm → Teaser-Screen
+- (entfernt 3.11., Fabian; später evtl.) „Duo · bald“ auf dem Startbildschirm → Teaser-Screen
 - Tests: Deflate, Format, Parser, Mapper, AI-Prompt (Common); QR gegen ZXing; Samples laden, Teilen→Import
   ergibt dieselbe Vorlage, Import-Flows in der UI (Robolectric)
 - iOS: kein In-App-QR-Scanner (Kamera-App öffnet den `overfit://`-Link), Begründung in DECISIONS.md
@@ -526,12 +754,12 @@ Kopplungscode, Verbindungen trennen), Sync, Eingang mit Import-Vorschau, „Kont
    Overfit-Seite „Overfit verbinden“ mit Feld „Kopplungscode“ (Deutsch bei deutscher Browsersprache); falscher Code →
    Hinweis „Code falsch oder abgelaufen“. Der echte Code kommt mit Teil 2 aus der App.
 
-## Nacht 3.11. – Backend Fuel/Spot + Web-Fallback (Session C)
+## Nacht 3.11. – Backend Guthaben/Einladungen + Web-Fallback (Session C)
 Fertig (kein App-Code angefasst):
 - `backend/`: Cloudflare Worker + D1, 42 Tests (Vitest/Miniflare, lokal ohne Cloudflare-Konto): anonyme Geräte-Identität
   (ECDSA P-256, signierte Anfragen mit Nonce/Zeitstempel), Konto mit Saldo/Buchungen in Mikro-Euro, Wiederherstellungscode,
   `POST /v1/messages` als Anthropic-Proxy (atomare Reservierung, Abrechnung nach `usage` + Aufschlag, Freigabe bei Fehlern),
-  Kauf-Verifikation (idempotent, Paket-Gutschrift = Preis × (1 − Store) / (1 + Aufschlag)), Spot (Token, Challenge, Einlösen,
+  Kauf-Verifikation (idempotent, Paket-Gutschrift = Preis × (1 − Store) / (1 + Aufschlag)), Einladungen (Token, Challenge, Einlösen,
   Limits, Budget, Verfall, Belohnung bei der ersten Coach-Anfrage), Rate-Limits, einheitliches Fehlerformat
 - API-Vertrag mit exaktem Signatur-Schema: `docs/backend-api.md` (Grundlage für die App-Session)
 - `web/`: Fallback-Seite `t/index.html` (liest `#payload` laut `docs/share-format.md`, DE/EN, „In Overfit öffnen“, APK-Download)
@@ -539,7 +767,7 @@ Fertig (kein App-Code angefasst):
 - DECISIONS: „Produktentscheidungen Nacht 3.11.“ + Backend-Entscheidungen
 
 Offen: Echte Google-Play-/Apple-Prüfer für Käufe und Play Integrity/App Attest (Schnittstellen + Mocks fertig, Produktion
-antwortet bis dahin 503 `purchases_unavailable` / `attestation_unavailable`); App-Anbindung (`LlmProvider` „Fuel“, Spot-UI) nach `docs/backend-api.md`.
+antwortet bis dahin 503 `purchases_unavailable` / `attestation_unavailable`); App-Anbindung (`LlmProvider` „Fuel“, Einladungs-UI) nach `docs/backend-api.md`.
 
 ### Von Fabian zu tun
 1. **GitHub Pages aktivieren:** Repo → Settings → Pages → Source „GitHub Actions“. Danach läuft `pages.yml` bei jedem Merge
@@ -547,7 +775,7 @@ antwortet bis dahin 503 `purchases_unavailable` / `attestation_unavailable`); Ap
 2. **Cloudflare-Backend deployen** (Schritte und alle Secrets in `backend/README.md`): Konto, `wrangler login`, `wrangler d1 create overfit`
    (ID in `wrangler.jsonc`), Migrationen, `ANTHROPIC_API_KEY` und `SPOT_SIGNING_KEY` als Secrets, `npm run deploy`. Worker-URL
    an die Session für die App-Anbindung geben.
-3. Später für Käufe/Spot in Produktion: Play-Console- und Apple-Developer-Konten (Phase 6), Dienstkonto/Schlüssel als Secrets
+3. Später für Käufe/Einladungen in Produktion: Play-Console- und Apple-Developer-Konten (Phase 6), Dienstkonto/Schlüssel als Secrets
    (Liste in `backend/README.md`), danach die echten Prüfer in `backend/src/verifiers.ts` ergänzen.
 4. Für Android App Links / iOS Universal Links wird eine eigene Domain mit `/.well-known/` gebraucht (unter
    `github.io/overfit/` nicht möglich) – bis dahin öffnet der Button „In Overfit öffnen“.
@@ -638,7 +866,7 @@ Offen / Hinweise:
    kopieren → „Aus Zwischenablage importieren“ → Vorschau zeigt Übungen (neu = eigene Übung) → „Übernehmen“
 7. Vorlage → „Teilen“ → „Als Datei teilen“ → `.overfit` an sich selbst mailen/in Dateien speichern, antippen → Overfit
    öffnet die Vorschau
-8. Startbildschirm ganz unten: „Duo · bald“ → Erklärtext
+8. (entfernt 3.11., Fabian; später evtl.) Startbildschirm ganz unten: „Duo · bald“ → Erklärtext
 9. Zwischenablage leer oder Text ohne Training → verständliche Fehlermeldung
 
 ## Bitte auf dem Handy testen: App-Icon „of“ (Session W)
@@ -648,3 +876,14 @@ Offen / Hinweise:
 4. App starten: Splash schwarz mit kleinem weißen „of“ (Android 12+ und iOS), danach direkt die App
 5. Browser: Favicon im Tab der Webseite, „Zum Home-Bildschirm“ auf dem iPhone zeigt das „of“
 6. Variante gefällt nicht? `python3 tools/icon/build_icon.py --variant B2` (B1–B6, siehe docs/DECISIONS.md), committen
+
+## Session AC – „Spot“ heißt jetzt „Einladung“ (3.11.)
+- Erledigt: Alle sichtbaren Texte (App DE+EN, Webseite, Store-Texte, README, Docs, Deploy-Summary, Buchungsbezeichnungen) sagen „Freunde einladen“, „Einladung einlösen“, „Einladungsbonus“ (EN: Invite friends, Redeem invite, Referral bonus). Neue Links `overfit://invite#…`, alte `overfit://spot#…` werden weiter gelesen. Technik (API, DB, SPOT_*) bleibt, siehe docs/DECISIONS.md.
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Einladungen)
+1. Profil → Guthaben → Bereich „Einladungen“ → „Freunde einladen“: QR und rotierender Code, Namen eintragen
+2. Zweites Handy: QR mit der Kamera-App scannen (Link `overfit://invite#…`) → Overfit öffnet „Einladung einlösen“; alternativ Link einfügen
+3. „Einladung einlösen“ → Einlösen: schwarz, zwei Pulse, Zahl zählt 0,00 → 1,00 €, darunter „Einladung von Fabian“, kräftiger Puls
+4. Guthaben → Buchungen: Eintrag „Einladungsbonus“; beim Einladenden „Einladungsbonus (Freund eingeladen)“ nach der ersten Auswertung des Freundes
+5. Ein alter Link `overfit://spot#…` (aus der Zwischenablage eingefügt) funktioniert weiter; nirgends steht mehr „Spot“

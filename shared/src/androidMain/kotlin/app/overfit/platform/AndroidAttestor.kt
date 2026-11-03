@@ -11,7 +11,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 /**
- * Play Integrity token for Spot redemption. The server challenge is bound via the nonce (base64url of its SHA-256).
+ * Play Integrity token for invite redemption. The server challenge is bound via the nonce (base64url of its SHA-256).
  * Without Play services (or when the request fails, e.g. sideloaded app without a linked Cloud project) → null, and the
  * server-side result for "no attestation" is `attestation_unavailable`, which the UI explains.
  */

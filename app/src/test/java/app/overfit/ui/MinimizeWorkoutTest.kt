@@ -152,7 +152,7 @@ class MinimizeWorkoutTest {
             today = { LocalDate(2026, 11, 3) }, restAlerts = alerts,
         )
         show()
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         assertEquals(false, compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty())
     }
 }

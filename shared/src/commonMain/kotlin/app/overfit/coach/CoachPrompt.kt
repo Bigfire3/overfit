@@ -36,6 +36,11 @@ data class CoachPrompt(
     val maxTokens: Int? = null,
     /** Earlier turns (coach chat), oldest first; they go before [user]. Empty for one-shot requests. */
     val history: List<PromptTurn> = emptyList(),
+    /**
+     * True for a coach review (workout evaluation). Through the credit backend, reviews on the cheapest image model
+     * first use gifted reviews (invite bonus); chat and other features always pay from the credit.
+     */
+    val review: Boolean = false,
 ) {
     val outputSchema: JsonObject get() = schema ?: CoachSchema.schema
     val outputSchemaName: String get() = schemaName ?: CoachSchema.NAME
@@ -87,7 +92,7 @@ object CoachPromptBuilder {
             appendLine(ctx.profileBlock)
             append("Write every text field in ${if (ctx.language == Language.DE) "German" else "English"}.")
         }
-        return CoachPrompt(static, dynamic, userMessage(ctx), images)
+        return CoachPrompt(static, dynamic, userMessage(ctx), images, review = true)
     }
 
     fun userMessage(ctx: CoachContext): String = buildString {
@@ -261,6 +266,6 @@ object CoachPromptBuilder {
 - exercise_reviews: workout review: one entry per exercise of today's workout (same exercise IDs, same order). verdict = better, same or worse compared to last time (start from "by the numbers", you may correct it with a reason, e.g. more reps at the same weight); first time = same. comment: one short sentence why. next: one concrete working set for next time (weight_kg in kg and reps, or duration_sec for timed exercises; unused values null), or null if it should stay unchanged. Progress review: empty list.
 - positives, improvements, tips: short bullet sentences (0–4 each). In a workout review at most 2 each and only points that are not about a single exercise.
 - photo_feedback: only if a photo is attached, otherwise null. Factual and constructive, focus on visible changes compared to the comparison photo. Never judge the person, only the training progress.
-- next_session: the complete next session in order. Use only exercise IDs from the list below. An exercise that is not in the current plan gets is_new = true and a reason. Sets with target values (weight_kg in kg, may be negative for assistance; reps; duration_sec for timed exercises; unused values null). rest_sec in seconds or null. reason: one short sentence per changed exercise, otherwise null. Keep unchanged exercises unchanged.
+- next_session: the complete next session in order. Use only exercise IDs from the list below. An exercise that is not in the current plan gets is_new = true and a reason. Sets with target values (weight_kg in kg, never negative (0 or more); reps; duration_sec for timed exercises; unused values null). rest_sec in seconds or null. reason: one short sentence per changed exercise, otherwise null. Keep unchanged exercises unchanged.
 - memory: the complete revised coach memory (max. about 1500 words): goals, progress per main exercise, plateaus, preferences, complaints, what works. Keep everything still relevant, add what you learned today."""
 }

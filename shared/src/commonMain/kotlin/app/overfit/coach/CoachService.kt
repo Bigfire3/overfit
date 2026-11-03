@@ -62,6 +62,11 @@ class CoachService(
     private val scope: CoroutineScope,
     private val photos: CoachPhotoLoader = CoachPhotoLoader { null },
     private val clock: () -> Long,
+    /** Fuel tiers of the backend (coach quality setting); null = unknown. Only asked while Fuel is the provider. */
+    private val fuelTiers: suspend () -> Map<String, app.overfit.fuel.FuelTierInfo>? = { null },
+    /** Credit: backend config (markup, typical tokens) and balance for the cost display of the model setting. */
+    private val fuelConfig: suspend () -> app.overfit.fuel.FuelConfig? = { null },
+    private val fuelBalance: suspend () -> Long? = { null },
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
 ) {
     private val mutex = Mutex()
@@ -78,6 +83,10 @@ class CoachService(
 
     fun access(): CoachAccess = access.invoke()
 
+    suspend fun fuelTiers(): Map<String, app.overfit.fuel.FuelTierInfo>? = fuelTiers.invoke()
+    suspend fun fuelConfig(): app.overfit.fuel.FuelConfig? = fuelConfig.invoke()
+    suspend fun fuelBalance(): Long? = fuelBalance.invoke()
+
     /** The transport for [id] (shared with the coach chat). */
     fun transportFor(id: ProviderId): CoachTransport = transport(id)
 
@@ -87,9 +96,10 @@ class CoachService(
      */
     val ai: AiGateway = object : AiGateway {
         override fun available(): Boolean = access() is CoachAccess.Ready
-        override suspend fun send(prompt: CoachPrompt, structured: Boolean): CoachReply {
+        override suspend fun send(prompt: CoachPrompt, structured: Boolean, light: Boolean): CoachReply {
             val ready = access() as? CoachAccess.Ready ?: throw CoachException(CoachErrorKind.NO_ACCESS)
-            return transport(ready.providerId).send(prompt, settings.state.value.model(ready.providerId), structured)
+            val model = if (light && ready.providerId == ProviderId.FUEL) app.overfit.ai.TIER_LITE else settings.state.value.model(ready.providerId)
+            return transport(ready.providerId).send(prompt, model, structured)
         }
     }
 
@@ -254,6 +264,8 @@ class CoachService(
                 planStatus = if (review.nextSession != null) PlanStatus.OPEN else PlanStatus.NONE,
                 costMicro = reply.costMicro,
                 balanceMicro = reply.balanceMicro,
+                servedModel = reply.servedModel,
+                fallbackFrom = reply.fallbackFrom,
             ),
         )
         val memory = review.memory?.trim()

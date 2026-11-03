@@ -4,13 +4,20 @@
 //
 //   node scripts/deploy-secrets.mjs <test|production> <vorhandene-secrets.json> <ausgabe.json> <zusammenfassung.md>
 //
-// - Pflicht: ANTHROPIC_API_KEY (aus GitHub oder schon im Worker). Fehlt er → Exit 1 mit Anleitung.
-// - SPOT_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
-//   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
+// - KI-Schlüssel: GEMINI_API_KEY (Stufe standard) und ANTHROPIC_API_KEY (Stufe pro), je aus GitHub oder schon im Worker.
+//   Mindestens einer ist Pflicht, sonst Exit 1 mit Anleitung. Fehlt einer, ist die Stufe aus /v1/config nicht verfügbar.
+// - INVITE_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
+//   ein Zufallswert erzeugt. Fehlt INVITE_SIGNING_KEY, wird das alte GitHub-Secret (LEGACY_INVITE_SIGNING_KEY) übernommen. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
 // - ADMIN_SECRET (nur Testbetrieb): wird bei jedem Lauf neu erzeugt, außer ein GitHub-Secret ist gesetzt; der Workflow nutzt ihn sofort.
+// - Web-Kauf (Stripe): STRIPE_SECRET_KEY (sk_test_… im Testbetrieb, sk_live_… in Produktion), STRIPE_WEBHOOK_SECRET (whsec_…).
+//   In Produktion haben STRIPE_LIVE_SECRET_KEY / STRIPE_LIVE_WEBHOOK_SECRET Vorrang (Test- und Live-Werte parallel in GitHub).
+//   Optional; fehlt einer (weder in GitHub noch im Worker) oder passt der Schlüssel nicht zum Modus, bleibt der Web-Kauf aus,
+//   mit Hinweis in der Zusammenfassung (kein Abbruch).
 // - Optional (Play/Apple-Prüfer): nur gesetzt, wenn vorhanden; sonst Hinweis in der Zusammenfassung.
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+
+export const STRIPE = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
 
 export const OPTIONAL = [
   'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME', 'PLAY_INTEGRITY_SERVICE_ACCOUNT',
@@ -19,7 +26,7 @@ export const OPTIONAL = [
 
 const b64u = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 export const generators = {
-  SPOT_SIGNING_KEY: () => randomBytes(48).toString('base64'),
+  INVITE_SIGNING_KEY: () => randomBytes(48).toString('base64'),
   SYNC_ENCRYPTION_KEY: () => b64u(randomBytes(32)),
   ADMIN_SECRET: () => randomBytes(32).toString('hex'),
 };
@@ -33,12 +40,23 @@ export function plan(mode, env, existing) {
   const generated = [];
   const given = (n) => (env[n] ?? '').trim();
 
-  if (given('ANTHROPIC_API_KEY')) secrets.ANTHROPIC_API_KEY = given('ANTHROPIC_API_KEY');
-  else if (have.has('ANTHROPIC_API_KEY')) notes.push('`ANTHROPIC_API_KEY`: bleibt wie im Worker gesetzt.');
-  else errors.push('ANTHROPIC_API_KEY');
-
-  for (const n of ['SPOT_SIGNING_KEY', 'SYNC_ENCRYPTION_KEY']) {
+  const aiKeys = { GEMINI_API_KEY: 'standard (Gemini)', ANTHROPIC_API_KEY: 'pro (Claude)' };
+  const missingAi = [];
+  for (const [n, tier] of Object.entries(aiKeys)) {
     if (given(n)) secrets[n] = given(n);
+    else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
+    else missingAi.push([n, tier]);
+  }
+  if (missingAi.length === 2) errors.push('AI_KEY');
+  else for (const [n, tier] of missingAi) notes.push(`\`${n}\` fehlt: Stufe ${tier} ist nicht verfügbar (die App blendet sie aus).`);
+
+  for (const n of ['INVITE_SIGNING_KEY', 'SYNC_ENCRYPTION_KEY']) {
+    if (given(n)) secrets[n] = given(n);
+    // Früherer GitHub-Secret-Name (vor Session AD), vom Workflow als LEGACY_INVITE_SIGNING_KEY durchgereicht.
+    else if (n === 'INVITE_SIGNING_KEY' && given('LEGACY_INVITE_SIGNING_KEY')) {
+      secrets[n] = given('LEGACY_INVITE_SIGNING_KEY');
+      notes.push('`INVITE_SIGNING_KEY`: aus dem alten GitHub-Secret übernommen (darf gelöscht werden, sobald `INVITE_SIGNING_KEY` gesetzt ist).');
+    }
     else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
     else {
       secrets[n] = generators[n]();
@@ -54,6 +72,25 @@ export function plan(mode, env, existing) {
       notes.push('`ADMIN_SECRET`: für diesen Lauf neu erzeugt (nur Testbetrieb, für Test-Guthaben).');
     }
   }
+  const stripeMissing = [];
+  for (const n of STRIPE) {
+    // Produktion nimmt bevorzugt eigene Live-Secrets (STRIPE_LIVE_…), damit Test- und Live-Schlüssel nebeneinander in GitHub liegen können.
+    const live = mode === 'production' ? given(n.replace('STRIPE_', 'STRIPE_LIVE_')) : '';
+    if (live) secrets[n] = live;
+    else if (given(n)) secrets[n] = given(n);
+    else if (!have.has(n)) stripeMissing.push(n);
+  }
+  let webPurchase = stripeMissing.length === 0;
+  const key = secrets.STRIPE_SECRET_KEY ?? '';
+  const wantLive = mode === 'production';
+  if (!webPurchase) {
+    notes.push(`Web-Kauf bleibt **aus**: es fehlt ${stripeMissing.map((n) => `\`${n}\``).join(', ')} ` +
+      '(Stripe → Entwickler → API-Schlüssel bzw. Webhooks; Anleitung in backend/README.md → „Web-Kauf“).');
+  } else if (key && !(wantLive ? /^(sk|rk)_live_/ : /^(sk|rk)_test_/).test(key)) {
+    webPurchase = false;
+    notes.push(`Web-Kauf bleibt **aus**: \`STRIPE_SECRET_KEY\` muss im Modus ${mode} mit \`${wantLive ? 'sk_live_' : 'sk_test_'}\` beginnen ` +
+      '(Testbetrieb nur Testmodus-Schlüssel, Produktion nur Live-Schlüssel).');
+  } else notes.push(`Web-Kauf (Stripe${wantLive ? '' : ', Testmodus'}): beide Secrets vorhanden.`);
   const skipped = [];
   for (const n of OPTIONAL) {
     if (given(n)) secrets[n] = given(n);
@@ -61,14 +98,15 @@ export function plan(mode, env, existing) {
   }
   if (skipped.length) {
     notes.push(`Optional übersprungen (kein GitHub-Secret gesetzt): ${skipped.map((n) => `\`${n}\``).join(', ')}. ` +
-      'Das sind die Store-Prüfer für echte Käufe und Spot-Geräteprüfung; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
+      'Das sind die Store-Prüfer für echte Käufe und Geräteprüfung für Einladungen; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
   }
-  return { secrets, notes, errors, generated };
+  return { secrets, notes, errors, generated, webPurchase };
 }
 
 const MISSING_HELP = {
-  ANTHROPIC_API_KEY: 'Der KI-Schlüssel für Fuel (Anthropic-API-Key, beginnt mit `sk-ant-`). Erstellen unter console.anthropic.com → API Keys. ' +
-    'Am besten in einem eigenen Workspace mit Ausgabenlimit.',
+  AI_KEY: 'Mindestens ein KI-Schlüssel für Guthaben: **`GEMINI_API_KEY`** (Gemini 3.6 Flash, Google AI Studio: aistudio.google.com/apikey, ' +
+    'beginnt mit `AIza`, Projekt mit Abrechnung) und/oder **`ANTHROPIC_API_KEY`** (Claude Sonnet 5.5, console.anthropic.com → API Keys, beginnt mit `sk-ant-`). ' +
+    'Am besten je mit Ausgabenlimit.',
 };
 
 if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {
@@ -83,7 +121,7 @@ if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {
   const r = plan(mode, process.env, existing);
   if (r.errors.length) {
     const msg = ['### ❌ Es fehlt ein Pflicht-Secret', '',
-      ...r.errors.map((n) => `- **\`${n}\`** – ${MISSING_HELP[n]}`), '',
+      ...r.errors.map((n) => `- ${MISSING_HELP[n]}`), '',
       'So trägst du es ein: GitHub → dieses Repo → **Settings → Secrets and variables → Actions → New repository secret** ' +
       '(Name exakt wie oben, Wert einfügen) → danach den Workflow erneut starten (Actions → „Backend deployen“ → Run workflow).', ''].join('\n');
     appendFileSync(summaryFile, msg);

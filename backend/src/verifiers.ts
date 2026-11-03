@@ -52,7 +52,7 @@ export const mockAttestationVerifier: AttestationVerifier = {
 };
 
 /**
- * Testbetrieb (`DEPLOY_MODE=test`): keine Geräteprüfung. Token `test:<geräte-id>`; pro Gerät höchstens ein Spot
+ * Testbetrieb (`DEPLOY_MODE=test`): keine Geräteprüfung. Token `test:<geräte-id>`; pro Gerät höchstens eine Einladung
  * (Schlüssel `test-<id>`). Nur für die Test-Instanz, die Limits dort sind niedrig. Siehe docs/DECISIONS.md.
  */
 export const testAttestationVerifier: AttestationVerifier = {

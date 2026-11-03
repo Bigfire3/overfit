@@ -46,7 +46,7 @@ class AppData(
 
     /**
      * Adds Push/Pull/Legs once: at the first start and, once, on existing installs (flag in the key-value store).
-     * Afterwards they are normal workouts: deleting them keeps them gone; "Add sample workouts" brings them back on request.
+     * Afterwards they are normal workouts: deleting them keeps them gone (they can be re-imported like any shared workout).
      */
     suspend fun seedSamplesOnce(): Result<Int> = runCatching {
         if (kv.get(KEY_SAMPLES_SEEDED) != null) return@runCatching 0
@@ -56,7 +56,7 @@ class AppData(
     }
 
     /** "Delete all data": workouts, templates and custom exercises go, the catalogue is loaded again. */
-    suspend fun resetAll() {
+    suspend fun resetAll(reseedSamples: Boolean = true) {
         database.transaction {
             database.coachDao().deleteAll()
             database.coachDao().deleteMemory()
@@ -70,6 +70,7 @@ class AppData(
         kv.remove(CatalogSeeder.KEY_VERSION)
         kv.remove(KEY_SAMPLES_SEEDED)
         seedCatalog()
+        if (reseedSamples) seedSamplesOnce() // fresh start: Push/Pull/Legs are back without restarting the app
     }
 
     companion object {

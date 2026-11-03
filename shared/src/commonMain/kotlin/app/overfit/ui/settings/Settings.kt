@@ -7,7 +7,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.platform.RestAlerts
 import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.Hairline
-import app.overfit.ui.share.SamplesRow
 import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.components.pressableRow
 
@@ -20,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import app.overfit.ai.ProviderId
 import app.overfit.ai.Providers
@@ -143,9 +143,6 @@ fun SettingsScreen(
         SectionTitle(t.app)
         ListRow(t.about, onClick = onAbout)
 
-        SectionTitle(t.templates)
-        SamplesRow(share)
-
         SectionTitle(t.photos.backupSection)
         ListRow(if (exportingBackup) t.photos.backupExporting else t.photos.backupExport, onClick = { if (!exportingBackup) onExportBackup() })
         Text(t.photos.backupExportHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
@@ -170,6 +167,10 @@ fun AboutScreen(versionName: String, onBack: () -> Unit, fuel: FuelAccess? = nul
         if (devUnlocked && fuel != null) DeveloperSection(fuel)
         Spacer(Modifier.height(Space.m))
         Text(t.aboutTagline)
+        Spacer(Modifier.height(Space.m))
+        Text(t.aboutLicense)
+        val uriHandler = LocalUriHandler.current
+        ListRow(t.aboutRepo, onClick = { uriHandler.openUri(REPO_URL) })
 
         SectionTitle(t.aboutAttribution)
         Text(t.aboutWorkoutGuide, style = Theme.type.caption.copy(lineHeight = Theme.type.body.lineHeight))
@@ -182,8 +183,9 @@ fun AboutScreen(versionName: String, onBack: () -> Unit, fuel: FuelAccess? = nul
 }
 
 private const val DEV_TAPS = 7
+private const val REPO_URL = "https://github.com/Bigfire3/overfit"
 
-/** Hidden developer settings: override of the Fuel/Spot backend URL. */
+/** Hidden developer settings: override of the credit/invite backend URL. */
 @Composable
 private fun DeveloperSection(fuel: FuelAccess) {
     val f = LocalFuelStrings.current
@@ -212,7 +214,7 @@ private fun FuelRow(session: FuelSession, fuelActive: Boolean, onClick: () -> Un
     val value = when {
         service == null -> f.fuelRowSoon
         !load -> ""
-        else -> ((account as? Loaded.Ready)?.value?.balanceMicro?.let { formatEuro(it, f.language) } ?: "") +
+        else -> ((account as? Loaded.Ready)?.value?.let { app.overfit.ui.fuel.creditSummary(it, f) } ?: "") +
             if (demo) " · ${f.fuelRowDemo}" else ""
     }
     ListRow(f.fuel, value.trim(), onClick = onClick)

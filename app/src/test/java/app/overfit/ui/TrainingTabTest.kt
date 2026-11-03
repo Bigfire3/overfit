@@ -64,7 +64,7 @@ class TrainingTabTest {
         runBlocking { data.seedCatalog() }
         val deps = AppDependencies(store, Providers(HttpClient(MockEngine { respond("{}") })), data, versionName = "0.1.test", today = { LocalDate(2026, 11, 3) })
         compose.setContent { OverfitApp(deps) }
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         return deps
     }
 
@@ -103,7 +103,7 @@ class TrainingTabTest {
         compose.waitUntil(20_000) { compose.onAllNodes(nameField).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(nameField).performTextReplacement("Brust")
         compose.onNodeWithText("Speichern").performClick()
-        waitFor("Duo · bald")
+        compose.waitForTrainingTab()
         compose.waitUntilState(20_000) { templates().singleOrNull()?.name == "Brust" }
         assertEquals("Brust", runBlocking { data.workouts.getFinished(running.id) }?.workout?.name)
 

@@ -35,7 +35,7 @@ import platform.UIKit.UIViewController
 fun MainViewController(): UIViewController {
     val version = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "?"
     val build = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleVersion") as? String ?: "?"
-    // Set at build time (xcodebuild OVERFIT_BACKEND_URL=… → Info.plist); empty = Fuel/Spot not configured.
+    // Set at build time (xcodebuild OVERFIT_BACKEND_URL=… → Info.plist); empty = credit/invite not configured.
     val backendUrl = NSBundle.mainBundle.objectForInfoDictionaryKey("OverfitBackendUrl") as? String ?: ""
     val launch = LaunchOptions.current()
     val kv = if (launch.uiTest) {
@@ -60,6 +60,8 @@ fun MainViewController(): UIViewController {
         share = IosPlatformShare(),
         inbox = IosIncoming.inbox,
         kv = kv,
+        // iOS builds come from the App Store / TestFlight: web purchase only where the server allows `store`.
+        distribution = app.overfit.fuel.Distribution.Store,
     )
     if (launch.uiTest) {
         launch.theme?.let(deps.store::setTheme)

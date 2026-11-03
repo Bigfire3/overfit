@@ -63,12 +63,12 @@ fun PromptView(
             )
             if (text != null && text.lines().size > collapsedLines || (text?.length ?: 0) > collapsedLines * 60) {
                 Spacer(Modifier.height(Space.xs))
-                TextButton(if (expanded) h.promptLess else h.promptMore, { expanded = !expanded })
+                SmallButton(if (expanded) h.promptLess else h.promptMore, { expanded = !expanded })
             }
         }
         Spacer(Modifier.height(Space.s))
         Row {
-            TextButton(
+            SmallButton(
                 if (copied) copiedLabel ?: h.promptCopied else h.promptCopy,
                 { if (text != null) { onCopy(text); copied = true } },
                 Modifier.testTag("prompt-copy:$title"),
@@ -76,7 +76,7 @@ fun PromptView(
             )
             if (onUseInChat != null) {
                 Spacer(Modifier.width(Space.l))
-                TextButton(h.promptUseInChat, onUseInChat, Modifier.testTag("prompt-chat:$title"))
+                SmallButton(h.promptUseInChat, onUseInChat, Modifier.testTag("prompt-chat:$title"))
             }
         }
     }

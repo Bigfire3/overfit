@@ -40,7 +40,7 @@ fun <T> rememberLoaded(key: Any?, block: suspend () -> T): Pair<Loaded<T>, () ->
     return state.value to { nonce++ }
 }
 
-/** Two-pixel progress line on a hairline track (rotation of the Spot code, etc.). */
+/** Two-pixel progress line on a hairline track (rotation of the invite code, etc.). */
 @Composable
 fun HairlineProgress(fraction: Float, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(2.dp).background(Theme.colors.hairline)) {
@@ -48,18 +48,25 @@ fun HairlineProgress(fraction: Float, modifier: Modifier = Modifier) {
     }
 }
 
-/** Friendly text for a Spot redeem error. */
-fun spotErrorText(code: String, t: FuelStrings): String = when (code) {
-    "spot_token_invalid", "challenge_invalid", "invalid_request" -> t.spotErrInvalid
-    "spot_token_used" -> t.spotErrUsed
-    "spot_token_expired" -> t.spotErrExpired
-    "spot_self" -> t.spotErrSelf
-    "spot_already_redeemed" -> t.spotErrAlready
-    "spot_device_used" -> t.spotErrDevice
-    "spot_inviter_limit" -> t.spotErrInviterLimit
-    "spot_budget_exhausted" -> t.spotErrBudget
-    "attestation_unavailable", "attestation_failed" -> t.spotErrAttestation
-    "rate_limited" -> t.spotErrRateLimited
-    "network", "upstream_unavailable" -> t.spotErrNetwork
-    else -> t.spotErrGeneric
+/** Friendly text for an invite redeem error. */
+fun inviteErrorText(code: String, t: FuelStrings): String = when (code) {
+    "invite_token_invalid", "challenge_invalid", "invalid_request" -> t.inviteErrInvalid
+    "invite_token_used" -> t.inviteErrUsed
+    "invite_token_expired" -> t.inviteErrExpired
+    "invite_self" -> t.inviteErrSelf
+    "invite_already_redeemed" -> t.inviteErrAlready
+    "invite_device_used" -> t.inviteErrDevice
+    "invite_inviter_limit" -> t.inviteErrInviterLimit
+    "invite_budget_exhausted" -> t.inviteErrBudget
+    "attestation_unavailable", "attestation_failed" -> t.inviteErrAttestation
+    "rate_limited" -> t.inviteErrRateLimited
+    "network", "upstream_unavailable" -> t.inviteErrNetwork
+    else -> t.inviteErrGeneric
+}
+
+/** "4,20 € Guthaben · 5 geschenkte Auswertungen" (the second part only when there are gifted reviews). */
+fun creditSummary(account: app.overfit.fuel.FuelAccount, t: FuelStrings): String {
+    val credit = t.creditAmount(app.overfit.fuel.formatEuro(account.balanceMicro, t.language))
+    val reviews = account.giftReviews.remaining
+    return if (reviews > 0) "$credit · ${t.giftReviews(reviews)}" else credit
 }

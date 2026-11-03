@@ -13,6 +13,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
+import app.overfit.fuel.FuelConfig
+import app.overfit.fuel.FuelTierInfo
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 @Serializable
 enum class ProviderId { OPENROUTER, ANTHROPIC, OPENAI, FUEL, GEMINI }
@@ -111,7 +116,7 @@ const val GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta
  */
 class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
     override val id = ProviderId.FUEL
-    override val label = "Fuel"
+    override val label = "Guthaben"
     override val keyUrl = ""
     override val keyPlaceholder = ""
     override val usesKey = false
@@ -132,10 +137,62 @@ class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
         }
     }
 
+    private var cached: Triple<FuelService, FuelConfig, TimeMark>? = null
+
+    /** `/v1/config` of the backend (cached for 10 minutes). Null = unknown (no backend, no network). */
+    suspend fun config(): FuelConfig? {
+        val s = service() ?: return null
+        cached?.let { (svc, cfg, mark) -> if (svc === s && mark.elapsedNow() < 10.minutes) return cfg }
+        return try {
+            s.config().also { cached = Triple(s, it, TimeSource.Monotonic.markNow()) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Current credit in µ€ (null = unknown). */
+    suspend fun balance(): Long? {
+        val s = service() ?: return null
+        return try {
+            s.account().balanceMicro
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Models of the backend (name, provider, price, availability). Null = unknown; empty = old backend without tiers. */
+    suspend fun tiers(): Map<String, FuelTierInfo>? = config()?.tiers
+
+    /**
+     * The `model` value to send for [wanted] (standard | pro | lite): the wanted tier when the backend offers it,
+     * otherwise the next one (lite → standard → pro, pro ↔ standard). Old backend: its only model.
+     */
+    suspend fun resolveTier(wanted: String): String {
+        val tiers = tiers() ?: return wanted
+        if (tiers.isEmpty()) return LEGACY_MODEL
+        val order = when (wanted) {
+            TIER_LITE -> listOf(TIER_LITE, TIER_STANDARD, TIER_PRO)
+            TIER_PRO -> listOf(TIER_PRO, TIER_STANDARD)
+            else -> listOf(TIER_STANDARD, TIER_PRO)
+        }
+        return order.firstOrNull { tiers[it]?.available == true } ?: wanted
+    }
+
     /** Sends an Anthropic Messages request through Fuel; the result carries cost and new balance. */
     suspend fun messages(bodyJson: String): FuelMessageResult =
         (service() ?: throw FuelException("not_configured", 503)).messages(bodyJson)
 }
+
+/** Fuel tiers (backend/src/providers.ts). */
+const val TIER_STANDARD = "standard"
+const val TIER_PRO = "pro"
+const val TIER_LITE = "lite"
+/** The only model of backends before the tiers. */
+private const val LEGACY_MODEL = "claude-sonnet-5-5"
 
 class Providers(val http: HttpClient, fuelService: () -> FuelService? = { null }) {
     /** Providers that need the user's own key. */

@@ -18,7 +18,6 @@ import app.overfit.domain.Numbers
 import app.overfit.domain.SetValues
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.WorkoutStats
-import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.theme.Theme
 import app.overfit.workout.WorkoutFormat
@@ -47,6 +46,9 @@ import app.overfit.domain.Muscle
 import app.overfit.domain.TrackingType
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.Icon
+import app.overfit.ui.components.HeaderDeleteButton
+import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.Chip
 import app.overfit.ui.components.ExerciseImage
@@ -190,11 +192,17 @@ fun ExerciseDetailScreen(
 
     Screen(
         scroll = true,
-        header = { BackHeader(t.back, onBack) },
-        footer = {
-            if (e.isCustom) PrimaryButton(t.edit, { onEditCustom(e.id) })
-            else PrimaryButton(t.save, { viewModel.saveSettings(tracking, rest.toIntOrNull(), onBack) })
+        header = {
+            BackHeader(t.back, onBack) {
+                if (e.isCustom) {
+                    HeaderIconButton(Icon.Edit, t.edit, { onEditCustom(e.id) })
+                    HeaderDeleteButton(t.delete, t.deleteConfirm, onConfirm = { viewModel.delete { onBack() } })
+                }
+            }
         },
+        footer = if (e.isCustom) null else ({
+            PrimaryButton(t.save, { viewModel.saveSettings(tracking, rest.toIntOrNull(), onBack) })
+        }),
     ) {
         ExerciseImage(e, size = 160.dp)
         Spacer(Modifier.height(Space.l))
@@ -214,9 +222,6 @@ fun ExerciseDetailScreen(
         if (e.isCustom) {
             Text(t.trackingName(e.trackingType))
             e.defaultRestSec?.let { ListRow(t.restTime, it.toString()) }
-            SectionTitle(t.data)
-            Spacer(Modifier.height(Space.s))
-            ConfirmButton(t.delete, t.deleteConfirm, onConfirm = { viewModel.delete { onBack() } })
         } else {
             TrackingChooser(tracking) { tracking = it }
             Spacer(Modifier.height(Space.s))

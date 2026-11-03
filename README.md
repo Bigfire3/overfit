@@ -13,8 +13,8 @@ Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRE
 - **Foto-Tagebuch**: Zeitachse, Vollbild, zwei Fotos vergleichen
 - **Teilen und Importieren**: Workouts und Trainings als Link, QR-Code oder Datei; Beispiel-Workouts Push/Pull/Legs;
   **KI-Workout** per Chat (ChatGPT, Claude, Gemini) erstellen und aus der Zwischenablage einfügen
-- **KI-Coach**: Coach-Tab mit Chat (Workout-Vorschläge, Auswertungen, Gedächtnis, Prompts); mit eigenem API-Key oder „Fuel“ (Coach-Guthaben); **KI-Chat-Verbindung** (Claude, ChatGPT, Gemini) oder „Kontext kopieren“
-- **Fuel und Spot**: Guthaben in Euro; Freunde per QR „spotten“, beide bekommen 1 € Fuel
+- **KI-Coach**: Coach-Tab mit Chat (Workout-Vorschläge, Auswertungen, Gedächtnis, Prompts); mit eigenem API-Key oder Guthaben (Coach-Guthaben in Euro, Modell frei wählbar, Kosten immer sichtbar); **KI-Chat-Verbindung** (Claude, ChatGPT, Gemini) oder „Kontext kopieren“
+- **Guthaben und Einladungen**: Guthaben in Euro; Freunde per QR einladen (Empfehlungsprogramm), Einladungsbonus: 1 € Guthaben für dich und deinen Freund
 - **Backup** als eine ZIP-Datei (Export/Import), **Alle Daten löschen**
 - Deutsch und Englisch, Hell/Dunkel/System, kg/lb, ohne Werbung und Tracking
 

@@ -56,8 +56,6 @@ data class Strings(
     val startWorkout: String,
     val templates: String,
     val templatesEmpty: String,
-    val coachTips: String,
-    val coachTipsEmpty: String,
 
     // Training tab: saved workouts (internally templates)
     val newWorkout: String,
@@ -125,6 +123,16 @@ data class Strings(
     val restSummary: (String) -> String,
     val addSet: String,
     val removeSet: (Int) -> String,
+    /** Edit mode / set lists (Session AE). */
+    val editMode: String,
+    val rename: String,
+    val setDeleted: String,
+    val undo: String,
+    val moreActions: (String) -> String,
+    val exerciseDetails: (String) -> String,
+    val weightOfSet: (Int) -> String,
+    val repsOfSet: (Int) -> String,
+    val durationOfSet: (Int) -> String,
     val note: String,
     val moveUp: String,
     val moveDown: String,
@@ -226,6 +234,8 @@ data class Strings(
     val aboutFont: String,
     val aboutLibraries: String,
     val aboutLibrariesText: String,
+    val aboutLicense: String,
+    val aboutRepo: String,
 )
 
 private val GERMAN_MONTHS = listOf("Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez.")
@@ -247,7 +257,7 @@ val German = Strings(
     weightTitle = "Wie viel\nwiegst du?",
     weightError = "Das sieht nicht nach einem realistischen Gewicht aus.",
     aiTitle = "Verbinde\ndeine KI",
-    aiSubtitle = "overfit nutzt deinen eigenen API-Key oder Fuel. Keine Werbung, kein Abo nötig.",
+    aiSubtitle = "overfit nutzt deinen eigenen API-Key oder Guthaben. Keine Werbung, kein Abo nötig.",
     aiKeyPlaceholder = "API-Key einfügen",
     aiHowTo = "Wie bekomme ich einen Key?",
     aiConnect = "Verbinden",
@@ -271,8 +281,6 @@ val German = Strings(
     startWorkout = "Training starten",
     templates = "Workouts",
     templatesEmpty = "Noch keine Workouts. Tippe oben auf +, um eins zu erstellen oder einfach leer zu starten.",
-    coachTips = "Letzte Coach-Tipps",
-    coachTipsEmpty = "Nach deinem ersten Training bekommst du hier Tipps vom Coach.",
 
     newWorkout = "Neues Workout",
     createWorkout = "Workout erstellen",
@@ -342,6 +350,15 @@ val German = Strings(
     restSummary = { "Pause $it" },
     addSet = "Satz hinzufügen",
     removeSet = { "Satz $it entfernen" },
+    editMode = "Bearbeitungsmodus",
+    rename = "Namen ändern",
+    setDeleted = "Satz gelöscht",
+    undo = "Rückgängig",
+    moreActions = { "Weitere Aktionen für $it" },
+    exerciseDetails = { "Details zu $it" },
+    weightOfSet = { "Gewicht Satz $it" },
+    repsOfSet = { "Wiederholungen Satz $it" },
+    durationOfSet = { "Dauer Satz $it" },
     note = "Notiz",
     moveUp = "Nach oben",
     moveDown = "Nach unten",
@@ -435,8 +452,10 @@ val German = Strings(
     aboutAttribution = "Übungsgrafiken",
     aboutWorkoutGuide = "Workout Guide von Bryl Lim, basierend auf Grafiken von Everkinetic. Lizenz: CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). Die Grafiken werden unverändert mitgeliefert und nur beim Anzeigen eingefärbt.",
     aboutFont = "Schrift: Inter von Rasmus Andersson. Lizenz: SIL Open Font License 1.1.",
-    aboutLibraries = "Open-Source-Bibliotheken",
-    aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor – jeweils Apache License 2.0.",
+    aboutLibraries = "Verwendete Bibliotheken",
+    aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor (Apache License 2.0)",
+    aboutLicense = "overfit ist Open Source unter der MIT-Lizenz.",
+    aboutRepo = "Quellcode auf GitHub",
 )
 
 val English = Strings(
@@ -455,7 +474,7 @@ val English = Strings(
     weightTitle = "How much do\nyou weigh?",
     weightError = "That doesn't look like a realistic weight.",
     aiTitle = "Connect\nyour AI",
-    aiSubtitle = "overfit uses your own API key or Fuel. No ads, no subscription required.",
+    aiSubtitle = "overfit uses your own API key or credit. No ads, no subscription required.",
     aiKeyPlaceholder = "Paste API key",
     aiHowTo = "How do I get a key?",
     aiConnect = "Connect",
@@ -479,8 +498,6 @@ val English = Strings(
     startWorkout = "Start workout",
     templates = "Workouts",
     templatesEmpty = "No workouts yet. Tap + at the top to create one or simply start empty.",
-    coachTips = "Latest coach tips",
-    coachTipsEmpty = "After your first workout, the coach's tips show up here.",
 
     newWorkout = "New workout",
     createWorkout = "Create workout",
@@ -550,6 +567,15 @@ val English = Strings(
     restSummary = { "Rest $it" },
     addSet = "Add set",
     removeSet = { "Remove set $it" },
+    editMode = "Editing",
+    rename = "Rename",
+    setDeleted = "Set deleted",
+    undo = "Undo",
+    moreActions = { "More actions for $it" },
+    exerciseDetails = { "Details for $it" },
+    weightOfSet = { "Weight set $it" },
+    repsOfSet = { "Reps set $it" },
+    durationOfSet = { "Duration set $it" },
     note = "Note",
     moveUp = "Move up",
     moveDown = "Move down",
@@ -643,8 +669,10 @@ val English = Strings(
     aboutAttribution = "Exercise illustrations",
     aboutWorkoutGuide = "Workout Guide by Bryl Lim, based on illustrations by Everkinetic. License: CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). The illustrations ship unmodified and are only tinted when displayed.",
     aboutFont = "Typeface: Inter by Rasmus Andersson. License: SIL Open Font License 1.1.",
-    aboutLibraries = "Open-source libraries",
-    aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor – all Apache License 2.0.",
+    aboutLibraries = "Libraries used",
+    aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor (Apache License 2.0)",
+    aboutLicense = "overfit is open source under the MIT License.",
+    aboutRepo = "Source code on GitHub",
 )
 
 fun stringsFor(language: Language): Strings = when (language) {

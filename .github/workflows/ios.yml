@@ -36,7 +36,7 @@ jobs:
 
       - name: App für den Simulator bauen
         env:
-          # Fuel/Spot backend URL (Repository-Variable, optional)
+          # Guthaben/Einladungs backend URL (Repository-Variable, optional)
           OVERFIT_BACKEND_URL: ${{ vars.OVERFIT_BACKEND_URL }}
         run: |
           set -o pipefail

@@ -28,14 +28,15 @@ import androidx.room.useWriterConnection
         CoachChatEntity::class,
         CoachChatMessageEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     // v1 → v2 adds the workout tables, v2 → v3 the photo table, v3 → v4 the coach tables (nothing is dropped or rewritten).
     // v4 → v5 is manual ([MIGRATION_4_5]): free-exercise-db removed, exercise.note added.
     // v5 → v6 adds the coach chat tables (pure addition).
+    // v6 → v7 adds the nullable columns servedModel / fallbackFrom to the coach review and chat message (pure addition).
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
-        AutoMigration(from = 5, to = 6),
+        AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7),
     ],
 )
 @TypeConverters(Converters::class)

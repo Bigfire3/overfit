@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -41,7 +42,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
-/** Import from the clipboard and from an opened link (inbox), samples, AI prompt, Duo teaser. */
+/** Import from the clipboard and from an opened link (inbox), samples, AI prompt. */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class ShareFlowTest {
@@ -131,21 +132,6 @@ class ShareFlowTest {
     }
 
     @Test
-    fun samplesAddedFromStartAndProfileIdempotently() {
-        launchOnboarded()
-        waitFor("Beispiel-Workouts hinzufügen")
-        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
-        // The row disappears after the first template is saved; all three must still arrive.
-        waitFor("Legs")
-        waitFor("Pull")
-        waitFor("Push")
-        compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
-        waitFor("schon da")
-        assertEquals(3, runBlocking { data.templates.templates.first() }.size)
-    }
-
-    @Test
     fun firstStartCreatesSamples_deletingKeepsThemGone() {
         kv.remove(AppData.KEY_SAMPLES_SEEDED)
         launchOnboarded()
@@ -157,19 +143,16 @@ class ShareFlowTest {
         // Next start: the flag is set, nothing comes back
         assertEquals(0, runBlocking { data.seedSamplesOnce() }.getOrThrow())
         assertEquals(listOf("Push", "Legs"), runBlocking { data.templates.templates.first() }.map { it.name })
-        // The explicit entry in the profile brings them back on request
+        // There is no "add sample workouts" row anymore, neither in the Training tab nor in the profile.
+        compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
         compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
-        waitFor("1 Beispiel-Workout")
+        waitFor("Über overfit")
+        compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
     }
 
     @Test
-    fun aiPromptIsCopiedAndDuoTeaserOpens() {
+    fun aiPromptIsCopied() {
         launchOnboarded()
-        compose.onNodeWithText("Duo · bald").performScrollTo().performClick()
-        waitFor("Zwei Handys trainieren gemeinsam")
-        compose.onNodeWithText("Duo ist noch nicht verfügbar", substring = true).assertIsDisplayed()
-        compose.onNodeWithContentDescription("Zurück").performClick()
         openPlus()
         waitFor("KI-Prompt kopieren")
         // The full prompt is visible before copying.

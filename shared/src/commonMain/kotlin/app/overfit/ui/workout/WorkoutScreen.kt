@@ -1,5 +1,14 @@
 package app.overfit.ui.workout
 
+import app.overfit.ui.components.Block
+import app.overfit.ui.components.BlockButton
+import app.overfit.ui.components.BlockShape
+import app.overfit.ui.components.MenuItem
+import app.overfit.ui.components.MoreMenu
+import app.overfit.ui.components.SetField
+import app.overfit.ui.components.SetRowSurface
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -63,7 +72,7 @@ import app.overfit.ui.components.ReorderState
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SmallInput
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.dragHandle
 import app.overfit.ui.components.pressableRow
@@ -114,6 +123,15 @@ fun WorkoutScreen(
     var collapsed by rememberSaveable { mutableStateOf(listOf<String>()) }
 
     var confirmingFinish by remember { mutableStateOf(false) }
+    // Last swiped-away set: "Undo" restores the workout as it was, as long as nothing else changed since.
+    var undo by remember { mutableStateOf<Pair<Workout, Workout>?>(null) }
+    LaunchedEffect(undo) { if (undo != null) { delay(5000); undo = null } }
+    val removeSet: (String) -> Unit = { setId ->
+        val before = workout
+        val after = before.removeSet(setId)
+        controller.edit { it.removeSet(setId) }
+        undo = before to after
+    }
     val listState = rememberLazyListState()
     val reorder = rememberReorderState(listState, canMove = { it is String && workout.exercise(it) != null }) { from, to ->
         controller.edit { w ->
@@ -124,6 +142,14 @@ fun WorkoutScreen(
     Screen(
         compact = true,
         footer = {
+            undo?.let { (before, after) ->
+                if (workout == after) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(t.setDeleted, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
+                        SmallButton(t.undo, { undo = null; controller.edit { w -> if (w == after) before else w } })
+                    }
+                }
+            }
             WorkoutFooter(
                 workout = workout,
                 now = now,
@@ -158,7 +184,12 @@ fun WorkoutScreen(
         Spacer(Modifier.height(Space.xs))
         Hairline()
 
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(bottom = Space.l)) {
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(),
+            state = listState,
+            contentPadding = PaddingValues(top = Space.s, bottom = Space.l),
+            verticalArrangement = Arrangement.spacedBy(Space.s),
+        ) {
             if (workout.exercises.isEmpty()) {
                 item(key = "empty") { Text(t.workoutEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted) }
             }
@@ -173,12 +204,13 @@ fun WorkoutScreen(
                     expanded = e.id !in collapsed,
                     onToggle = { collapsed = if (e.id in collapsed) collapsed - e.id else collapsed + e.id },
                     controller = controller,
+                    onRemoveSet = removeSet,
                     onReplace = { onReplaceExercise(e.id) },
                 )
             }
             item(key = "actions") {
-                ListRow(t.addExercise, onClick = onAddExercises) { LineIcon(Icon.Plus) }
-                Spacer(Modifier.height(Space.m))
+                BlockButton(t.addExercise, onAddExercises)
+                Spacer(Modifier.height(Space.l))
                 ConfirmButton(t.discardWorkout, t.discardConfirm, onConfirm = { scope.launch { controller.discard() } })
             }
         }
@@ -247,19 +279,23 @@ private fun ExerciseSection(
     expanded: Boolean,
     onToggle: () -> Unit,
     controller: WorkoutController,
+    onRemoveSet: (setId: String) -> Unit,
     onReplace: () -> Unit,
 ) {
     val t = LocalStrings.current
     val type = entry.exercise.trackingType
-    Column(modifier.fillMaxWidth()) {
+    Block(modifier) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 64.dp).pressableRow(onToggle).padding(vertical = Space.s),
+            Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(BlockShape.row).pressableRow(onToggle)
+                .dragHandle(reorder, entry.id).semantics { contentDescription = t.reorder },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ExerciseImage(entry.exercise, size = 40.dp)
+            LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+            Spacer(Modifier.width(Space.s))
+            Box(Modifier.clip(BlockShape.field)) { ExerciseImage(entry.exercise, size = 48.dp) }
             Spacer(Modifier.width(Space.m))
             Column(Modifier.weight(1f)) {
-                Text(entry.exercise.name, style = Theme.type.label)
+                Text(entry.exercise.name, style = Theme.type.label, maxLines = 2)
                 Text(t.setsDone(entry.completedSets, entry.sets.size), style = Theme.type.caption, tone = Tone.Muted)
                 if (lastTime.isNotEmpty()) {
                     Text(
@@ -270,39 +306,39 @@ private fun ExerciseSection(
                     )
                 }
             }
-            Box(
-                Modifier.size(40.dp).dragHandle(reorder, entry.id).semantics { contentDescription = t.reorder },
-                contentAlignment = Alignment.Center,
-            ) { LineIcon(Icon.Drag, color = Theme.colors.muted) }
+            MoreMenu(
+                t.moreActions(entry.exercise.name),
+                listOf(
+                    MenuItem(t.replace, onClick = onReplace),
+                    MenuItem(t.remove, destructive = true) { controller.edit { it.removeExercise(entry.id) } },
+                ),
+            )
         }
         if (expanded) {
-            entry.sets.forEachIndexed { i, set ->
-                key(set.id) {
-                    SetRow(
-                        number = i + 1,
-                        type = type,
-                        unit = unit,
-                        language = language,
-                        set = set,
-                        onValues = { controller.setValues(set.id, it) },
-                        onToggle = { controller.toggleSet(set.id) },
-                        onRemove = { controller.edit { it.removeSet(set.id) } },
-                    )
+            Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                entry.sets.forEachIndexed { i, set ->
+                    key(set.id) {
+                        SetRow(
+                            number = i + 1,
+                            type = type,
+                            unit = unit,
+                            language = language,
+                            set = set,
+                            onValues = { controller.setValues(set.id, it) },
+                            onToggle = { controller.toggleSet(set.id) },
+                            onRemove = { onRemoveSet(set.id) },
+                        )
+                    }
                 }
-            }
-            Row(Modifier.fillMaxWidth().padding(vertical = Space.s), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-                TextButton(t.addSet, { controller.edit { it.addSet(entry.id) } }, tone = Tone.Default)
-                entry.sets.lastOrNull()?.let { last ->
-                    TextButton(t.duplicateSet, { controller.edit { it.duplicateSet(last.id) } })
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+                    BlockButton(t.addSet, { controller.edit { it.addSet(entry.id) } }, Modifier.weight(1.3f), inBlock = true)
+                    entry.sets.lastOrNull()?.let { last ->
+                        BlockButton(t.duplicateSet, { controller.edit { it.duplicateSet(last.id) } }, Modifier.weight(1f), icon = null, inBlock = true)
+                    }
                 }
-            }
-            NoteField(entry.id, entry.note) { v -> controller.edit { it.setExerciseNote(entry.id, v.take(300)) } }
-            Row(Modifier.fillMaxWidth().padding(vertical = Space.m), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-                TextButton(t.replace, onReplace)
-                TextButton(t.remove, { controller.edit { it.removeExercise(entry.id) } })
+                NoteField(entry.id, entry.note) { v -> controller.edit { it.setExerciseNote(entry.id, v.take(300)) } }
             }
         }
-        Hairline()
     }
 }
 
@@ -336,34 +372,28 @@ private fun SetRow(
     val done = set.completed
     val actual = set.actual
     val target = set.target
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.s),
-    ) {
-        Text("$number", Modifier.width(20.dp), style = Theme.type.caption, tone = if (done) Tone.Default else Tone.Muted)
+    SetRowSurface(t.removeSet(number), onRemove, Modifier.testTag("set-row:$number")) {
+        Text("$number", Modifier.width(24.dp), style = Theme.type.label, tone = if (done) Tone.Default else Tone.Muted, align = TextAlign.Center)
         if (type.usesWeight) {
             Row(Modifier.weight(1.3f), verticalAlignment = Alignment.CenterVertically) {
                 NumberInput(
+                    description = t.weightOfSet(number),
                     value = actual.weightKg,
                     resetKey = set.id,
                     format = { Numbers.formatWeight(it, unit, language) },
                     parse = { Numbers.parseWeight(it, unit) },
                     onCommit = { onValues(actual.copy(weightKg = it)) },
-                    filter = { s -> s.filter { c -> c.isDigit() || c == ',' || c == '.' || c == '-' }.take(8) },
+                    filter = { s -> s.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(8) },
                     unit = unit.symbol,
                     keyboardType = KeyboardType.Decimal,
-                    placeholder = target.weightKg?.let { Numbers.formatWeight(it, unit, language) } ?: unit.symbol,
+                    placeholder = target.weightKg?.let { Numbers.formatWeight(it, unit, language) } ?: "–",
                     modifier = Modifier.weight(1f),
                 )
-                // Many number keyboards have no minus key: negative weight = assistance (e.g. a band).
-                TextButton("±", {
-                    (actual.weightKg ?: target.weightKg)?.let { onValues(actual.copy(weightKg = -it)) }
-                }, Modifier.padding(start = Space.xs))
             }
         }
         if (type.usesReps) {
             NumberInput(
+                description = t.repsOfSet(number),
                 value = actual.reps,
                 resetKey = set.id,
                 format = { it.toString() },
@@ -372,12 +402,13 @@ private fun SetRow(
                 filter = { s -> s.filter(Char::isDigit).take(4) },
                 unit = t.repsUnit,
                 keyboardType = KeyboardType.Number,
-                placeholder = target.reps?.toString() ?: t.repsUnit,
+                placeholder = target.reps?.toString() ?: "–",
                 modifier = Modifier.weight(1f),
             )
         }
         if (type.usesTime) {
             NumberInput(
+                description = t.durationOfSet(number),
                 value = actual.durationSec,
                 resetKey = set.id,
                 format = { it.toString() },
@@ -386,14 +417,11 @@ private fun SetRow(
                 filter = { s -> s.filter { c -> c.isDigit() || c == ':' }.take(6) },
                 unit = t.secondsUnit,
                 keyboardType = KeyboardType.Number,
-                placeholder = target.durationSec?.toString() ?: t.secondsUnit,
+                placeholder = target.durationSec?.toString() ?: "–",
                 modifier = Modifier.weight(1f),
             )
         }
         CheckButton(done, if (done) t.reopenSet(number) else t.completeSet(number), onToggle)
-        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-            IconButton(Icon.Close, t.removeSet(number), onRemove)
-        }
     }
 }
 
@@ -427,6 +455,7 @@ private fun CheckButton(done: Boolean, description: String, onClick: () -> Unit)
  */
 @Composable
 private fun <N : Any> NumberInput(
+    description: String,
     value: N?,
     resetKey: Any,
     format: (N) -> String,
@@ -442,7 +471,7 @@ private fun <N : Any> NumberInput(
     LaunchedEffect(value) {
         if (parse(text) != value) text = value?.let(format).orEmpty()
     }
-    SmallInput(
+    SetField(
         text,
         { input ->
             val filtered = filter(input)
@@ -450,6 +479,7 @@ private fun <N : Any> NumberInput(
             if (filtered.isBlank()) onCommit(null) else parse(filtered)?.let(onCommit)
         },
         unit = unit,
+        description = description,
         modifier = modifier,
         keyboardType = keyboardType,
         placeholder = placeholder,

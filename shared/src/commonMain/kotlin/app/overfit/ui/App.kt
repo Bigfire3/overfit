@@ -49,17 +49,18 @@ import app.overfit.chat.ChatFeature
 import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.FuelSession
-import app.overfit.fuel.isSpotLink
+import app.overfit.fuel.isInviteLink
 import app.overfit.i18n.LocalFuelStrings
 import app.overfit.i18n.fuelStringsFor
 import app.overfit.platform.Haptics
 import app.overfit.platform.NoHaptics
 import app.overfit.ui.fuel.FuelScreen
+import app.overfit.ui.fuel.RedeemCodeScreen
 import app.overfit.ui.fuel.LedgerScreen
 import app.overfit.ui.fuel.RecoveryScreen
-import app.overfit.ui.fuel.SpotInviteScreen
-import app.overfit.ui.fuel.SpotRedeemScreen
-import app.overfit.ui.fuel.SpotRevealScreen
+import app.overfit.ui.fuel.InviteShowScreen
+import app.overfit.ui.fuel.InviteRedeemScreen
+import app.overfit.ui.fuel.InviteRevealScreen
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.overfit.ui.chat.AiCoachScreen
@@ -85,7 +86,10 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
 import app.overfit.i18n.stringsFor
 import app.overfit.ui.ai.ConnectAiScreen
+import app.overfit.ui.components.ConfirmArea
 import app.overfit.ui.components.Hairline
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.Text
@@ -126,7 +130,6 @@ import app.overfit.ui.settings.AboutScreen
 import app.overfit.share.ImportInbox
 import app.overfit.share.NoopPlatformShare
 import app.overfit.share.PlatformShare
-import app.overfit.ui.share.DuoScreen
 import app.overfit.ui.share.ImportScreen
 import app.overfit.ui.share.ImportViewModel
 import app.overfit.ui.share.ShareDependencies
@@ -152,7 +155,6 @@ import app.overfit.ui.coach.CoachReviewScreen
 import app.overfit.ui.coach.CoachSessionScreen
 import app.overfit.ui.coach.CoachSettingsScreen
 import app.overfit.ui.coach.createCoach
-import app.overfit.ui.coach.latestCoachTips
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.overfit.ui.settings.SettingsScreen
 import app.overfit.ui.theme.OverfitTheme
@@ -185,7 +187,7 @@ class AppDependencies(
     val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     /** Main-thread scope that lives as long as the app (workout state, rest timer). */
     workoutScope: CoroutineScope = MainScope(),
-    /** Fuel/Spot backend (URL from the build, developer override); defaults to "not configured". */
+    /** credit/invite backend (URL from the build, developer override); defaults to "not configured". */
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
     /** Small key-value storage for the chat sync state (not secret). */
     kv: KeyValueStore = InMemoryKeyValueStore(),
@@ -193,6 +195,8 @@ class AppDependencies(
     coachPhotos: CoachPhotoLoader? = null,
     /** Replaces the real providers (tests). */
     coachTransport: ((ProviderId) -> CoachTransport)? = null,
+    /** How this build was installed; decides with `/v1/config` whether "Top up on the web" is shown. */
+    val distribution: app.overfit.fuel.Distribution = app.overfit.fuel.Distribution.Sideload,
 ) {
     val fuelSession = FuelSession(fuel)
     /** The AI coach: requests, queue, reviews, memory. Runs in the app scope. */
@@ -295,12 +299,12 @@ class AppDependencies(
 @Serializable data object AboutRoute
 @Serializable data object FuelRoute
 @Serializable data object LedgerRoute
+@Serializable data object RedeemCodeRoute
 @Serializable data object RecoveryRoute
-@Serializable data object SpotInviteRoute
-@Serializable data class SpotRedeemRoute(val code: String = "")
-@Serializable data class SpotRevealRoute(val amountMicro: Long, val inviterName: String = "")
+@Serializable data object InviteShowRoute
+@Serializable data class InviteRedeemRoute(val code: String = "")
+@Serializable data class InviteRevealRoute(val reviews: Int, val inviterName: String = "")
 @Serializable data object ImportRoute
-@Serializable data object DuoRoute
 @Serializable data class ShareRoute(val templateId: Long)
 @Serializable data class ExerciseDetailRoute(val id: String)
 /** Finish flow right after "Finish": summary, feeling, note, photos, coach slot. */
@@ -410,11 +414,17 @@ fun OverfitApp(deps: AppDependencies) {
             }
             // Links, files and scans from outside open the import screen (not during onboarding).
             LaunchedEffect(incoming, state.onboardingDone) {
-                // A Spot link (QR scanned with the camera app) goes to "I was spotted", not to the training import.
-                val spot = incoming
-                if (spot != null && state.onboardingDone && isSpotLink(spot)) {
+                // An invite link (QR scanned with the camera app) goes to "redeem invite", not to the training import.
+                val link = incoming
+                // Back from the web purchase page (overfit://guthaben): credit screen, which reloads the balance.
+                if (link != null && state.onboardingDone && app.overfit.fuel.isCreditReturnLink(link)) {
                     deps.inbox.consume()
-                    nav.navigate(SpotRedeemRoute(spot)) { launchSingleTop = true }
+                    nav.navigate(FuelRoute) { launchSingleTop = true }
+                    return@LaunchedEffect
+                }
+                if (link != null && state.onboardingDone && isInviteLink(link)) {
+                    deps.inbox.consume()
+                    nav.navigate(InviteRedeemRoute(link)) { launchSingleTop = true }
                     return@LaunchedEffect
                 }
                 if (incoming != null && state.onboardingDone &&
@@ -423,8 +433,20 @@ fun OverfitApp(deps: AppDependencies) {
                     nav.navigate(ImportRoute) { launchSingleTop = true }
                 }
             }
+            ConfirmArea(Modifier.fillMaxSize()) {
             AppScaffold(nav, workoutState.workout, deps.clock, onOpenWorkout = { nav.openWorkout() }) {
-                NavHost(nav, startDestination = start, modifier = Modifier.fillMaxSize()) {
+                NavHost(
+                    nav,
+                    startDestination = start,
+                    modifier = Modifier.fillMaxSize(),
+                    // One calm transition for the whole app (see DECISIONS "Übergänge"): tab switches are instant,
+                    // everything else a short fade-through. The default (700 ms crossfade) looked buggy.
+                    enterTransition = { ScreenMotion.enter(initialState.destination, targetState.destination) },
+                    exitTransition = { ScreenMotion.exit(initialState.destination, targetState.destination) },
+                    popEnterTransition = { ScreenMotion.enter(initialState.destination, targetState.destination) },
+                    popExitTransition = { ScreenMotion.exit(initialState.destination, targetState.destination) },
+                    sizeTransform = null,
+                ) {
                     composable<NameRoute> {
                         NameStep(state.profile.name, onNext = { deps.store.setName(it); nav.navigate(AgeRoute) })
                     }
@@ -478,9 +500,6 @@ fun OverfitApp(deps: AppDependencies) {
                             onExercises = { nav.navigate(ExercisesRoute) },
                             onOpenWorkout = { nav.navigate(WorkoutPlanRoute(it)) },
                             share = share,
-                            onDuo = { nav.navigate(DuoRoute) },
-                            coachTips = latestCoachTips(deps.coach),
-                            onCoach = { nav.selectTab(Tab.COACH) },
                             chatInboxCount = chatInbox.items.size,
                             chatInboxFull = chatInbox.full,
                             onChatInbox = { nav.navigate(ChatInboxRoute) },
@@ -522,6 +541,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onEndRunning = { deps.data.scope.launch { deps.workout.finish() }; nav.openWorkout() },
                             onEdit = { nav.navigate(TemplateEditorRoute(id)) },
                             onShare = { nav.navigate(ShareRoute(id)) },
+                            // App scope: the screen closes itself as soon as the workout is gone.
+                            onDelete = { deps.data.scope.launch { deps.data.templates.delete(id) } },
                         )
                     }
                     composable<WorkoutRoute> {
@@ -670,7 +691,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onClose = nav::popBackStack,
                             onAddExercises = { nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
-                            onShare = { nav.navigate(ShareRoute(id)) },
+                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it)) },
                         )
                     }
                     composable<ExercisePickerRoute> { entry ->
@@ -844,7 +865,6 @@ fun OverfitApp(deps: AppDependencies) {
                             language = state.language,
                         )
                     }
-                    composable<DuoRoute> { DuoScreen(onBack = nav::popBackStack) }
                     composable<CoachMemoryRoute> { CoachMemoryScreen(deps.coach, onBack = nav::popBackStack) }
                     composable<CoachRoute> {
                         CoachTabScreen(
@@ -897,29 +917,32 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                             onLedger = { nav.navigate(LedgerRoute) },
                             onRecovery = { nav.navigate(RecoveryRoute) },
-                            onSpotInvite = { nav.navigate(SpotInviteRoute) },
-                            onSpotRedeem = { nav.navigate(SpotRedeemRoute()) },
+                            onInviteShow = { nav.navigate(InviteShowRoute) },
+                            onInviteRedeem = { nav.navigate(InviteRedeemRoute()) },
                             fuelActive = state.providerId == ProviderId.FUEL,
+                            onRedeemCode = { nav.navigate(RedeemCodeRoute) },
+                            distribution = deps.distribution,
                         )
                     }
+                    composable<RedeemCodeRoute> { RedeemCodeScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<LedgerRoute> { LedgerScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<RecoveryRoute> { RecoveryScreen(deps.fuelSession, onBack = nav::popBackStack, onRestored = {}) }
-                    composable<SpotInviteRoute> { SpotInviteScreen(deps.fuelSession, onBack = nav::popBackStack) }
-                    composable<SpotRedeemRoute> { entry ->
-                        SpotRedeemScreen(
+                    composable<InviteShowRoute> { InviteShowScreen(deps.fuelSession, onBack = nav::popBackStack) }
+                    composable<InviteRedeemRoute> { entry ->
+                        InviteRedeemScreen(
                             canScan = deps.share.canScanInApp,
-                            initialCode = entry.toRoute<SpotRedeemRoute>().code,
+                            initialCode = entry.toRoute<InviteRedeemRoute>().code,
                             session = deps.fuelSession,
                             onBack = nav::popBackStack,
-                            onRedeemed = { micro, name ->
-                                nav.navigate(SpotRevealRoute(micro, name.orEmpty())) { popUpTo<SpotRedeemRoute> { inclusive = true } }
+                            onRedeemed = { reviews, name ->
+                                nav.navigate(InviteRevealRoute(reviews, name.orEmpty())) { popUpTo<InviteRedeemRoute> { inclusive = true } }
                             },
                         )
                     }
-                    composable<SpotRevealRoute> { entry ->
-                        val route = entry.toRoute<SpotRevealRoute>()
-                        SpotRevealScreen(
-                            amountMicro = route.amountMicro,
+                    composable<InviteRevealRoute> { entry ->
+                        val route = entry.toRoute<InviteRevealRoute>()
+                        InviteRevealScreen(
+                            reviews = route.reviews,
                             inviterName = route.inviterName.ifEmpty { null },
                             haptics = deps.haptics,
                             vibration = state.settings.vibration,
@@ -927,6 +950,7 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                 }
+            }
             }
         }
     }
@@ -972,8 +996,18 @@ private fun AppScaffold(
     val destination = entry?.destination
     val current = Tab.entries.firstOrNull { tab -> destination?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
 
+    // While a screen change runs, taps are swallowed: a double tap no longer opens a screen twice or pops two screens.
+    val visible by nav.visibleEntries.collectAsStateWithLifecycle()
+    // Tab switches have no transition (ScreenMotion), so they never block: only a fade between other screens does.
+    val screens = visible.filter { it.destination !is androidx.navigation.NavGraph }
+    val transitioning = screens.size > 1 && !screens.all { e -> Tab.entries.any { e.destination.hasRoute(it.routeClass) } }
     Column(Modifier.fillMaxSize().background(Theme.colors.background)) {
-        Box(Modifier.weight(1f)) { content() }
+        Box(Modifier.weight(1f)) {
+            content()
+            if (transitioning) Box(Modifier.matchParentSize().testTag("nav-transition").pointerInput(Unit) {
+                awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
+            })
+        }
         // A running workout that is not on screen (minimized) sits above the tab bar on every main screen.
         if (current != null && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
         if (current != null) {

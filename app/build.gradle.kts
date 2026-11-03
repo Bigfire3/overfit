@@ -16,7 +16,7 @@ android {
         targetSdk = 37
         versionCode = ciRunNumber
         versionName = "0.1.$ciRunNumber"
-        // Fuel/Spot backend; empty = not configured (the app then shows "coming soon" and the demo). CI variable OVERFIT_BACKEND_URL.
+        // credit/invite backend; empty = not configured (the app then shows "coming soon" and the demo). CI variable OVERFIT_BACKEND_URL.
         buildConfigField("String", "OVERFIT_BACKEND_URL", "\"${System.getenv("OVERFIT_BACKEND_URL").orEmpty().trim()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -93,6 +93,8 @@ dependencies {
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
+    // Component tests (Column, Row) build small hosts around design-system parts.
+    testImplementation(libs.compose.foundation)
     debugImplementation(platform(libs.androidx.compose.bom))
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

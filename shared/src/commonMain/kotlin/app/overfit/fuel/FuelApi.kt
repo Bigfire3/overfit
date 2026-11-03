@@ -24,13 +24,14 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlin.random.Random
 import kotlin.time.Clock
 
 /**
- * Client of the Fuel/Spot backend (docs/backend-api.md). Signs every request with the device key.
+ * Client of the credit/invite backend (docs/backend-api.md). Signs every request with the device key.
  * Recovers on its own from `unknown_device` (registers, then retries once) and from clock skew
  * (`timestamp_out_of_range` carries the server time).
  */
@@ -169,10 +170,10 @@ class FuelApi(
         return parse(call(HttpMethod.Post, "/v1/recovery/restore", body)) { decode(it) }
     }
 
-    override suspend fun spotToken(): SpotToken = parse(call(HttpMethod.Post, "/v1/spot/token")) { decode(it) }
+    override suspend fun inviteToken(): InviteToken = parse(call(HttpMethod.Post, "/v1/invite/token")) { decode(it) }
 
-    override suspend fun redeemSpot(token: String): SpotRedeemResult {
-        val challenge = parse(call(HttpMethod.Post, "/v1/spot/challenge")) { decode<SpotChallenge>(it) }
+    override suspend fun redeemInvite(token: String): InviteRedeemResult {
+        val challenge = parse(call(HttpMethod.Post, "/v1/invite/challenge")) { decode<InviteChallenge>(it) }
         // Test server (DEPLOY_MODE=test): no device check, a test token bound to this device instead. Production never accepts it.
         val attestation = attestor.attest(challenge.challenge)
             ?: if (config().mode == "test") Attestation("google", "test:${signer.deviceId}") else null
@@ -185,7 +186,17 @@ class FuelApi(
                 put("challenge", challenge.challenge)
             })
         }.toString()
-        return parse(call(HttpMethod.Post, "/v1/spot/redeem", body)) { decode(it) }
+        return parse(call(HttpMethod.Post, "/v1/invite/redeem", body)) { decode(it) }
+    }
+
+    override suspend fun webPurchaseLink(locale: String): WebPurchaseLink {
+        val body = buildJsonObject { put("locale", locale) }.toString()
+        return parse(call(HttpMethod.Post, "/v1/purchase/web-link", body)) { decode(it) }
+    }
+
+    override suspend fun redeemCode(code: String): CodeRedeemResult {
+        val body = buildJsonObject { put("code", code.trim()) }.toString()
+        return parse(call(HttpMethod.Post, "/v1/codes/redeem", body)) { decode(it) }
     }
 
     override suspend fun messages(bodyJson: String): FuelMessageResult = parse(call(HttpMethod.Post, "/v1/messages", bodyJson)) { element ->
@@ -194,6 +205,9 @@ class FuelApi(
             body = element,
             costMicro = meta?.get("costMicro")?.jsonPrimitive?.longOrNull ?: 0,
             balanceMicro = meta?.get("balanceMicro")?.jsonPrimitive?.longOrNull ?: 0,
+            servedModel = meta?.get("model")?.jsonPrimitive?.contentOrNull,
+            chosenModel = meta?.get("requestedModel")?.jsonPrimitive?.contentOrNull,
+            giftReview = meta?.get("giftReview")?.jsonPrimitive?.booleanOrNull ?: false,
         )
     }
 }

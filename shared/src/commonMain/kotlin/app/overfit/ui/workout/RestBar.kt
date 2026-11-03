@@ -28,7 +28,7 @@ import app.overfit.domain.Workout
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
 import app.overfit.ui.theme.Space
@@ -59,9 +59,9 @@ fun RestBar(
     @Composable
     fun Actions(modifier: Modifier = Modifier) {
         Row(modifier, horizontalArrangement = Arrangement.spacedBy(Space.l), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(t.restMinus, { onAdjust(-15) })
-            TextButton(t.restPlus, { onAdjust(15) })
-            TextButton(t.restSkip, onSkip, tone = Tone.Default)
+            SmallButton(t.restMinus, { onAdjust(-15) })
+            SmallButton(t.restPlus, { onAdjust(15) })
+            SmallButton(t.restSkip, onSkip, tone = Tone.Default)
         }
     }
 

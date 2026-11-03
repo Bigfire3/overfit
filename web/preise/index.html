@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>overfit – Preise</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="stylesheet" href="../style.css">
+<style>
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 15px; }
+td { padding: 8px 0; border-top: 1px solid var(--line); }
+td:last-child { text-align: right; white-space: nowrap; padding-left: 12px; }
+h2 { font-size: 17px; margin: 28px 0 8px; }
+.en { display: none; }
+html[lang="en"] .de { display: none; }
+html[lang="en"] .en { display: block; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">overfit</div>
+
+  <div class="de">
+    <h1>Wie setzen sich die Preise zusammen?</h1>
+    <p class="sub">Ohne Werbetext: wofür dein Geld draufgeht.</p>
+    <p><b>Im Web bekommst du 1:1:</b> 10&nbsp;€ bezahlt sind 10&nbsp;€ Guthaben. <b>Im App Store und Play Store</b> kostet dasselbe Guthaben mehr, und zwar offen: „5&nbsp;€ Guthaben für 6,99&nbsp;€“, „10&nbsp;€ Guthaben für 13,99&nbsp;€“. Verbraucht wird das Guthaben überall gleich: zum Listenpreis des KI-Anbieters für das gewählte Modell <b>plus 28&nbsp;% Aufschlag</b>. Unter jeder Antwort steht der echte Preis.</p>
+
+    <h2>Im Web: 10&nbsp;€ zahlen, 10&nbsp;€ Guthaben</h2>
+    <p>Beispiel, wenn das Guthaben ganz verbraucht wird. overfit ist Kleinunternehmer: Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>
+    <table>
+      <tr><td>Du zahlst</td><td>10,00 €</td></tr>
+      <tr><td>Zahlungsgebühr Stripe (angesetzt mit 2,5 % + 0,25 €, Mischung aus EU- und anderen Karten)</td><td>− 0,50 €</td></tr>
+      <tr><td>Bleibt bei uns</td><td>9,50 €</td></tr>
+      <tr><td>Rechnung der KI-Anbieter für 10 € Guthaben (10 € ÷ 1,28)</td><td>− 7,81 €</td></tr>
+      <tr><td>Rücklage für Geschenktes (Startguthaben, Einladungsbonus als Coach-Auswertungen), angesetzt mit 10 % von 9,50 €</td><td>− 0,95 €</td></tr>
+      <tr><td>Gewinn, auch für den Betrieb (Server, Entwicklung)</td><td>0,74 € (≈ 8 %)</td></tr>
+    </table>
+
+    <h2>Im Store: warum dasselbe Guthaben mehr kostet</h2>
+    <p>Apple und Google verkaufen selbst und führen die Umsatzsteuer des Käuferlands ab (in Deutschland 19&nbsp;%). Dazu nehmen sie 15&nbsp;% vom Preis ohne Umsatzsteuer. Beispiel 5&nbsp;€ Guthaben für 6,99&nbsp;€, ganz verbraucht:</p>
+    <table>
+      <tr><td>Du zahlst</td><td>6,99 €</td></tr>
+      <tr><td>Umsatzsteuer, führt der Store ab (19 % in Deutschland)</td><td>− 1,12 €</td></tr>
+      <tr><td>Store-Gebühr (15 % vom Preis ohne Umsatzsteuer)</td><td>− 0,88 €</td></tr>
+      <tr><td>Bleibt bei uns</td><td>4,99 €</td></tr>
+      <tr><td>Rechnung der KI-Anbieter für 5 € Guthaben (5 € ÷ 1,28)</td><td>− 3,91 €</td></tr>
+      <tr><td>Rücklage für Geschenktes (Startguthaben, Einladungsbonus als Coach-Auswertungen), angesetzt mit 10 % von 4,99 €</td><td>− 0,50 €</td></tr>
+      <tr><td>Gewinn</td><td>0,59 € (≈ 12 %)</td></tr>
+    </table>
+    <p class="dim small">Der Store-Preis gilt in allen Euro-Ländern gleich, die Umsatzsteuer nicht: Bei 27&nbsp;% bleiben 0,30&nbsp;€ (≈ 6&nbsp;%). Darauf ist die Preisstufe ausgelegt, damit kein Kauf draufzahlt. Ohne diesen Aufpreis müssten alle, auch im Web, rund 69&nbsp;% Aufschlag zahlen; so sind es 28&nbsp;%. Die vollständige Rechnung steht im Repository unter docs/monetization.md.</p>
+    <p class="dim small"><a href="?lang=en">English</a></p>
+  </div>
+
+  <div class="en">
+    <h1>How are the prices made up?</h1>
+    <p class="sub">No marketing: where your money goes.</p>
+    <p><b>On the web you get 1:1:</b> pay €10, get €10 of credit. <b>In the App Store and Play Store</b> the same credit costs more, openly: “€5 of credit for €6.99”, “€10 of credit for €13.99”. Credit is used up the same way everywhere: at the AI provider's list price for the model you choose <b>plus a 28 % markup</b>. The real price is shown under every answer.</p>
+
+    <h2>On the web: pay €10, get €10 of credit</h2>
+    <p>Example, if the credit is used up completely. overfit is a small business: no VAT is charged under § 19 UStG (German small business scheme).</p>
+    <table>
+      <tr><td>You pay</td><td>€10.00</td></tr>
+      <tr><td>Stripe payment fee (assumed at 2.5 % + €0.25, a mix of EU and other cards)</td><td>− €0.50</td></tr>
+      <tr><td>Left with us</td><td>€9.50</td></tr>
+      <tr><td>AI providers' bill for €10 of credit (€10 ÷ 1.28)</td><td>− €7.81</td></tr>
+      <tr><td>Starter credit and referral bonus (assumed at 10 % of €9.50)</td><td>− €0.95</td></tr>
+      <tr><td>Profit, also for running costs (servers, development)</td><td>€0.74 (≈ 8 %)</td></tr>
+    </table>
+
+    <h2>In the stores: why the same credit costs more</h2>
+    <p>Apple and Google sell the credit themselves and pay the VAT of the buyer's country (19 % in Germany). On top they take 15 % of the price without VAT. Example €5 of credit for €6.99, used up completely:</p>
+    <table>
+      <tr><td>You pay</td><td>€6.99</td></tr>
+      <tr><td>VAT, paid by the store (19 % in Germany)</td><td>− €1.12</td></tr>
+      <tr><td>Store fee (15 % of the price without VAT)</td><td>− €0.88</td></tr>
+      <tr><td>Left with us</td><td>€4.99</td></tr>
+      <tr><td>AI providers' bill for €5 of credit (€5 ÷ 1.28)</td><td>− €3.91</td></tr>
+      <tr><td>Starter credit and referral bonus (10 % of €4.99)</td><td>− €0.50</td></tr>
+      <tr><td>Profit</td><td>€0.59 (≈ 12 %)</td></tr>
+    </table>
+    <p class="dim small">The store price is the same in all euro countries, VAT is not: at 27 % €0.30 (≈ 6 %) is left. The price tier is sized for that so that no purchase loses money. Without this store surcharge everyone, also on the web, would pay a markup of about 69 %; this way it is 28 %. The full calculation is in the repository at docs/monetization.md.</p>
+    <p class="dim small"><a href="?lang=de">Deutsch</a></p>
+  </div>
+</main>
+<script>
+(function () {
+  var p = new URLSearchParams(location.search).get('lang');
+  var de = p ? p === 'de' : (navigator.language || '').toLowerCase().indexOf('de') === 0;
+  document.documentElement.lang = de ? 'de' : 'en';
+})();
+</script>
+</body>
+</html>

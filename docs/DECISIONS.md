@@ -283,7 +283,7 @@ Zuerst als native Android-Version gebaut (PR #17), dann nach der KMP-Entscheidun
   und hängen als `Strings.share` ein, um Merge-Konflikte in der großen `Strings.kt` klein zu halten.
 - **Beispielvorlagen:** `files/samples/{push,pull,legs}.json` in der gleichen Datei-Form wie der Export. „Hinzufügen“
   ist idempotent über den Namen (Push/Pull/Legs), wer eine löscht, kann sie neu holen.
-- **Duo:** Nur ein Teaser-Eintrag „Duo · bald“ auf dem Startbildschirm und ein Text-Screen, keine Datenerhebung.
+- **Duo:** (entfernt 3.11., Fabian; später evtl.) Nur ein Teaser-Eintrag „Duo · bald“ auf dem Startbildschirm und ein Text-Screen, keine Datenerhebung.
 ## Produktentscheidungen Nacht 3.11.
 
 Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus, KI-Coach, App-Anbindung):
@@ -296,7 +296,7 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
   Bewusste Ausnahme von „keine Animationen“.
 - **Haptik:** leichter Tick beim Abhaken eines Satzes, drei kurze Pulse am Ende der Pause, das Reveal-Muster. Schalter
   „Vibration“ im Profil (Standard an).
-- **Duo-Modus** (zwei Handys trainieren gemeinsam: synchrone Sätze, gemeinsamer Pausentimer) wird nur angeteasert: Eintrag
+- **Duo-Modus** (entfernt 3.11., Fabian; später evtl.) (zwei Handys trainieren gemeinsam: synchrone Sätze, gemeinsamer Pausentimer) wird nur angeteasert: Eintrag
   „Duo · bald“ mit kurzer Erklärung, keine Datenerhebung.
 - **Teilen/Import:** Format laut SPEC und `docs/share-format.md` (JSON, Raw Deflate, Base64url im URL-Fragment); Beispielvorlagen
   Push, Pull, Legs in `samples/`.
@@ -455,7 +455,7 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - **Übungsliste im Prompt:** alle `wg:`-Übungen (302), eigene Übungen und alles, was in Vorlagen/Trainings vorkommt – nicht
   alle 1.098 (die 796 `fedb:` kosten ~10k Token pro Anfrage, Cache hält nur 5 Minuten, eine Auswertung pro Training).
 - **Modelle:** Standard Anthropic `claude-sonnet-5-5` (SPEC), OpenAI `gpt-5`, OpenRouter `anthropic/claude-sonnet-5.5`, in
-  Profil → Coach → Coach-Einstellungen änderbar. Fuel ist fest `claude-sonnet-5-5` (Backend erlaubt nur dieses). `effort`
+  Profil → Coach → Coach-Einstellungen änderbar. Fuel ist fest `claude-sonnet-5-5` (Backend erlaubt nur dieses; überholt: Stufen, siehe „Fuel: Stufen statt fester Anbieter“). `effort`
   `medium`, `max_tokens` 8.000 (Fuel-Grenze 8.192).
 - **Warteschlange ohne WorkManager:** Jede Anfrage ist sofort eine Zeile in `coach_review` (QUEUED). Netzfehler, Timeout
   (150 s), 429, 5xx → bleibt QUEUED und wird beim App-Start und jedem Zurückkommen in den Vordergrund automatisch gesendet;
@@ -522,7 +522,7 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templates verstehe ich nicht … Alles soll gespeichert werden.“
 
 - **Begriff:** In der UI heißt ein gespeicherter Plan überall „Workout“ (DE und EN), eine laufende/abgeschlossene Einheit weiter „Training“ (DE) / „workout“ (EN). Intern bleiben `workout_template`, `Template`, `TemplateRepository` – keine Schemaänderung, keine Migration.
-- **Tab 1:** DE „Training“, EN „Workouts“ (im Englischen liest sich der Plural als Liste besser), Icon Blitz. Der Tab zeigt nur noch: laufendes Training oben („Läuft gerade“ + „Training fortsetzen“ als PrimaryButton), Liste der Workouts (Name, Übungen, „zuletzt vor N Tagen“), Coach-Tipps, Duo. Begrüßung und Gewicht sind raus (Gewicht steht im Profil). Der Übungen-Tab zeigt nur noch Übungen.
+- **Tab 1:** DE „Training“, EN „Workouts“ (im Englischen liest sich der Plural als Liste besser), Icon Blitz. Der Tab zeigt nur noch: laufendes Training oben („Läuft gerade“ + „Training fortsetzen“ als PrimaryButton), Liste der Workouts (Name, Übungen, „zuletzt vor N Tagen“), Coach-Tipps, Duo (Coach-Tipps und Duo entfernt 3.11., Fabian). Begrüßung und Gewicht sind raus (Gewicht steht im Profil). Der Übungen-Tab zeigt nur noch Übungen.
 - **„+“ oben rechts** öffnet eine eigene Seite (kein Bottom-Sheet, das Designsystem hat keins) mit „Workout erstellen“ (Editor, speichert, startet nicht) und „Leer starten“. Darunter unter „Weitere Wege“ Import, KI-Prompt und Beispiel-Workouts.
 - **Workout-Seite:** Tipp auf ein Workout öffnet eine Ansicht mit „Starten“ (PrimaryButton), „Bearbeiten“, „Teilen“. Import, Chat-Eingang, Coach und „Als Workout speichern“ im Verlauf führen ebenfalls dorthin statt in den Editor.
 - **Automatisch übernehmen (`WorkoutPlan`, `TemplateRepository.adopt`):** Endet ein Training (Beenden *und* Verwerfen), übernimmt sein Workout Übungsliste, Reihenfolge, Satzanzahl, Pausen und Namen – ohne Dialog. Ein leer gestartetes Training mit mindestens einer Übung wird ein neues Workout; die Sitzung bekommt dessen ID (für „zuletzt“, Coach). Zielwerte werden *nicht* aus den Ist-Werten kopiert: Sätze, die bleiben, behalten ihre geplanten Werte, neue Sätze/Übungen bekommen leere Ziele, die beim nächsten Start wie bisher aus der letzten Ausführung kommen.
@@ -803,3 +803,251 @@ Prüfung des Codes (Start, Vordergrund, Fuel-Konto, Registrierung, `/v1/config`,
   Profil und der Fuel-Hinweis ergeben **0** Anfragen an den Backend-Host; als Gegenprobe erzeugt „Fuel ansehen“ danach Anfragen.
 - In der App (Coach-Tab → KI-Zugang, nur bei eigenem Key): „Deine Daten gehen direkt an <Anbieter>, nicht über overfit-Server.“ (DE/EN).
 - Bewusst nicht Teil der Garantie: Fuel, Spot, KI-Chat-Verbindung und Kurz-Code-QR – sie sind ausdrückliche Opt-ins und sprechen mit dem Backend.
+
+## Fuel: Stufen statt fester Anbieter, AI Gateway (Session X, 3.11.)
+- **Stufen:** Die App schickt weiter das Anthropic-Messages-Format, `model` ist aber eine Stufe: `standard` (Google `gemini-3.6-flash`,
+  Voreinstellung für Coach-Auswertung, Chat und Vorschläge), `pro` (Anthropic `claude-sonnet-5-5`), `lite` (Workers AI
+  `@cf/meta/llama-3.1-8b-instruct`, nur „Mit KI ausfüllen“). Das Backend bildet das Format ab und antwortet im Anthropic-Format, damit
+  `anthropicReply` in der App und alle App-Verträge gleich bleiben. Alte App-Versionen schicken `claude-sonnet-5-5` und landen auf `pro`.
+- **Modellwahl:** `gemini-3.6-flash` ist laut Googles Modellliste stabil (3.8 Flash ist noch „New“, gleicher Preis), auch der eigene
+  Gemini-Key-Weg der App nutzt es. Für `lite` ein Modell, das bei Workers AI ausdrücklich JSON-Modus kann (Llama 3.1 8B); die günstigeren
+  fp8-fast-Varianten stehen nicht auf der JSON-Liste. Schlägt der JSON-Modus fehl, weicht die Anfrage auf `standard` aus.
+- **Gemini über die native API** (`generateContent`) statt OpenAI-kompatibel: `responseJsonSchema` nimmt das Schema der App direkt,
+  `usageMetadata` liefert Cache- und Thinking-Token getrennt (beides wird abgerechnet), `finishReason`/`blockReason` lassen sich sauber auf
+  `max_tokens`/`refusal` abbilden. Gemini zählt Thinking in die Ausgabe, darum bekommt es `2 × max_tokens` (mind. 4096) und
+  `thinkingLevel: medium` (oder `effort` der App).
+- **Preise im Code** (`backend/src/providers.ts`, µ€ je MTok, Listenpreis × 0,92 €/$), mit Gültig-ab-Datum: Gemini 3.6 Flash wird am
+  1.1.2027 doppelt so teuer, das ist schon hinterlegt (Test). Workers AI in Neurons je MTok (0,011 $ je 1000 Neurons); das Freikontingent
+  von 10 000 Neurons/Tag rechnen wir nicht heraus (Marge). `PRICE_TABLE` kann einzelne Modelle kurzfristig überschreiben.
+- **Ausweichen:** Ausfall = 5xx, 429, 408, Zeitüberschreitung, Netzwerk, bei Workers AI jeder Binding-Fehler. Dann genau ein Versuch mit
+  der Ausweich-Stufe (`standard` ↔ `pro`, `lite` → `standard`), wenn sie konfiguriert ist, Bilder kann (falls nötig) und von den 140 s
+  Gesamtbudget noch ≥ 15 s übrig sind. 4xx-Ablehnungen weichen nie aus (die App wiederholt Structured-Output-Fehler selbst ohne Schema).
+  `lite` → `standard` ist zusätzlich zum Auftrag drin, weil „Mit KI ausfüllen“ sonst bei jeder Workers-AI-Störung ausfiele; es kostet uns
+  pro Fall Bruchteile eines Cents.
+- **Nie mehr als die angefragte Stufe:** abgerechnet wird `min(Kosten zum Preis des genutzten Modells, Kosten zum Preis der angefragten
+  Stufe)` für die tatsächlich verbrauchten Token, höchstens die Reservierung der angefragten Stufe. Begründung: Der Nutzer hat einen Preis
+  gewählt und kann nichts für den Ausfall; Ausweichen ist selten, die Differenz (Sonnet statt Flash ≈ 2,7×) trägt der 8-%-Aufschlag über alle
+  Anfragen. Weicht `pro` auf `standard` aus, zahlt der Nutzer den günstigeren Preis. Das Ledger bucht `model` = genutztes Modell und `tier`
+  = angefragte (abgerechnete) Stufe (Migration `0003_ledger_tier.sql`), die Antwort meldet `overfit.servedTier` und `fallback`.
+- **Nicht verfügbar ≠ Ausfall:** Fehlt der Key einer Stufe, ersetzt das Backend sie nicht still (sonst dauerhafte Quersubvention), sondern
+  antwortet `503 tier_unavailable` mit `details.available`. `/v1/config` meldet je Stufe `available`, die App wählt dann selbst die nächste
+  (lite → standard → pro, pro ↔ standard) und blendet Pro aus, wenn es fehlt.
+- **AI Gateway:** alle Anbieter-Aufrufe laufen über ein Gateway je Betrieb (`overfit`, `overfit-test`): Gemini und Anthropic über
+  `env.AI.gateway(id).getUrl(provider)` (keine Account-ID im Code nötig), Workers AI über die `gateway`-Option von `AI.run`. Das Gateway ist
+  nicht authentifiziert, weil jeder Aufruf ohnehin den Anbieter-Key braucht. Angelegt mit Protokollen, Rate-Limit 600/min (gleitend, nur
+  Notbremse; je Gerät gilt weiter 10/min) und ohne Cache (Coach-Anfragen sind praktisch nie gleich; im Dashboard zuschaltbar).
+  **Datenschutz:** Anfragen mit Körperfotos schicken `cf-aig-collect-log: false`, das Gateway speichert sie nicht. Textanfragen werden
+  protokolliert (Fehlersuche, Kosten); Metadaten nur `tier`, keine Konto-ID.
+- **Workers-AI-Binding nur im Deploy:** `ai` steht nicht in `wrangler.jsonc`, sondern wird von `scripts/deploy-config.mjs` ergänzt.
+  Sonst bräuchten die Vitest/Miniflare-Tests und `wrangler dev` ein Cloudflare-Konto (das Binding ist immer remote). Tests mocken `AI`.
+- **Deploy-Rechte:** Der Workflow prüft vor dem Deploy `GET /ai/models/search` (braucht *Workers AI · Read*) und liest bzw. legt das Gateway
+  per REST an (`/ai-gateway/gateways`, braucht *AI Gateway · Edit*). 401/403 → Abbruch mit genauer Anleitung, welche Zeile im Token fehlt.
+- **Secrets:** `GEMINI_API_KEY` neu, `ANTHROPIC_API_KEY` optional; mindestens einer ist Pflicht (Abbruch mit Anleitung). Fehlt einer, steht
+  in der Zusammenfassung, welche Stufe nicht verfügbar ist. Testbetrieb unverändert.
+- **App:** Coach-Einstellungen → „Coach-Qualität: Standard / Pro“ (nur mit Fuel, nur wenn beide Stufen verfügbar; Hinweis „Pro kostet etwa
+  das n-Fache“ aus den Preisen in `/v1/config`, gewichtet 80 % Eingabe / 20 % Ausgabe). Gespeichert in den Coach-Einstellungen (kein
+  Room-Schema). „Mit KI ausfüllen“ fragt über `AiGateway.send(light = true)`: mit Fuel `lite`, mit eigenem Key unverändert.
+  `FuelProvider` merkt sich `/v1/config` 10 Minuten. Die Config wird nur geladen, wenn Fuel der KI-Zugang ist; die Garantie „eigener Key =
+  null Backend-Anfragen“ bleibt (OwnKeyPrivacyTest).
+
+## Ehrliche Begriffe und volle Kostentransparenz (Session Y, 3.11.)
+Auslöser (Fabian): „Ich möchte nicht die Begriffe Standard oder Pro oder Lite verwenden. Das klingt nach Abzocke. Verwende einfach die Namen der Modelle … und kommuniziere die Kosten.“ Außerdem: „Fuel“ heißt künftig „Guthaben“ (EN „Credit“), schlicht und in Euro.
+
+### Grundsatz (gilt für alle künftigen Sessions)
+1. **Kein Marketing-Name für Modelle.** In der UI, auf der Webseite, in Store-Texten und Doku stehen die echten Modellnamen mit Anbieter („Gemini 3.6 Flash (Google)“, „Claude Sonnet 5.5 (Anthropic)“, „Llama 3.1 8B (Cloudflare)“), nie „Standard“, „Pro“, „Lite“ o. Ä.
+2. **Preise sind immer sichtbar:** vor der Wahl (geschätzt, pro Auswertung, Chat-Nachricht und „Mit KI ausfüllen“), nach der Antwort (echt, mit Modell).
+3. **Die Marge steht offen** in docs/monetization.md („Marge (offen)“): 8 % Aufschlag auf den Listenpreis, Store-Gebühr 15 %, daraus ≈ 6,3 % vom Kaufpreis.
+4. Wenn ein anderes Modell antwortet als das gewählte, sagt die App es: „Gemini 3.6 Flash war nicht erreichbar, Claude Sonnet 5.5 hat geantwortet, berechnet wurde der Preis von Gemini 3.6 Flash.“
+
+### Umbenennung Fuel → Guthaben
+- Sichtbar überall: UI (DE „Guthaben“, EN „Credit“), README, SPEC, Store-Texte, backend/README, docs, Workflow-Meldungen. Komposita: „Guthaben aufladen“, „Guthaben · 4,20 €“, „Mit Guthaben nutzen“, „Guthaben öffnen“. Spot bleibt Spot (1 € Guthaben je Einladung).
+- **Bezeichner im Code bleiben** (`Fuel*`-Klassen, Paket `app.overfit.fuel`, `ui/fuel`, String-Felder `fuel*`, `FuelStrings`): Das Umbenennen berührt ~60 Dateien, Room-Tabellen/Backups und Tests ohne Nutzen für Nutzer und birgt Merge-Konflikte mit den parallelen Sessions U und Z. Nutzer sehen sie nie.
+- **Store-Produkt-IDs bleiben** `overfit.fuel.5` / `overfit.fuel.10` (bei Apple/Google registriert, Änderung = neue Produkte, nicht sichtbar).
+- Die Web-Kaufseite (Session Z) nutzt „Guthaben“ bereits.
+
+### Modellnamen statt Stufen
+- Stufen-IDs (`standard`, `pro`, `lite`) bleiben **intern** (Protokoll App ↔ Backend, gespeicherte Einstellung, Ledger-Spalte `tier`); die UI zeigt sie nie.
+- `GET /v1/config` liefert je Stufe `displayName`, `vendor`, `label`, `thinkingTokens`, Preise, dazu `usageProfiles` (typische Token je Aufgabe). Die App liest die Namen von dort; die statische Tabelle `fuel/ModelNames.kt` benennt nur gespeicherte Modell-IDs in alten Buchungen und Antworten und dient als Rückfall bei altem Backend.
+- Auswahl im Coach: „Modell für deinen Coach“ als Liste der verfügbaren Modelle; pro Modell „Auswertung ca. 1,5 ct · Chat-Nachricht ca. 1,1 ct“, darunter „Mit deinem Guthaben (4,20 €) reicht das für etwa 278 Auswertungen.“ und „„Mit KI ausfüllen“ nutzt immer Llama 3.1 8B (Cloudflare), ca. 0,04 ct je Übung.“
+- Unter jeder Coach-Antwort und Chat-Antwort: „Modell · echte Kosten · Guthaben“. Buchungen zeigen das Modell statt der Stufe; bei Ausweichung steht „Ersatzmodell, berechnet wurde der Preis von …“.
+- Antwort-Meta (`overfit`) trägt zusätzlich `modelName`, `vendor`, `requestedModel*`; die App speichert `servedModel`/`fallbackFrom` an Review und Chat-Nachricht (Room v7, AutoMigration 6→7, Migrationstest).
+
+### Kostenschätzung (Methode, berechnet statt geraten)
+Schätzung = ⌈(Eingabe-Token × Eingabepreis + (Ausgabe-Token + Thinking) × Ausgabepreis) / 1 Mio. × (1 + Aufschlag)⌉ in µ€, Integer-Rechnung wie das Backend (`CostEstimate.kt`, unit-getestet). Preise aus der Preistabelle (`/v1/config`), Aufschlag `markupBp`. Typische Token-Mengen aus den **echten Prompts**, gemessen an den Bausteinen der App (Zeichen, ÷ 3,3 Zeichen je Token, bewusst hoch gerundet, ohne Cache-Rabatt):
+- **Coach-Auswertung:** System (Anweisungen ≈ 1,1k + Ausgaberegeln 1,8k + Beispiel 0,6k Zeichen) + Übungsliste des Katalogs (302 Einträge, 11,5k Zeichen) + Schema ≈ 1,5k + Profil ≈ 0,6k + Nutzernachricht (Gedächtnis ≈ 2,5k, heutiges Training ≈ 2,5k, Vorlage ≈ 0,8k, frühere Einheiten ≈ 2,5k, Verläufe ≈ 1,5k) ⇒ ≈ 27 000 Zeichen ⇒ **≈ 8 200 Token ein**; Antwort (JSON mit Bewertung, Übungen, nächster Einheit, Gedächtnis) ≈ **1 400 Token aus**.
+- **Chat-Nachricht:** System ≈ 15k Zeichen (Regeln, Share-Beispiel, Übungsliste) + Schema ≈ 1,5k + Kontext ≈ 3k + Verlauf (≈ 6 Nachrichten) ≈ 2,4k + Frage ⇒ **≈ 6 700 ein / 500 aus**.
+- **Mit KI ausfüllen:** System ≈ 1,8k + Schema ≈ 0,9k + Eingabe ≈ 0,2k ⇒ **≈ 900 ein / 120 aus** (immer Llama 3.1 8B).
+- **Gemini-Thinking:** zählt als Ausgabe; Aufschlag von ≈ 1 000 Token bei Coach und Chat (`thinkingTokens`, Stufe `medium`).
+- Die echten Mengen schwanken (lange Gedächtnisse, viele Übungen). Die echten Kosten stehen unter jeder Antwort; die Schätzung ist als „ca.“ gekennzeichnet. Ändern sich Prompts deutlich, werden `USAGE_PROFILES` (backend/src/providers.ts) und `DEFAULT_USAGE_PROFILES` (App, Rückfall für alte Backends) neu gemessen.
+
+### Protokollierung von Anfragen mit Körperfotos
+- **Recherche (Cloudflare-Doku, AI Gateway → Logging, 3.11.):** Der Header `cf-aig-collect-log-payload: false` überspringt das Speichern von Anfrage und Antwort, die Metadaten (Tokens, Kosten, Modell, Anbieter, Dauer, Status) werden weiter protokolliert. `cf-aig-collect-log: false` unterdrückt dagegen den ganzen Eintrag, und das war bisher unser Verhalten bei Foto-Anfragen (Kosten und Tokens fehlten im Gateway).
+- **Entscheidung:** Foto-Anfragen senden jetzt `cf-aig-collect-log-payload: false` statt `cf-aig-collect-log: false`. Es werden weiterhin keine Fotos, Prompts oder Antworten gespeichert; Kosten und Verbrauch erscheinen im Gateway. Zusätzlich `cf-aig-metadata` `{ tier, photo, fallback }` bei jeder Anfrage (nur Markierungen, keine Inhalte). Für Workers AI läuft dieselbe Metadaten-Angabe über die `gateway`-Option; diese Stufe nimmt keine Bilder.
+- **Eigener Weg unabhängig vom Gateway:** Das Ledger in D1 hält je Verbrauchsbuchung Modell, Tokens, berechneten Betrag und (neu, Migration 0004) `cost_micro` (Anbieterkosten zum Listenpreis ohne Aufschlag), `fallback`, `photo`; Stufe (`tier`) war schon da. `GET /v1/admin/usage?from=&to=` (ADMIN_SECRET ≥ 16 Zeichen, auch in Produktion; sonst 404) gruppiert nach Modell/Stufe/Ausweichung/Foto und liefert Anzahl, Tokens, berechnet, Anbieterkosten und Marge (= berechnet − Anbieterkosten). Dazu `backend/scripts/usage-report.mjs` als Tabelle.
+- **Datenschutz:** Die Auswertung enthält nur Zahlen und Ja/Nein-Markierungen, nie Prompt, Antwort, Foto, Konto- oder Geräte-IDs. Ein Foto-Flag verrät nur „diese Anfrage enthielt ein Foto“, nicht welches; es gibt keine Verbindung zu einer Person im Bericht (aggregiert). Alte Buchungen behalten `cost_micro = NULL` (Marge unbekannt) statt geschätzter Werte.
+
+## Guthaben im Web, Testmodus (Session Z, 3.11.)
+- **Anbieter: Paddle (Billing) als Merchant of Record, zuerst nur Sandbox.** Paddle übernimmt EU-USt, Belege, Erstattungen und
+  Chargebacks; die Sandbox ist für ein Einzelkonto sofort und kostenlos nutzbar (keine Domain- oder Kontoprüfung, Default Payment
+  Link darf jede Domain sein). Lemon Squeezy wäre gleichwertig, gehört aber inzwischen zu Stripe und wird umgebaut; Stripe allein
+  hieße USt selbst abführen (OSS). Gebühr Paddle: 5 % + 0,50 € je Kauf. Die Integration liegt hinter `PaymentProvider`
+  (`backend/src/payments/provider.ts`: `createCheckout`, `parseWebhook`); ein Wechsel betrifft nur `paddle.ts`.
+- **Checkout per API-Transaktion + Paddle.js auf der eigenen Seite** (`/v1/web/checkout` legt die Transaktion mit Preis ohne
+  Katalog, `tax_mode: internal` an). So braucht Fabian im Paddle-Dashboard keine Produkte/Preise anzulegen; Pakete und Preise
+  stehen im Backend (`WEB_PACKAGES`). Paddle hat keine eigene gehostete Seite; der Default Payment Link zeigt auf `/guthaben/`.
+- **Pakete 5/10/20 € statt 2/5/10 €:** Die Fixgebühr von 0,50 € frisst bei 2 € ein Viertel des Preises. (Session AA: weiter auf 10/20/50 €, siehe unten.)
+- **1:1-Guthaben, Endpreise inkl. USt.** Fabians Vorgabe; die Margenfrage ist in Session AA entschieden (nächster Abschnitt).
+- **Kauflink = Zufallstoken mit Hash in D1 statt HMAC-signiertem Token.** Einmaligkeit und Ablauf muss der Server ohnehin
+  speichern; ein signierter Token brächte nichts dazu, würde aber die Konto-ID in die URL tragen. Token im Fragment (`#t=`), damit er
+  weder in Logs noch im Referer landet. 15 Minuten, bis zu 5 Checkouts (Paket wechseln, Abbruch), nach der ersten Zahlung verbraucht.
+- **Backend-Adresse der Kaufseite nur aus `config.js` (Pages-Workflow, Repo-Variable `OVERFIT_BACKEND_URL`), nie aus der URL:**
+  sonst könnte ein präparierter Link unsere Seite auf einen fremden Server mit fremdem Paddle-Konto umleiten.
+- **Sandbox nie in Produktion:** Ein Produktions-Worker bietet den Web-Kauf nur mit `PADDLE_ENV=live` an; der Testbetrieb ist immer
+  Sandbox. Sonst könnte jemand mit Testkarten echtes Guthaben (= echte KI-Kosten) erzeugen.
+- **Idempotenz:** Wächterzeile `web_events (provider, event_key)` in derselben D1-Batch-Transaktion wie die Gutschrift; eine zweite
+  Zustellung scheitert am Primärschlüssel und rollt komplett zurück. Erstattungen erst bei `status = approved`; abgezogen wird von
+  allen Posten des Kontos (unbefristete zuerst), nie unter 0, Fehlbetrag als `incident = …:shortfall` an der Bestellung.
+  Chargeback-Rücknahmen (`chargeback_reversal`) buchen nichts automatisch zurück (selten, lieber von Hand).
+- **Guthaben-Codes** 12 Zeichen aus 31 (ohne 0/O/1/I/L, ≈ 59 Bit), Klartext in D1 (wie ein Gutschein; wer die DB hat, hat ohnehin
+  die Salden). Der Käufer sieht den Code nur auf der Erfolgsseite (Bestell-ID als Geheimnis). Erstattung vor dem Einlösen senkt den
+  Wert bzw. sperrt den Code, danach Abzug beim Einlöser. Codes verfallen nicht.
+- **Store-Regeln:** App-Knopf „Im Web aufladen“ nur, wenn `/v1/config` → `webPurchase.channels` den Kanal enthält. Kanal Android:
+  Installer (Play/andere Stores = `store`, sonst `sideload`), iOS immer `store`. Standard `sideload`, Repo-Variable
+  `WEB_PURCHASE_CHANNELS`. „Code einlösen“ bleibt überall sichtbar (kein Kaufweg in der App).
+- **Datenschutz-Garantie:** Der Web-Kauf ist ein Opt-in hinter dem bestehenden Guthaben-Opt-in; `OwnKeyPrivacyTest` bleibt grün.
+- **Benennung:** Neue Texte sagen „Guthaben“/„Credit“ (Session Y benennt den Rest um); sie liegen in `i18n/WebCreditStrings.kt`,
+  damit es mit der parallelen Umbenennung keine Konflikte gibt. Neue Ledger-Typen: `code_redeem`, `refund`, `chargeback`; neues Feld
+  `source` (`web`, `code`).
+- Impressum, Datenschutz, AGB auf der Kaufseite sind sichtbar als „folgt vor dem Start“ markiert, keine erfundenen Rechtstexte.
+
+## Marge bei 1:1-Guthaben (Session AA, 3.11.)
+Fabians Entscheidung (Geld): „1:1 mit höherer Marge“. Guthaben = Kaufpreis in jedem Kanal; der Aufschlag auf die Modellpreise wird so hoch gesetzt, dass jeder Kauf auch bei ganz verbrauchtem Guthaben kostendeckend ist. Rechnung mit Tabelle: docs/monetization.md „Rechnung (Session AA)“.
+- **Ein einziger Aufschlag `MARKUP_BP = 6900` (69 %)**, weil das Guthaben kanalübergreifend dasselbe ist. Dimensioniert für den ungünstigsten Kanal (Store: 15 % Gebühr auf den Preis ohne USt, nötig 68,7 %) mit 10 % Spot-/Startguthaben-Rücklage und 7 % Zielgewinn vom Netto (Spanne 5–10 %; bescheiden, aber genug für Betrieb, Rückbuchungen und Kursschwankungen). Zentral in `backend/src/config.ts` (`DEFAULT_MARKUP_BP`) und `wrangler.jsonc`; `/v1/config` liefert Preise und `usageProfiles`, die App rechnet die Schätzung (Coach-Auswertung Gemini 3.6 Flash ≈ 2,4 ct) daraus, ohne eigene Konstante.
+- **Web-Pakete 10/20/50 € statt 5/10/20 €:** Die feste Paddle-Gebühr von 0,50 € macht 5 € zum teuersten Paket (nötig wären 74,5 % statt 68,7 %, also 5,8 Punkte mehr für alle). Ab 10 € ist der Store der Engpass. Das 5-€-Store-Paket (`overfit.fuel.5`) bleibt: proportionale Gebühr, kein Einfluss auf den Aufschlag. IDs stabil, nichts läuft aus.
+- **Store-Gutschrift korrigiert:** vorher Preis × (1 − Gebühr) ÷ (1 + Aufschlag) (zog den Aufschlag doppelt ab und ließ die USt weg). Jetzt Gutschrift = Preis, die Store-Gebühr (15 % auf Netto nach USt) steckt im Aufschlag. `STORE_FEE_BP` entfällt, `storeFeeBp` ist nicht mehr in `/v1/config`.
+- **Transparenz:** Aufschlag und Wofür in monetization.md; App unter „Guthaben“: ein Satz plus Link „Wie setzen sich die Preise zusammen?“ auf `/preise/` (DE+EN, Beispielrechnung).
+- **Verworfen:** Abzug beim Kauf (widerspricht 1:1); eigener Aufschlag je Kanal (das Guthaben ist kanalübergreifend dasselbe und wird beim Verbrauch nicht nach Herkunft getrennt; ein Wert ist einfacher und ehrlicher).
+- **Offen für später:** Bei Paddle für kleine Pakete bessere Konditionen anfragen; bei Wechselkurs- oder Preisänderungen der Modelle `backend/test/pricing.test.ts` anpassen und Aufschlag neu rechnen.
+
+## „Spot“ heißt jetzt „Einladung“ (Session AC, 3.11.)
+Fabian: „Benenne Spot um in das, was es ist. Referral-Programm mit Einladung und so weiter.“ Der Name „Spot“ war nicht selbsterklärend.
+- **Sichtbare Begriffe:** DE „Freunde einladen“ (Menüpunkt und Titel), „Einladung einlösen“, „Einladung von <Name>“, „Einladungscode“, Bonus „Einladungsbonus: 1 € Guthaben für dich und deinen Freund“; in erklärenden Texten zusätzlich „Empfehlungsprogramm“. EN „Invite friends“, „Redeem invite“, „Invitation from <name>“, „Referral bonus“, „referral program“. Ledger-Bezeichnungen: „Einladungsbonus“ bzw. „Referral bonus“ (für beide Seiten; der Einladende sieht den Zusatz „Freund eingeladen“). „Spot“ steht in keinem sichtbaren Text mehr (App, Web, Store-Texte, README, Docs, Deploy-Summary).
+- **Technik bleibt bewusst „spot“:** Code-Bezeichner, API-Pfade (`/v1/spot/*`), Fehlercodes (`spot_*`), DB-Spalten/Tabellen, Ledger-Typen (`spot_bonus`, `spot_reward`) und Config-Namen (`SPOT_*`). Ein Umbenennen würde die Server-API, Migrationen und deployte Secrets/Variablen brechen, ohne dass Nutzer etwas davon sehen.
+- **Link-Alias:** Neue QR-Codes/Links erzeugen `overfit://invite#<token>`; die App liest zusätzlich `overfit://spot#…`, damit alte QR-Codes und Links weiter gehen. Beide laufen über denselben URL-Scheme-Handler (`overfit`), das Manifest bzw. die Info.plist bleiben unverändert. Test: `FuelBasicsTest.spotTokenParsing`.
+- Reveal-Animation und Haptik unverändert, nur der Text.
+
+## Web-Kauf über Stripe, Store-Aufpreis offen, Aufschlag 28 % (Session AB, 3.11.)
+Fabians Entscheidung (Geld): „Ja, mit Stripe umbauen und Store-Aufpreis ausweisen. Ich bin schon Kleinunternehmer.“ Rechnung mit Tabellen:
+docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer und Schwellen“.
+- **Stripe statt Paddle, Paddle entfernt.** Paddle ist Merchant of Record und schlägt USt auf bzw. zieht sie ab; das passt nicht zum
+  Direktverkauf als Kleinunternehmer (ohne USt), und die Gebühr (5 % + 0,50 €) war der Grund für den hohen Aufschlag. Paddle als zweite
+  Implementierung zu behalten hätte Secrets, Doku, Tests und eine Auswahl-Logik am Leben gehalten, ohne dass sie je genutzt wird; die
+  Schnittstelle `PaymentProvider` bleibt, ein Wechsel ist weiterhin eine neue Datei in `backend/src/payments/`. Migrationen bleiben
+  abwärtskompatibel: `0006_stripe.sql` fügt nur Spalten hinzu (`provider_payment_id`, `country`, `paid_micro`); alte Sandbox-Bestellungen
+  (`provider = paddle`) bleiben lesbar.
+- **Gehosteter Stripe Checkout, kein Stripe.js, kein Node-SDK.** Formular-POST an `/v1/checkout/sessions` per fetch, Weiterleitung auf
+  `session.url`. Kein Publishable Key nötig, keine Kartendaten auf unserer Seite. Zahlarten nicht im Code fest: „dynamische
+  Zahlungsmethoden“ aus dem Dashboard (Karte, Wallets, Link, SEPA, Klarna …). Verzögerte Zahlarten buchen erst bei
+  `checkout.session.async_payment_succeeded`. Idempotency-Key je Bestellung.
+- **Webhook-Signatur selbst geprüft** (WebCrypto, HMAC-SHA256 über `t.body`, 300 s Toleranz wie Stripes SDK, mehrere `v1`). Zusätzlich
+  `livemode`-Abgleich: Test-Ereignisse buchen nie auf einem Live-Worker. Erstattungen kommen als `charge.refunded` mit kumulierter Summe;
+  gebucht wird nur die Differenz zum schon Erstatteten, idempotent über `refund:<charge>:<Summe>`. Chargeback: `charge.dispute.created`.
+  Erstattung vor Zahlungsbestätigung findet die Bestellung über `metadata.overfit_order` am PaymentIntent.
+- **Modus aus dem Schlüssel statt Repo-Variable** (`PADDLE_ENV` entfällt): Testbetrieb nimmt nur `sk_test_…`, Produktion nur `sk_live_…`.
+  Für Produktion eigene GitHub-Secrets `STRIPE_LIVE_SECRET_KEY`/`STRIPE_LIVE_WEBHOOK_SECRET`, damit Test- und Live-Werte nebeneinander liegen.
+- **Abbruch-Rücksprung ohne Token:** `cancel_url` enthält den Kauflink-Token nicht (er soll nicht bei Stripe landen); die Kaufseite merkt
+  ihn sich vor der Weiterleitung in `sessionStorage`.
+- **Kleinunternehmer:** Endpreise ohne USt, kein Stripe Tax. „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ steht auf Kaufseite,
+  Stripe-Checkout (`custom_text`) und Bestätigung. Stripe-Belege haben kein freies Fußzeilenfeld; für eine Rechnung mit Hinweis gibt es
+  `STRIPE_INVOICES=on` (Stripe-Rechnung mit Fußzeile, kostet extra), standardmäßig aus, weil bei B2C keine Rechnungspflicht besteht und die
+  Gebühr den Gewinn kleiner Pakete auffrisst.
+- **Schwellen-Werkzeug statt Beratung:** `webRevenue` im Admin-Usage-Report (Jahr, Land, Summe, Warnung ab 80 % von 10.000 € EU-Lieferschwelle,
+  25.000 €/100.000 € Kleinunternehmergrenze). Gespeichert wird nur das Rechnungsland. Unbekanntes Land zählt bei der Lieferschwelle
+  vorsichtshalber mit. Store-Erlöse fehlen darin (stehen in den Store-Konsolen); der Hinweis sagt das.
+- **Preise je Kanal:** Web 1:1. Store-Pakete bekommen festes Guthaben und einen offen ausgewiesenen Store-Preis (`PACKAGES` mit
+  `priceMicro` = Store-Preis, `creditMicro` = Guthaben): 5 € für 6,99 €, 10 € für 13,99 €. Die Stores sind Verkäufer, führen USt ab und
+  nehmen 15 % vom Netto; Fabians Kleinunternehmerstatus ändert das nicht. Preisstufen: die niedrigste x,99-Stufe, die bei 27 % USt noch
+  ≥ 5 % Gewinn lässt (6,49 bzw. 13,49 € reichen nicht). Produkt-IDs bleiben; Store-Kauf ist noch nicht live, also bricht nichts.
+- **Aufschlag 28 % (`MARKUP_BP = 2800`).** Stripe-Gebühr konservativ gemischt mit 2,5 % + 0,25 € (Preisseite: EWR 1,5 %, Premium 2,8 %,
+  UK 2,5 %, Nicht-EWR 3,15 %, Umrechnung + 2 %, jeweils + 0,25 €); jede einzelne Zahlart muss ohne Verlust bleiben. Sonst dieselben
+  Annahmen wie AA (10 % Rücklage für Startguthaben und Einladungsbonus, Ziel 7 %, Untergrenze 5 % vom Netto). 28 % ist der kleinste ganze Wert, mit dem jedes Web-Paket
+  ≥ 5 % behält; ab 10 € > 7 %. Coach-Auswertung Gemini 3.6 Flash damit ≈ 1,8 ct statt 2,4 ct.
+- **5 € im Web wieder drin:** kostet alle nur einen Punkt (27 % → 28 %) statt 5,8 Punkte wie bei Paddle; ein niedriger Einstieg ist für
+  eine App ohne Abo den Punkt wert. Vorgewählt bleibt 10 €.
+- **Verworfen:** eigener Aufschlag je Kanal beim Verbrauch (Guthaben wird nicht nach Herkunft getrennt, siehe AA); 6,49/12,99 € im Store
+  (bräuchten ~35 % Aufschlag für alle); Stripe Tax/OSS jetzt schon (erst nötig über der Lieferschwelle).
+- **Offen:** echter Lauf gegen Stripe im Testmodus (alles gemockt geprüft); Live-Betrieb braucht Kontoaktivierung, Rechtstexte,
+  juristische Prüfung. Bei Preisänderungen `backend/test/pricing.test.ts` anpassen und neu rechnen.
+
+## Session AD – Einladung intern, Guthaben vs. echte Euro, Bonus als Auswertungen (3.11.)
+
+- **„Spot“ intern entfernt:** API `/v1/invite/*`, Env `INVITE_*`, Tabellen `invite_redemptions`/`invite_tokens_used`, Ledger-Typen
+  `invite_bonus`/`invite_reward`, Kotlin `Invite*`. Alte Pfade und alte `spot`-Links werden nicht mehr gelesen (App unveröffentlicht).
+  Der Token-Präfix wechselt mit; laufende 45-s-Codes werden beim Deploy einmal ungültig (harmlos). Bleibende Erwähnungen: Migration 0001
+  (angewandte Migrationen ändern wir nie) und 0007 (benennt um), der Fallback im Deploy-Workflow, `package-lock.json` (`@cspotcode`, fremd).
+- **Signierschlüssel:** Fehlt das GitHub-Secret `INVITE_SIGNING_KEY`, übernimmt der Deploy das alte Secret; fehlen beide, wird ein neuer
+  erzeugt (der Schlüssel signiert nur kurzlebige Tokens und Challenges, ein Wechsel verliert nichts). Der alte Secret-Name im Worker wird
+  gelöscht.
+- **Geschenkte Auswertungen als eigener Zähler (Tabelle `review_gifts`)** statt Euro-Posten: Fabian hat „5 + 5 Auswertungen“ entschieden.
+  Ein Zähler ist ehrlicher als ein Euro-Betrag (die Kosten schwanken je Modell und Preis) und lässt sich auf ein Modell begrenzen.
+- **Was ist eine Coach-Auswertung?** Die App markiert sie im Body (`overfit.purpose = "review"`, nur über Guthaben, wird vor dem Anbieter
+  entfernt). Der Server kann den Inhalt nicht prüfen; dass ein manipulierter Client einen Chat als Auswertung ausgibt, begrenzen Stufe
+  standard, die Obergrenze je Anfrage (0,25 € Anbieterkosten) und die harte Monatsgrenze der echten Kosten (50 €). Das reicht für einen
+  Bonus von 5 Anfragen.
+- **Belohnung bei jeder ersten erfolgreichen Anfrage** (auch wenn sie geschenkt war), nicht erst bei einer bezahlten: Der Neue soll seine
+  geschenkten Auswertungen nutzen können, ohne dass der Einladende leer ausgeht.
+- **Monatsbudget doppelt:** Zählt Auswertungen bei der Einlösung (1000, Vorhersage) und echte Kosten beim Verbrauch (50 €, Garantie).
+  Ausweichen auf Claude bei Ausfall bleibt erlaubt; die echten Kosten zählen in die 50 € mit.
+- **Reservierung geschenkter Auswertungen** zählt den Zähler sofort herunter und gibt ihn bei Fehlschlag zurück. Stürzt der Worker
+  zwischen beidem ab, ist eine Auswertung verloren (sicherer Fehler, selten).
+- **Kontoumzug:** Geschenkte Einladungs-Auswertungen und alte Euro-Einladungsboni des aufgegebenen Kontos verfallen (Buchung
+  `invite_expired`), Startguthaben/Test-Gutschriften und Gekauftes wandern mit. Belohnungen gehen nie an das eigene Konto.
+- **Gekauft vs. geschenkt:** Geschenkt = `test_credit`, `invite_bonus`, `invite_reward`; alles andere (Store, Web, Code) ist gekauft.
+  Verbrauch: Geschenktes zuerst (explizit sortiert, nicht nur über den Verfall). Erstattungen ziehen weiter zuerst vom Gekauften ab.
+- **Kategorie je Buchung kommt vom Server** (`category`), die App rechnet sie für alte Backends selbst aus. „Verfallen“ ist eine fünfte
+  Kategorie neben bezahlt/geschenkt/verbraucht/erstattet.
+- **Finanzbericht:** Gebühren sind geschätzt (Stripe-Mischung 2,5 % + 0,25 €, Store 15 % auf netto bei 19 % USt), weil Stripe und die
+  Stores die echten Gebühren erst in Auszahlungsberichten nennen. Store-Erstattungen fließen noch nicht ein (keine Store-Webhooks).
+- **Kein Room-Update:** Ob eine gespeicherte Antwort geschenkt war, erkennt die App an Kosten 0 (Anzeige „geschenkte Auswertung“).
+
+## Duo-Teaser, Coach-Tipps auf dem Training-Tab, Lizenzhinweis (3.11., Fabian)
+- Duo-Teaser komplett entfernt (Screen, Route, Texte); Duo ggf. später. Ebenso „Letzte Coach-Tipps“ und die Coach-Zeile auf dem Training-Tab (Coach bleibt eigener Tab).
+- „Über“: oben „overfit ist Open Source unter der MIT-Lizenz“ mit Link zum Repo (LICENSE ist MIT); die Bibliotheken stehen getrennt mit „(Apache License 2.0)“, damit die Lizenzen nicht verwechselt werden.
+
+## Feedback-Runde 3: Übergänge, Kopfzeilen-Icons, Buttons, Bestätigen, Flächen statt Haarlinien (Session AE, 3.11.)
+- **Ursache der „verbuggten Übergänge“:** Der `NavHost` hatte keine eigenen Übergänge, also galt der Standard: 700 ms Überblendung
+  (alter und neuer Screen halbtransparent übereinander), auch zwischen Tabs. Dazu wechselten Tab-Leiste und Mini-Workout-Leiste sofort,
+  während die Überblendung noch lief (der ausblendende Screen sprang in der Höhe), und Taps während der 700 ms wirkten weiter: Doppel-Tipp
+  auf „Zurück“ poppte zwei Screens, Doppel-Tipp auf eine Zeile öffnete sie zweimal.
+- **Lösung, ein Übergang für alles (`ui/ScreenMotion.kt`):** Tab-Wechsel ohne Animation; alle anderen Wechsel ein kurzes Fade-through
+  (alter Screen 90 ms aus, dann neuer 150 ms ein), nie zwei halbtransparente Screens übereinander, nichts gleitet. `sizeTransform = null`.
+  Während ein solcher Wechsel läuft (`visibleEntries` > 1, nicht nur Tabs), schluckt eine Ebene über dem `NavHost` alle Taps.
+  Tests: `UiFeedbackTest` (Wechsel < 300 ms und schluckt den zweiten Tap, Tab-Wechsel < 50 ms).
+- **Icons oben rechts:** `BackHeader(actions = …)` mit `HeaderIconButton` (Teilen, Bearbeiten) und `HeaderDeleteButton` (Mülleimer → rote
+  Pille „Wirklich löschen?“, zweiter Tipp löscht). Gilt für Workout, Training im Verlauf, eigene Übung, Foto. Bearbeiten-Modi (Workout-Editor,
+  Übungsformular) zeigen weder Teilen noch Löschen; deshalb liegt „Workout löschen“ jetzt im Workout-Screen und „Übung löschen“ in den
+  Übungsdetails. Ausnahme Workout-Screen: „Bearbeiten“ als großer SecondaryButton unter „Starten“ (Fabians Vorgabe), kein Stift oben.
+  Hinweis „Trainings bleiben im Verlauf“ erscheint, solange Löschen scharf ist, statt „zuletzt …“.
+- **Keine unterstrichenen Buttons mehr:** `TertiaryButton`/`TextButton` entfernt, Ersatz `SmallButton` (kompakte graue Pille, so breit wie
+  der Text). Alle Verwendungen umgestellt; Listenzeilen mit Chevron bleiben Zeilen. `ConfirmButton(textOnly)` entfällt.
+- **Bestätigungs-Buttons:** ohne Rahmen. Zentral `ConfirmArming` (CompositionLocal) + `ConfirmArea` um die ganze App: höchstens einer scharf
+  (der nächste entschärft den vorigen), ein Tipp irgendwo anders entschärft (Pointer-Input im Initial-Pass am Root, nichts wird verbraucht;
+  ein Tipp innerhalb der Grenzen des scharfen Buttons zählt als Bestätigung). 4-s-Rücksetzung bleibt. Test in `UiFeedbackTest`.
+- **Flächen statt Haarlinien für Übungs-/Satzlisten (Editor und Workout-Modus):** `Block` (surface, 16 dp Radius) je Übung, `SetRowSurface`
+  (surfacePressed, 12 dp) je Satz, `SetField` (eigene Fläche, große Zahl, Einheit „KG“/„WDH.“), `BlockButton` („+ Satz hinzufügen“,
+  „+ Übung hinzufügen“), `MoreMenu` (⋮: Ersetzen, Nach oben/unten, Entfernen). Farben bleiben unsere Palette. Übrige Listen (Verlauf,
+  Einstellungen) behalten Haarlinien.
+- **Satz nach links wischen = löschen:** rote Fläche hinter der Zeile, ab 40 % Breite wird gelöscht, sonst federt die Zeile zurück.
+  Danach 5 s „Satz gelöscht · Rückgängig“ über dem Fuß; Rückgängig stellt nur her, solange seitdem nichts anderes geändert wurde (sonst
+  würde es neue Eingaben überschreiben). Screenreader bekommen „Satz n entfernen“ als Aktion. Der Drag liegt auf dem festen äußeren
+  Rahmen, nicht auf der gleitenden Zeile (sonst schrumpfen die Deltas). Das ×-Icon je Satz entfällt. Tests: Komponente + Editor.
+- **Editor-Kopf:** Name groß als Eingabe mit Stift daneben (fokussiert das Feld), darunter „Bearbeitungsmodus“; Übungsbild mit „?“ öffnet
+  die Übungsdetails. Langes Drücken auf den Übungskopf verschiebt weiter per Ziehen.
+
+## Feedback-Runde 4 (Session AF, 3.11.)
+- **Beispiele nach „Daten löschen“:** `resetAll()` löschte den Flag `samples_seeded_v1`, säte aber erst beim nächsten Start neu. Jetzt sät `resetAll()` Push/Pull/Legs sofort (einmalig, wie beim ersten Start). Backup-Wiederherstellung ruft `resetAll(reseedSamples = false)`: wiederhergestellte Daten bekommen keine zusätzlichen Beispiele. Im Normalbetrieb gelöschte Beispiele bleiben weg (Flag bleibt gesetzt).
+- **Schwarzer Screen nach Workout löschen:** `templates.templates` ist ein `combine` zweier Room-Abfragen und emittiert nach dem Löschen mehrfach. `WorkoutPlanScreen` rief bei jeder Emission mit „Workout weg“ `onBack()` auf; ein zweiter Pop entfernte auch den Training-Tab, der Back-Stack war leer. Jetzt schließt der Screen genau einmal.
+- **Kalender:** immer sichtbar, auch ohne Foto/Training (Hinweistext darüber). Tag nur mit Training: gefüllter Punkt in der Kachel. Foto und Training: Foto, plus kleiner Punkt oben links.
+- **Gewichte nur Plus:** ± -Schalter entfernt (Editor und Training), das Eingabefeld lässt kein „-“ mehr zu. Vorhandene negative Werte (z. B. importierte Hilfsgewichte) werden nicht gelöscht oder migriert und weiter angezeigt; beim Bearbeiten des Feldes fällt das Minus weg, der Wert wird positiv. Keine Room-Migration; Parser/Import bleiben tolerant.
+- **Gewichte nur Plus, KI-Seite (Wunsch Manager):** Coach-Prompt verlangt `weight_kg` ≥ 0; `CoachParser` und Share-/Chat-Import (`ShareFormat`) klemmen negative Werte auf 0 (eine Stelle je Eingang, deckt Plan-Diff, Coach-Chat-Workouts und Import ab). Gespeicherte alte Werte bleiben, die Verlaufsanzeige zeigt sie weiter.
+- **Satzzeile (Punkt 5, Screenshot 0.1.227):** Ursache war der ±-Knopf, der die Felder auf ca. 40 dp quetschte (Platzhalter brach um). Mit dem Entfernen des Knopfes + `SetField`: Mindestbreite 52 dp, Platzhalter und Einheit einzeilig (`maxLines = 1`, kein Umbruch), Feld füllt die Breite, rechtsbündig. Platzhalter ist „–“ statt der Einheit (keine doppelte Einheit neben dem „KG“-Label). Test `SetRowLayoutTest` (360 dp, DE/EN, Gewicht×Wdh., Gewicht×Zeit, leer).

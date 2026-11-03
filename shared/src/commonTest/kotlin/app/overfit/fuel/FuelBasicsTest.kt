@@ -80,16 +80,42 @@ class FuelBasicsTest {
     }
 
     @Test
-    fun spotTokenParsing() {
-        assertEquals("abc123.def_456-x", parseSpotToken("https://bigfire3.github.io/overfit/spot#abc123.def_456-x"))
-        assertEquals("abc123.def_456-x", parseSpotToken("  abc123.def_456-x "))
-        assertEquals("abc123.def_456-x", parseSpotToken(spotLink("abc123.def_456-x")))
-        assertEquals("abc123.def_456-x", parseSpotToken("overfit://spot#abc123.def_456-x"))
-        assertTrue(isSpotLink(" overfit://spot#abc123.def_456-x"))
-        assertTrue(!isSpotLink("overfit://t#abc"))
-        assertNull(parseSpotToken("https://example.com/foo"))
-        assertNull(parseSpotToken("hello world"))
-        assertNull(parseSpotToken(""))
+    fun inviteTokenParsing() {
+        assertEquals("abc123.def_456-x", parseInviteToken("  abc123.def_456-x "))
+        assertEquals("abc123.def_456-x", parseInviteToken(inviteLink("abc123.def_456-x")))
+        assertEquals("abc123.def_456-x", parseInviteToken("overfit://invite#abc123.def_456-x"))
+        // Old link forms (earlier program name, web links) are no longer read.
+        assertNull(parseInviteToken("overfit://" + "sp" + "ot#abc123.def_456-x"))
+        assertTrue(!isInviteLink(" overfit://" + "sp" + "ot#abc123.def_456-x"))
+        assertNull(parseInviteToken("https://bigfire3.github.io/overfit/invite#abc123.def_456-x"))
+        assertTrue(isInviteLink(" overfit://invite#abc123.def_456-x"))
+        assertEquals("overfit://invite#abc123.def_456-x", inviteLink("abc123.def_456-x"))
+        assertTrue(!isInviteLink("overfit://t#abc"))
+        assertNull(parseInviteToken("https://example.com/foo"))
+        assertNull(parseInviteToken("hello world"))
+        assertNull(parseInviteToken(""))
+    }
+
+    @Test
+    fun ledgerKindsAndAccountSplit() {
+        assertEquals(LedgerKind.Paid, LedgerEntry(1, 0, "purchase", 5_000_000).kind)
+        assertEquals(LedgerKind.Paid, LedgerEntry(1, 0, "code_redeem", 5_000_000).kind)
+        assertEquals(LedgerKind.Gifted, LedgerEntry(1, 0, "test_credit", 1_000_000).kind)
+        assertEquals(LedgerKind.Gifted, LedgerEntry(1, 0, "invite_bonus", 0, reviews = 5).kind)
+        assertEquals(LedgerKind.Used, LedgerEntry(1, 0, "usage", -2_000).kind)
+        assertEquals(LedgerKind.Refunded, LedgerEntry(1, 0, "refund", -5_000_000).kind)
+        assertEquals(LedgerKind.Expired, LedgerEntry(1, 0, "invite_expired", 0, reviews = -5).kind)
+        assertEquals(LedgerKind.Used, LedgerEntry(1, 0, "x", 0, category = "used").kind) // server wins
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val a = json.decodeFromString<FuelAccount>(
+            """{"balanceMicro":4200000,"purchasedMicro":3200000,"giftedMicro":1000000,"giftReviews":{"remaining":5,"expiring":[{"count":5,"expiresAt":9}]}}""",
+        )
+        assertEquals(3_200_000, a.purchasedMicro)
+        assertEquals(5, a.giftReviews.remaining)
+        assertEquals("4,20 € Guthaben · 5 geschenkte Auswertungen", app.overfit.ui.fuel.creditSummary(a, app.overfit.i18n.GermanFuel))
+        assertEquals("4,20 € Guthaben", app.overfit.ui.fuel.creditSummary(a.copy(giftReviews = GiftReviews()), app.overfit.i18n.GermanFuel))
+        assertEquals("−1 Auswertung", app.overfit.i18n.GermanFuel.ledgerReviews(-1))
+        assertEquals("+5 Auswertungen", app.overfit.i18n.GermanFuel.ledgerReviews(5))
     }
 
     @Test

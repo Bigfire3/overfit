@@ -63,7 +63,7 @@ import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
@@ -192,7 +192,7 @@ fun ImportScreen(
         preview != null -> PreviewScreen(preview, unit, language, state.busy, onBack = viewModel::reset) {
             viewModel.accept(onImported)
         }
-        scanning -> Screen(header = { BackHeader(t.back) { scanning = false } }) {
+        scanning -> Screen(header = { BackHeader(t.back, { scanning = false }) }) {
             Title(s.scanQr)
             Spacer(Modifier.height(Space.s))
             Text(s.scanHint, tone = Tone.Muted)
@@ -435,7 +435,7 @@ private fun SharePreview(training: SharedTraining, unit: WeightUnit, language: L
 }
 
 /**
- * Generic QR code for any text (workouts, Spot invites, later Duo): black on white with quiet zone, so every scanner
+ * Generic QR code for any text (workouts, invites, later Duo): black on white with quiet zone, so every scanner
  * reads it regardless of the theme. Round modules; the three finder patterns stay solid squares with rounded corners.
  */
 @Composable
@@ -463,43 +463,11 @@ fun QrView(text: String, modifier: Modifier = Modifier, rounded: Boolean = true)
 const val QR_QUIET_ZONE = 3
 
 // ---------------------------------------------------------------------------------------------
-// Duo teaser
-
-@Composable
-fun DuoScreen(onBack: () -> Unit) {
-    val t = LocalStrings.current
-    Screen(header = { BackHeader(t.back, onBack) }) {
-        Title(t.share.duoTitle)
-        Spacer(Modifier.height(Space.l))
-        Text(t.share.duoBody)
-        Spacer(Modifier.height(Space.m))
-        Text(t.share.duoNote, style = Theme.type.caption, tone = Tone.Muted)
-    }
-}
-
-// ---------------------------------------------------------------------------------------------
 // Entry points in other screens
 
-/** "Add sample templates" (idempotent) with the result shown as the row's second line. */
+/** Rows under the template list: import and copy AI prompt. */
 @Composable
-fun SamplesRow(share: ShareDependencies) {
-    val s = LocalStrings.current.share
-    var message by remember { mutableStateOf<String?>(null) }
-    ListRow(s.addSamples, onClick = {
-        // App scope, not the composable's: the first saved template makes the list non-empty, the row leaves
-        // the composition, and a composition scope would cancel the import half-way (only Push would arrive).
-        share.scope.launch {
-            val n = share.importer.addSamples()
-            message = if (n == 0) s.samplesAlready else s.samplesAdded(n)
-        }
-    }) {
-        message?.let { Text(it, style = Theme.type.caption, tone = Tone.Muted) }
-    }
-}
-
-/** Rows under the template list: import, copy AI prompt, sample templates. */
-@Composable
-fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit, showSamples: Boolean = true) {
+fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit) {
     val s = LocalStrings.current.share
     var aiCopied by remember { mutableStateOf(false) }
     ListRow(s.importTitle, onClick = onImport)
@@ -509,5 +477,4 @@ fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit, showSampl
         text = remember { aiTemplateText(s, share.aiProfile()) },
         onCopy = { share.platform.copyText(it); aiCopied = true },
     )
-    if (showSamples) SamplesRow(share)
 }

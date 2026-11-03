@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -52,13 +54,15 @@ import app.overfit.domain.WorkoutSummary
 import app.overfit.i18n.LocalStrings
 import app.overfit.share.PlatformShare
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.HeaderDeleteButton
+import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.history.formatVolume
@@ -119,17 +123,18 @@ fun PhotosScreen(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Title(t.photosTitle)
             if (selecting) {
-                TextButton(p.cancel, onClick = { selecting = false; selected = emptyList() })
+                SmallButton(p.cancel, onClick = { selecting = false; selected = emptyList() })
             } else if (photoList.size >= 2) {
-                TextButton(p.compare, onClick = { selecting = true })
+                SmallButton(p.compare, onClick = { selecting = true })
             }
         }
         Spacer(Modifier.height(Space.s))
         if (empty) {
+            // The calendar stays visible even without a single photo or workout.
             Text(t.photosEmpty, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.m))
+            Spacer(Modifier.height(Space.xs))
             Text(p.emptyHint, style = Theme.type.caption, tone = Tone.Muted)
-            return@Screen
+            Spacer(Modifier.height(Space.s))
         }
         if (loaded) {
             DiaryStats(historyList.size, photoList.size, streak)
@@ -254,8 +259,16 @@ private fun DayCell(
                     contentAlignment = Alignment.Center,
                 ) { Text(p.photoCount(n), style = Theme.type.caption, tone = Tone.Inverse) }
                 if (selecting && picked) Box(Modifier.fillMaxSize().border(2.dp, Theme.colors.foreground, shape))
+                // Photo and workout on the same day: the photo wins, a small dot keeps the workout visible.
+                if (training) Box(
+                    Modifier.align(Alignment.TopStart).padding(4.dp).size(10.dp)
+                        .background(Theme.colors.inverseBackground, CircleShape),
+                )
             }
-            training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface))
+            // Workout without a photo: a clearly filled dot in the middle of the tile.
+            training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(18.dp).background(Theme.colors.foreground, CircleShape))
+            }
             else -> Spacer(Modifier.weight(1f))
         }
     }
@@ -288,11 +301,22 @@ fun PhotoViewerScreen(
     val startDay = days.indexOfFirst { d -> d.photos.any { it.photo.id == photoId } }
 
     Column(Modifier.fillMaxSize().background(Color.Black).windowInsetsPadding(WindowInsets.safeDrawing)) {
-        Box(Modifier.padding(horizontal = Space.l, vertical = Space.m).height(40.dp), contentAlignment = Alignment.CenterStart) {
+        // Header like every detail screen: back left, share and delete as icons top right (for the photo shown).
+        var shown by remember { mutableStateOf<String?>(null) }
+        val scope = rememberCoroutineScope()
+        Row(Modifier.padding(horizontal = Space.l, vertical = Space.m).height(44.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(40.dp).semantics { contentDescription = t.back }.clickable(onClick = onBack),
+                Modifier.size(44.dp).semantics { contentDescription = t.back }.clickable(onClick = onBack),
                 contentAlignment = Alignment.CenterStart,
             ) { LineIcon(Icon.Back, color = white) }
+            Spacer(Modifier.weight(1f))
+            shown?.let { id ->
+                HeaderIconButton(Icon.Share, p.sharePhoto, {
+                    scope.launch { loadJpeg(id)?.let { platform.shareBytes("overfit-$id.jpg", it, "image/jpeg") } }
+                }, color = white)
+                Spacer(Modifier.width(Space.xs))
+                HeaderDeleteButton(p.deletePhoto, p.deletePhotoConfirm, onConfirm = { onDelete(id) }, color = white)
+            }
         }
         if (startDay < 0) {
             if (photos != null) BasicText(p.notFound, Modifier.padding(horizontal = Space.l), style = body)
@@ -305,6 +329,7 @@ fun PhotoViewerScreen(
         val innerIndex = (inner[pager.currentPage] ?: initialInner(days, startDay, pager.currentPage, photoId))
             .coerceIn(0, currentDay.photos.lastIndex)
         val item = currentDay.photos[innerIndex]
+        SideEffect { shown = item.photo.id }
 
         HorizontalPager(pager, Modifier.fillMaxWidth().weight(1f), key = { days[it].date.toString() }) { page ->
             val day = days[page]
@@ -330,7 +355,7 @@ fun PhotoViewerScreen(
                 }
             }
         }
-        ViewerInfo(item, history, language, unit, platform, loadSummary, loadJpeg, onWorkout, onDelete)
+        ViewerInfo(item, history, language, unit, loadSummary, onWorkout)
     }
 }
 
@@ -343,20 +368,14 @@ private fun ViewerInfo(
     history: List<HistoryRow>?,
     language: Language,
     unit: WeightUnit,
-    platform: PlatformShare,
     loadSummary: suspend (String) -> WorkoutSummary?,
-    loadJpeg: suspend (String) -> ByteArray?,
     onWorkout: (String) -> Unit,
-    onDelete: (String) -> Unit,
 ) {
     val t = LocalStrings.current
     val p = t.photos
     val h = t.history
     val white = Color.White
     val dim = white.copy(alpha = 0.6f)
-    var confirm by remember(item.photo.id) { mutableStateOf(false) }
-    LaunchedEffect(confirm) { if (confirm) { delay(4000); confirm = false } }
-    val scope = rememberCoroutineScope()
     val row = history?.firstOrNull { it.id == item.photo.sessionId }
     val summary by produceState<WorkoutSummary?>(null, item.photo.sessionId) { value = loadSummary(item.photo.sessionId) }
     Column(Modifier.fillMaxWidth().padding(horizontal = Space.l, vertical = Space.m)) {
@@ -376,12 +395,6 @@ private fun ViewerInfo(
         }
         Spacer(Modifier.height(Space.s))
         ViewerAction(p.toWorkout, white) { onWorkout(item.photo.sessionId) }
-        ViewerAction(p.sharePhoto, white) {
-            scope.launch { loadJpeg(item.photo.id)?.let { platform.shareBytes("overfit-${item.photo.id}.jpg", it, "image/jpeg") } }
-        }
-        ViewerAction(if (confirm) p.deletePhotoConfirm else p.deletePhoto, if (confirm) Color(0xFFFF453A) else dim) {
-            if (confirm) onDelete(item.photo.id) else confirm = true
-        }
     }
 }
 

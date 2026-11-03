@@ -55,7 +55,8 @@ class AppDataTest {
 
         data.resetAll()
 
-        assertTrue(data.templates.templates.first().isEmpty())
+        // Own workout gone; the Push/Pull/Legs examples are back right away (fresh start).
+        assertEquals(listOf("Push", "Pull", "Legs"), data.templates.templates.first().map { it.name })
         assertNull(data.exercises.get(customId))
         assertEquals(catalogSize, db.exerciseDao().count())
         assertNotNull(db.exerciseDao().get(data.catalog.load().exercises.first().id))

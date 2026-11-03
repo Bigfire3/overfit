@@ -42,20 +42,31 @@ import app.overfit.domain.TrackingType
 import app.overfit.domain.WeightUnit
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
-import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.Block
+import app.overfit.ui.components.BlockButton
+import app.overfit.ui.components.BlockShape
+import app.overfit.ui.components.HeaderIconButton
+import app.overfit.ui.components.MenuItem
+import app.overfit.ui.components.MoreMenu
+import app.overfit.ui.components.SetField
+import app.overfit.ui.components.SetRowSurface
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.sp
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.ExerciseImage
-import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
-import app.overfit.ui.components.IconButton
 import app.overfit.ui.components.LineIcon
-import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SmallInput
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.dragHandle
 import app.overfit.ui.components.ReorderState
@@ -130,6 +141,25 @@ class TemplateEditorViewModel(
         }
     }
 
+    /** Last swiped-away set: [before] comes back on "Undo" as long as nothing else was changed ([after]). */
+    data class Undo(val before: TemplateDraft, val after: TemplateDraft)
+    private val _undo = MutableStateFlow<Undo?>(null)
+    val undo: StateFlow<Undo?> = _undo.asStateFlow()
+
+    fun removeSet(exerciseKey: Long, setKey: Long) {
+        val before = _state.value.draft
+        edit { it.removeSet(exerciseKey, setKey) }
+        _undo.value = Undo(before, _state.value.draft)
+    }
+
+    fun undoRemoveSet() {
+        val u = _undo.value ?: return
+        _undo.value = null
+        if (_state.value.draft == u.after) edit { u.before }
+    }
+
+    fun dismissUndo() { _undo.value = null }
+
     fun save() {
         val s = _state.value
         if (s.saving || s.loading) return
@@ -150,9 +180,10 @@ class TemplateEditorViewModel(
 }
 
 /**
- * Create/edit a template: name and exercises (collapsible sections) with planned sets and target
- * values, rest and note per exercise. Saving writes everything in one transaction. Leaving with
- * unsaved changes needs a second back press.
+ * Create/edit a saved workout ("Bearbeitungsmodus"): name in the header (pencil = rename), one grey [Block] per
+ * exercise (collapsible; image with "?" for details; ⋮ for replace/move/remove), one [SetRowSurface] per set
+ * (swipe left = delete, with "Undo"), "+ Add set", "+ Add exercise" and "Save" pinned at the bottom.
+ * No share or delete here: those live on the workout screen. Leaving with unsaved changes needs a second back press.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -162,15 +193,18 @@ fun TemplateEditorScreen(
     onClose: () -> Unit,
     onAddExercises: () -> Unit,
     onReplaceExercise: () -> Unit,
-    onShare: () -> Unit,
+    onExerciseDetails: (String) -> Unit,
 ) {
     val t = LocalStrings.current
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val undo by viewModel.undo.collectAsStateWithLifecycle()
     val draft = state.draft
     var collapsed by rememberSaveable { mutableStateOf(listOf<Long>()) }
     var backArmed by remember { mutableStateOf(false) }
     LaunchedEffect(state.closed) { if (state.closed) onClose() }
     LaunchedEffect(backArmed) { if (backArmed) { delay(4000); backArmed = false } }
+    LaunchedEffect(undo) { if (undo != null) { delay(5000); viewModel.dismissUndo() } }
+    val showUndo = undo?.after == draft && undo != null
 
     val listState = rememberLazyListState()
     val reorder = rememberReorderState(listState, canMove = { it is Long }) { from, to ->
@@ -183,6 +217,7 @@ fun TemplateEditorScreen(
 
     val back = { if (state.dirty && !backArmed) backArmed = true else onClose() }
     BackHandler(enabled = state.dirty, onBack = back)
+    val nameFocus = remember { FocusRequester() }
 
     Screen(
         header = { BackHeader(t.back, back) },
@@ -191,21 +226,38 @@ fun TemplateEditorScreen(
                 backArmed -> t.unsavedHint
                 else -> state.problem?.describe(t)
             }
+            if (showUndo) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(t.setDeleted, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
+                    SmallButton(t.undo, viewModel::undoRemoveSet)
+                }
+            }
             if (message != null) Text(message, style = Theme.type.caption, tone = Tone.Muted)
             PrimaryButton(t.save, viewModel::save, enabled = !state.loading, loading = state.saving)
         },
     ) {
         if (state.loading) return@Screen
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(bottom = Space.l)) {
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(),
+            state = listState,
+            contentPadding = PaddingValues(bottom = Space.l),
+            verticalArrangement = Arrangement.spacedBy(Space.s),
+        ) {
             item(key = "name") {
-                Text(if (draft.isNew) t.newTemplate else t.editTemplate, tone = Tone.Muted)
-                Spacer(Modifier.height(Space.s))
-                BigInput(draft.name, { v -> viewModel.edit { it.withName(v.take(60)) } }, t.templateNamePlaceholder, Modifier.fillMaxWidth())
-                Spacer(Modifier.height(Space.l))
-                Hairline()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BigInput(
+                        draft.name,
+                        { v -> viewModel.edit { it.withName(v.take(60)) } },
+                        t.templateNamePlaceholder,
+                        Modifier.weight(1f).focusRequester(nameFocus),
+                    )
+                    HeaderIconButton(Icon.Edit, t.rename, { nameFocus.requestFocus() }, color = Theme.colors.muted)
+                }
+                Text(if (draft.isNew) t.newTemplate else t.editMode, style = Theme.type.caption, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.m))
             }
             itemsIndexed(draft.exercises, key = { _, e -> e.key }) { index, entry ->
-                ExerciseSection(
+                ExerciseBlock(
                     modifier = Modifier.then(reorderableItem(reorder, entry.key)),
                     reorder = reorder,
                     entry = entry,
@@ -215,18 +267,14 @@ fun TemplateEditorScreen(
                     isLast = index == draft.exercises.lastIndex,
                     onToggle = { collapsed = if (entry.key in collapsed) collapsed - entry.key else collapsed + entry.key },
                     onEdit = viewModel::edit,
+                    onRemoveSet = { setKey -> viewModel.removeSet(entry.key, setKey) },
                     onReplace = { viewModel.pendingReplaceKey = entry.key; onReplaceExercise() },
+                    onDetails = { onExerciseDetails(entry.exercise.id) },
                 )
             }
             item(key = "actions") {
-                ListRow(t.addExercise, onClick = onAddExercises) { LineIcon(Icon.Plus) }
-                if (!draft.isNew) {
-                    ListRow(t.share.shareTemplate, onClick = onShare)
-                    Spacer(Modifier.height(Space.l))
-                    ConfirmButton(t.deleteTemplate, t.deleteConfirm, onConfirm = { viewModel.delete() })
-                    Spacer(Modifier.height(Space.s))
-                    Text(t.deletedKeepsHistory, style = Theme.type.caption, tone = Tone.Muted)
-                }
+                Spacer(Modifier.height(Space.s))
+                BlockButton(t.addExercise, onAddExercises)
             }
         }
     }
@@ -238,7 +286,7 @@ private fun TemplateDraft.Problem.describe(t: Strings): String = when (this) {
 }
 
 @Composable
-private fun ExerciseSection(
+private fun ExerciseBlock(
     modifier: Modifier,
     reorder: ReorderState,
     entry: DraftExercise,
@@ -248,65 +296,83 @@ private fun ExerciseSection(
     isLast: Boolean,
     onToggle: () -> Unit,
     onEdit: ((TemplateDraft) -> TemplateDraft) -> Unit,
+    onRemoveSet: (setKey: Long) -> Unit,
     onReplace: () -> Unit,
+    onDetails: () -> Unit,
 ) {
     val t = LocalStrings.current
     val key = entry.key
     val type = entry.exercise.trackingType
-    Column(modifier.fillMaxWidth()) {
+    Block(modifier) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 64.dp).pressableRow(onToggle).padding(vertical = Space.s),
+            Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(BlockShape.row).pressableRow(onToggle).dragHandle(reorder, key)
+                .semantics { contentDescription = t.reorder },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ExerciseImage(entry.exercise, size = 40.dp)
+            LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+            Spacer(Modifier.width(Space.s))
+            ExerciseThumb(entry, onDetails)
             Spacer(Modifier.width(Space.m))
             Column(Modifier.weight(1f)) {
-                Text(entry.exercise.name, style = Theme.type.label)
+                Text(entry.exercise.name, style = Theme.type.label, maxLines = 2)
                 val rest = entry.rest.toIntOrNull()?.let { t.restSummary(Numbers.formatDuration(it)) }
                 Text(listOfNotNull(t.setCount(entry.sets.size), rest).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
             }
-            Box(
-                Modifier.size(40.dp).dragHandle(reorder, key).semantics { contentDescription = t.reorder },
-                contentAlignment = Alignment.Center,
-            ) { LineIcon(Icon.Drag, color = Theme.colors.muted) }
-            LineIcon(if (expanded) Icon.ChevronUp else Icon.ChevronDown, size = 20.dp, color = Theme.colors.muted)
+            MoreMenu(
+                t.moreActions(entry.exercise.name),
+                buildList {
+                    add(MenuItem(t.replace, onClick = onReplace))
+                    if (!isFirst) add(MenuItem(t.moveUp) { onEdit { it.moveExercise(key, -1) } })
+                    if (!isLast) add(MenuItem(t.moveDown) { onEdit { it.moveExercise(key, 1) } })
+                    add(MenuItem(t.remove, destructive = true) { onEdit { it.removeExercise(key) } })
+                },
+            )
         }
         if (expanded) {
-            entry.sets.forEachIndexed { i, set ->
-                SetRow(i + 1, type, unit, set, onChange = { transform -> onEdit { it.updateSet(key, set.key, transform) } }) {
-                    onEdit { it.removeSet(key, set.key) }
+            Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                entry.sets.forEachIndexed { i, set ->
+                    androidx.compose.runtime.key(set.key) {
+                        SetRow(i + 1, type, unit, set, onChange = { transform -> onEdit { it.updateSet(key, set.key, transform) } }) {
+                            onRemoveSet(set.key)
+                        }
+                    }
+                }
+                BlockButton(t.addSet, { onEdit { it.addSet(key) } }, inBlock = true)
+                Row(Modifier.fillMaxWidth().padding(top = Space.xs), horizontalArrangement = Arrangement.spacedBy(Space.m), verticalAlignment = Alignment.Bottom) {
+                    SmallInput(
+                        entry.rest,
+                        { v -> onEdit { it.setRest(key, v) } },
+                        unit = t.secondsUnit,
+                        placeholder = t.restDefault,
+                        description = t.restTime,
+                        modifier = Modifier.width(96.dp),
+                    )
+                    SmallInput(
+                        entry.note,
+                        { v -> onEdit { it.setNote(key, v.take(300)) } },
+                        unit = "",
+                        placeholder = t.note,
+                        keyboardType = KeyboardType.Text,
+                        align = TextAlign.Start,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(vertical = Space.s), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-                TextButton(t.addSet, { onEdit { it.addSet(key) } }, tone = Tone.Default)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.m), verticalAlignment = Alignment.Bottom) {
-                SmallInput(
-                    entry.rest,
-                    { v -> onEdit { it.setRest(key, v) } },
-                    unit = t.secondsUnit,
-                    placeholder = t.restDefault,
-                    description = t.restTime,
-                    modifier = Modifier.width(96.dp),
-                )
-                SmallInput(
-                    entry.note,
-                    { v -> onEdit { it.setNote(key, v.take(300)) } },
-                    unit = "",
-                    placeholder = t.note,
-                    keyboardType = KeyboardType.Text,
-                    align = TextAlign.Start,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Row(Modifier.fillMaxWidth().padding(vertical = Space.m), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-                if (!isFirst) TextButton(t.moveUp, { onEdit { it.moveExercise(key, -1) } })
-                if (!isLast) TextButton(t.moveDown, { onEdit { it.moveExercise(key, 1) } })
-                TextButton(t.replace, onReplace)
-                TextButton(t.remove, { onEdit { it.removeExercise(key) } })
-            }
         }
-        Hairline()
+    }
+}
+
+/** Exercise image with a small "?" in the corner: opens the exercise details. */
+@Composable
+private fun ExerciseThumb(entry: DraftExercise, onDetails: () -> Unit) {
+    val t = LocalStrings.current
+    Box(Modifier.size(48.dp).clip(BlockShape.field).semantics { contentDescription = t.exerciseDetails(entry.exercise.name) }
+        .pressableRow(onDetails)) {
+        ExerciseImage(entry.exercise, size = 48.dp)
+        Box(
+            Modifier.align(Alignment.BottomEnd).padding(2.dp).size(16.dp).clip(CircleShape).background(Theme.colors.inverseBackground),
+            contentAlignment = Alignment.Center,
+        ) { Text("?", style = Theme.type.caption.copy(fontSize = 11.sp), tone = Tone.Inverse) }
     }
 }
 
@@ -320,37 +386,33 @@ private fun SetRow(
     onRemove: () -> Unit,
 ) {
     val t = LocalStrings.current
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.m)) {
-        Text("$number", Modifier.width(20.dp), style = Theme.type.caption, tone = Tone.Muted)
+    SetRowSurface(t.removeSet(number), onRemove, Modifier.testTag("set-row:$number")) {
+        Text("$number", Modifier.width(24.dp), style = Theme.type.label, tone = Tone.Muted, align = TextAlign.Center)
         if (type.usesWeight) {
-            Row(Modifier.weight(1.3f), verticalAlignment = Alignment.CenterVertically) {
-                SmallInput(
-                    set.weight,
-                    { v -> onChange { it.copy(weight = v.filter { c -> c.isDigit() || c == ',' || c == '.' || c == '-' }.take(8)) } },
-                    unit = unit.symbol,
-                    keyboardType = KeyboardType.Decimal,
-                    modifier = Modifier.weight(1f),
-                )
-                // Many number keyboards have no minus key: negative weight = assistance (e.g. a band).
-                TextButton("±", {
-                    onChange { it.copy(weight = if (it.weight.startsWith("-")) it.weight.removePrefix("-") else "-${it.weight}") }
-                }, Modifier.padding(start = Space.xs))
-            }
+            SetField(
+                set.weight,
+                { v -> onChange { it.copy(weight = v.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(8)) } },
+                unit = unit.symbol,
+                description = t.weightOfSet(number),
+                keyboardType = KeyboardType.Decimal,
+                modifier = Modifier.weight(1.2f),
+            )
         }
         if (type.usesReps) {
-            SmallInput(set.reps, { v -> onChange { it.copy(reps = v.filter(Char::isDigit).take(4)) } }, unit = t.repsUnit, modifier = Modifier.weight(1f))
+            SetField(
+                set.reps, { v -> onChange { it.copy(reps = v.filter(Char::isDigit).take(4)) } },
+                unit = t.repsUnit, description = t.repsOfSet(number), modifier = Modifier.weight(1f),
+            )
         }
         if (type.usesTime) {
-            SmallInput(
+            SetField(
                 set.duration,
                 { v -> onChange { it.copy(duration = v.filter { c -> c.isDigit() || c == ':' }.take(6)) } },
                 unit = t.secondsUnit,
+                description = t.durationOfSet(number),
                 keyboardType = KeyboardType.Number,
                 modifier = Modifier.weight(1f),
             )
-        }
-        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-            IconButton(Icon.Close, t.removeSet(number), onRemove)
         }
     }
 }

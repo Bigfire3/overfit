@@ -1,7 +1,7 @@
 # Store-Texte
 
 Gilt für App Store und Google Play. Stand: aktueller Funktionsumfang (siehe docs/PROGRESS.md). Limits: Play Titel 30, Kurzbeschreibung 80, Langbeschreibung 4000; App Store Untertitel 30, Beschreibung 4000.
-Marke: Wortmarke „overfit“ immer klein, Claim „personal training for everyone“ (30 Zeichen) in beiden Sprachen auf Englisch (siehe docs/DECISIONS.md). Keine Funktion bewerben, die es nicht gibt (Duo nur „bald“).
+Marke: Wortmarke „overfit“ immer klein, Claim „personal training for everyone“ (30 Zeichen) in beiden Sprachen auf Englisch (siehe docs/DECISIONS.md). Keine Funktion bewerben, die es nicht gibt (Duo entfernt 3.11., Fabian).
 
 ## Deutsch
 
@@ -37,13 +37,12 @@ AUSWERTUNG
 KI-COACH
 • Der Coach kennt dein Training und hat ein Gedächtnis für Ziele, Verletzungen und Vorlieben
 • Coach-Tab: dein persönlicher Trainer im Chat – Workout-Vorschläge, Auswertungen, Gedächtnis, Prompts mit sichtbarem Text
-• Eigener API-Key (Gemini, Claude, OpenAI, OpenRouter) oder Fuel, das Coach-Guthaben in der App
+• Eigener API-Key (Gemini, Claude, OpenAI, OpenRouter) oder Guthaben (in Euro, in der App aufladbar)
 • KI-Chat-Verbindung: nutze Claude, ChatGPT oder Gemini mit deinen echten Trainingsdaten
 
 TEILEN
 • Workouts und Trainings per Link, QR-Code oder Datei teilen
-• „Spot“: Freunde einladen, ihr bekommt beide 1 € Fuel
-• Duo – gemeinsam trainieren: bald
+• Freunde einladen (Empfehlungsprogramm): Einladungsbonus von 1 € Guthaben für dich und deinen Freund
 
 DEINE DATEN
 • Alles liegt lokal auf deinem Gerät, ohne Konto, ohne Werbung, ohne Tracking
@@ -84,13 +83,12 @@ REVIEW
 AI COACH
 • The coach knows your training and has a memory for goals, injuries and preferences
 • Coach tab: your personal trainer in chat – workout suggestions, reviews, memory, prompts with visible text
-• Your own API key (Gemini, Claude, OpenAI, OpenRouter) or Fuel, the coach credit inside the app
+• Your own API key (Gemini, Claude, OpenAI, OpenRouter) or credit (in euro, topped up inside the app)
 • AI chat connection: use Claude, ChatGPT or Gemini with your real training data
 
 SHARING
 • Share workouts and trainings as link, QR code or file
-• "Spot": invite friends, you both get €1 Fuel
-• Duo – train together: coming soon
+• Invite friends (referral program): referral bonus of €1 credit for you and your friend
 
 YOUR DATA
 • Everything stays on your device, no account, no ads, no tracking

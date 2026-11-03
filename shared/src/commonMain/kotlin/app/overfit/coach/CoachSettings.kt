@@ -19,8 +19,12 @@ data class CoachSettings(
     /** Edited coach role and rules; null = the default text in the app language. */
     val instructions: String? = null,
 ) {
-    fun model(id: ProviderId): String = if (id == ProviderId.FUEL) CoachModels.FUEL
-    else models[id.name]?.takeIf { it.isNotBlank() } ?: CoachModels.default(id)
+    /** For Fuel: the coach quality (tier standard or pro). */
+    fun model(id: ProviderId): String = if (id == ProviderId.FUEL) {
+        models[id.name]?.takeIf { it == app.overfit.ai.TIER_PRO } ?: CoachModels.FUEL
+    } else {
+        models[id.name]?.takeIf { it.isNotBlank() } ?: CoachModels.default(id)
+    }
 }
 
 class CoachSettingsStore(private val kv: KeyValueStore) {

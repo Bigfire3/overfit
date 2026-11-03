@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * What the Fuel/Spot screens talk to: the real backend when a URL is configured, or the local demo while the user
+ * What the credit/invite screens talk to: the real backend when a URL is configured, or the local demo while the user
  * is looking at it. Demo state is per process and never persisted.
  */
 class FuelSession(val access: FuelAccess, private val demoService: FuelService = DemoFuelService()) {

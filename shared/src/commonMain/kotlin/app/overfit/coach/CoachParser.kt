@@ -71,7 +71,7 @@ object CoachParser {
     }
 
     private fun set(o: JsonObject): SuggestedSet? = SuggestedSet(
-        weightKg = o.field("weight_kg")?.number()?.let { (it * 100).roundToInt() / 100.0 },
+        weightKg = o.field("weight_kg")?.number()?.let { (it.coerceAtLeast(0.0) * 100).roundToInt() / 100.0 }, // weights are never negative
         reps = o.field("reps")?.number()?.roundToInt()?.takeIf { it in 0..1000 },
         durationSec = o.field("duration_sec")?.number()?.roundToInt()?.takeIf { it in 0..86_400 },
     ).takeUnless { it.weightKg == null && it.reps == null && it.durationSec == null }

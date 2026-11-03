@@ -37,7 +37,8 @@ import app.overfit.domain.WeightUnit
 import app.overfit.domain.Workout
 import app.overfit.domain.WorkoutSummary
 import app.overfit.i18n.LocalStrings
-import app.overfit.ui.components.ConfirmButton
+import app.overfit.ui.components.HeaderDeleteButton
+import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
@@ -125,7 +126,17 @@ fun HistoryDetailScreen(
     }
     val photos by remember(workoutId) { workouts.observePhotosOf(workoutId) }.collectAsStateWithLifecycle(emptyList())
 
-    Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
+    Screen(scroll = true, header = {
+        BackHeader(t.back, onBack) {
+            if (data != null) {
+                HeaderIconButton(Icon.Share, h.shareWorkout, onShare)
+                HeaderDeleteButton(t.delete, t.deleteConfirm, onConfirm = {
+                    appScope.launch { workouts.deleteWorkout(workoutId) }
+                    onBack()
+                })
+            }
+        }
+    }) {
         val d = data ?: return@Screen
         val w = d.finished.workout
         Text("${t.date(localDateTime(w.startedAt).date)} · ${clockTime(w.startedAt)}", tone = Tone.Muted)
@@ -193,12 +204,6 @@ fun HistoryDetailScreen(
             }
         })
         if (onCoach != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.reviewTitle, onClick = onCoach)
-        ListRow(h.shareWorkout, onClick = onShare)
-        Spacer(Modifier.height(Space.l))
-        ConfirmButton(t.delete, t.deleteConfirm, onConfirm = {
-            appScope.launch { workouts.deleteWorkout(workoutId) }
-            onBack()
-        })
     }
 }
 

@@ -86,6 +86,15 @@ class DiaryScreenTest {
     @Test fun emptyStateExplainsPhotoAfterWorkout() {
         show { PhotosScreen(emptyList(), emptyList(), Language.DE, today, {}, {}, { _, _ -> }) }
         compose.onNodeWithText("Beim Beenden eines Trainings kannst du ein Foto machen. Es bleibt privat in der App.").assertIsDisplayed()
+        // The calendar is there without a single photo.
+        compose.onNodeWithText("November 2026").assertIsDisplayed()
+        compose.onNodeWithText("Mo").assertIsDisplayed()
+    }
+
+    @Test fun calendarShowsTrainingDaysWithoutAnyPhoto() {
+        show { PhotosScreen(emptyList(), listOf(session("s1", LocalDate(2026, 11, 2), "Push")), Language.DE, today, {}, {}, { _, _ -> }) }
+        compose.onNodeWithText("November 2026").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Tag 2, Training").assertIsDisplayed()
     }
 
     @Test fun viewerSwipesBetweenPhotoDaysAndDeletesWithConfirmation() {
@@ -108,7 +117,7 @@ class DiaryScreenTest {
         compose.onNodeWithText("Push").assertIsDisplayed()
         // Two photos on that day: page dots/description of the vertical pager.
         compose.onNodeWithContentDescription("Foto 1 von 2").assertIsDisplayed()
-        compose.onNodeWithText("Foto löschen").performClick()
+        compose.onNodeWithContentDescription("Foto löschen").performClick() // bin icon top right
         assertEquals(null, deleted)
         compose.onNodeWithText("Wirklich löschen? Nochmal tippen.").performClick()
         assertEquals("p2", deleted)

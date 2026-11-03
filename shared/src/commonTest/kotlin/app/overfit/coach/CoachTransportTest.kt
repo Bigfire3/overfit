@@ -7,9 +7,10 @@ import app.overfit.fuel.FuelConfig
 import app.overfit.fuel.FuelException
 import app.overfit.fuel.FuelMessageResult
 import app.overfit.fuel.FuelService
+import app.overfit.fuel.FuelTierInfo
 import app.overfit.fuel.LedgerPage
-import app.overfit.fuel.SpotRedeemResult
-import app.overfit.fuel.SpotToken
+import app.overfit.fuel.InviteRedeemResult
+import app.overfit.fuel.InviteToken
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -237,17 +238,21 @@ class CoachTransportTest {
 
     // ---- Fuel ----
 
-    private class FakeFuel(private val onMessages: (String) -> FuelMessageResult) : FuelService {
+    private class FakeFuel(
+        private val config: FuelConfig? = null,
+        private val onMessages: (String) -> FuelMessageResult,
+    ) : FuelService {
         var lastBody: String? = null
+        var configCalls = 0
         override val isDemo = false
-        override suspend fun config(): FuelConfig = error("unused")
+        override suspend fun config(): FuelConfig { configCalls++; return config ?: error("offline") }
         override suspend fun account(): FuelAccount = error("unused")
         override suspend fun setDisplayName(name: String?): String? = error("unused")
         override suspend fun ledger(before: Long?, limit: Int): LedgerPage = error("unused")
         override suspend fun createRecoveryCode(): String = error("unused")
         override suspend fun restore(code: String): FuelAccount = error("unused")
-        override suspend fun spotToken(): SpotToken = error("unused")
-        override suspend fun redeemSpot(token: String): SpotRedeemResult = error("unused")
+        override suspend fun inviteToken(): InviteToken = error("unused")
+        override suspend fun redeemInvite(token: String): InviteRedeemResult = error("unused")
         override suspend fun messages(bodyJson: String): FuelMessageResult {
             lastBody = bodyJson
             return onMessages(bodyJson)
@@ -259,15 +264,80 @@ class CoachTransportTest {
         put("stop_reason", JsonPrimitive("end_turn"))
     }
 
+    private fun tiers(vararg available: String) = FuelConfig(
+        tiers = listOf("standard", "pro", "lite").associateWith { FuelTierInfo(available = it in available) },
+    )
+
+    private suspend fun sentModel(config: FuelConfig?, wanted: String): String {
+        val fake = FakeFuel(config) { FuelMessageResult(fuelAnswer, 30_000, 4_170_000) }
+        FuelCoach(FuelProvider { fake }).send(prompt, wanted)
+        return Json.parseToJsonElement(fake.lastBody!!).jsonObject["model"]!!.jsonPrimitive.content
+    }
+
     @Test
-    fun fuelSuccessUsesFixedModelAndReportsCost() = runTest {
-        val fake = FakeFuel { FuelMessageResult(fuelAnswer, 30_000, 4_170_000) }
-        val reply = FuelCoach(FuelProvider { fake }).send(prompt, "claude-haiku-4-5")
+    fun fuelSuccessSendsTierAndReportsCost() = runTest {
+        val fake = FakeFuel(tiers("standard", "pro", "lite")) { FuelMessageResult(fuelAnswer, 30_000, 4_170_000) }
+        val reply = FuelCoach(FuelProvider { fake }).send(prompt, "pro")
         assertEquals("fuel text", reply.text)
         assertEquals(30_000L, reply.costMicro)
         assertEquals(4_170_000L, reply.balanceMicro)
         val sent = Json.parseToJsonElement(fake.lastBody!!).jsonObject
-        assertEquals("claude-sonnet-5-5", sent["model"]!!.jsonPrimitive.content)
+        assertEquals("pro", sent["model"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun fuelMarksCoachReviewsSoGiftedReviewsCanApply() = runTest {
+        val fake = FakeFuel(tiers("standard")) { FuelMessageResult(fuelAnswer, 0, 0, giftReview = true) }
+        val reply = FuelCoach(FuelProvider { fake }).send(prompt.copy(review = true), "standard")
+        assertTrue(reply.giftReview)
+        assertEquals("review", Json.parseToJsonElement(fake.lastBody!!).jsonObject["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)
+        FuelCoach(FuelProvider { fake }).send(prompt.copy(review = false), "standard")
+        assertEquals("chat", Json.parseToJsonElement(fake.lastBody!!).jsonObject["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)
+        // Never in the body sent directly to Anthropic (own key).
+        assertTrue("overfit" !in anthropicBody(prompt.copy(review = true), "claude-sonnet-5-5", true))
+        // Real coach reviews are marked.
+        assertTrue(CoachPromptBuilder.build(CoachContext(ReviewKind.entries.first(), app.overfit.domain.Language.DE, "", "", null, emptyList())).review)
+    }
+
+    @Test
+    fun fuelReportsTheModelThatAnsweredAndTheChosenOneOnFallback() = runTest {
+        val fake = FakeFuel(tiers("standard", "pro", "lite")) {
+            FuelMessageResult(fuelAnswer, 30_000, 4_170_000, servedModel = "claude-sonnet-5-5", chosenModel = "gemini-3.6-flash")
+        }
+        val reply = FuelCoach(FuelProvider { fake }).send(prompt, "standard")
+        assertEquals("claude-sonnet-5-5", reply.servedModel)
+        assertEquals("gemini-3.6-flash", reply.fallbackFrom)
+        val same = FakeFuel(tiers("standard")) {
+            FuelMessageResult(fuelAnswer, 30_000, 4_170_000, servedModel = "gemini-3.6-flash", chosenModel = "gemini-3.6-flash")
+        }
+        val r2 = FuelCoach(FuelProvider { same }).send(prompt, "standard")
+        assertEquals("gemini-3.6-flash", r2.servedModel)
+        assertEquals(null, r2.fallbackFrom)
+    }
+
+    @Test
+    fun fuelTierFallsBackToWhatTheBackendOffers() = runTest {
+        assertEquals("standard", sentModel(tiers("standard", "pro", "lite"), "standard"))
+        assertEquals("lite", sentModel(tiers("standard", "pro", "lite"), "lite"))
+        assertEquals("standard", sentModel(tiers("standard", "pro"), "lite"))
+        assertEquals("pro", sentModel(tiers("pro"), "lite"))
+        assertEquals("standard", sentModel(tiers("standard"), "pro"))
+        assertEquals("pro", sentModel(tiers("pro"), "standard"))
+        // Unknown value (old settings) → standard
+        assertEquals("standard", sentModel(tiers("standard", "pro"), "claude-haiku-4-5"))
+        // Old backend without tiers: its only model
+        assertEquals("claude-sonnet-5-5", sentModel(FuelConfig(), "standard"))
+        // Config not reachable: as asked, the backend decides
+        assertEquals("pro", sentModel(null, "pro"))
+    }
+
+    @Test
+    fun fuelConfigIsCached() = runTest {
+        val fake = FakeFuel(tiers("standard")) { FuelMessageResult(fuelAnswer, 1, 1) }
+        val coach = FuelCoach(FuelProvider { fake })
+        coach.send(prompt, "standard")
+        coach.send(prompt, "standard")
+        assertEquals(1, fake.configCalls)
     }
 
     @Test
@@ -282,6 +352,7 @@ class CoachTransportTest {
         assertEquals(CoachErrorKind.SERVER, kind(FuelException("x", 502)))
         assertEquals(CoachErrorKind.AUTH, kind(FuelException("x", 401)))
         assertEquals(CoachErrorKind.BAD_REQUEST, kind(FuelException("x", 400)))
+        assertEquals(CoachErrorKind.NO_ACCESS, kind(FuelException("tier_unavailable", 503)))
     }
 
     @Test

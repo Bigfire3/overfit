@@ -35,10 +35,15 @@ data class CoachReply(
     val raw: String,
     val costMicro: Long? = null,
     val balanceMicro: Long? = null,
+    /** Credit: model that really answered (ID), and the model chosen when a replacement answered instead (else null). */
+    val servedModel: String? = null,
+    val fallbackFrom: String? = null,
     /** Output was cut off (max tokens). */
     val truncated: Boolean = false,
     /** The model declined (safety). */
     val refused: Boolean = false,
+    /** Credit: paid with a gifted review (invite bonus), nothing taken from the credit. */
+    val giftReview: Boolean = false,
 )
 
 enum class CoachErrorKind(val retryable: Boolean) {
@@ -60,8 +65,8 @@ object CoachModels {
     const val OPENROUTER = "anthropic/claude-sonnet-5.5"
     /** Newest Gemini Flash marked "Stable" in Google's model list (3.8 Flash is still "New"). */
     const val GEMINI = "gemini-3.6-flash"
-    /** The Fuel backend only accepts this model (see backend/src/config.ts). */
-    const val FUEL = "claude-sonnet-5-5"
+    /** Credit sends a tier ID instead of a model (backend/src/providers.ts); internal only, the UI shows the real model names. */
+    const val FUEL = app.overfit.ai.TIER_STANDARD
     const val MAX_TOKENS = 8_000
     /** Gemini counts its thinking tokens into the output limit, so it gets more room. */
     const val GEMINI_MAX_TOKENS = 16_000
@@ -288,13 +293,22 @@ class OpenRouterCoach(http: HttpClient, apiKey: () -> String?) :
 class GeminiCoach(http: HttpClient, apiKey: () -> String?) :
     ChatCompletionsCoach(http, apiKey, ProviderId.GEMINI, "${app.overfit.ai.GEMINI_OPENAI_BASE}/chat/completions")
 
-/** Fuel: the Anthropic body through our backend, which reports cost and the new balance. */
+/**
+ * Fuel: the Anthropic body through our backend, which maps it onto the provider of the tier and reports cost and the
+ * new balance. [model] is the tier (standard | pro | lite); a tier the backend does not offer falls back to the next.
+ */
+/** Anthropic body plus Overfit's own `overfit.purpose` (the backend strips it before the provider sees it). */
+fun fuelBody(prompt: CoachPrompt, tier: String, structured: Boolean): JsonObject {
+    val base = anthropicBody(prompt, tier, structured)
+    return JsonObject(base + ("overfit" to buildJsonObject { put("purpose", if (prompt.review) "review" else "chat") }))
+}
+
 class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
     override val providerId = ProviderId.FUEL
     override suspend fun send(prompt: CoachPrompt, model: String, structured: Boolean): CoachReply {
         if (!fuel.available) throw CoachException(CoachErrorKind.NO_ACCESS)
         val result = try {
-            fuel.messages(anthropicBody(prompt, CoachModels.FUEL, structured).toString())
+            fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured).toString())
         } catch (e: CancellationException) {
             throw e
         } catch (e: FuelException) {
@@ -302,7 +316,7 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
                 when {
                     e.code == "network" -> CoachErrorKind.NETWORK
                     e.code == "insufficient_funds" -> CoachErrorKind.NO_FUEL
-                    e.code == "not_configured" -> CoachErrorKind.NO_ACCESS
+                    e.code == "not_configured" || e.code == "tier_unavailable" -> CoachErrorKind.NO_ACCESS
                     e.code == "rate_limited" || e.status == 429 -> CoachErrorKind.RATE_LIMIT
                     e.status >= 500 || e.code == "upstream_unavailable" -> CoachErrorKind.SERVER
                     e.status == 401 || e.status == 403 -> CoachErrorKind.AUTH
@@ -314,7 +328,13 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
             throw CoachException(CoachErrorKind.NETWORK, e.message)
         }
         val body = result.body as? JsonObject ?: throw CoachException(CoachErrorKind.SERVER, "Not an object")
-        return anthropicReply(body, body.toString()).copy(costMicro = result.costMicro, balanceMicro = result.balanceMicro)
+        return anthropicReply(body, body.toString()).copy(
+            giftReview = result.giftReview,
+            costMicro = result.costMicro,
+            balanceMicro = result.balanceMicro,
+            servedModel = result.servedModel,
+            fallbackFrom = result.chosenModel?.takeIf { result.servedModel != null && it != result.servedModel },
+        )
     }
 }
 

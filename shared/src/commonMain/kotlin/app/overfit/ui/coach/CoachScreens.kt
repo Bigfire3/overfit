@@ -61,7 +61,7 @@ import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
@@ -362,7 +362,7 @@ private fun RawAnswer(raw: String?) {
     val c = LocalCoachStrings.current
     var show by remember { mutableStateOf(false) }
     Spacer(Modifier.height(Space.m))
-    TextButton(if (show) c.hideRaw else c.showRaw, onClick = { show = !show })
+    SmallButton(if (show) c.hideRaw else c.showRaw, onClick = { show = !show })
     if (show) Text(raw.take(6_000), style = Theme.type.caption, tone = Tone.Muted)
 }
 
@@ -441,7 +441,7 @@ private fun Result(
                 diff.unknownIds.forEach { Text(c.planUnknown(it), style = Theme.type.caption, tone = Tone.Muted) }
                 if (planOpen) {
                     Spacer(Modifier.height(Space.s))
-                    TextButton(c.planReject, onClick = onReject)
+                    SmallButton(c.planReject, onClick = onReject)
                 }
             }
         }
@@ -458,7 +458,7 @@ private fun Result(
     val cost = item.costMicro
     val balance = item.balanceMicro
     if (cost != null && balance != null) {
-        Text(c.fuelCost(formatEuro(cost, language), formatEuro(balance, language)), style = Theme.type.caption, tone = Tone.Muted)
+        AnswerCostLine(c, language, cost, balance, item.servedModel, item.fallbackFrom)
     }
 }
 
@@ -591,7 +591,7 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
         Title(c.settingsTitle)
         SectionTitle(c.model)
         if (provider == app.overfit.ai.ProviderId.FUEL) {
-            Text(c.modelFuelFixed, tone = Tone.Muted)
+            FuelQuality(coach, settings.model(provider))
         } else {
             ListRow(providerLabel(provider)) {
                 app.overfit.ui.components.RowInput(model, { model = it.trim().take(100) }, onCommit = { coach.settings.setModel(provider, model) })
@@ -608,17 +608,88 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
         Spacer(Modifier.height(Space.s))
         TextArea(instructions, { instructions = it; saved = false }, "", Modifier.testTag("coach-instructions"))
         Row(Modifier.fillMaxWidth().padding(top = Space.s), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(c.instructionsReset, onClick = { instructions = defaultText; coach.settings.setInstructions(null); saved = true })
+            SmallButton(c.instructionsReset, onClick = { instructions = defaultText; coach.settings.setInstructions(null); saved = true })
             if (saved) Text(c.saved, style = Theme.type.caption, tone = Tone.Muted)
         }
     }
 }
 
-/** The latest coach tips for the start screen (empty until the first review). */
+/**
+ * Credit: the real model name and cost of an answer, plus a transparent note when a replacement model answered
+ * (the price of the chosen model was charged). [served] is the model ID; null with an old backend (no model line).
+ */
 @Composable
-fun latestCoachTips(coach: CoachService): List<String> {
-    val reviews by coach.reviews.collectAsState(initial = emptyList())
-    return reviews.firstOrNull { it.status == ReviewStatus.DONE && it.review != null }?.review?.tips.orEmpty().take(3)
+internal fun AnswerCostLine(c: CoachStrings, language: app.overfit.domain.Language, cost: Long, balance: Long?, served: String?, fallbackFrom: String?) {
+    val model = served?.let { app.overfit.fuel.modelLabel(it) }
+    val f = app.overfit.i18n.LocalFuelStrings.current
+    // Cost is credit used (never a price); 0 = paid with a gifted review (invite bonus).
+    val money = if (cost == 0L) f.answerGifted else f.creditAmount(app.overfit.fuel.formatCost(cost, language))
+    val line = c.answerInfo(model, money, balance?.let { formatEuro(it, language) })
+    Text(line, style = Theme.type.caption, tone = Tone.Muted)
+    if (served != null && fallbackFrom != null) {
+        Text(
+            c.answerFallback(app.overfit.fuel.modelShortName(fallbackFrom), app.overfit.fuel.modelShortName(served)),
+            Modifier.padding(top = Space.xs), style = Theme.type.caption, tone = Tone.Muted,
+        )
+    }
+}
+
+/**
+ * Credit: choice of the coach model by its real name. Every model shows what it costs (estimated per review and chat
+ * message, from the backend's price table, markup and typical token amounts) and how many reviews the credit pays for.
+ * A model is only offered when the backend has it (`/v1/config` → tiers). The tier IDs stay internal.
+ */
+@Composable
+private fun FuelQuality(coach: CoachService, tier: String) {
+    val c = LocalCoachStrings.current
+    val language = app.overfit.i18n.LocalFuelStrings.current.language
+    val config by androidx.compose.runtime.produceState<app.overfit.fuel.FuelConfig?>(null, coach) { value = coach.fuelConfig() }
+    val balance by androidx.compose.runtime.produceState<Long?>(null, coach) { value = coach.fuelBalance() }
+    val cfg = config
+    val tiers = cfg?.tiers
+    if (cfg == null) { Text(app.overfit.i18n.LocalFuelStrings.current.loading, tone = Tone.Muted); return }
+    val offered = listOf(app.overfit.ai.TIER_STANDARD, app.overfit.ai.TIER_PRO).mapNotNull { id -> tiers?.get(id)?.takeIf { it.available }?.let { id to it } }
+    if (offered.isEmpty()) return
+    if (offered.size == 1) {
+        Text(c.modelFixed(offered[0].second.label), tone = Tone.Muted)
+        // The one model answers whatever is stored: keep the stored choice in sync.
+    }
+    val selected = offered.firstOrNull { it.first == tier } ?: offered.first()
+    fun cost(info: app.overfit.fuel.FuelTierInfo, task: app.overfit.fuel.FuelTask) =
+        app.overfit.fuel.CostEstimate.micro(info, cfg.markupBp, task, cfg.usageProfiles)
+    if (offered.size > 1) offered.forEach { (id, info) ->
+        val on = id == selected.first
+        ListRow(info.label, tone = if (on) Tone.Default else Tone.Muted, onClick = { coach.settings.setModel(app.overfit.ai.ProviderId.FUEL, id) }, trailing = {
+            if (on) LineIcon(Icon.Check, size = 20.dp)
+        })
+        Text(
+            c.modelCosts(
+                app.overfit.fuel.formatCents(cost(info, app.overfit.fuel.FuelTask.COACH), language),
+                app.overfit.fuel.formatCents(cost(info, app.overfit.fuel.FuelTask.CHAT), language),
+            ),
+            Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted,
+        )
+    } else Text(
+        c.modelCosts(
+            app.overfit.fuel.formatCents(cost(selected.second, app.overfit.fuel.FuelTask.COACH), language),
+            app.overfit.fuel.formatCents(cost(selected.second, app.overfit.fuel.FuelTask.CHAT), language),
+        ),
+        Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted,
+    )
+    val review = cost(selected.second, app.overfit.fuel.FuelTask.COACH)
+    balance?.let {
+        Text(
+            c.modelAffordable(formatEuro(it, language), app.overfit.fuel.CostEstimate.affordable(it, review)),
+            Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted,
+        )
+    }
+    tiers?.get(app.overfit.ai.TIER_LITE)?.takeIf { it.available }?.let { lite ->
+        Text(
+            c.modelAutofill(lite.label, app.overfit.fuel.formatCents(cost(lite, app.overfit.fuel.FuelTask.AUTOFILL), language)),
+            Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted,
+        )
+    }
+    Text(c.modelEstimateNote((cfg.markupBp / 100).toString()), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Faint)
 }
 
 private fun providerLabel(id: app.overfit.ai.ProviderId) = when (id) {
@@ -626,5 +697,5 @@ private fun providerLabel(id: app.overfit.ai.ProviderId) = when (id) {
     app.overfit.ai.ProviderId.OPENAI -> "OpenAI"
     app.overfit.ai.ProviderId.OPENROUTER -> "OpenRouter"
     app.overfit.ai.ProviderId.GEMINI -> "Gemini"
-    app.overfit.ai.ProviderId.FUEL -> "Fuel"
+    app.overfit.ai.ProviderId.FUEL -> "Guthaben"
 }

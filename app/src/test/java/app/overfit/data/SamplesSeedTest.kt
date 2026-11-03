@@ -44,9 +44,20 @@ class SamplesSeedTest {
         data.templates.delete(data.templates.templates.first().first { it.name == "Pull" }.id)
         assertEquals(0, data.seedSamplesOnce().getOrThrow()) // flag set: nothing comes back
         assertEquals(listOf("Push", "Legs"), names())
-        // The explicit "Add sample workouts" entry still brings them back on request.
+        // The importer can still add missing ones (idempotent, matched by name).
         assertEquals(1, data.importer.addSamples())
         assertEquals(3, names().size)
+    }
+
+    @Test
+    fun deleteAllData_bringsSamplesBackWithoutRestart() = runTest {
+        data.seedSamplesOnce()
+        data.templates.delete(data.templates.templates.first().first { it.name == "Pull" }.id)
+        data.resetAll()
+        assertEquals(listOf("Push", "Pull", "Legs"), names())
+        // Restoring a backup starts from a clean slate without samples.
+        data.resetAll(reseedSamples = false)
+        assertEquals(emptyList<String>(), names())
     }
 
     @Test
