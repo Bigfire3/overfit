@@ -3,7 +3,7 @@ package app.overfit.domain
 import kotlin.math.min
 
 /**
- * Fuzzy search over the exercise catalogue (~1100 entries, fully in memory).
+ * Fuzzy search over the exercise catalogue (~300 Workout Guide entries plus custom ones, fully in memory).
  *
  * - All query words must match (AND). A word matches if a name word equals it, starts with it,
  *   occurs in the name written as one word ("pushup" ↔ "Push-up") or differs by one typo
@@ -64,7 +64,7 @@ object ExerciseSearch {
             .thenBy { it.name.length }
             .thenBy { it.name.lowercase() }
 
-    /** Eigene Übungen zuerst, dann Workout Guide (schönere Bilder), dann free-exercise-db. */
+    /** Eigene Übungen zuerst, dann Workout Guide (FREE_DB gibt es seit DB v5 nicht mehr, nur der Vollständigkeit halber). */
     private fun sourceRank(source: ExerciseSource) = when (source) {
         ExerciseSource.CUSTOM -> 0
         ExerciseSource.WORKOUT_GUIDE -> 1

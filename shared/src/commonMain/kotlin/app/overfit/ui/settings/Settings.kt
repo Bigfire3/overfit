@@ -5,12 +5,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.platform.RestAlerts
-import app.overfit.data.images.OfflineImages
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.share.SamplesRow
 import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.components.pressableRow
-import coil3.compose.LocalPlatformContext
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -67,7 +65,6 @@ fun SettingsScreen(
     onFuel: () -> Unit,
     onAiCoach: () -> Unit = {},
     onChatNotes: () -> Unit = {},
-    offlineImages: OfflineImages,
     restAlerts: RestAlerts,
     share: ShareDependencies,
     onReset: () -> Unit,
@@ -159,7 +156,6 @@ fun SettingsScreen(
         ListRow(t.photos.backupImport, onClick = onImportBackup)
 
         SectionTitle(t.data)
-        OfflineImagesRow(offlineImages)
         ListRow(
             if (confirmReset) t.resetConfirm else t.reset,
             tone = if (confirmReset) Tone.Default else Tone.Muted,
@@ -184,8 +180,6 @@ fun AboutScreen(versionName: String, onBack: () -> Unit, fuel: FuelAccess? = nul
 
         SectionTitle(t.aboutAttribution)
         Text(t.aboutWorkoutGuide, style = Theme.type.caption.copy(lineHeight = Theme.type.body.lineHeight))
-        Spacer(Modifier.height(Space.m))
-        Text(t.aboutFreeExerciseDb, style = Theme.type.caption)
 
         SectionTitle(t.aboutLibraries)
         Text(t.aboutFont, style = Theme.type.caption)
@@ -228,21 +222,3 @@ private fun FuelRow(session: FuelSession, onClick: () -> Unit) {
     ListRow(f.fuel, value.trim(), onClick = onClick)
 }
 
-/** "Download all images" with progress; tapping again only loads what is still missing. */
-@Composable
-private fun OfflineImagesRow(offlineImages: OfflineImages) {
-    val t = LocalStrings.current
-    val context = LocalPlatformContext.current
-    val status by offlineImages.status.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { offlineImages.refresh(context) }
-    val value = when {
-        status.running -> t.offlineImagesRunning(status.done, status.total)
-        status.total > 0 && status.stored == status.total -> t.offlineImagesDone(status.stored, status.total)
-        else -> t.offlineImagesIdle(status.stored)
-    }
-    Column(Modifier.pressableRow { offlineImages.start(context) }.padding(vertical = Space.m)) {
-        Text(t.offlineImages)
-        Text(value, style = Theme.type.caption, tone = Tone.Muted)
-    }
-    Hairline()
-}

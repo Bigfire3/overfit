@@ -29,16 +29,19 @@ object ExerciseImages {
     /** Workout Guide frames are bundled SVGs (tinted when drawn). */
     fun isBundledVector(exercise: Exercise): Boolean = exercise.imageRef?.endsWith(".svg") == true
 
-    /** Coil model: URI of a bundled resource, an http(s) URL, or null (→ initials tile). */
+    /**
+     * Coil model: URI of a bundled resource, or null (→ initials tile). Only bundled images exist since the
+     * free-exercise-db photos were removed; nothing is loaded over the network.
+     */
     fun model(exercise: Exercise): String? {
         val ref = exercise.imageRef ?: return null
-        return if (ref.startsWith("http")) ref else Res.getUri("files/$ref")
+        return if (ref.startsWith("http")) null else Res.getUri("files/$ref")
     }
 }
 
 /**
  * Still image of an exercise: Workout Guide SVG tinted in the foreground colour (black/white
- * design), free-exercise-db photo, or – without image or if loading fails – an initials tile.
+ * design) or – without image or if loading fails – an initials tile.
  */
 @Composable
 fun ExerciseImage(exercise: Exercise, modifier: Modifier = Modifier, size: Dp = 48.dp) {

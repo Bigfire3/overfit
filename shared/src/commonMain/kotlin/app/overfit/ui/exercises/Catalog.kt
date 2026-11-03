@@ -48,6 +48,7 @@ import app.overfit.ui.share.TemplateImportRows
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
+import app.overfit.i18n.LocalExerciseFormStrings
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Screen
@@ -172,6 +173,8 @@ fun ColumnScope.CatalogList(
     language: Language,
     onClick: (Exercise) -> Unit,
     selectedIds: List<String>? = null,
+    /** Picker: last row "Create new exercise" (with the search text as name). */
+    onCreate: ((String) -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val filter by catalog.filter.collectAsStateWithLifecycle()
@@ -211,6 +214,12 @@ fun ColumnScope.CatalogList(
                     ExerciseRow(exercise, language, selected = selectedIds?.contains(exercise.id)) { onClick(exercise) }
                 }
             }
+        }
+        if (onCreate != null && list != null) item(key = "create") {
+            val f = LocalExerciseFormStrings.current
+            val query = filter.query.trim()
+            Spacer(Modifier.height(Space.s))
+            ListRow(if (query.isEmpty()) f.createInPickerEmpty else f.createInPicker(query), onClick = { onCreate(query) })
         }
     }
 }
@@ -260,9 +269,19 @@ fun ExercisePickerScreen(
     single: Boolean,
     onBack: () -> Unit,
     onPicked: (List<String>) -> Unit,
+    /** Opens the custom-exercise form with the search text; null hides the row. */
+    onCreate: ((String) -> Unit)? = null,
+    /** Exercise just created (or chosen under "Did you mean …?") in the form above; it is added right away. */
+    created: String? = null,
+    onCreatedConsumed: () -> Unit = {},
 ) {
     val t = LocalStrings.current
     val selected = rememberSaveable(saver = selectionSaver) { mutableStateListOf<String>() }
+    LaunchedEffect(created) {
+        val id = created ?: return@LaunchedEffect
+        onCreatedConsumed()
+        onPicked(if (single) listOf(id) else (selected.toList() - id) + id)
+    }
     Screen(
         header = { BackHeader(t.back, onBack) },
         footer = if (single) null else ({
@@ -282,6 +301,7 @@ fun ExercisePickerScreen(
                 }
             },
             selectedIds = selected,
+            onCreate = onCreate,
         )
     }
 }

@@ -11,6 +11,8 @@ data class Exercise(
     val equipment: Equipment?,
     val trackingType: TrackingType,
     val defaultRestSec: Int?,
+    /** Execution note (custom exercises). */
+    val note: String? = null,
 ) {
     val isCustom: Boolean get() = source == ExerciseSource.CUSTOM
 

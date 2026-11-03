@@ -43,7 +43,7 @@ class WorkoutRepositoryTest {
     fun tearDown() = db.close()
 
     private suspend fun custom(name: String, type: TrackingType = TrackingType.WEIGHT_REPS): Exercise =
-        exercises.get(exercises.createCustom(CustomExerciseInput(name, type, 60, null, null)))!!
+        exercises.get(exercises.createCustom(CustomExerciseInput(name, type, 60)))!!
 
     private var seq = 0
     private fun ids(): () -> String = { "g${seq++}" }
