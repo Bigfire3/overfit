@@ -127,7 +127,7 @@ class AppSmokeTest {
         // Settings, sub-screens, language switch
         compose.onNodeWithText("Profil").performClick()
         compose.onNodeWithText("Coach & KI").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Über Overfit").performScrollTo().performClick()
+        compose.onNodeWithText("Über overfit").performScrollTo().performClick()
         compose.onNodeWithText("CC BY-SA 4.0", substring = true).assertExists()
         compose.onNodeWithText("Version 0.1.test").assertExists()
         compose.onNodeWithContentDescription("Zurück").performClick()

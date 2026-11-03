@@ -71,7 +71,7 @@ for (const [hash, needle] of [['', 'No workout found'], ['#%%%', 'damaged'], ['#
   check(await page.locator('#open').isHidden(), `Fehlerfall ${hash.slice(0, 12) || '(leer)'}: kein „Öffnen“-Button`);
 }
 await page.goto(`${base}/`);
-check((await page.innerText('h1')).includes('Train'), 'Startseite');
+check((await page.innerText('h1')).includes('personal training for everyone'), 'Startseite');
 await browser.close();
 server.close();
 process.exit(failed ? 1 : 0);

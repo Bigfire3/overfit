@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Alle UI-Texte liegen mehrsprachig in :shared (app.overfit.i18n). Hier nur der Launcher-Name. -->
-    <string name="app_name">Overfit</string>
+    <string name="app_name">overfit</string>
 </resources>

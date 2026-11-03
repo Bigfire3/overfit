@@ -684,3 +684,10 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 
 ### Zur Prüfung durch Fabian
 - Unterstrichene Textlinks vs. eigene Pill-Buttons: Seiten-Aktionen (Bearbeiten/Teilen) sind jetzt graue Pills, Inline-Aktionen in Listen unterstrichen. Leicht umkehrbar in `Components.kt`.
+
+## Marke und Claim (Session T)
+- **Wortmarke „overfit“ immer klein**, auch am Satzanfang und in Fließtexten (wie „eBay“): eine Schreibweise, kein Abwägen im Einzelfall. Geändert: App-Name (`appName`, Android-Label), „Über/About overfit“, Store-Texte, README, Web. Interne Namen (Paket `app.overfit`, Datei `.overfit`, `overfit://`) bleiben unverändert.
+- **Claim „personal training for everyone“** in beiden Sprachen auf Englisch als Markenclaim (30 Zeichen = App-Store-Untertitel). Auf Deutsch zusätzlich eine erklärende Zeile („Dein Trainer in der Tasche …“) statt Übersetzung: ein Claim, überall wiedererkennbar, Store-Suche profitiert von englischem Begriff nicht, aber die Marke bleibt einheitlich.
+- **Store-Titel** „overfit: Workout & KI-Coach“ / „overfit: Workout & AI Coach“ (je 27 Zeichen), Play-Kurzbeschreibung ≤ 80 geprüft.
+- **`aiSubtitle`:** „kein Abo nötig“ statt „kein Abo“, damit ein späteres optionales Pro-Abo nicht widerspricht (siehe docs/monetization.md).
+- **Onboarding:** Der erste Screen ist die Namensfrage, es gibt keinen Splash und keinen Markentext; nichts geändert (keine Funktionsänderung).
