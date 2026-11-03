@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import app.overfit.platform.AndroidRestAlerts
 import app.overfit.platform.AppVisibility
+import app.overfit.platform.EXTRA_OPEN_WORKOUT
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,6 +64,11 @@ class MainActivity : ComponentActivity() {
 
     /** Opened link (https or overfit://) or `.overfit` file → text for the import screen. */
     private fun handleIncoming(intent: Intent?) {
+        // Tap on the rest/workout notification: always the maximized workout, consumed once.
+        if (intent?.getBooleanExtra(EXTRA_OPEN_WORKOUT, false) == true) {
+            intent.removeExtra(EXTRA_OPEN_WORKOUT)
+            (application as OverfitApp).dependencies.requestOpenWorkout()
+        }
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
         val text = when (uri.scheme) {

@@ -85,6 +85,8 @@ fun WorkoutScreen(
     onAddExercises: () -> Unit,
     onReplaceExercise: (entryId: String) -> Unit,
     onClosed: () -> Unit,
+    /** Hides the workout without touching it (the mini bar takes over); also what the system back gesture does. */
+    onMinimize: () -> Unit = {},
     /** After "Finish": opens the finish flow (summary, feeling, note, photos) for this workout. */
     onFinished: (workoutId: String) -> Unit = { onClosed() },
 ) {
@@ -134,6 +136,7 @@ fun WorkoutScreen(
             )
         },
     ) {
+        IconButton(Icon.ChevronDown, t.minimizeWorkout, onMinimize)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.m)) {
             NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.weight(1f))
             TextButton(

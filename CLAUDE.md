@@ -36,11 +36,11 @@
 - Android SDK nach `~/android-sdk` installieren (cmdline-tools, `platforms;android-37.0`, `build-tools;36.0.0`), `local.properties` mit `sdk.dir`.
 - Maven Central antwortet hinter dem Proxy mit 429 → Gradle immer mit `-I tools/claude-env-maven-mirror.gradle.kts` aufrufen (Google-Mirror, auch für Robolectric).
 - Checks: `./gradlew -I tools/claude-env-maven-mirror.gradle.kts :shared:testAndroidHostTest :shared:compileKotlinIosSimulatorArm64 :app:testDebugUnitTest :app:assembleRelease`
-- iOS-Code lässt sich unter Linux kompilieren (Kotlin/Native-Klibs), aber nicht linken oder starten. Das prüft die iOS-CI auf macOS (pausiert, nur von Hand starten).
+- iOS-Code lässt sich unter Linux kompilieren (Kotlin/Native-Klibs), aber nicht linken oder starten. Das prüft die iOS-CI auf macOS.
 
 ## Git & CI
-- Du kannst nur auf deinen Session-Branch pushen. Android-CI baut auch dort (ohne Release). Die iOS-CI ist pausiert (macOS-Minuten kosten 10x) und läuft nur von Hand. Am Phasenende PR nach main.
-- Eigene PRs nach main merge selbstständig, ohne zu fragen, sobald: Android-CI auf dem aktuellen Head grün (iOS-CI nur, wenn ausdrücklich angefordert), kein Merge-Konflikt, keine offenen Review-Kommentare. Draft-Status vorher aufheben. Merge-Methode: Merge-Commit. PRs anderer Sessions nicht mergen, sondern mir melden.
+- Du kannst nur auf deinen Session-Branch pushen. Android-CI baut auch dort (ohne Release), iOS-CI nur für PRs nach main (öffentliches Repo, kostenlos). Am Phasenende PR nach main.
+- Eigene PRs nach main merge selbstständig, ohne zu fragen, sobald: CI (Android und iOS) auf dem aktuellen Head grün, kein Merge-Konflikt, keine offenen Review-Kommentare. Draft-Status vorher aufheben. Merge-Methode: Merge-Commit. PRs anderer Sessions nicht mergen, sondern mir melden.
 - Nur Merges nach main aktualisieren das Release „latest“ (neue APK fürs Handy). Nach dem Merge sag mir, was ich testen soll.
 - Nach einem Merge Folgearbeit nicht auf dem alten Stand stapeln: Session-Branch neu von main starten.
 - Wird das Pushen der Workflow-Datei abgelehnt (fehlende Berechtigung), sag mir genau, was ich wo freigeben muss.
