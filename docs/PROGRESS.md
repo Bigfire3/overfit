@@ -32,6 +32,18 @@ die App selbst). Ton synthetisch erzeugt. Details und Lautlos-Verhalten in DECIS
 5. Profil → „Ticken vor Pausenende“ aus: keine Klicks mehr, Vibration/Benachrichtigung wie gehabt.
 6. Falls „Genaue Pausen-Benachrichtigungen“ nicht erlaubt ist: Ticken kann entfallen (bewusst, lieber kein als falsches Ticken).
 
+## Feedback-Runde 4 (Session AF, 3.11.)
+**Erledigt:** Beispiele (Push/Pull/Legs) kommen nach „Daten löschen“ sofort zurück; kein schwarzer Screen mehr nach Workout löschen
+(doppelter Pop behoben); Kalender immer sichtbar, Trainingstage ohne Foto als gefüllter Punkt, bei Foto + Training kleiner Punkt;
+Gewichte nur noch Plus (± entfernt). Details in DECISIONS.md. Tests: `SamplesSeedTest`, `DiaryScreenTest`, `UiFeedbackTest` erweitert.
+
+### Bitte auf dem Handy testen (Session AF)
+1. Profil → Alle Daten löschen → Onboarding durchlaufen: Push, Pull, Legs sind sofort da. Ein Beispiel löschen, App neu starten: bleibt weg.
+2. Workout öffnen → Mülleimer → bestätigen: Du landest in der Workout-Liste, nicht auf schwarzem Screen. Auch Training im Verlauf, eigene Übung, Foto löschen.
+3. Fotos-Tab ohne Foto: Kalender ist da. Tag mit Training ohne Foto: gefüllter Punkt. Tag mit Foto + Training: Bild mit kleinem Punkt.
+4. Satz-Eingabe (Editor und Training): kein ±-Knopf, im Gewichtsfeld ist kein Minus möglich.
+5. Training starten (Weighted Pull-up, Englisch und Deutsch): Satzzeile einzeilig, Felder breit genug für „102.5“, Platzhalter „–“ statt senkrechtem „kg“, Zeit-Übung (Plank) ebenso.
+
 ## Feedback-Runde 3: UI (Session AE, 3.11.)
 **Erledigt** (enthält PR #56: Push/Pull/Legs ab dem ersten Start, keine „Beispiel-Workouts hinzufügen“-Zeile mehr):
 - Übergänge: Ursache (700-ms-Standardüberblendung, Leisten springen, Doppel-Taps wirken) behoben; Tabs sofort, sonst kurzes Fade-through,

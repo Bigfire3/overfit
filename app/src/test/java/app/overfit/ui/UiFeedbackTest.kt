@@ -151,6 +151,21 @@ class UiFeedbackTest {
     }
 
     @Test
+    fun deletingAWorkout_landsInTheWorkoutList_notOnABlackScreen() {
+        launchApp()
+        compose.onNodeWithText("Push").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Workout löschen").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Wirklich löschen?", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Wirklich löschen?", substring = true).performClick()
+        // Back on the training tab (list with Pull and Legs), not on an empty screen.
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Pull").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText("Legs").assertCountEquals(1)
+        compose.onAllNodesWithText("Push").assertCountEquals(0)
+        compose.onNodeWithTag("tab:HISTORY").assertExists()
+    }
+
+    @Test
     fun tabSwitch_isInstant() {
         launchApp()
         compose.mainClock.autoAdvance = false
