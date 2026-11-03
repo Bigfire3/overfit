@@ -3,6 +3,7 @@ import type { Config, Device, Env } from './types';
 import { availableMicro, release, reserve, settle, now } from './ledger';
 import { costMicro } from './money';
 import { randomId } from './crypto';
+import { type Tier, callTier, outputLimit, tierAvailable, tierForModel, TIER_NAMES, TIERS, UpstreamError } from './providers';
 
 const enc = new TextEncoder();
 
@@ -19,6 +20,16 @@ export function estimateInputTokens(body: Record<string, unknown>, cfg: Config):
   return Math.ceil(enc.encode(json).length / 2) + images * cfg.imageTokensReserve;
 }
 
+/** Zählt Bild-Blöcke in allen Nachrichten. */
+function countImages(messages: unknown[]): number {
+  let n = 0;
+  for (const m of messages) {
+    const c = (m as { content?: unknown })?.content;
+    if (Array.isArray(c)) n += c.filter((b) => (b as { type?: string })?.type === 'image').length;
+  }
+  return n;
+}
+
 export async function handleMessages(env: Env, cfg: Config, device: Device, bodyBytes: Uint8Array): Promise<Response> {
   let body: Record<string, unknown>;
   try {
@@ -27,11 +38,9 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
   } catch {
     throw new ApiError(400, 'invalid_request', 'Body muss ein JSON-Objekt sein');
   }
-  const model = body.model;
-  if (typeof model !== 'string' || !cfg.prices[model]) {
-    throw new ApiError(400, 'model_not_allowed', 'Modell nicht erlaubt', { allowed: Object.keys(cfg.prices) });
-  }
-  const price = cfg.prices[model];
+  // `model` ist eine Stufe (standard | pro | lite); alte App-Versionen schicken die Modell-ID (→ deren Stufe).
+  const tier = typeof body.model === 'string' ? tierForModel(body.model) : null;
+  if (!tier) throw new ApiError(400, 'model_not_allowed', 'Stufe nicht erlaubt', { allowed: TIER_NAMES });
   const maxTokens = body.max_tokens;
   if (!Number.isInteger(maxTokens) || (maxTokens as number) < 1 || (maxTokens as number) > cfg.maxTokensCap) {
     throw new ApiError(400, 'invalid_max_tokens', `max_tokens muss 1..${cfg.maxTokensCap} sein`, { max: cfg.maxTokensCap });
@@ -40,11 +49,20 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
     throw new ApiError(400, 'invalid_request', 'messages fehlt');
   }
-  if (!env.ANTHROPIC_API_KEY) throw new ApiError(503, 'not_configured', 'Coach-Dienst nicht konfiguriert');
+  const images = countImages(body.messages);
+  if (images > 0 && !TIERS[tier].images) {
+    throw new ApiError(400, 'images_not_supported', `Die Stufe ${tier} verarbeitet keine Bilder`, { tier });
+  }
+  if (!tierAvailable(env, tier)) {
+    const available = TIER_NAMES.filter((t) => tierAvailable(env, t));
+    if (available.length === 0) throw new ApiError(503, 'not_configured', 'Coach-Dienst nicht konfiguriert');
+    throw new ApiError(503, 'tier_unavailable', `Stufe ${tier} ist nicht verfügbar`, { tier, available });
+  }
 
+  const price = cfg.prices[TIERS[tier].model];
   const maxPrice = { ...price, in: Math.max(price.in, price.cacheWrite) };
   const hold = costMicro(
-    { input_tokens: estimateInputTokens(body, cfg), output_tokens: maxTokens as number },
+    { input_tokens: estimateInputTokens(body, cfg), output_tokens: outputLimit(tier, maxTokens as number, cfg) },
     maxPrice,
     cfg.markupBp,
   );
@@ -56,54 +74,59 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     });
   }
 
-  let upstream: Response;
+  // Erst die angefragte Stufe, bei Ausfall einmal die Ausweich-Stufe (falls verfügbar und noch Zeit übrig ist).
+  const started = Date.now();
+  const opts = (timeoutMs: number) => ({ timeoutMs, hasImages: images > 0, tier });
+  let served: Tier = tier;
+  let result;
   try {
-    upstream = await fetch(`${cfg.anthropicBaseUrl}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: bodyBytes,
-      signal: AbortSignal.timeout(120_000),
-    });
-  } catch {
+    try {
+      result = await callTier(env, cfg, tier, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, cfg.upstreamBudgetMs)));
+    } catch (e) {
+      const fb = TIERS[tier].fallback;
+      const left = cfg.upstreamBudgetMs - (Date.now() - started);
+      if (!(e instanceof UpstreamError) || !e.unavailable || !fb || !tierAvailable(env, fb) || left < 15_000) throw e;
+      if (images > 0 && !TIERS[fb].images) throw e;
+      console.warn('fallback', tier, '→', fb, e.status, e.message);
+      served = fb;
+      result = await callTier(env, cfg, fb, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, left)));
+    }
+  } catch (e) {
     await release(env, holdId);
-    throw new ApiError(504, 'upstream_unavailable', 'KI-Anbieter nicht erreichbar, nichts abgebucht');
+    if (!(e instanceof UpstreamError)) throw e;
+    if (e.timeout || e.status === 0) {
+      throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status });
+    }
+    if (!e.unavailable) {
+      throw new ApiError(400, 'upstream_rejected', e.message || 'KI-Anbieter hat die Anfrage abgelehnt, nichts abgebucht', {
+        upstreamStatus: e.status,
+      });
+    }
+    throw new ApiError(502, 'upstream_unavailable', e.message || 'KI-Anbieter nicht verfügbar, nichts abgebucht', { upstreamStatus: e.status });
   }
 
-  const text = await upstream.text();
-  let parsed: Record<string, unknown> | null = null;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    /* parsed bleibt null */
-  }
-  if (!upstream.ok || !parsed) {
-    await release(env, holdId);
-    const upstreamMessage = (parsed?.error as { message?: string } | undefined)?.message;
-    const code = upstream.status >= 400 && upstream.status < 500 && upstream.status !== 429 ? 'upstream_rejected' : 'upstream_unavailable';
-    throw new ApiError(code === 'upstream_rejected' ? 400 : 502, code, upstreamMessage ?? 'KI-Anbieter hat die Anfrage abgelehnt, nichts abgebucht', {
-      upstreamStatus: upstream.status,
-    });
-  }
-
-  const usage = (parsed.usage ?? {}) as Record<string, number>;
-  const hasUsage = typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number';
-  // Ohne Nutzungsangabe wird sicherheitshalber der reservierte Höchstbetrag berechnet.
-  const cost = hasUsage ? costMicro(usage, price, cfg.markupBp) : hold;
+  const servedModel = TIERS[served].model;
+  const usage = result.usage;
+  // Abgerechnet wird höchstens der Preis der angefragten Stufe (Ausweichen auf eine teurere Stufe trägt die Marge).
+  // Ohne Nutzungsangabe sicherheitshalber der reservierte Höchstbetrag.
+  const cost = usage
+    ? Math.min(costMicro(usage, cfg.prices[servedModel], cfg.markupBp), costMicro(usage, price, cfg.markupBp))
+    : hold;
   const charged = await settle(env, device.accountId, holdId, hold, cost, {
-    model,
-    input: usage.input_tokens ?? 0,
-    cacheRead: usage.cache_read_input_tokens ?? 0,
-    cacheWrite: usage.cache_creation_input_tokens ?? 0,
-    output: usage.output_tokens ?? 0,
+    model: servedModel,
+    tier,
+    input: usage?.input_tokens ?? 0,
+    cacheRead: usage?.cache_read_input_tokens ?? 0,
+    cacheWrite: usage?.cache_creation_input_tokens ?? 0,
+    output: usage?.output_tokens ?? 0,
   });
   if (charged > 0) await rewardInviter(env, cfg, device.accountId);
   const balance = await availableMicro(env, device.accountId);
   return Response.json(
-    { ...parsed, overfit: { costMicro: charged, balanceMicro: balance, currency: 'EUR' } },
+    {
+      ...result.body,
+      overfit: { costMicro: charged, balanceMicro: balance, currency: 'EUR', tier, servedTier: served, model: servedModel, fallback: served !== tier },
+    },
     { headers: { 'x-overfit-cost-micro': String(charged), 'x-overfit-balance-micro': String(balance) } },
   );
 }

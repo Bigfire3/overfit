@@ -1,5 +1,6 @@
 package app.overfit.fuel
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -28,6 +29,8 @@ data class LedgerEntry(
     val type: String,
     val amountMicro: Long,
     val model: String? = null,
+    /** Fuel tier the entry was billed at (standard | pro | lite); null for old entries. */
+    val tier: String? = null,
     val inputTokens: Long = 0,
     val cacheReadTokens: Long = 0,
     val cacheWriteTokens: Long = 0,
@@ -49,6 +52,19 @@ data class SpotConfig(
     val expiryDays: Int = 180,
 )
 
+/** List price of a model in µ€ per million tokens (without the Fuel markup). */
+@Serializable
+data class TierPrice(@SerialName("in") val input: Long = 0, val out: Long = 0, val cacheRead: Long = 0, val cacheWrite: Long = 0)
+
+/** One AI tier of the backend (`/v1/config` → `tiers`). */
+@Serializable
+data class FuelTierInfo(
+    val available: Boolean = false,
+    val model: String = "",
+    val images: Boolean = false,
+    val price: TierPrice = TierPrice(),
+)
+
 @Serializable
 data class FuelConfig(
     /** `test` = test server (no device check, test credit); anything else = production. */
@@ -56,6 +72,9 @@ data class FuelConfig(
     val markupBp: Int = 0,
     val storeFeeBp: Int = 0,
     val maxTokensCap: Int = 8192,
+    val defaultTier: String = "standard",
+    /** standard | pro | lite → availability and price. Empty = old backend (only the model `claude-sonnet-5-5`). */
+    val tiers: Map<String, FuelTierInfo> = emptyMap(),
     val packages: List<FuelPackage> = emptyList(),
     val spot: SpotConfig = SpotConfig(),
 )

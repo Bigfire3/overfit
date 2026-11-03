@@ -591,7 +591,7 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
         Title(c.settingsTitle)
         SectionTitle(c.model)
         if (provider == app.overfit.ai.ProviderId.FUEL) {
-            Text(c.modelFuelFixed, tone = Tone.Muted)
+            FuelQuality(coach, settings.model(provider))
         } else {
             ListRow(providerLabel(provider)) {
                 app.overfit.ui.components.RowInput(model, { model = it.trim().take(100) }, onCommit = { coach.settings.setModel(provider, model) })
@@ -612,6 +612,38 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
             if (saved) Text(c.saved, style = Theme.type.caption, tone = Tone.Muted)
         }
     }
+}
+
+/**
+ * Fuel: coach quality Standard (Gemini Flash) or Pro (Claude Sonnet). Pro is only offered when the backend has it
+ * (`/v1/config` → tiers); the hint names the price difference.
+ */
+@Composable
+private fun FuelQuality(coach: CoachService, tier: String) {
+    val c = LocalCoachStrings.current
+    val tiers by androidx.compose.runtime.produceState<Map<String, app.overfit.fuel.FuelTierInfo>?>(null, coach) { value = coach.fuelTiers() }
+    val standard = tiers?.get(app.overfit.ai.TIER_STANDARD)?.takeIf { it.available }
+    val pro = tiers?.get(app.overfit.ai.TIER_PRO)?.takeIf { it.available }
+    if (tiers != null && (standard == null || pro == null)) {
+        Text(c.qualityFixed(standard == null && pro != null), tone = Tone.Muted)
+        return
+    }
+    ListRow(c.quality) {
+        app.overfit.ui.components.Segmented(
+            tier,
+            listOf(app.overfit.ai.TIER_STANDARD to c.qualityStandard, app.overfit.ai.TIER_PRO to c.qualityPro),
+        ) { coach.settings.setModel(app.overfit.ai.ProviderId.FUEL, it) }
+    }
+    Text(c.qualityHint(priceRatio(standard, pro)), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+}
+
+/** How many times a typical coach request (~80 % input, 20 % output tokens) costs with Pro instead of Standard. */
+internal fun priceRatio(standard: app.overfit.fuel.FuelTierInfo?, pro: app.overfit.fuel.FuelTierInfo?): Int? {
+    if (standard == null || pro == null) return null
+    val s = standard.price.input * 8 + standard.price.out * 2
+    val p = pro.price.input * 8 + pro.price.out * 2
+    if (s <= 0 || p <= s) return null
+    return ((p.toDouble() / s) + 0.5).toInt().coerceAtLeast(2)
 }
 
 /** The latest coach tips for the start screen (empty until the first review). */

@@ -454,7 +454,7 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - **Übungsliste im Prompt:** alle `wg:`-Übungen (302), eigene Übungen und alles, was in Vorlagen/Trainings vorkommt – nicht
   alle 1.098 (die 796 `fedb:` kosten ~10k Token pro Anfrage, Cache hält nur 5 Minuten, eine Auswertung pro Training).
 - **Modelle:** Standard Anthropic `claude-sonnet-5-5` (SPEC), OpenAI `gpt-5`, OpenRouter `anthropic/claude-sonnet-5.5`, in
-  Profil → Coach → Coach-Einstellungen änderbar. Fuel ist fest `claude-sonnet-5-5` (Backend erlaubt nur dieses). `effort`
+  Profil → Coach → Coach-Einstellungen änderbar. Fuel ist fest `claude-sonnet-5-5` (Backend erlaubt nur dieses; überholt: Stufen, siehe „Fuel: Stufen statt fester Anbieter“). `effort`
   `medium`, `max_tokens` 8.000 (Fuel-Grenze 8.192).
 - **Warteschlange ohne WorkManager:** Jede Anfrage ist sofort eine Zeile in `coach_review` (QUEUED). Netzfehler, Timeout
   (150 s), 429, 5xx → bleibt QUEUED und wird beim App-Start und jedem Zurückkommen in den Vordergrund automatisch gesendet;
@@ -756,3 +756,49 @@ Prüfung des Codes (Start, Vordergrund, Fuel-Konto, Registrierung, `/v1/config`,
   Profil und der Fuel-Hinweis ergeben **0** Anfragen an den Backend-Host; als Gegenprobe erzeugt „Fuel ansehen“ danach Anfragen.
 - In der App (Coach-Tab → KI-Zugang, nur bei eigenem Key): „Deine Daten gehen direkt an <Anbieter>, nicht über overfit-Server.“ (DE/EN).
 - Bewusst nicht Teil der Garantie: Fuel, Spot, KI-Chat-Verbindung und Kurz-Code-QR – sie sind ausdrückliche Opt-ins und sprechen mit dem Backend.
+
+## Fuel: Stufen statt fester Anbieter, AI Gateway (Session X, 3.11.)
+- **Stufen:** Die App schickt weiter das Anthropic-Messages-Format, `model` ist aber eine Stufe: `standard` (Google `gemini-3.6-flash`,
+  Voreinstellung für Coach-Auswertung, Chat und Vorschläge), `pro` (Anthropic `claude-sonnet-5-5`), `lite` (Workers AI
+  `@cf/meta/llama-3.1-8b-instruct`, nur „Mit KI ausfüllen“). Das Backend bildet das Format ab und antwortet im Anthropic-Format, damit
+  `anthropicReply` in der App und alle App-Verträge gleich bleiben. Alte App-Versionen schicken `claude-sonnet-5-5` und landen auf `pro`.
+- **Modellwahl:** `gemini-3.6-flash` ist laut Googles Modellliste stabil (3.8 Flash ist noch „New“, gleicher Preis), auch der eigene
+  Gemini-Key-Weg der App nutzt es. Für `lite` ein Modell, das bei Workers AI ausdrücklich JSON-Modus kann (Llama 3.1 8B); die günstigeren
+  fp8-fast-Varianten stehen nicht auf der JSON-Liste. Schlägt der JSON-Modus fehl, weicht die Anfrage auf `standard` aus.
+- **Gemini über die native API** (`generateContent`) statt OpenAI-kompatibel: `responseJsonSchema` nimmt das Schema der App direkt,
+  `usageMetadata` liefert Cache- und Thinking-Token getrennt (beides wird abgerechnet), `finishReason`/`blockReason` lassen sich sauber auf
+  `max_tokens`/`refusal` abbilden. Gemini zählt Thinking in die Ausgabe, darum bekommt es `2 × max_tokens` (mind. 4096) und
+  `thinkingLevel: medium` (oder `effort` der App).
+- **Preise im Code** (`backend/src/providers.ts`, µ€ je MTok, Listenpreis × 0,92 €/$), mit Gültig-ab-Datum: Gemini 3.6 Flash wird am
+  1.1.2027 doppelt so teuer, das ist schon hinterlegt (Test). Workers AI in Neurons je MTok (0,011 $ je 1000 Neurons); das Freikontingent
+  von 10 000 Neurons/Tag rechnen wir nicht heraus (Marge). `PRICE_TABLE` kann einzelne Modelle kurzfristig überschreiben.
+- **Ausweichen:** Ausfall = 5xx, 429, 408, Zeitüberschreitung, Netzwerk, bei Workers AI jeder Binding-Fehler. Dann genau ein Versuch mit
+  der Ausweich-Stufe (`standard` ↔ `pro`, `lite` → `standard`), wenn sie konfiguriert ist, Bilder kann (falls nötig) und von den 140 s
+  Gesamtbudget noch ≥ 15 s übrig sind. 4xx-Ablehnungen weichen nie aus (die App wiederholt Structured-Output-Fehler selbst ohne Schema).
+  `lite` → `standard` ist zusätzlich zum Auftrag drin, weil „Mit KI ausfüllen“ sonst bei jeder Workers-AI-Störung ausfiele; es kostet uns
+  pro Fall Bruchteile eines Cents.
+- **Nie mehr als die angefragte Stufe:** abgerechnet wird `min(Kosten zum Preis des genutzten Modells, Kosten zum Preis der angefragten
+  Stufe)` für die tatsächlich verbrauchten Token, höchstens die Reservierung der angefragten Stufe. Begründung: Der Nutzer hat einen Preis
+  gewählt und kann nichts für den Ausfall; Ausweichen ist selten, die Differenz (Sonnet statt Flash ≈ 2,7×) trägt der 8-%-Aufschlag über alle
+  Anfragen. Weicht `pro` auf `standard` aus, zahlt der Nutzer den günstigeren Preis. Das Ledger bucht `model` = genutztes Modell und `tier`
+  = angefragte (abgerechnete) Stufe (Migration `0003_ledger_tier.sql`), die Antwort meldet `overfit.servedTier` und `fallback`.
+- **Nicht verfügbar ≠ Ausfall:** Fehlt der Key einer Stufe, ersetzt das Backend sie nicht still (sonst dauerhafte Quersubvention), sondern
+  antwortet `503 tier_unavailable` mit `details.available`. `/v1/config` meldet je Stufe `available`, die App wählt dann selbst die nächste
+  (lite → standard → pro, pro ↔ standard) und blendet Pro aus, wenn es fehlt.
+- **AI Gateway:** alle Anbieter-Aufrufe laufen über ein Gateway je Betrieb (`overfit`, `overfit-test`): Gemini und Anthropic über
+  `env.AI.gateway(id).getUrl(provider)` (keine Account-ID im Code nötig), Workers AI über die `gateway`-Option von `AI.run`. Das Gateway ist
+  nicht authentifiziert, weil jeder Aufruf ohnehin den Anbieter-Key braucht. Angelegt mit Protokollen, Rate-Limit 600/min (gleitend, nur
+  Notbremse; je Gerät gilt weiter 10/min) und ohne Cache (Coach-Anfragen sind praktisch nie gleich; im Dashboard zuschaltbar).
+  **Datenschutz:** Anfragen mit Körperfotos schicken `cf-aig-collect-log: false`, das Gateway speichert sie nicht. Textanfragen werden
+  protokolliert (Fehlersuche, Kosten); Metadaten nur `tier`, keine Konto-ID.
+- **Workers-AI-Binding nur im Deploy:** `ai` steht nicht in `wrangler.jsonc`, sondern wird von `scripts/deploy-config.mjs` ergänzt.
+  Sonst bräuchten die Vitest/Miniflare-Tests und `wrangler dev` ein Cloudflare-Konto (das Binding ist immer remote). Tests mocken `AI`.
+- **Deploy-Rechte:** Der Workflow prüft vor dem Deploy `GET /ai/models/search` (braucht *Workers AI · Read*) und liest bzw. legt das Gateway
+  per REST an (`/ai-gateway/gateways`, braucht *AI Gateway · Edit*). 401/403 → Abbruch mit genauer Anleitung, welche Zeile im Token fehlt.
+- **Secrets:** `GEMINI_API_KEY` neu, `ANTHROPIC_API_KEY` optional; mindestens einer ist Pflicht (Abbruch mit Anleitung). Fehlt einer, steht
+  in der Zusammenfassung, welche Stufe nicht verfügbar ist. Testbetrieb unverändert.
+- **App:** Coach-Einstellungen → „Coach-Qualität: Standard / Pro“ (nur mit Fuel, nur wenn beide Stufen verfügbar; Hinweis „Pro kostet etwa
+  das n-Fache“ aus den Preisen in `/v1/config`, gewichtet 80 % Eingabe / 20 % Ausgabe). Gespeichert in den Coach-Einstellungen (kein
+  Room-Schema). „Mit KI ausfüllen“ fragt über `AiGateway.send(light = true)`: mit Fuel `lite`, mit eigenem Key unverändert.
+  `FuelProvider` merkt sich `/v1/config` 10 Minuten. Die Config wird nur geladen, wenn Fuel der KI-Zugang ist; die Garantie „eigener Key =
+  null Backend-Anfragen“ bleibt (OwnKeyPrivacyTest).

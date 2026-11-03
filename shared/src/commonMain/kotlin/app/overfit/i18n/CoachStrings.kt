@@ -108,7 +108,13 @@ class CoachStrings(
     // Settings
     val model: String,
     val modelHint: (String) -> String,
-    val modelFuelFixed: String,
+    val quality: String,
+    val qualityStandard: String,
+    val qualityPro: String,
+    /** Hint below the choice; the argument is "Pro costs about n times as much" (null = unknown). */
+    val qualityHint: (Int?) -> String,
+    /** Only one tier available: which model answers. */
+    val qualityFixed: (pro: Boolean) -> String,
     val sendPhotos: String,
     val sendPhotosHint: String,
     val instructions: String,
@@ -226,7 +232,14 @@ val GermanCoach = CoachStrings(
     memoryPlaceholder = "Z. B. Ziel: 100 kg Bankdrücken. Linke Schulter zwickt bei Überkopf.",
     model = "Modell",
     modelHint = { "Standard: $it. Bei OpenRouter z. B. anthropic/…, openai/…" },
-    modelFuelFixed = "Mit Fuel antwortet immer Claude Sonnet 5.5.",
+    quality = "Coach-Qualität",
+    qualityStandard = "Standard",
+    qualityPro = "Pro",
+    qualityHint = { n ->
+        "Standard nutzt Gemini Flash und reicht für Auswertungen, Chat und Vorschläge. Pro nutzt Claude Sonnet und kostet pro Anfrage " +
+            (if (n != null) "etwa das $n-Fache." else "mehr.")
+    },
+    qualityFixed = { pro -> if (pro) "Mit Fuel antwortet Claude Sonnet (Pro)." else "Mit Fuel antwortet Gemini Flash (Standard)." },
     sendPhotos = "Körperfotos an Coach senden",
     sendPhotosHint = "Nur mit deiner Einwilligung: Das Trainingsfoto (verkleinert) und ein Vergleichsfoto von vor mindestens 4 Wochen gehen an den gewählten KI-Anbieter. Standard: aus.",
     instructions = "Coach-Anweisungen",
@@ -353,7 +366,14 @@ val EnglishCoach = CoachStrings(
     memoryPlaceholder = "E.g. goal: 100 kg bench press. Left shoulder hurts on overhead work.",
     model = "Model",
     modelHint = { "Default: $it. On OpenRouter e.g. anthropic/…, openai/…" },
-    modelFuelFixed = "With Fuel, Claude Sonnet 5.5 always answers.",
+    quality = "Coach quality",
+    qualityStandard = "Standard",
+    qualityPro = "Pro",
+    qualityHint = { n ->
+        "Standard uses Gemini Flash and is enough for reviews, chat and suggestions. Pro uses Claude Sonnet and costs " +
+            (if (n != null) "about $n times as much per request." else "more per request.")
+    },
+    qualityFixed = { pro -> if (pro) "With Fuel, Claude Sonnet (Pro) answers." else "With Fuel, Gemini Flash (Standard) answers." },
     sendPhotos = "Send body photos to coach",
     sendPhotosHint = "Only with your consent: the workout photo (downscaled) and a comparison photo from at least 4 weeks ago go to the chosen AI provider. Default: off.",
     instructions = "Coach instructions",

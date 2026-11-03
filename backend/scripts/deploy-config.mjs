@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Hilfsskript für .github/workflows/backend-deploy.yml (läuft auch lokal).
 //
-//   node scripts/deploy-config.mjs names <test|production>              → JSON mit Worker-, Datenbank- und Bucket-Namen
+//   node scripts/deploy-config.mjs names <test|production>              → JSON mit Worker-, Datenbank-, Bucket- und Gateway-Namen
 //   node scripts/deploy-config.mjs config <test|production> <db-id>     → schreibt wrangler.generated.jsonc (nicht committen)
 //
 // Test- und Produktionsbetrieb sind getrennte Instanzen (eigener Worker, eigene Datenbank, eigener Bucket):
@@ -14,8 +14,8 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const NAMES = {
-  production: { worker: 'overfit-backend', db: 'overfit', bucket: 'overfit-chat-photos' },
-  test: { worker: 'overfit-backend-test', db: 'overfit-test', bucket: 'overfit-chat-photos-test' },
+  production: { worker: 'overfit-backend', db: 'overfit', bucket: 'overfit-chat-photos', gateway: 'overfit' },
+  test: { worker: 'overfit-backend-test', db: 'overfit-test', bucket: 'overfit-chat-photos-test', gateway: 'overfit-test' },
 };
 
 /** Zusätzliche `vars` je Modus. Testbetrieb: niedrige Limits, kein Dev-Modus, Geräteprüfung bleibt „required“ (der Test-Prüfer greift über DEPLOY_MODE). */
@@ -51,7 +51,9 @@ export function buildConfig(mode, databaseId, base = readJsonc(join(root, 'wrang
   cfg.main = join(root, 'src/index.ts');
   cfg.d1_databases = [{ ...base.d1_databases[0], database_name: n.db, database_id: databaseId, migrations_dir: join(root, 'migrations') }];
   cfg.r2_buckets = [{ ...base.r2_buckets[0], bucket_name: n.bucket }];
-  cfg.vars = { ...base.vars, ...MODE_VARS[mode] };
+  // Workers AI (Stufe `lite`) und AI-Gateway-URLs; nur im Deploy, damit lokale Tests kein Cloudflare-Konto brauchen.
+  cfg.ai = { binding: 'AI' };
+  cfg.vars = { ...base.vars, ...MODE_VARS[mode], AI_GATEWAY_ID: n.gateway };
   return cfg;
 }
 

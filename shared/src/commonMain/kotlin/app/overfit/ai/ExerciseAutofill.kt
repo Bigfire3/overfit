@@ -26,7 +26,8 @@ import kotlin.math.roundToInt
  */
 interface AiGateway {
     fun available(): Boolean
-    suspend fun send(prompt: CoachPrompt, structured: Boolean): CoachReply
+    /** [light]: a simple task; with Fuel it goes to the cheap tier `lite` (own keys: unchanged). */
+    suspend fun send(prompt: CoachPrompt, structured: Boolean, light: Boolean = false): CoachReply
 }
 
 /** What the AI suggests for a new exercise. Everything stays editable in the form. */
@@ -59,7 +60,7 @@ class ExerciseAutofill(private val gateway: AiGateway) {
         var structured = true
         repeat(3) { attempt ->
             val reply = try {
-                gateway.send(ExerciseAutofillPrompt.build(clean, language, structured), structured)
+                gateway.send(ExerciseAutofillPrompt.build(clean, language, structured), structured, light = true)
             } catch (e: CoachException) {
                 if (e.kind == CoachErrorKind.BAD_REQUEST && structured && attempt == 0) {
                     structured = false

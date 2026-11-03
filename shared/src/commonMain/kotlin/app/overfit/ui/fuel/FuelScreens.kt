@@ -211,7 +211,10 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
             // detail line under the row: date and, for usage, tokens
             val detail = buildString {
                 append(s.date(epochToDate(e.ts)))
-                if (e.type == "usage") append(" · ").append(t.ledgerTokens(e.inputTokens + e.cacheReadTokens + e.cacheWriteTokens, e.outputTokens))
+                if (e.type == "usage") {
+                    e.tier?.let { append(" · ").append(t.ledgerTier(it)) }
+                    append(" · ").append(t.ledgerTokens(e.inputTokens + e.cacheReadTokens + e.cacheWriteTokens, e.outputTokens))
+                }
             }
             Text(detail, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(bottom = Space.s))
         }

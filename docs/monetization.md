@@ -1,6 +1,6 @@
 # Monetarisierung
 
-Marke: **overfit – personal training for everyone** (siehe DECISIONS.md). Stand: Plan, mit Fabian abgestimmt. Umgesetzt ist heute nur Fuel mit Store-Kauf im Backend-Vertrag (`/v1/purchases/verify`); alles andere hier ist geplant.
+Marke: **overfit – personal training for everyone** (siehe DECISIONS.md). Stand: Plan, mit Fabian abgestimmt. Umgesetzt ist heute nur Fuel (mit Preisstufen) mit Store-Kauf im Backend-Vertrag (`/v1/purchases/verify`); alles andere hier ist geplant.
 
 ## Grundsätze
 - **Grundfunktionen kostenlos, keine Werbung.** Training loggen, Katalog, Workouts, Pausentimer, Auswertung, Diary, Teilen, eigener API-Key bleiben gratis.
@@ -10,6 +10,20 @@ Marke: **overfit – personal training for everyone** (siehe DECISIONS.md). Stan
 ## Fuel (heute)
 - Coach-Guthaben in Euro. Kauf **in der App** über Google Play Billing bzw. Apple In-App-Kauf. Small-Business-Gebühr der Stores: **15 %**, im Backend als `STORE_FEE_BP` eingepreist (Gutschrift = Preis × (1 − Gebühr) / (1 + Aufschlag)).
 - Apple verlangt, dass es Fuel **parallel als In-App-Kauf** gibt, sobald die App auf externe Kaufwege verweist.
+
+### Preisstufen (Session X)
+Abgerechnet wird je Anfrage nach Token zum Listenpreis des Modells plus 8 % Aufschlag (`MARKUP_BP`). Die Stufe wählt der Nutzer
+(Coach-Einstellungen → „Coach-Qualität“), „Mit KI ausfüllen“ nutzt immer `lite`.
+
+| Stufe | Modell | Listenpreis je 1 Mio. Token (ein / aus) | Typische Coach-Auswertung* |
+|---|---|---|---|
+| Standard (Voreinstellung) | Gemini 3.6 Flash | 0,75 $ / 3,75 $ (ab 1.1.2027: 1,50 $ / 7,50 $) | ≈ 1,5 ct (ab 2027 ≈ 3 ct) |
+| Pro | Claude Sonnet 5.5 | 2 $ / 10 $ | ≈ 4 ct |
+| Lite (nur Übung ausfüllen) | Llama 3.1 8B (Workers AI) | 0,28 $ / 0,83 $ | – (eine Übung ausfüllen ≈ 0,07 ct) |
+
+\* grob: 10 000 Token Eingabe, 2 000 Ausgabe (bei Gemini inkl. Thinking), mit Aufschlag, 0,92 €/$.
+Fällt der Anbieter einer Stufe aus, antwortet die andere; der Nutzer zahlt nie mehr als die gewählte Stufe (Differenz trägt die Marge).
+Preise pflegt der Betreiber in `backend/src/providers.ts`.
 
 ## Fuel günstiger im Web (geplant)
 - Eigene Webseite mit niedrigerem Preis (keine Store-Gebühr). Aus der App wird nur dorthin verlinkt, **wo es erlaubt ist**: EU über die DMA-Programme der Stores, USA über externe Links nach den Epic-Urteilen. Die Regeln ändern sich laufend und müssen **vor dem Start juristisch geprüft** werden; pro Land per Konfiguration schaltbar.

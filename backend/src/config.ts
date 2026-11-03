@@ -1,10 +1,5 @@
 import type { Config, Env, Price } from './types';
-
-// Preise in Mikro-Euro pro 1 Mio. Token (Listenpreis in USD × Wechselkurs, vom Betreiber zu pflegen).
-// Sonnet 5.5: 2 $ / 10 $ pro MTok, Cache-Read 0,20 $, Cache-Write 2,50 $ – umgerechnet mit 0,92 €/$.
-const DEFAULT_PRICES: Record<string, Price> = {
-  'claude-sonnet-5-5': { in: 1_840_000, cacheRead: 184_000, cacheWrite: 2_300_000, out: 9_200_000 },
-};
+import { currentPrices } from './providers';
 
 const DEFAULT_PACKAGES = {
   'overfit.fuel.5': { priceMicro: 5_000_000 },
@@ -39,7 +34,9 @@ export function getConfig(env: Env): Config {
     testCreditCapMicro: int(env.TEST_CREDIT_CAP_MICRO, 20_000_000),
     attestationMode: mock(env.ATTESTATION_MODE),
     purchaseMode: mock(env.PURCHASE_MODE),
-    anthropicBaseUrl: env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
+    aiGatewayId: env.AI_GATEWAY_ID?.trim() || null,
+    upstreamTimeoutMs: int(env.UPSTREAM_TIMEOUT_MS, 100_000, 1000),
+    upstreamBudgetMs: int(env.UPSTREAM_BUDGET_MS, 140_000, 1000),
     markupBp: int(env.MARKUP_BP, 800),
     storeFeeBp: int(env.STORE_FEE_BP, 1500),
     spotStarterMicro: int(env.SPOT_STARTER_MICRO, 1_000_000),
@@ -52,7 +49,8 @@ export function getConfig(env: Env): Config {
     maxTokensCap: int(env.MAX_TOKENS_CAP, 8192, 1),
     maxBodyBytes: int(env.MAX_BODY_BYTES, 8 * 1024 * 1024, 1024),
     imageTokensReserve: int(env.IMAGE_TOKENS_RESERVE, 3000),
-    prices: json(env.PRICE_TABLE, DEFAULT_PRICES),
+    // Preise je Modell in µ€/MTok (Tabelle in providers.ts); PRICE_TABLE überschreibt einzelne Modelle.
+    prices: { ...currentPrices(), ...json<Record<string, Price>>(env.PRICE_TABLE, {}) },
     packages: json(env.PACKAGES, DEFAULT_PACKAGES),
     rlDevicePerMin: int(env.RL_DEVICE_PER_MIN, 60, 1),
     rlMessagesPerMin: int(env.RL_MESSAGES_PER_MIN, 10, 1),
