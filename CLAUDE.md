@@ -23,6 +23,7 @@
 - Einfache, klar abgegrenzte Aufgaben an die Subagents in .claude/agents/ (kmp-worker, test-writer: Sonnet 5.5, effort medium). Sind die Agent-Dateien in der laufenden Session nicht verfügbar, nutze das Agent-Tool mit Modell Sonnet und effort medium.
 - Bei dir bleiben: Architektur, Datenmodell + Migrationen, Workout-State, Pausentimer/Hintergrund-Logik, KI-Schnittstelle, Reviews der Subagent-Ergebnisse.
 - Maximal 2 Subagents parallel.
+- **Gegencheck mit Sonnet** (Owner: „Überprüfe dich mit Sonnet am Agenten immer gegen.“): Vor jedem Merge prüft ein frischer Sonnet-Subagent (effort medium, zählt ins Limit oben) die Änderung unabhängig. Er bekommt Aufgabe und Diff, nicht die eigene Schlussfolgerung, sucht Fehler und prüft das Ergebnis selbst nach: Build/Tests ausführen, bei UI und Bildern Robolectric-Screenshots bzw. gerenderte Bilder ansehen (geht etwas lokal nicht, z. B. iOS, sagen, was offen bleibt). Befunde beheben oder begründet verwerfen und in der PR-Beschreibung bzw. im Bericht nennen. Nach größeren Fixes erneut prüfen lassen.
 
 ## Sparregeln
 - Nur Dateien lesen, die du brauchst. Keine kompletten Verzeichnis-Dumps.
@@ -44,7 +45,7 @@
 
 ## Git & CI
 - Du kannst nur auf deinen Session-Branch pushen. Android-CI baut auch dort (ohne Release), iOS-CI nur für PRs nach main (öffentliches Repo, kostenlos). Am Phasenende PR nach main.
-- Eigene PRs nach main merge selbstständig, ohne zu fragen, sobald: CI (Android und iOS) auf dem aktuellen Head grün, kein Merge-Konflikt, keine offenen Review-Kommentare. Draft-Status vorher aufheben. Merge-Methode: Merge-Commit. PRs anderer Sessions nicht mergen, sondern mir melden.
+- Eigene PRs nach main merge selbstständig, ohne zu fragen, sobald: Sonnet-Gegencheck erledigt (siehe Modelle & Effort), CI (Android und iOS) auf dem aktuellen Head grün, kein Merge-Konflikt, keine offenen Review-Kommentare. Draft-Status vorher aufheben. Merge-Methode: Merge-Commit. PRs anderer Sessions nicht mergen, sondern mir melden.
 - Nur Merges nach main aktualisieren das Release „latest“ (neue APK fürs Handy). Nach dem Merge sag mir, was ich testen soll.
 - Nach einem Merge Folgearbeit nicht auf dem alten Stand stapeln: Session-Branch neu von main starten.
 - Wird das Pushen der Workflow-Datei abgelehnt (fehlende Berechtigung), sag mir genau, was ich wo freigeben muss.
