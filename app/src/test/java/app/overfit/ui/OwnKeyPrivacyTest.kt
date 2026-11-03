@@ -76,7 +76,7 @@ class OwnKeyPrivacyTest {
     private val requests = CopyOnWriteArrayList<String>()
     private val backendRequests get() = requests.filter { it.startsWith("$backendHost ") }
 
-    private val kv = InMemoryKeyValueStore()
+    private val kv = InMemoryKeyValueStore().apply { put(app.overfit.data.AppStore.KEY_COACH_STORY_SEEN, "1") }
     private val store = AppStore(kv, InMemorySecretStore(), DeviceDefaults(Language.DE, WeightUnit.KG))
     private val database = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext()).build()
     private val data = AppData(database, kv, readCatalog = { File("../shared/src/commonMain/composeResources/files/catalog/exercises.json").readBytes() })

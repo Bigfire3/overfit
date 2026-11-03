@@ -147,6 +147,8 @@ import app.overfit.ui.coach.CoachFinishChoice
 import app.overfit.ui.coach.CoachFinishSection
 import app.overfit.ui.coach.CoachHomeScreen
 import app.overfit.ui.coach.CoachChatScreen
+import app.overfit.ui.coach.CoachStoryScreen
+import app.overfit.ui.coach.StoryTarget
 import app.overfit.ui.coach.CoachTabNav
 import app.overfit.ui.coach.CoachTabScreen
 import app.overfit.ui.coach.CoachMemoryScreen
@@ -197,6 +199,8 @@ class AppDependencies(
     coachTransport: ((ProviderId) -> CoachTransport)? = null,
     /** How this build was installed; decides with `/v1/config` whether "Top up on the web" is shown. */
     val distribution: app.overfit.fuel.Distribution = app.overfit.fuel.Distribution.Sideload,
+    /** The Coach story moves on by itself after a few seconds (tests switch it off). */
+    val coachStoryAutoAdvance: Boolean = true,
 ) {
     val fuelSession = FuelSession(fuel)
     /** The AI coach: requests, queue, reviews, memory. Runs in the app scope. */
@@ -289,6 +293,8 @@ class AppDependencies(
 @Serializable data object ChatNotesRoute
 @Serializable data object CoachMemoryRoute
 @Serializable data object CoachRoute
+/** Full-screen story from the Coach title: what the AI can evaluate and the ways to use it. */
+@Serializable data object CoachStoryRoute
 /** Coach chat; [chatId] empty = new chat, [draft] prefills the input ("Use in chat"). */
 @Serializable data class CoachChatRoute(val chatId: String = "", val draft: String = "")
 @Serializable data object CoachReviewsRoute
@@ -870,7 +876,30 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<CoachMemoryRoute> { CoachMemoryScreen(deps.coach, onBack = nav::popBackStack) }
+                    composable<CoachStoryRoute> {
+                        CoachStoryScreen(
+                            onClose = nav::popBackStack,
+                            autoAdvance = deps.coachStoryAutoAdvance,
+                            onTarget = { target ->
+                                nav.popBackStack()
+                                nav.navigate(
+                                    when (target) {
+                                        StoryTarget.OwnKey -> ConnectRoute
+                                        StoryTarget.Credit -> FuelRoute
+                                        StoryTarget.ChatConnections -> ChatProviderRoute(ChatProvider.CLAUDE.name)
+                                    },
+                                )
+                            },
+                        )
+                    }
                     composable<CoachRoute> {
+                        // First visit: the story opens once by itself; afterwards only via the title.
+                        LaunchedEffect(Unit) {
+                            if (!deps.store.coachStorySeen()) {
+                                deps.store.markCoachStorySeen()
+                                nav.navigate(CoachStoryRoute)
+                            }
+                        }
                         CoachTabScreen(
                             coach = deps.coach,
                             chat = deps.coachChat,
@@ -887,6 +916,7 @@ fun OverfitApp(deps: AppDependencies) {
                                 access = { nav.navigate(AiCoachRoute) },
                                 chatProvider = { nav.navigate(ChatProviderRoute(it.name)) },
                                 chatNotes = { nav.navigate(ChatNotesRoute) },
+                                story = { nav.navigate(CoachStoryRoute) },
                             ),
                         )
                     }
