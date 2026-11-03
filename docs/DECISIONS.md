@@ -838,3 +838,42 @@ Schätzung = ⌈(Eingabe-Token × Eingabepreis + (Ausgabe-Token + Thinking) × A
 - **Entscheidung:** Foto-Anfragen senden jetzt `cf-aig-collect-log-payload: false` statt `cf-aig-collect-log: false`. Es werden weiterhin keine Fotos, Prompts oder Antworten gespeichert; Kosten und Verbrauch erscheinen im Gateway. Zusätzlich `cf-aig-metadata` `{ tier, photo, fallback }` bei jeder Anfrage (nur Markierungen, keine Inhalte). Für Workers AI läuft dieselbe Metadaten-Angabe über die `gateway`-Option; diese Stufe nimmt keine Bilder.
 - **Eigener Weg unabhängig vom Gateway:** Das Ledger in D1 hält je Verbrauchsbuchung Modell, Tokens, berechneten Betrag und (neu, Migration 0004) `cost_micro` (Anbieterkosten zum Listenpreis ohne Aufschlag), `fallback`, `photo`; Stufe (`tier`) war schon da. `GET /v1/admin/usage?from=&to=` (ADMIN_SECRET ≥ 16 Zeichen, auch in Produktion; sonst 404) gruppiert nach Modell/Stufe/Ausweichung/Foto und liefert Anzahl, Tokens, berechnet, Anbieterkosten und Marge (= berechnet − Anbieterkosten). Dazu `backend/scripts/usage-report.mjs` als Tabelle.
 - **Datenschutz:** Die Auswertung enthält nur Zahlen und Ja/Nein-Markierungen, nie Prompt, Antwort, Foto, Konto- oder Geräte-IDs. Ein Foto-Flag verrät nur „diese Anfrage enthielt ein Foto“, nicht welches; es gibt keine Verbindung zu einer Person im Bericht (aggregiert). Alte Buchungen behalten `cost_micro = NULL` (Marge unbekannt) statt geschätzter Werte.
+
+## Guthaben im Web, Testmodus (Session Z, 3.11.)
+- **Anbieter: Paddle (Billing) als Merchant of Record, zuerst nur Sandbox.** Paddle übernimmt EU-USt, Belege, Erstattungen und
+  Chargebacks; die Sandbox ist für ein Einzelkonto sofort und kostenlos nutzbar (keine Domain- oder Kontoprüfung, Default Payment
+  Link darf jede Domain sein). Lemon Squeezy wäre gleichwertig, gehört aber inzwischen zu Stripe und wird umgebaut; Stripe allein
+  hieße USt selbst abführen (OSS). Gebühr Paddle: 5 % + 0,50 € je Kauf. Die Integration liegt hinter `PaymentProvider`
+  (`backend/src/payments/provider.ts`: `createCheckout`, `parseWebhook`); ein Wechsel betrifft nur `paddle.ts`.
+- **Checkout per API-Transaktion + Paddle.js auf der eigenen Seite** (`/v1/web/checkout` legt die Transaktion mit Preis ohne
+  Katalog, `tax_mode: internal` an). So braucht Fabian im Paddle-Dashboard keine Produkte/Preise anzulegen; Pakete und Preise
+  stehen im Backend (`WEB_PACKAGES`). Paddle hat keine eigene gehostete Seite; der Default Payment Link zeigt auf `/guthaben/`.
+- **Pakete 5/10/20 € statt 2/5/10 €:** Die Fixgebühr von 0,50 € frisst bei 2 € ein Viertel des Preises. 5 € bleibt der kleinste
+  Einstieg, 20 € für Vielnutzer.
+- **1:1-Guthaben (5 € = 5 €), Endpreise inkl. USt.** Fabians Vorgabe, so im Testmodus umgesetzt. Nachgerechnet mit der Marge aus
+  Session Y (8 % Aufschlag ≈ 6,3 % vom Kaufpreis): USt und Paddle-Gebühr (23–31 % des Preises) liegen weit darüber, jedes Paket
+  verlöre im Live-Betrieb Geld (5 €: −1,18 €, 10 €: −1,86 €, 20 €: −3,21 €). Vorschlag in docs/monetization.md („Rechnung Web-Kauf“):
+  Aufteilung offen zeigen (Guthaben = Preis − USt − Paddle-Gebühr), Mindestpaket 10 €, keine versteckten Aufschläge. Nicht umgesetzt,
+  weil es Fabians 1:1-Vorgabe ändert und im Testmodus kein Geld fließt; vor dem Live-Start zu entscheiden.
+- **Kauflink = Zufallstoken mit Hash in D1 statt HMAC-signiertem Token.** Einmaligkeit und Ablauf muss der Server ohnehin
+  speichern; ein signierter Token brächte nichts dazu, würde aber die Konto-ID in die URL tragen. Token im Fragment (`#t=`), damit er
+  weder in Logs noch im Referer landet. 15 Minuten, bis zu 5 Checkouts (Paket wechseln, Abbruch), nach der ersten Zahlung verbraucht.
+- **Backend-Adresse der Kaufseite nur aus `config.js` (Pages-Workflow, Repo-Variable `OVERFIT_BACKEND_URL`), nie aus der URL:**
+  sonst könnte ein präparierter Link unsere Seite auf einen fremden Server mit fremdem Paddle-Konto umleiten.
+- **Sandbox nie in Produktion:** Ein Produktions-Worker bietet den Web-Kauf nur mit `PADDLE_ENV=live` an; der Testbetrieb ist immer
+  Sandbox. Sonst könnte jemand mit Testkarten echtes Guthaben (= echte KI-Kosten) erzeugen.
+- **Idempotenz:** Wächterzeile `web_events (provider, event_key)` in derselben D1-Batch-Transaktion wie die Gutschrift; eine zweite
+  Zustellung scheitert am Primärschlüssel und rollt komplett zurück. Erstattungen erst bei `status = approved`; abgezogen wird von
+  allen Posten des Kontos (unbefristete zuerst), nie unter 0, Fehlbetrag als `incident = …:shortfall` an der Bestellung.
+  Chargeback-Rücknahmen (`chargeback_reversal`) buchen nichts automatisch zurück (selten, lieber von Hand).
+- **Guthaben-Codes** 12 Zeichen aus 31 (ohne 0/O/1/I/L, ≈ 59 Bit), Klartext in D1 (wie ein Gutschein; wer die DB hat, hat ohnehin
+  die Salden). Der Käufer sieht den Code nur auf der Erfolgsseite (Bestell-ID als Geheimnis). Erstattung vor dem Einlösen senkt den
+  Wert bzw. sperrt den Code, danach Abzug beim Einlöser. Codes verfallen nicht.
+- **Store-Regeln:** App-Knopf „Im Web aufladen“ nur, wenn `/v1/config` → `webPurchase.channels` den Kanal enthält. Kanal Android:
+  Installer (Play/andere Stores = `store`, sonst `sideload`), iOS immer `store`. Standard `sideload`, Repo-Variable
+  `WEB_PURCHASE_CHANNELS`. „Code einlösen“ bleibt überall sichtbar (kein Kaufweg in der App).
+- **Datenschutz-Garantie:** Der Web-Kauf ist ein Opt-in hinter dem bestehenden Guthaben-Opt-in; `OwnKeyPrivacyTest` bleibt grün.
+- **Benennung:** Neue Texte sagen „Guthaben“/„Credit“ (Session Y benennt den Rest um); sie liegen in `i18n/WebCreditStrings.kt`,
+  damit es mit der parallelen Umbenennung keine Konflikte gibt. Neue Ledger-Typen: `code_redeem`, `refund`, `chargeback`; neues Feld
+  `source` (`web`, `code`).
+- Impressum, Datenschutz, AGB auf der Kaufseite sind sichtbar als „folgt vor dem Start“ markiert, keine erfundenen Rechtstexte.

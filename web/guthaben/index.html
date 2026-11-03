@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>overfit – Guthaben</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="guthaben.css">
+</head>
+<body>
+<main>
+  <div class="brand">overfit</div>
+  <p class="test" id="test" hidden data-i18n="test">Testmodus – keine echte Zahlung</p>
+
+  <section id="loading"><p class="dim" data-i18n="loading">Lädt …</p></section>
+
+  <section id="error" hidden>
+    <h1 data-i18n="errTitle">Gerade nicht verfügbar</h1>
+    <p class="sub" id="errText"></p>
+  </section>
+
+  <section id="shop" hidden>
+    <h1 id="shopTitle"></h1>
+    <p class="sub" id="shopSub"></p>
+    <p class="note" id="linkNote" hidden></p>
+    <div class="packs" id="packs" role="radiogroup"></div>
+    <p class="dim small" data-i18n="honest">Endpreise inkl. USt. Du zahlst 5&nbsp;€ und bekommst 5&nbsp;€ Guthaben, ohne Abzug. Die Marge steckt in den Modellpreisen, die die App nennt.</p>
+    <div class="actions">
+      <button class="btn primary" id="pay" type="button" data-i18n="pay">Weiter zur Zahlung</button>
+      <button class="btn secondary" id="switch" type="button" hidden></button>
+    </div>
+    <p class="dim small" id="payError" hidden></p>
+    <p class="dim small" data-i18n="mor">Die Zahlung wickelt Paddle als Verkäufer (Merchant of Record) ab, inklusive Umsatzsteuer und Beleg per E-Mail. overfit sieht keine Zahlungsdaten.</p>
+  </section>
+
+  <section id="done" hidden>
+    <h1 id="doneTitle"></h1>
+    <p class="sub" id="doneText"></p>
+    <div class="code" id="codeBox" hidden>
+      <div class="codeValue" id="codeValue"></div>
+      <button class="btn secondary" id="copy" type="button" data-i18n="copy">Code kopieren</button>
+    </div>
+    <div class="actions">
+      <a class="btn primary" id="back" href="overfit://guthaben" data-i18n="back">Zurück zur App</a>
+    </div>
+  </section>
+
+  <footer>
+    <span class="placeholder" data-i18n="imprint">Impressum (folgt vor dem Start)</span> ·
+    <span class="placeholder" data-i18n="privacy">Datenschutz (folgt vor dem Start)</span> ·
+    <span class="placeholder" data-i18n="terms">AGB und Widerruf (folgt vor dem Start)</span>
+  </footer>
+</main>
+<script src="config.js"></script>
+<script src="guthaben.js"></script>
+</body>
+</html>

@@ -56,6 +56,13 @@ jobs:
       APPLE_IAP_ISSUER_ID: ${{ secrets.APPLE_IAP_ISSUER_ID }}
       APPLE_BUNDLE_ID: ${{ secrets.APPLE_BUNDLE_ID }}
       APPLE_APP_ATTEST_TEAM_ID: ${{ secrets.APPLE_APP_ATTEST_TEAM_ID }}
+      # Web-Kauf über Paddle (optional; fehlt einer, bleibt der Web-Kauf aus). Sandbox im Testbetrieb.
+      PADDLE_API_KEY: ${{ secrets.PADDLE_API_KEY }}
+      PADDLE_WEBHOOK_SECRET: ${{ secrets.PADDLE_WEBHOOK_SECRET }}
+      PADDLE_CLIENT_TOKEN: ${{ secrets.PADDLE_CLIENT_TOKEN }}
+      # Repo-Variablen: PADDLE_ENV=live nur für echte Zahlungen im Produktionsbetrieb; WEB_PURCHASE_CHANNELS (sideload,store)
+      PADDLE_ENV: ${{ vars.PADDLE_ENV }}
+      WEB_PURCHASE_CHANNELS: ${{ vars.WEB_PURCHASE_CHANNELS }}
     steps:
       - name: Voraussetzungen prüfen
         id: pre
@@ -255,6 +262,27 @@ jobs:
           [ -n "$TIERS" ] || { echo "::error::Keine KI-Stufe verfügbar: $CFG"; exit 1; }
           echo "Health und Config in Ordnung (mode=$MODE, Stufen: $TIERS)."
           echo "- Verfügbare KI-Stufen: $TIERS" >> "$GITHUB_STEP_SUMMARY"
+          WEB=$(echo "$CFG" | jq -c '.webPurchase // {}')
+          {
+            echo
+            echo "### Web-Kauf (Guthaben auf der Webseite)"
+            echo
+            if [ "$(echo "$WEB" | jq -r '.enabled')" = "true" ]; then
+              if [ "$(echo "$WEB" | jq -r '.testMode')" = "true" ]; then echo "**An, Testmodus (Paddle-Sandbox):** keine echte Zahlung, nur Testkarten."; else echo "**An, echte Zahlungen (Paddle live).**"; fi
+              echo
+              echo "Webhook-URL (einmalig bei Paddle eintragen: Developer Tools → Notifications → New destination, Ereignisse \`transaction.completed\`, \`adjustment.created\`, \`adjustment.updated\`):"
+              echo
+              echo '```'
+              echo "$URL/v1/webhooks/payment"
+              echo '```'
+              echo
+              echo "Kaufseite: $(echo "$WEB" | jq -r '.pageUrl') · App-Knopf „Im Web aufladen“ in: $(echo "$WEB" | jq -r '.channels | join(", ")')"
+            else
+              echo "**Aus.** Es fehlen Paddle-Secrets (siehe „Secrets“ oben) oder Produktion ohne Repo-Variable \`PADDLE_ENV = live\`."
+              echo "Sobald sie gesetzt sind, lautet die Webhook-URL: \`$URL/v1/webhooks/payment\`"
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Test-Guthaben gutschreiben
         if: steps.pre.outputs.run == 'true' && inputs.mode == 'test' && inputs.credit_eur != '' && inputs.credit_eur != '0'

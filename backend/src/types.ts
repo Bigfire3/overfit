@@ -19,7 +19,25 @@ export interface Env {
   APPLE_IAP_ISSUER_ID?: string;
   APPLE_BUNDLE_ID?: string;
   APPLE_APP_ATTEST_TEAM_ID?: string;
+  /** Web-Kauf über Paddle (Merchant of Record). Fehlt einer der drei Werte, ist der Web-Kauf aus. */
+  PADDLE_API_KEY?: string;
+  PADDLE_WEBHOOK_SECRET?: string;
+  /** Client-seitiges Token für Paddle.js (öffentlich, beginnt mit `test_` in der Sandbox bzw. `live_`). */
+  PADDLE_CLIENT_TOKEN?: string;
   // Konfiguration (alle optional, Defaults in config.ts)
+  /** `live` = echte Zahlungen (nur im Produktionsbetrieb); sonst Sandbox (Testmodus). */
+  PADDLE_ENV?: string;
+  /** Nur Tests/lokal: andere API-Basis für Paddle. */
+  PADDLE_API_BASE?: string;
+  /** `off` schaltet den Web-Kauf ab, auch wenn die Paddle-Secrets gesetzt sind. */
+  WEB_PURCHASE?: string;
+  /** Adresse der Kaufseite, Standard https://bigfire3.github.io/overfit/guthaben/ */
+  WEB_PURCHASE_URL?: string;
+  /** Kanäle, in denen die App „Im Web aufladen“ zeigt (Komma-Liste aus sideload, store). Standard: sideload. */
+  WEB_PURCHASE_CHANNELS?: string;
+  /** JSON {"web.5": {"priceMicro": 5000000}, …}; Guthaben = Preis. */
+  WEB_PACKAGES?: string;
+  WEB_LINK_TTL_SEC?: string;
   ANTHROPIC_BASE_URL?: string;
   GEMINI_BASE_URL?: string;
   /** Name des Cloudflare AI Gateways; leer = Anbieter direkt (lokal). Setzt der Deploy-Workflow. */
@@ -107,6 +125,12 @@ export interface Config {
   imageTokensReserve: number;
   prices: Record<string, Price>;
   packages: Record<string, { priceMicro: number }>;
+  /** Pakete der Kaufseite: Endpreis inkl. USt; Guthaben = Preis (1:1, keine Gebühr abgezogen). */
+  webPackages: Record<string, { priceMicro: number }>;
+  webPurchaseOff: boolean;
+  webPurchaseUrl: string;
+  webPurchaseChannels: string[];
+  webLinkTtlSec: number;
   rlDevicePerMin: number;
   rlMessagesPerMin: number;
   rlRegisterPerHourIp: number;

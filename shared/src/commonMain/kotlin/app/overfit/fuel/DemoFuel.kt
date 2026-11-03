@@ -59,6 +59,15 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
     override suspend fun redeemSpot(token: String) =
         SpotRedeemResult(grantedMicro = 1_000_000, expiresAt = nowSec() + 180L * 86_400, inviter = SpotInviter("Fabian"), balanceMicro = 1_000_000)
 
+    /** Demo: any well-formed code works once per process; nothing touches a real account. */
+    override suspend fun redeemCode(code: String): CodeRedeemResult {
+        if (code.filter { it.isLetterOrDigit() }.length != 12) throw FuelException("invalid_code", 404)
+        if (!redeemed.add(code.uppercase())) throw FuelException("already_redeemed", 409)
+        return CodeRedeemResult(5_000_000, DEMO_BALANCE_MICRO + 5_000_000)
+    }
+
+    private val redeemed = mutableSetOf<String>()
+
     override suspend fun messages(bodyJson: String): FuelMessageResult =
         FuelMessageResult(JsonNull, 0, DEMO_BALANCE_MICRO)
 

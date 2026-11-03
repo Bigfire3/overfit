@@ -188,6 +188,12 @@ den gleichen OAuth-Ablauf.
 | `AI_GATEWAY_ID` | leer (direkt) | Name des Cloudflare AI Gateways; setzt der Deploy-Workflow (`overfit` bzw. `overfit-test`) |
 | `UPSTREAM_TIMEOUT_MS` / `UPSTREAM_BUDGET_MS` | 100 000 / 140 000 | Zeitlimit je Anbieter-Versuch / für Anfrage samt Ausweichen |
 | `PACKAGES` | 5 € / 10 € | JSON: `{"<store-produkt-id>":{"priceMicro":…}}` |
+| `WEB_PACKAGES` | 5 € / 10 € / 20 € | Pakete der Kaufseite, JSON `{"web.5":{"priceMicro":5000000}}`; Guthaben = Preis (1:1) |
+| `PADDLE_ENV` | Sandbox | `live` = echte Zahlungen, nur im Produktionsbetrieb (Repo-Variable `PADDLE_ENV`); Testbetrieb ist immer Sandbox |
+| `WEB_PURCHASE_CHANNELS` | `sideload` | Wo die App „Im Web aufladen“ zeigt: `sideload` (APK), `store` (Play/App Store); Repo-Variable |
+| `WEB_PURCHASE` | an | `off` schaltet den Web-Kauf ab, auch mit Paddle-Secrets |
+| `WEB_PURCHASE_URL` | `https://bigfire3.github.io/overfit/guthaben/` | Adresse der Kaufseite (Ziel des Kauflinks) |
+| `WEB_LINK_TTL_SEC` | 900 | Gültigkeit des Kauflinks aus der App |
 | `CHAT_MAX_DOCS` / `CHAT_MAX_BYTES` | 5000 / 25 MB | Grenzen der KI-Chat-Daten je Konto (ohne Fotos) |
 | `CHAT_MAX_PHOTOS` / `CHAT_MAX_PHOTO_BYTES` | 300 / 3 MB | Fotos je Konto / Größe je Foto |
 | `CHAT_INBOX_MAX` | 50 | Offene Eingangs-Einträge, bevor der Chat nichts mehr ablegen kann |
@@ -196,6 +202,33 @@ den gleichen OAuth-Ablauf.
 | `DEPLOY_MODE` | `production` | `test` = Testbetrieb (siehe oben); setzt der Deploy-Workflow |
 | `TEST_STARTER_MICRO` / `TEST_CREDIT_CAP_MICRO` | 1 000 000 / 20 000 000 | Test-Startguthaben je Konto / Obergrenze für alles Test-Guthaben |
 | `RL_*` | siehe API-Doku | Rate-Limits (`RL_MCP_PER_MIN` 120 je Verbindung) |
+
+## Web-Kauf (Paddle, Testmodus)
+
+Guthaben lässt sich auf `https://bigfire3.github.io/overfit/guthaben/` kaufen: aus der App mit Kauflink („Im Web aufladen“,
+15 Minuten gültig, ohne Login) oder ohne App als **Guthaben-Code** (Geschenk, in der App unter „Code einlösen“).
+Paddle ist Merchant of Record (übernimmt USt, Beleg, Erstattungen). Gebucht wird nur per Webhook, idempotent; Erstattung und
+Chargeback holen Guthaben zurück (nie unter 0) und markieren den Vorfall. Vertrag: `docs/backend-api.md` → „Web-Kauf“.
+
+Secrets (alle drei nötig, sonst bleibt der Web-Kauf aus, ohne Abbruch): `PADDLE_API_KEY` (`pdl_sdbx_apikey_…`),
+`PADDLE_CLIENT_TOKEN` (`test_…`, öffentlich, für Paddle.js), `PADDLE_WEBHOOK_SECRET` (`pdl_ntfset_…`). Der Testbetrieb nutzt
+immer die Sandbox (keine echte Zahlung). Ein Produktions-Worker bietet den Web-Kauf nur mit Repo-Variable `PADDLE_ENV = live`
+an, damit Testkarten nie echtes Guthaben erzeugen.
+
+**Einrichten im Browser (Sandbox):**
+1. **sandbox-login.paddle.com/signup** → Sandbox-Konto anlegen (kostenlos, ohne Prüfung).
+2. Paddle → **Checkout → Checkout settings** → *Default payment link* = `https://bigfire3.github.io/overfit/guthaben/` → Save.
+3. **Developer tools → Authentication → API keys → New API key** (Name `overfit-test`, Recht *Transactions: Write*) → kopieren.
+   **Client-side tokens → New client-side token** → kopieren.
+4. **Developer tools → Notifications → New destination**: Typ *Webhook*, URL = `<Worker-Adresse>/v1/webhooks/payment`
+   (Worker-Adresse = Repo-Variable `OVERFIT_BACKEND_URL`), Ereignisse `transaction.completed`, `adjustment.created`,
+   `adjustment.updated` → Save → Ziel öffnen → *Secret key* kopieren.
+5. GitHub → Settings → Secrets and variables → Actions → New repository secret: `PADDLE_API_KEY`, `PADDLE_CLIENT_TOKEN`,
+   `PADDLE_WEBHOOK_SECRET`.
+6. Actions → **Backend deployen** → Run workflow (`mode` = test). Die Zusammenfassung zeigt „Web-Kauf: An, Testmodus“ und die
+   Webhook-URL (muss mit Schritt 4 übereinstimmen).
+7. Actions → **Web veröffentlichen (GitHub Pages)** → Run workflow, damit die Kaufseite die Backend-Adresse kennt.
+8. Testkauf: Karte `4242 4242 4242 4242`, Ablauf in der Zukunft, CVC `100`, beliebiger Name und E-Mail.
 
 ## KI-Modelle, Preise und AI Gateway
 

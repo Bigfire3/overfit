@@ -37,6 +37,8 @@ data class LedgerEntry(
     val outputTokens: Long = 0,
     /** A replacement model answered (the price of the chosen model, [tier], was charged). */
     val fallback: Boolean = false,
+    /** Where credit came from: null = store/internal, `web` = bought on the web page, `code` = redeemed credit code. */
+    val source: String? = null,
 )
 
 @Serializable
@@ -79,6 +81,29 @@ data class FuelTierInfo(
 @Serializable
 data class UsageProfile(val inputTokens: Long = 0, val outputTokens: Long = 0)
 
+/** Buying credit on the web page (`/v1/config` → `webPurchase`). Off unless the server says otherwise. */
+@Serializable
+data class WebPurchaseConfig(
+    val enabled: Boolean = false,
+    /** True = sandbox of the payment provider: no real payment. */
+    val testMode: Boolean = true,
+    /** Channels in which the app shows "Top up on the web": `sideload` (APK from GitHub), `store` (Play Store, App Store). */
+    val channels: List<String> = emptyList(),
+)
+
+/** How this build was installed. Store builds hide the web purchase unless the server enables `store` (store rules). */
+enum class Distribution(val key: String) { Sideload("sideload"), Store("store") }
+
+/** Whether the "Top up on the web" button is shown for this build. */
+fun FuelConfig.showsWebPurchase(distribution: Distribution): Boolean =
+    webPurchase.enabled && distribution.key in webPurchase.channels
+
+@Serializable
+data class WebPurchaseLink(val url: String, val expiresAt: Long = 0, val ttlSec: Int = 900)
+
+@Serializable
+data class CodeRedeemResult(val creditedMicro: Long, val balanceMicro: Long = 0)
+
 @Serializable
 data class FuelConfig(
     /** `test` = test server (no device check, test credit); anything else = production. */
@@ -92,6 +117,7 @@ data class FuelConfig(
     /** coach | chat | autofill → typical tokens, for the cost estimate. Empty = old backend. */
     val usageProfiles: Map<String, UsageProfile> = emptyMap(),
     val packages: List<FuelPackage> = emptyList(),
+    val webPurchase: WebPurchaseConfig = WebPurchaseConfig(),
     val spot: SpotConfig = SpotConfig(),
 )
 

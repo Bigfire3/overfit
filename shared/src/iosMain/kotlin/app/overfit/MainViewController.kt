@@ -44,6 +44,8 @@ fun MainViewController(): UIViewController {
         share = IosPlatformShare(),
         inbox = IosIncoming.inbox,
         kv = kv,
+        // iOS builds come from the App Store / TestFlight: web purchase only where the server allows `store`.
+        distribution = app.overfit.fuel.Distribution.Store,
     )
     return ComposeUIViewController { OverfitApp(deps) }
 }

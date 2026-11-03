@@ -72,6 +72,9 @@ fun FuelScreen(
     onSpotRedeem: () -> Unit,
     /** True when Fuel is the chosen AI access. With an own key the screen asks first (no request before). */
     fuelActive: Boolean = true,
+    onRedeemCode: () -> Unit = {},
+    /** How this build was installed; with `/v1/config` it decides whether "Top up on the web" is shown. */
+    distribution: app.overfit.fuel.Distribution = app.overfit.fuel.Distribution.Sideload,
 ) {
     val t = LocalFuelStrings.current
     val language = t.language
@@ -111,6 +114,12 @@ fun FuelScreen(
 
     val (account, reload) = rememberLoaded(service) { service.account() }
     val (config, _) = rememberLoaded(service) { service.config() }
+    // Back from the web purchase page (browser → app, or the overfit://guthaben link): show the new balance.
+    var resumes by remember { mutableStateOf(0) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(service) {
+        if (resumes++ > 0) reload()
+        onPauseOrDispose { }
+    }
     Screen(scroll = true, header = { BackHeader(LocalStrings.current.back, onBack) }) {
         Title(t.fuel)
         Spacer(Modifier.height(Space.s))
@@ -135,6 +144,7 @@ fun FuelScreen(
             }
         }
         Text(t.topUpNote, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.s))
+        WebCreditSection(service, (config as? Loaded.Ready<FuelConfig>)?.value, distribution, language, isDemo, onRedeemCode)
 
         SectionTitle(t.spot)
         ListRow(t.spotInvite, onClick = onSpotInvite)
@@ -197,9 +207,13 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
         Hairline()
         if (entries.isEmpty() && state is Loaded.Ready) Text(t.ledgerEmpty, tone = Tone.Muted, modifier = Modifier.padding(top = Space.m))
         entries.forEach { e ->
+            val w = app.overfit.i18n.webCreditStringsFor(language)
             val title = when (e.type) {
                 "usage" -> t.ledgerUsage
-                "purchase" -> t.ledgerPurchase
+                "purchase" -> if (e.source == "web") w.ledgerWebPurchase else t.ledgerPurchase
+                "code_redeem" -> w.ledgerCode
+                "refund" -> w.ledgerRefund
+                "chargeback" -> w.ledgerChargeback
                 "spot_bonus" -> t.ledgerSpotBonus
                 "spot_reward" -> t.ledgerSpotReward
                 else -> e.type
