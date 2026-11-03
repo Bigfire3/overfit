@@ -262,10 +262,11 @@ Zuerst als native Android-Version gebaut (PR #17), dann nach der KMP-Entscheidun
 - **QR-Code selbst geschrieben:** Reiner Kotlin-Generator (Byte-Modus, Fehlerkorrektur M, Version 1–30) in commonMain,
   damit Android und iOS denselben Code zeichnen, ohne ZXing auf iOS. Gegen ZXing-Decoder getestet (Versionen 1–30,
   inkl. Umlaute). QR nur bis 1.000 Zeichen Link, sonst Hinweis und Datei/Link.
-- **Scannen:** Android in der App mit CameraX + ZXing core (Apache-2.0, keine Play-Dienste). **iOS: kein In-App-Scanner,
+- **Scannen:** Android in der App mit CameraX + ZXing core (Apache-2.0, keine Play-Dienste). ~~**iOS: kein In-App-Scanner,
   die Kamera-App reicht**, weil der QR ein Link ist (`overfit://`-Link öffnet die App direkt, der https-Link den
   Browser/die Web-Seite mit „In Overfit öffnen“). Grund: AVFoundation-Scanner lässt sich unter Linux nicht testen, und der
-  Nutzen gegenüber der Kamera-App ist klein. Die Import-Seite zeigt auf iOS einen Hinweis statt des Scan-Knopfs.
+  Nutzen gegenüber der Kamera-App ist klein. Die Import-Seite zeigt auf iOS einen Hinweis statt des Scan-Knopfs.~~
+  Ersetzt (Session U): seit dem kompakten `OF1:`-QR ist der Code kein Link mehr, iOS scannt in der App (AVFoundation).
 - **Android-Links:** Intent-Filter für `https://bigfire3.github.io/overfit/t` **ohne** `autoVerify` (die Domain gehört
   nicht der App; ohne Verifizierung fragt Android bzw. der Browser) sowie `overfit://`, `.overfit`-Dateien
   (`application/x-overfit`, `content`/`file`). `launchMode=singleTop`, damit ein zweiter Link in der laufenden App
@@ -685,6 +686,52 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 ### Zur Prüfung durch Fabian
 - Unterstrichene Textlinks vs. eigene Pill-Buttons: Seiten-Aktionen (Bearbeiten/Teilen) sind jetzt graue Pills, Inline-Aktionen in Listen unterstrichen. Leicht umkehrbar in `Components.kt`.
 
+## iPhone testbar machen (Session U, 3.11.)
+- **Sehen statt raten:** Die iOS-CI startet die echte App im Simulator (neuestes iPhone Pro, neuestes iOS des Runners)
+  und fährt sie per XCUITest. Compose Multiplatform legt die Semantik als Accessibility-Elemente offen, die Tests finden
+  Texte und Content-Descriptions über ihr Label – dieselben Schritte wie `ScreenshotTest` auf Android. Screenshots als
+  Artefakt `ios-screenshots` und in `docs/screenshots/ios/`.
+- **UI-Test-Modus über Launch-Argumente** (`-overfitUITest`, `-overfitTheme`, `-overfitSkipOnboarding`,
+  `-overfitKeepData`) statt Deep-Links je Screen: kein Eingriff in die Navigation (App.kt), eigene UserDefaults-Suite,
+  eigene Datenbankdatei und eigener Keychain-Eintrag, die beim Start geleert werden. Ein normaler Start ist unberührt.
+- **Bundle-ID `app.overfit`** wie die Android-applicationId. Ist sie im Apple-Portal vergeben, setzt die Variable
+  `IOS_BUNDLE_ID` eine andere, ohne Codeänderung.
+- **TestFlight:** automatische Signierung mit App-Store-Connect-API-Key (`-allowProvisioningUpdates`), Export mit
+  `destination=upload` (Apples eigener Upload, kein altool/fastlane). Schlüssel-Rolle **Admin statt App Manager**:
+  Team-API-Keys mit App Manager dürfen keine Cloud-verwalteten Verteilungszertifikate anlegen
+  („Cloud signing permission error“); ohne Zertifikat schlägt die automatische Signierung fehl. Ohne Secrets bricht der
+  Workflow im ersten Schritt mit Liste und Anleitung ab.
+- **Statusleiste:** Das App-Theme setzt `overrideUserInterfaceStyle` des Fensters. Damit passen Statusleiste,
+  Tastatur, Share-Sheet und Picker zur App, auch wenn iOS selbst hell und die App dunkel ist.
+- **App-Icon:** dieselbe Hantel wie das Android-Launcher-Icon (weiß auf schwarz, 1024 px). Launch-Screen: einfarbig,
+  weiß bzw. im Dunkelmodus schwarz (Asset-Farbe `LaunchBackground`).
+
+### Paritäts-Audit Android ↔ iOS
+| Bereich | Android | iOS | Stand |
+|---|---|---|---|
+| `expect` `prepareJpeg` | Bitmap, EXIF-Drehung | UIGraphicsImageRenderer (wendet Orientierung an) | gleich |
+| `expect` `rememberPhotoPicker` | Kamera-Intent, Photo Picker | UIImagePickerController (Kamera, Mediathek ohne Berechtigung) | gleich |
+| `expect` `rememberFilePicker` | SAF | UIDocumentPicker (Kopie) | gleich |
+| `expect` `QrScanner` | CameraX + ZXing | **neu:** AVFoundation (`AVCaptureMetadataOutput`, iOS 16) | Lücke geschlossen |
+| `expect` `deviceDefaults` | Locale | `NSLocale.preferredLanguages` → Sprache folgt dem System | gleich |
+| `expect` `createHttpClient` | OkHttp | Darwin | gleich |
+| `expect` Room-Konstruktor/Builder | System-SQLite | gebündeltes SQLite, Documents | gleich |
+| `KeyValueStore` / `SecretStore` | SharedPreferences / Keystore | UserDefaults / Keychain (nur dieses Gerät) | gleich |
+| `Haptics` | Vibrator | UIFeedbackGenerator | gleich |
+| `RestAlerts` | Exakter Alarm + Benachrichtigung mit Aktionen | `UNTimeIntervalNotificationTrigger`, Ton (iOS vibriert nur mit Ton) | +15 s/Überspringen in der Mitteilung fehlen auf iOS (bräuchte Notification-Actions + Hintergrund-Logik) |
+| Tipp auf Pausen-Mitteilung | Intent → maximiertes Training | **neu:** `UNUserNotificationCenterDelegate` → maximiertes Training | Lücke geschlossen |
+| Berechtigung Mitteilungen | beim ersten Trainingsstart | beim ersten Trainingsstart | gleich |
+| Training im Hintergrund/nach Beenden | Zustand in DB, Timer aus Zeitstempel | gleich; XCUITest `testWorkoutSurvivesRelaunch` | gleich |
+| `PlatformShare` | Share-Sheet, FileProvider | UIActivityViewController (inkl. AirDrop, „In Dateien sichern“) | gleich |
+| `overfit://`-Links | Intent-Filter | `CFBundleURLTypes` + `onOpenURL` | gleich |
+| `.overfit`-Dateien | VIEW/SEND-Filter | Dokumenttyp + exportierte UTI, `onOpenURL` (Kopie, `LSSupportsOpeningDocumentsInPlace = NO`) | gleich |
+| https-Link `bigfire3.github.io/overfit/t` | Intent-Filter (ohne Verifizierung) | Web-Seite mit „In Overfit öffnen“ | Universal Links brauchen eine eigene Domain (AASA im Domain-Root) |
+| App Attest / Play Integrity | Play Integrity | DCAppAttestService (TestFlight/App Store = Produktionsumgebung) | gleich |
+| Zurück | System-Zurück | Wisch vom linken Rand (Compose BackHandler/NavHost); XCUITest `testEdgeSwipeBack` | gleich |
+| Safe Areas, Tastatur | `safeDrawing`, `imePadding` | dieselben Insets in Compose | per Screenshot geprüft |
+| Statusleiste hell/dunkel | Edge-to-Edge, Theme | **neu:** Fenster-Stil folgt dem App-Theme | Lücke geschlossen |
+| App-Icon, Launch | adaptives Icon | **neu:** AppIcon + Launch-Farbe | Lücke geschlossen |
+| Sprache | System, in der App umschaltbar | gleich | gleich |
 ## Wackel-Tests nach #39 (Session S, 3.11.)
 **Befund** (lokal reproduziert in der Gesamtsuite, etwa jeder zweite Lauf; die Klasse allein bleibt grün; mit Log-Ausgaben und State-Dump beim Timeout):
 1. `CustomExerciseFlowTest`: Nach „Speichern“ fand `waitFor("Turkish Get-up Neu")` den Namen sofort im Formular bzw. im Suchfeld des Pickers, obwohl das Speichern (Room-Write im `viewModelScope`, Rückkehr auf dem Main-Looper) noch lief. Die Prüfung danach kam zu früh. Der Umbau auf `waitUntil { state … }` (PR #41) lief in den Timeout, weil eine reine State-Bedingung unter Robolectric den Main-Looper nicht pumpt (erst `fetchSemanticsNodes` synchronisiert). Laut Log kam `onSaved` erst **nach** den 20 s, danach landete die Übung korrekt im Training. Die App hatte hier also keinen Fehler.

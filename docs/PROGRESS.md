@@ -340,6 +340,38 @@ Erledigt:
 11. Training → „+“ → „KI-Prompt kopieren“ zeigt den Prompt ebenfalls an. Coach → Claude/ChatGPT/Gemini → „Kontext kopieren“ und Gem-Anleitung mit Text.
 12. Profil: nur noch „Coach & KI“ und Fuel im Abschnitt KI.
 
+## iPhone testbar machen (Session U, 3.11.)
+**Erledigt:**
+- iOS-CI startet die App im Simulator (iPhone 17 Pro) und fährt sie per XCUITest: Smoke-Flow (Workout starten, Satz abhaken, minimieren, wieder öffnen, beenden), Zurückwischen vom linken Rand, Training übersteht das Beenden der App. Dazu Screenshots aller Hauptscreens hell und dunkel (Artefakt `ios-screenshots`, Kopie in `docs/screenshots/ios/`), Homescreen-Icon und Launch Screen.
+- QR-Scanner in der App auch auf dem iPhone (AVFoundation), damit lassen sich die kompakten `OF1:`-Codes importieren.
+- Tipp auf die Pausen-Mitteilung öffnet das maximierte Training (auch wenn die App dabei startet).
+- Statusleiste, Tastatur, Share-Sheet und Picker folgen dem App-Theme (Dunkel bei hellem iPhone und umgekehrt).
+- `.overfit`-Dateien aus Dateien/WhatsApp/Mail werden als Kopie geöffnet. Anzeigename „overfit“.
+- TestFlight-Workflow `ios-testflight.yml` (manuell, kein Mac nötig), Anleitung in der README unter „iPhone: TestFlight“.
+- Paritäts-Audit Android ↔ iOS in DECISIONS.md.
+**Offen:** +15 s/Überspringen direkt in der iOS-Mitteilung (Android hat das). Universal Links für den https-Link brauchen eine eigene Domain. Der Simulator hat keine Kamera, der Scanner ist nur auf dem echten iPhone prüfbar.
+
+### Was Fabian für TestFlight tun muss (nur Browser)
+1. developer.apple.com/programs → Enroll (99 €/Jahr), Bestätigung abwarten.
+2. developer.apple.com/account → Membership details → Team ID notieren.
+3. appstoreconnect.apple.com → Apps → „+“ → Neue App: iOS, Name „overfit“ (falls vergeben: „overfit Training“), Sprache Deutsch, Bundle-ID `app.overfit` (fehlt sie in der Liste: developer.apple.com → Identifiers → „+“ → App IDs → Explicit `app.overfit` anlegen), SKU `overfit`.
+4. App Store Connect → Benutzer und Zugriff → Integrationen → App Store Connect API → Team-Schlüssel „+“, Zugriff **Admin** → `.p8` laden, Schlüssel-ID und Issuer-ID notieren.
+5. GitHub → Repo → Settings → Secrets and variables → Actions → New repository secret: `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_P8` (Inhalt der .p8-Datei), `APPLE_TEAM_ID`.
+6. GitHub → Actions → „iOS TestFlight“ → Run workflow. Nach 5–30 Minuten ist der Build in App Store Connect → TestFlight.
+7. TestFlight → Interne Tests → Gruppe anlegen, dich hinzufügen, Build zuordnen. Am iPhone die App „TestFlight“ laden, anmelden, overfit installieren.
+
+### Bitte auf dem iPhone testen (sobald TestFlight läuft)
+1. Homescreen: Icon „of“; Start zeigt kurz den schwarzen Launch Screen mit „of“. Onboarding: Tastatur verdeckt „Weiter“ nicht.
+2. Training starten → Mitteilungen erlauben. Satz abhaken → Haptik, Pause läuft. App in den Hintergrund, Bildschirm sperren: zum Pausenende kommt eine Mitteilung mit Ton/Vibration. Mitteilung antippen → das Training ist maximiert offen.
+3. Im Training vom linken Rand nach rechts wischen → Training minimiert, Leiste unten. Leiste antippen → wieder offen. Übungskatalog öffnen und per Wischen zurück.
+4. App aus dem App-Umschalter wischen und neu öffnen → das laufende Training ist da.
+5. Profil → Darstellung Dunkel bei hellem iPhone: Statusleiste weiß, Tastatur dunkel; Hell entsprechend.
+6. Workout teilen → QR. Zweites Gerät: Training → „+“ → Importieren → QR-Code scannen (Kamera erlauben) → Vorschau → Übernehmen.
+7. „Als Datei teilen“ → an dich per WhatsApp/AirDrop → Datei antippen → Teilen → overfit → Vorschau. Ebenso aus der Dateien-App und „Datei auswählen“ im Import.
+8. Beenden-Flow: Foto aufnehmen (Kamera) und aus der Mediathek wählen; Fotos-Tab zeigt es.
+9. Coach → Neuer Chat → Eingabefeld: Tastatur schiebt das Feld nach oben, nichts verdeckt.
+10. iPhone auf Englisch, overfit neu installieren → die App startet auf Englisch (danach in Profil umschaltbar).
+
 ## Teilen und Import verbessern, Beispiel-Workouts standardmäßig (Session Q, 3.11.)
 **Erledigt:**
 - Import: „Datei auswählen“ (System-Dateiauswähler); Android öffnet `.overfit`-Dateien aus Dateien/Downloads/WhatsApp (VIEW) und nimmt sie über „Teilen mit …“ an (SEND), danach dieselbe Vorschau. Backup-ZIP im Import → Hinweis.

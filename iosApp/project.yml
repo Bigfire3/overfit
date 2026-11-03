@@ -13,6 +13,8 @@ settings:
     SWIFT_VERSION: "5.0"
     # Guthaben/Einladungs backend URL, passed by CI (xcodebuild OVERFIT_BACKEND_URL=…); empty = not configured.
     OVERFIT_BACKEND_URL: ""
+    # Kotlin builds only iosArm64 and iosSimulatorArm64 (no Intel simulator).
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
 targets:
   Overfit:
     type: application
@@ -22,7 +24,7 @@ targets:
     info:
       path: Overfit/Info.plist
       properties:
-        CFBundleDisplayName: Overfit
+        CFBundleDisplayName: overfit
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         OverfitBackendUrl: $(OVERFIT_BACKEND_URL)
@@ -36,7 +38,7 @@ targets:
         # Compose Multiplatform: allow 120 Hz on ProMotion devices.
         CADisableMinimumFrameDurationOnPhone: true
         # Body photos after a workout (stored only inside the app, never in the photo library).
-        NSCameraUsageDescription: Overfit nimmt auf Wunsch ein Fortschrittsfoto nach dem Training auf. Es bleibt nur in der App. / Overfit takes an optional progress photo after a workout. It stays inside the app.
+        NSCameraUsageDescription: Overfit nutzt die Kamera für Fortschrittsfotos nach dem Training (sie bleiben in der App) und zum Scannen geteilter Workout-QR-Codes. / Overfit uses the camera for progress photos after a workout (they stay inside the app) and to scan shared workout QR codes.
         NSPhotoLibraryUsageDescription: Overfit übernimmt auf Wunsch ein Foto als Fortschrittsfoto. / Overfit can use a photo of your choice as a progress photo.
         # overfit://t#… opens the import screen.
         CFBundleURLTypes:
@@ -50,6 +52,8 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension: [overfit]
               public.mime-type: [application/x-overfit]
+        # Files from Files/WhatsApp/Mail are copied into the app (no in-place editing needed).
+        LSSupportsOpeningDocumentsInPlace: false
         CFBundleDocumentTypes:
           - CFBundleTypeName: Overfit Training
             CFBundleTypeRole: Viewer
@@ -76,3 +80,26 @@ targets:
         script: |
           cd "$SRCROOT/.."
           ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+  # UI tests (XCUITest): smoke flow and screenshots, run by .github/workflows/ios.yml in the simulator.
+  OverfitUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: OverfitUITests
+    dependencies:
+      - target: Overfit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.overfit.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        TEST_TARGET_NAME: Overfit
+schemes:
+  Overfit:
+    build:
+      targets:
+        Overfit: all
+        OverfitUITests: [test]
+    test:
+      targets:
+        - OverfitUITests

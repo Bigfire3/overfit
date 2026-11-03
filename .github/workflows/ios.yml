@@ -12,7 +12,7 @@ on:
 jobs:
   build:
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     concurrency:
       group: ios-${{ github.ref }}
       cancel-in-progress: true
@@ -39,5 +39,55 @@ jobs:
           # Guthaben/Einladungs backend URL (Repository-Variable, optional)
           OVERFIT_BACKEND_URL: ${{ vars.OVERFIT_BACKEND_URL }}
         run: |
+          set -o pipefail
           xcodebuild -project iosApp/Overfit.xcodeproj -scheme Overfit -configuration Debug \
             -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO OVERFIT_BACKEND_URL="$OVERFIT_BACKEND_URL" build | tail -n 60
+
+      # The newest iPhone with Dynamic Island on the newest iOS runtime of the runner.
+      - name: Simulator wählen und starten
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          def ver(rt): return [int(x) for x in rt.split("iOS-")[-1].split("-") if x.isdigit()]
+          runtimes = sorted((rt for rt in data if "iOS" in rt and data[rt]), key=ver, reverse=True)
+          for rt in runtimes:
+              phones = [d for d in data[rt] if d["name"].startswith("iPhone") and " Pro" in d["name"] and "Max" not in d["name"]]
+              phones = phones or [d for d in data[rt] if d["name"].startswith("iPhone")]
+              if phones:
+                  phones.sort(key=lambda d: d["name"], reverse=True)
+                  print(phones[0]["udid"]); break
+          ')
+          xcrun simctl list devices | grep "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          # Clean status bar for the screenshots.
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      # XCUITest: smoke flow (start, tick a set, minimize, finish, relaunch) and screenshots in light/dark.
+      - name: UI-Tests im Simulator (Smoke-Flow, Screenshots)
+        env:
+          TEST_RUNNER_SCREENSHOT_DIR: ${{ github.workspace }}/ios-screenshots
+        run: |
+          set -o pipefail
+          xcodebuild -project iosApp/Overfit.xcodeproj -scheme Overfit -configuration Debug \
+            -destination "id=${{ steps.sim.outputs.udid }}" -resultBundlePath ios-ui-tests.xcresult \
+            OVERFIT_BACKEND_URL="" test 2>&1 | grep -E "Test Case|error:|failed|passed|XCTAssert|Nicht gefunden" | tail -n 80
+
+      - name: Screenshots aus dem Testergebnis holen
+        if: always()
+        run: |
+          mkdir -p ios-screenshots/attachments
+          xcrun xcresulttool export attachments --path ios-ui-tests.xcresult --output-path ios-screenshots/attachments || true
+          ls ios-screenshots ios-screenshots/attachments | head -n 80
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ios-screenshots
+          path: |
+            ios-screenshots
+            ios-ui-tests.xcresult
+          retention-days: 14

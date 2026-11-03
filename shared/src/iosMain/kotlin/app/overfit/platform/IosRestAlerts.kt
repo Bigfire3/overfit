@@ -186,7 +186,7 @@ class IosRestAlerts : RestAlerts {
         return if (wavData().writeToFile(path, atomically = true)) TICK_SOUND else null
     }
 
-    private companion object {
+    companion object {
         const val ID = "app.overfit.rest"
         const val ID_TICKS = "app.overfit.rest.ticks"
         /** Versioned: iOS caches notification sounds by name. */
