@@ -24,6 +24,7 @@ androidxJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 robolectric = "4.17"
 sqlite = "2.6.2"
+playIntegrity = "1.4.0"
 
 [libraries]
 # Kotlin Multiplatform (:shared)
@@ -51,6 +52,7 @@ sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sql
 coil-compose-mp = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-svg-mp = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
+play-integrity = { module = "com.google.android.play:integrity", version.ref = "playIntegrity" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 # Android (:app)

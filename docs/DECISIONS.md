@@ -247,3 +247,20 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
   im Workflow aus den App-Ressourcen kopiert, damit keine zweite Kopie im Repo liegt. **Einschränkung:** Android App Links /
   iOS Universal Links brauchen `/.well-known/…` im Wurzelverzeichnis der Domain; unter `bigfire3.github.io/overfit/` ist das nicht
   möglich. Bis eine eigene Domain steht, hilft der Button „In Overfit öffnen“ (`overfit://t#…`).
+
+## Fuel & Spot in der App (Nacht 3.11., Session D)
+- **Texte in eigener Datei:** `i18n/FuelStrings.kt` (DE + EN, fehlende Übersetzung = Compile-Fehler wie bei `Strings`), damit paralleles Arbeiten an `Strings.kt` nicht kollidiert. Kann später in `Strings.kt` einfließen.
+- **Geräte-Identität:** `DeviceKey` (expect-ähnlich über Interface + Plattformklassen): Android Keystore (EC P-256, nicht exportierbar, StrongBox wenn möglich), iOS Secure Enclave mit Keychain-Softwareschlüssel als Rückfall (Simulator). Signatur DER (der Server akzeptiert beides). Öffentlicher Schlüssel wird immer als 65-Byte-Rohpunkt gesendet. SHA-256 ist reines Kotlin (keine Plattformabhängigkeit), abgesichert mit Standardvektoren; die Signatur ist gegen einen mit WebCrypto erzeugten Testvektor geprüft (`SignatureVectorTest`).
+- **Backend-URL:** Build-Zeit `OVERFIT_BACKEND_URL` (Repository-Variable → Android `BuildConfig`, iOS `Info.plist` über XcodeGen); Entwickler-Override durch 7× Tippen auf die Version in „Über“ (nur im Speicher entsperrt, Wert dauerhaft in `KeyValueStore`). Leer = „Fuel startet bald“ + Demo.
+- **Fuel als KI-Zugang:** `ProviderId.FUEL` + `FuelProvider` (nutzt keinen Key, „Validierung“ = Konto abrufbar). Er steht in der Auswahl vor den Key-Anbietern; „Fuel verwenden“ öffnet den Fuel-Bildschirm. Ein vorhandener eigener Key bleibt gespeichert. Phase 4 ruft `FuelProvider.messages(bodyJson)` auf (liefert Kosten und neuen Saldo).
+- **Demo:** `DemoFuelService` implementiert dieselbe `FuelService`-Schnittstelle lokal; alle Screens laufen darauf, Banner „Demo“, keine echten Daten.
+- **Anzeige von Beträgen:** DE „4,20 €“, EN „€4.20“ (kaufmännisch gerundet). Kosten unter 1 Cent mit 4 Nachkommastellen, damit sie nicht wie 0 aussehen.
+- **Spot-Link im QR:** `https://bigfire3.github.io/overfit/spot#<token>` (Token im Fragment). Die Seite `/spot` existiert noch nicht (Web-Fallback zeigt dort 404); die App akzeptiert Link oder nacktes Token.
+- **QR-Code:** eigener kleiner Encoder in `ui/components/QrCode.kt` (Byte-Modus, ECC M, Version 1–12), gegen Referenzmatrizen getestet. Der QR-**Scanner** kommt aus Session B: `AppDependencies.qrScanner` ist der Einhängepunkt; bis dahin lässt sich der Link einfügen.
+- **Attestierung:** Android Play Integrity (Nonce = base64url(SHA-256(challenge))), iOS App Attest (clientDataHash = SHA-256(challenge); Token = JSON `{"keyId","attestation"(base64url)}`). Das Format gegenüber dem späteren Server-Prüfer ist damit festgelegt und muss dort so gelesen werden. Ohne Support/Konfiguration → `attestation_unavailable` + freundliche Meldung.
+- **Reveal:** schwarzer Vollbildschirm (immer schwarz/weiß, unabhängig vom Theme), Haptik `Reveal` (zwei Pulse), 1,1 s Schwarz, Zahl zählt 2,4 s ease-out hoch (Inter, tabellarische Ziffern), am Ende `RevealFinish`; Tippen schließt erst nach dem Ende.
+- **Haptics:** API 1:1 von Session A übernommen (`Haptics`, `HapticPattern`, `AndroidHaptics`, `IosHaptics`); beim Merge identisch.
+
+### Zur Prüfung durch Fabian
+- Spot-Link-Domain (`bigfire3.github.io/overfit/spot`) und die zugehörige Web-Seite.
+- Name „Fuel · 4,20 €“ in EN als „€4.20“ formatiert (DE „4,20 €“).

@@ -55,6 +55,8 @@ jobs:
       - name: Signiertes Release-APK und App Bundle (Google Play)
         env:
           OVERFIT_KEYSTORE_PASSWORD: ${{ secrets.OVERFIT_KEYSTORE_PASSWORD }}
+          # Fuel/Spot backend URL (Repository-Variable, optional; leer = "startet bald" in der App)
+          OVERFIT_BACKEND_URL: ${{ vars.OVERFIT_BACKEND_URL }}
         run: ./gradlew :app:assembleRelease :app:bundleRelease --console=plain
 
       - name: APK vorbereiten

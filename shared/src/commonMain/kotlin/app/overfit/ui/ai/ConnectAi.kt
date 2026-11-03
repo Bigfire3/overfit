@@ -15,6 +15,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import app.overfit.ai.KeyValidation
+import app.overfit.ai.LlmProvider
+import app.overfit.i18n.LocalFuelStrings
 import app.overfit.ai.ProviderId
 import app.overfit.ai.Providers
 import app.overfit.i18n.LocalStrings
@@ -43,6 +45,8 @@ fun ConnectAiScreen(
     header: @Composable () -> Unit,
     onConnected: (ProviderId, String) -> Unit,
     onSkip: (() -> Unit)? = null,
+    /** Opens the Fuel screen (coach credit); null hides the Fuel option. */
+    onUseFuel: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val scope = rememberCoroutineScope()
@@ -51,7 +55,9 @@ fun ConnectAiScreen(
     var providerId by rememberSaveable { mutableStateOf(initialProvider) }
     var key by remember { mutableStateOf("") }
     var status by remember { mutableStateOf(Status.IDLE) }
+    val fuelStrings = LocalFuelStrings.current
     val provider = providers.get(providerId)
+    val fuelSelected = !provider.usesKey
     val trimmed = key.trim()
 
     val connect: () -> Unit = connect@{
@@ -76,7 +82,9 @@ fun ConnectAiScreen(
         scroll = true,
         header = header,
         footer = {
-            PrimaryButton(
+            if (fuelSelected) {
+                PrimaryButton(label = fuelStrings.aiFuelOpen, onClick = { onUseFuel?.invoke() })
+            } else PrimaryButton(
                 label = if (status == Status.OK) t.aiConnected else t.aiConnect,
                 onClick = connect,
                 enabled = trimmed.isNotEmpty(),
@@ -94,7 +102,7 @@ fun ConnectAiScreen(
         Spacer(Modifier.height(Space.xl))
         Column {
             Hairline()
-            providers.all.forEach { p ->
+            (if (onUseFuel != null) listOf(providers.fuel) else emptyList<LlmProvider>()).plus(providers.all).forEach { p ->
                 val active = p.id == providerId
                 ListRow(
                     label = p.label,
@@ -106,7 +114,9 @@ fun ConnectAiScreen(
         }
 
         Spacer(Modifier.height(Space.l))
-        KeyInput(
+        if (fuelSelected) {
+            Text(fuelStrings.aiFuelDescription, tone = Tone.Muted)
+        } else KeyInput(
             value = key,
             onValueChange = { key = it; if (status != Status.CHECKING) status = Status.IDLE },
             placeholder = "${t.aiKeyPlaceholder} (${provider.keyPlaceholder})",
@@ -122,8 +132,10 @@ fun ConnectAiScreen(
             Text(message, style = Theme.type.caption)
         }
 
-        Spacer(Modifier.height(Space.l))
-        TextButton(t.aiHowTo, { uriHandler.openUri(provider.keyUrl) }, tone = Tone.Default)
+        if (!fuelSelected) {
+            Spacer(Modifier.height(Space.l))
+            TextButton(t.aiHowTo, { uriHandler.openUri(provider.keyUrl) }, tone = Tone.Default)
+        }
         Spacer(Modifier.height(Space.l))
         Text(t.aiPrivacy, style = Theme.type.caption, tone = Tone.Muted)
     }
