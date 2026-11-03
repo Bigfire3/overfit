@@ -54,6 +54,7 @@ private data class FinishData(val summary: WorkoutSummary, val finished: Finishe
  * already stored as finished; "Save" (and back) only add note and feeling. Everything that must
  * survive leaving this screen runs in [appScope].
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun FinishScreen(
     workoutId: String,
@@ -82,8 +83,8 @@ fun FinishScreen(
     var seeded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(data) {
         val d = data ?: return@LaunchedEffect
-        // Prefill once, but never overwrite what the user already entered while the data was loading.
         if (!seeded) {
+            // Only fill what the user has not touched yet: the screen is usable before the data has loaded.
             seeded = true
             if (feeling == null) feeling = d.finished.feeling
             if (note.isEmpty()) note = d.finished.note.orEmpty()
@@ -113,6 +114,9 @@ fun FinishScreen(
         }
         Unit
     }
+
+    // System back (Android gesture/button) saves note and feeling like the header back button does.
+    androidx.compose.ui.backhandler.BackHandler(enabled = true, onBack = save)
 
     Screen(
         scroll = true,
