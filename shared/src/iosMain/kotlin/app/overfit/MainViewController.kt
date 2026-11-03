@@ -42,6 +42,7 @@ fun MainViewController(): UIViewController {
         fuel = fuelAccess,
         share = IosPlatformShare(),
         inbox = IosIncoming.inbox,
+        kv = kv,
     )
     return ComposeUIViewController { OverfitApp(deps) }
 }

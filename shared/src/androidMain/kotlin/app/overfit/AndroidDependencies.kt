@@ -47,5 +47,6 @@ fun androidDependencies(
     fuel = fuel,
     share = AndroidPlatformShare(context),
     inbox = ImportInbox(),
+    kv = kv,
     )
 }
