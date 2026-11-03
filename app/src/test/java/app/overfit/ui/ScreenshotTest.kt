@@ -1,5 +1,6 @@
 package app.overfit.ui
 
+import kotlinx.coroutines.runBlocking
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
@@ -118,7 +119,8 @@ class ScreenshotTest {
         compose.setContent { OverfitApp(deps) }
         waitFor("Duo · bald")
         shot("training-leer")
-        click("Beispiel-Workouts hinzufügen")
+        // The sample workouts normally arrive at the first start; here they are added after the empty-state shot.
+        runBlocking { data.importer.addSamples() }
         waitFor("Legs")
         shot("training")
 

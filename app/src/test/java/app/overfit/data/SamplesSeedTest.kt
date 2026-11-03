@@ -44,7 +44,7 @@ class SamplesSeedTest {
         data.templates.delete(data.templates.templates.first().first { it.name == "Pull" }.id)
         assertEquals(0, data.seedSamplesOnce().getOrThrow()) // flag set: nothing comes back
         assertEquals(listOf("Push", "Legs"), names())
-        // The explicit "Add sample workouts" entry still brings them back on request.
+        // The importer can still add missing ones (idempotent, matched by name).
         assertEquals(1, data.importer.addSamples())
         assertEquals(3, names().size)
     }

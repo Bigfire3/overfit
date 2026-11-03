@@ -98,7 +98,6 @@ class AppSmokeTest {
         // Training tab (no profile hero anymore): empty state with the "+" button; the profile data is in the store.
         compose.onNodeWithContentDescription("Neues Workout").assertIsDisplayed()
         compose.onNodeWithText("Noch keine Workouts", substring = true).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().assertIsDisplayed()
         assertEquals("Fabi", store.state.value.profile.name)
         assertEquals(82.4, store.state.value.weights.last().kg, 0.001)
         assertEquals("sk-or-wrong", secrets.load())

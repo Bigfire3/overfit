@@ -132,21 +132,6 @@ class ShareFlowTest {
     }
 
     @Test
-    fun samplesAreThereFromTheStartWithoutAnAddRow() {
-        // Fresh install: the first start adds Push/Pull/Legs, there is no "add samples" row anywhere.
-        kv.remove(AppData.KEY_SAMPLES_SEEDED)
-        launchOnboarded()
-        waitFor("Legs")
-        waitFor("Pull")
-        waitFor("Push")
-        compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
-        compose.onNodeWithText("Profil").performClick()
-        waitFor("Über overfit")
-        compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
-        assertEquals(3, runBlocking { data.templates.templates.first() }.size)
-    }
-
-    @Test
     fun firstStartCreatesSamples_deletingKeepsThemGone() {
         kv.remove(AppData.KEY_SAMPLES_SEEDED)
         launchOnboarded()
@@ -158,10 +143,11 @@ class ShareFlowTest {
         // Next start: the flag is set, nothing comes back
         assertEquals(0, runBlocking { data.seedSamplesOnce() }.getOrThrow())
         assertEquals(listOf("Push", "Legs"), runBlocking { data.templates.templates.first() }.map { it.name })
-        // The explicit entry in the profile brings them back on request
+        // There is no "add sample workouts" row anymore, neither in the Training tab nor in the profile.
+        compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
         compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("Beispiel-Workouts hinzufügen").performScrollTo().performClick()
-        waitFor("1 Beispiel-Workout")
+        waitFor("Über overfit")
+        compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
     }
 
     @Test
