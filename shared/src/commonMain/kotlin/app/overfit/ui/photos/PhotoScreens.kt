@@ -130,10 +130,11 @@ fun PhotosScreen(
         }
         Spacer(Modifier.height(Space.s))
         if (empty) {
+            // The calendar stays visible even without a single photo or workout.
             Text(t.photosEmpty, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.m))
+            Spacer(Modifier.height(Space.xs))
             Text(p.emptyHint, style = Theme.type.caption, tone = Tone.Muted)
-            return@Screen
+            Spacer(Modifier.height(Space.s))
         }
         if (loaded) {
             DiaryStats(historyList.size, photoList.size, streak)
@@ -258,8 +259,16 @@ private fun DayCell(
                     contentAlignment = Alignment.Center,
                 ) { Text(p.photoCount(n), style = Theme.type.caption, tone = Tone.Inverse) }
                 if (selecting && picked) Box(Modifier.fillMaxSize().border(2.dp, Theme.colors.foreground, shape))
+                // Photo and workout on the same day: the photo wins, a small dot keeps the workout visible.
+                if (training) Box(
+                    Modifier.align(Alignment.TopStart).padding(4.dp).size(10.dp)
+                        .background(Theme.colors.inverseBackground, CircleShape),
+                )
             }
-            training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface))
+            // Workout without a photo: a clearly filled dot in the middle of the tile.
+            training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(18.dp).background(Theme.colors.foreground, CircleShape))
+            }
             else -> Spacer(Modifier.weight(1f))
         }
     }

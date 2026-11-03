@@ -15,6 +15,17 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Feedback-Runde 4 (Session AF, 3.11.)
+**Erledigt:** Beispiele (Push/Pull/Legs) kommen nach „Daten löschen“ sofort zurück; kein schwarzer Screen mehr nach Workout löschen
+(doppelter Pop behoben); Kalender immer sichtbar, Trainingstage ohne Foto als gefüllter Punkt, bei Foto + Training kleiner Punkt;
+Gewichte nur noch Plus (± entfernt). Details in DECISIONS.md. Tests: `SamplesSeedTest`, `DiaryScreenTest`, `UiFeedbackTest` erweitert.
+
+### Bitte auf dem Handy testen (Session AF)
+1. Profil → Alle Daten löschen → Onboarding durchlaufen: Push, Pull, Legs sind sofort da. Ein Beispiel löschen, App neu starten: bleibt weg.
+2. Workout öffnen → Mülleimer → bestätigen: Du landest in der Workout-Liste, nicht auf schwarzem Screen. Auch Training im Verlauf, eigene Übung, Foto löschen.
+3. Fotos-Tab ohne Foto: Kalender ist da. Tag mit Training ohne Foto: gefüllter Punkt. Tag mit Foto + Training: Bild mit kleinem Punkt.
+4. Satz-Eingabe (Editor und Training): kein ±-Knopf, im Gewichtsfeld ist kein Minus möglich.
+
 ## Feedback-Runde 3: UI (Session AE, 3.11.)
 **Erledigt** (enthält PR #56: Push/Pull/Legs ab dem ersten Start, keine „Beispiel-Workouts hinzufügen“-Zeile mehr):
 - Übergänge: Ursache (700-ms-Standardüberblendung, Leisten springen, Doppel-Taps wirken) behoben; Tabs sofort, sonst kurzes Fade-through,

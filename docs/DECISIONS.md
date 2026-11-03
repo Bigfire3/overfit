@@ -996,3 +996,9 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   Rahmen, nicht auf der gleitenden Zeile (sonst schrumpfen die Deltas). Das ×-Icon je Satz entfällt. Tests: Komponente + Editor.
 - **Editor-Kopf:** Name groß als Eingabe mit Stift daneben (fokussiert das Feld), darunter „Bearbeitungsmodus“; Übungsbild mit „?“ öffnet
   die Übungsdetails. Langes Drücken auf den Übungskopf verschiebt weiter per Ziehen.
+
+## Feedback-Runde 4 (Session AF, 3.11.)
+- **Beispiele nach „Daten löschen“:** `resetAll()` löschte den Flag `samples_seeded_v1`, säte aber erst beim nächsten Start neu. Jetzt sät `resetAll()` Push/Pull/Legs sofort (einmalig, wie beim ersten Start). Backup-Wiederherstellung ruft `resetAll(reseedSamples = false)`: wiederhergestellte Daten bekommen keine zusätzlichen Beispiele. Im Normalbetrieb gelöschte Beispiele bleiben weg (Flag bleibt gesetzt).
+- **Schwarzer Screen nach Workout löschen:** `templates.templates` ist ein `combine` zweier Room-Abfragen und emittiert nach dem Löschen mehrfach. `WorkoutPlanScreen` rief bei jeder Emission mit „Workout weg“ `onBack()` auf; ein zweiter Pop entfernte auch den Training-Tab, der Back-Stack war leer. Jetzt schließt der Screen genau einmal.
+- **Kalender:** immer sichtbar, auch ohne Foto/Training (Hinweistext darüber). Tag nur mit Training: gefüllter Punkt in der Kachel. Foto und Training: Foto, plus kleiner Punkt oben links.
+- **Gewichte nur Plus:** ± -Schalter entfernt (Editor und Training), das Eingabefeld lässt kein „-“ mehr zu. Vorhandene negative Werte (z. B. importierte Hilfsgewichte) werden nicht gelöscht oder migriert und weiter angezeigt; beim Bearbeiten des Feldes fällt das Minus weg, der Wert wird positiv. Keine Room-Migration; Parser/Import bleiben tolerant.

@@ -383,16 +383,12 @@ private fun SetRow(
                     format = { Numbers.formatWeight(it, unit, language) },
                     parse = { Numbers.parseWeight(it, unit) },
                     onCommit = { onValues(actual.copy(weightKg = it)) },
-                    filter = { s -> s.filter { c -> c.isDigit() || c == ',' || c == '.' || c == '-' }.take(8) },
+                    filter = { s -> s.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(8) },
                     unit = unit.symbol,
                     keyboardType = KeyboardType.Decimal,
                     placeholder = target.weightKg?.let { Numbers.formatWeight(it, unit, language) } ?: unit.symbol,
                     modifier = Modifier.weight(1f),
                 )
-                // Many number keyboards have no minus key: negative weight = assistance (e.g. a band).
-                SmallButton("±", {
-                    (actual.weightKg ?: target.weightKg)?.let { onValues(actual.copy(weightKg = -it)) }
-                }, Modifier.padding(start = Space.xs))
             }
         }
         if (type.usesReps) {
