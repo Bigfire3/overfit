@@ -4,7 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -95,14 +101,22 @@ fun CoachStoryScreen(
             }
             .semantics {
                 onClick(label = s.next) { if (page < last) page += 1 else onClose(); true }
+                customActions = listOf(CustomAccessibilityAction(s.back) { if (page > 0) page -= 1; true })
             }
             .pointerInput(Unit) {
-                var drag = 0f
-                detectVerticalDragGestures(
-                    onDragStart = { drag = 0f },
-                    onDragEnd = { if (drag > CLOSE_DRAG_PX) onClose() },
-                    onVerticalDrag = { _, delta -> drag += delta },
-                )
+                // Swipe down closes. Watched in the initial pass without consuming, so it works from anywhere (also over the
+                // scrollable middle column) and taps/scrolls/buttons are untouched.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    var total = 0f
+                    var closed = false
+                    while (true) {
+                        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        total += change.positionChange().y
+                        if (!closed && total > CLOSE_DRAG_PX) { closed = true; onClose() }
+                    }
+                }
             }
             .testTag("story"),
     ) {
@@ -120,7 +134,7 @@ fun CoachStoryScreen(
                 Box(
                     Modifier.size(44.dp).testTag("story:close")
                         .semantics { contentDescription = s.close }
-                        .clickable { onClose() },
+                        .clickable(role = Role.Button) { onClose() },
                     contentAlignment = Alignment.Center,
                 ) { LineIcon(Icon.Close) }
             }

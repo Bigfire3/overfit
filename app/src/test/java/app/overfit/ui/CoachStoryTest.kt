@@ -58,6 +58,7 @@ class CoachStoryTest {
     @After
     fun tearDown() {
         // Stop the app's background work first, so no query hits the closed database.
+        compose.waitForIdle()
         data.scope.cancel()
         database.close()
     }
@@ -133,7 +134,8 @@ class CoachStoryTest {
         compose.onNodeWithTag("tab:COACH").performClick()
         compose.onNodeWithTag("coach:storyOpen").performClick()
         await(s.whatItDoes.title)
-        compose.onNodeWithTag("story").performTouchInput { swipeDown() }
+        // From the middle of the screen (over the scrollable text column), not only from the top edge.
+        compose.onNodeWithTag("story").performTouchInput { swipeDown(startY = height * 0.45f, endY = height * 0.9f) }
         awaitStoryGone()
 
         compose.onNodeWithTag("coach:storyOpen").performClick()
