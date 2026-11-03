@@ -205,7 +205,7 @@ final class ScreenshotTests: OverfitUITestCase {
         waitFor("Training beendet")
         shot("08-beenden")
         tap("Speichern")
-        waitFor("Duo · bald")
+        waitFor("Legs")
 
         tab("HISTORY")
         waitFor("Push")
@@ -236,7 +236,7 @@ final class ScreenshotTests: OverfitUITestCase {
         waitFor("Eigene Übung")
         shot("13-uebungskatalog")
         tap("Zurück")
-        waitFor("Duo · bald")
+        waitFor("Legs")
         tap("Neues Workout")
         waitFor("Workout importieren")
         shot("14-neues-workout-menue")
