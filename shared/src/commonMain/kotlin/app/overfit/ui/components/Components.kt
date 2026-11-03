@@ -31,6 +31,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -50,6 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Space
@@ -104,6 +109,8 @@ fun Screen(
     scroll: Boolean = false,
     header: (@Composable () -> Unit)? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
+    /** Dense layout for the running workout: no top gap, tighter footer. */
+    compact: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -114,7 +121,7 @@ fun Screen(
             .imePadding()
             .padding(horizontal = Space.l),
     ) {
-        Spacer(Modifier.height(Space.m))
+        Spacer(Modifier.height(if (compact) Space.xs else Space.m))
         header?.invoke()
         val body = Modifier.weight(1f).fillMaxWidth()
         Column(if (scroll) body.verticalScroll(rememberScrollState()) else body) {
@@ -123,8 +130,8 @@ fun Screen(
         }
         if (footer != null) {
             Column(
-                Modifier.fillMaxWidth().padding(top = Space.m, bottom = Space.m),
-                verticalArrangement = Arrangement.spacedBy(Space.m),
+                Modifier.fillMaxWidth().padding(top = if (compact) Space.s else Space.m, bottom = if (compact) Space.s else Space.m),
+                verticalArrangement = Arrangement.spacedBy(if (compact) Space.s else Space.m),
                 content = footer,
             )
         }
@@ -134,7 +141,7 @@ fun Screen(
 /** Header row with a back button. */
 @Composable
 fun BackHeader(label: String, onBack: () -> Unit) {
-    Box(Modifier.height(40.dp).fillMaxWidth().padding(bottom = 0.dp), contentAlignment = Alignment.CenterStart) {
+    Box(Modifier.height(44.dp).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         IconButton(Icon.Back, label, onBack)
     }
     Spacer(Modifier.height(Space.l))
@@ -161,24 +168,159 @@ private fun Modifier.pressable(
         }
 }
 
-/** Press feedback (dimming) for whole rows, like the list rows. */
+/** Press feedback for whole rows: grey [surface] fill while pressed. */
 @Composable
-fun Modifier.pressableRow(onClick: () -> Unit): Modifier = pressable(onClick = onClick)
+fun Modifier.pressableRow(onClick: () -> Unit): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    return this
+        .background(if (pressed) Theme.colors.surface else Color.Transparent)
+        .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
+}
 
-/** The one primary action on a screen: inverted, full width, pill. */
+/** Standard button height; [ButtonHeight.compact] for inline actions. Touch targets stay >= 44 dp. */
+object ButtonHeight {
+    val standard = 48.dp
+    val compact = 40.dp
+}
+
+/** Meaning of a button in its confirm state: red = destructive, green = positive (done, saved). */
+enum class Confirm { Destructive, Positive }
+
 @Composable
-fun PrimaryButton(label: String, onClick: () -> Unit, enabled: Boolean = true, loading: Boolean = false) {
-    val active = enabled && !loading
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .alpha(if (enabled) 1f else 0.25f)
-            .background(Theme.colors.inverseBackground, RoundedCornerShape(50))
-            .pressable(enabled = active, haptic = true, onClick = onClick),
-        contentAlignment = Alignment.Center,
+private fun PillButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    enabled: Boolean,
+    compact: Boolean,
+    haptic: Boolean,
+    fill: Color,
+    pressedFill: Color,
+    contentTone: Color,
+    border: Color? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val haptics = LocalHapticFeedback.current
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier
+            .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
+            .alpha(if (enabled) 1f else 0.3f)
+            .background(if (pressed) pressedFill else fill, shape)
+            .then(if (border != null) Modifier.border(1.dp, border, shape) else Modifier)
+            .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) {
+                if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .padding(horizontal = Space.l),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Text(if (loading) "…" else label, style = Theme.type.label, tone = Tone.Inverse)
+        BasicText(label, style = Theme.type.label.copy(color = contentTone), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (trailing != null) { Spacer(Modifier.width(Space.s)); trailing() }
+    }
+}
+
+/** The one primary action on a screen: inverted, full width, pill, 48 dp. */
+@Composable
+fun PrimaryButton(
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    compact: Boolean = false,
+) {
+    val c = Theme.colors
+    PillButton(
+        if (loading) "…" else label, onClick, modifier, enabled && !loading, compact, haptic = true,
+        fill = c.inverseBackground, pressedFill = c.inverseBackground.copy(alpha = 0.75f), contentTone = c.inverseForeground,
+    )
+}
+
+/** Second-most important action: grey [surface] fill, clearly a button. */
+@Composable
+fun SecondaryButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    enabled: Boolean = true,
+    compact: Boolean = false,
+) {
+    val c = Theme.colors
+    PillButton(label, onClick, modifier, enabled, compact, haptic = false, fill = c.surface, pressedFill = c.surfacePressed, contentTone = c.foreground)
+}
+
+/** Destructive action (delete, discard): [negativeSubtle] fill, red label. */
+@Composable
+fun DestructiveButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    enabled: Boolean = true,
+    compact: Boolean = false,
+) {
+    val c = Theme.colors
+    PillButton(label, onClick, modifier, enabled, compact, haptic = false, fill = c.negativeSubtle, pressedFill = c.negativeSubtle.copy(alpha = 0.6f), contentTone = c.negative)
+}
+
+/**
+ * Confirm pattern: first tap changes the text ([confirmLabel]) and the colours, the second tap runs
+ * [onConfirm]; without a second tap the button resets after 4 s. [kind] picks red (destructive) or
+ * green (positive) for the confirm state.
+ */
+@Composable
+fun ConfirmButton(
+    label: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    kind: Confirm = Confirm.Destructive,
+    compact: Boolean = false,
+    enabled: Boolean = true,
+    /** Idle look: secondary (grey pill) or plain underlined text. */
+    textOnly: Boolean = false,
+    /** Lets a crowded parent make room while the longer confirm text shows. */
+    onConfirmingChange: (Boolean) -> Unit = {},
+) {
+    var confirming by remember { mutableStateOf(false) }
+    LaunchedEffect(confirming) {
+        onConfirmingChange(confirming)
+        if (confirming) { delay(4000); confirming = false }
+    }
+    val c = Theme.colors
+    val action = { if (confirming) { confirming = false; onConfirm() } else confirming = true }
+    when {
+        confirming -> {
+            val (fill, tone) = if (kind == Confirm.Destructive) c.negativeSubtle to c.negative else c.positiveSubtle to c.positive
+            PillButton(confirmLabel, action, modifier, enabled, compact, haptic = true, fill = fill, pressedFill = fill.copy(alpha = 0.6f), contentTone = tone, border = tone)
+        }
+        textOnly -> TertiaryButton(label, action, modifier)
+        else -> SecondaryButton(label, action, modifier, enabled, compact)
+    }
+}
+
+/** Text link: underlined, so it reads as clickable; at least 44 dp tall. Optional arrow. */
+@Composable
+fun TertiaryButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tone: Tone = Tone.Default,
+    arrow: Boolean = false,
+) {
+    Row(
+        modifier.heightIn(min = 44.dp).pressable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicText(
+            label,
+            style = Theme.type.label.copy(color = tone.color(), textDecoration = TextDecoration.Underline),
+        )
+        if (arrow) { Spacer(Modifier.width(Space.xs)); LineIcon(Icon.ChevronRight, size = 18.dp, color = tone.color()) }
     }
 }
 
@@ -187,16 +329,16 @@ fun TextButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tone: Tone = Tone.Muted,
+    tone: Tone = Tone.Default,
 ) {
-    Text(label, modifier.pressable(onClick = onClick).padding(vertical = Space.xs), style = Theme.type.label, tone = tone)
+    TertiaryButton(label, onClick, modifier, tone)
 }
 
 @Composable
 fun IconButton(icon: Icon, label: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(40.dp)
+            .size(44.dp)
             .semantics { contentDescription = label }
             .pressable(onClick = onClick),
         contentAlignment = Alignment.CenterStart,
@@ -216,8 +358,9 @@ fun BigInput(
     suffix: String? = null,
     keyboardType: KeyboardType = KeyboardType.Text,
     onDone: () -> Unit = {},
+    textStyle: TextStyle = Theme.type.title,
 ) {
-    val style = Theme.type.title.copy(color = Theme.colors.foreground)
+    val style = textStyle.copy(color = Theme.colors.foreground)
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         BasicTextField(
             value = value,
@@ -237,7 +380,7 @@ fun BigInput(
         )
         if (suffix != null) {
             Spacer(Modifier.width(Space.s))
-            Text(suffix, style = Theme.type.title, tone = Tone.Muted)
+            Text(suffix, style = textStyle, tone = Tone.Muted)
         }
     }
 }
@@ -312,8 +455,8 @@ fun RowInput(
 fun <T> Segmented(value: T, options: List<Pair<T, String>>, onChange: (T) -> Unit) {
     Row(
         Modifier
-            .border(0.5.dp, Theme.colors.hairline, RoundedCornerShape(50))
-            .padding(2.dp),
+            .background(Theme.colors.surface, RoundedCornerShape(50))
+            .padding(3.dp),
     ) {
         options.forEach { (option, label) ->
             val active = option == value
@@ -322,7 +465,7 @@ fun <T> Segmented(value: T, options: List<Pair<T, String>>, onChange: (T) -> Uni
                     .background(if (active) Theme.colors.inverseBackground else Color.Transparent, RoundedCornerShape(50))
                     .semantics { selected = active }
                     .pressable(role = Role.Tab, haptic = !active) { onChange(option) }
-                    .padding(horizontal = Space.m, vertical = 6.dp),
+                    .padding(horizontal = Space.m, vertical = 9.dp),
             ) {
                 Text(label, style = Theme.type.caption, tone = if (active) Tone.Inverse else Tone.Muted)
             }
@@ -356,7 +499,7 @@ fun ListRow(
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    Column(if (onClick != null) Modifier.pressable(onClick = onClick) else Modifier) {
+    Column(if (onClick != null) Modifier.pressableRow(onClick) else Modifier) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -366,6 +509,9 @@ fun ListRow(
             if (trailing != null) {
                 Spacer(Modifier.width(Space.m))
                 trailing()
+            } else if (onClick != null) {
+                Spacer(Modifier.width(Space.m))
+                LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
             }
         }
         Hairline()
@@ -374,7 +520,12 @@ fun ListRow(
 
 @Composable
 fun ListRow(label: String, value: String, tone: Tone = Tone.Default, onClick: (() -> Unit)? = null) {
-    ListRow(label, tone, onClick) { Text(value, tone = Tone.Muted) }
+    ListRow(label, tone, onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(value, tone = Tone.Muted)
+            if (onClick != null) { Spacer(Modifier.width(Space.xs)); LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted) }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

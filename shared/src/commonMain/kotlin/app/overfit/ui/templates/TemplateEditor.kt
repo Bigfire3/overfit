@@ -42,6 +42,7 @@ import app.overfit.domain.TrackingType
 import app.overfit.domain.WeightUnit
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
+import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.ExerciseImage
@@ -168,10 +169,8 @@ fun TemplateEditorScreen(
     val draft = state.draft
     var collapsed by rememberSaveable { mutableStateOf(listOf<Long>()) }
     var backArmed by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
     LaunchedEffect(state.closed) { if (state.closed) onClose() }
     LaunchedEffect(backArmed) { if (backArmed) { delay(4000); backArmed = false } }
-    LaunchedEffect(confirmDelete) { if (confirmDelete) { delay(4000); confirmDelete = false } }
 
     val listState = rememberLazyListState()
     val reorder = rememberReorderState(listState, canMove = { it is Long }) { from, to ->
@@ -223,11 +222,9 @@ fun TemplateEditorScreen(
                 ListRow(t.addExercise, onClick = onAddExercises) { LineIcon(Icon.Plus) }
                 if (!draft.isNew) {
                     ListRow(t.share.shareTemplate, onClick = onShare)
-                    ListRow(
-                        if (confirmDelete) t.deleteConfirm else t.deleteTemplate,
-                        tone = if (confirmDelete) Tone.Default else Tone.Muted,
-                        onClick = { if (confirmDelete) viewModel.delete() else confirmDelete = true },
-                    )
+                    Spacer(Modifier.height(Space.l))
+                    ConfirmButton(t.deleteTemplate, t.deleteConfirm, onConfirm = { viewModel.delete() })
+                    Spacer(Modifier.height(Space.s))
                     Text(t.deletedKeepsHistory, style = Theme.type.caption, tone = Tone.Muted)
                 }
             }

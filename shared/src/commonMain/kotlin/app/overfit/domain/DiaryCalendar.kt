@@ -30,13 +30,22 @@ object DiaryCalendar {
         return cells
     }
 
-    /** Months from [today]'s month back to the month of [earliest], newest first, as (year, month). */
+    /** Months always shown besides the current one, even when empty (BeReal-style memories). */
+    const val MIN_MONTHS_BACK = 3
+
+    /**
+     * Months from [today]'s month back to the month of [earliest], newest first, as (year, month).
+     * Empty months in between are included, and at least the last [MIN_MONTHS_BACK] months plus the
+     * current one, so the diary never shows a single lonely month.
+     */
     fun months(earliest: LocalDate?, today: LocalDate): List<Pair<Int, Int>> {
         val start = earliest?.takeIf { it <= today } ?: today
+        val floor = today.minus(DatePeriod(months = MIN_MONTHS_BACK))
+        val from = if (start < floor) start else floor
         val out = mutableListOf<Pair<Int, Int>>()
         var y = today.year
         var m = today.monthNumber
-        while (y > start.year || (y == start.year && m >= start.monthNumber)) {
+        while (y > from.year || (y == from.year && m >= from.monthNumber)) {
             out += y to m
             if (m == 1) { m = 12; y-- } else m--
         }
