@@ -10,7 +10,9 @@
 | 4 | KI-Coach | offen |
 | 5 | Feinschliff | offen |
 | 6 | Store-Release (App Store, Play Store) | offen |
-| 7 | Credits-System | offen |
+| 7 | Credits-System (Coach-Guthaben) | offen |
+| 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | offen |
+| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
 
 ## Letzte Session
 Phase 1 abgeschlossen (erst nativ gebaut, dann auf KMP portiert):
@@ -32,6 +34,29 @@ Phase 1 abgeschlossen (erst nativ gebaut, dann auf KMP portiert):
 - Tests: Suche, Zahlen/Einheiten und Vorlagen-Entwurf als Common-Tests (Android-Host und iOS-Simulator); Datenbank,
   Seeding, Migration und UI-Durchlauf (Suche → eigene Übung → Vorlage) als Robolectric-Tests
 
+## Davor: Signatur über Secrets und Planung Teilen/Guthaben (PR #14)
+- Neuer Signaturschlüssel nur noch in GitHub-Secrets, `signing/` entfernt; CI baut zusätzlich das App Bundle für Google Play
+- Apache-2.0-Lizenz, Skript zum Bereinigen der Git-Historie
+- SPEC: Teilen per Link/QR, Coach-Guthaben, Einladen mit Startguthaben (Phasen 7–9)
+- Lokal grün: `:shared:testAndroidHostTest`, `:app:testDebugUnitTest`, signiertes APK + AAB (neues Zertifikat geprüft)
+
+Von dir zu tun:
+1. Nach dem Merge `scripts/purge-old-signing-history.sh` ausführen (braucht `pip install git-filter-repo`,
+   ggf. Force-Push auf main kurz erlauben), wenn keine anderen offenen PRs mehr laufen
+2. Bundle-ID / Paketnamen `app.overfit` im Apple-Developer-Konto und in der Play Console reservieren
+
+## Davor: Phase 0b
+Phase 0b abgeschlossen:
+- Umbau auf Kotlin Multiplatform: `:shared` (UI + Logik für Android und iOS), `:app` (Android-Hülle, unverändert signiert),
+  `iosApp/` (XcodeGen-Spec + SwiftUI-Host), iOS-CI auf macOS
+- Designsystem schwarz-weiß (Inter, keine Akzentfarbe, Haarlinien, Pill-Button, eigene Linien-Icons), Dunkel/Hell/System
+- Deutsch und Englisch, in der App umschaltbar
+- Onboarding: Name, Alter, Gewicht (kg/lb), KI-Zugang mit Key-Prüfung (OpenRouter, Anthropic, OpenAI) oder „Später einrichten“
+- Profil-Tab mit Sprache, Darstellung, Profil, KI-Zugang, Coach-Gedächtnis, Über, Alle Daten löschen
+- API-Key verschlüsselt im Android Keystore bzw. iOS Keychain
+- Profil-Block für den Coach (`buildProfileBlock`), unit-getestet
+- Tests: 19 Common-Tests + 2 Robolectric-UI-Tests, lokal grün; iOS-Code kompiliert (Linux), Linken/Starten prüft die iOS-CI
+
 Offen / Hinweise:
 - Drag & Drop zum Umsortieren kommt mit Phase 2 (jetzt: „Nach oben/unten“)
 - „Training starten“ bleibt deaktiviert (Phase 2); Tippen auf eine Vorlage öffnet den Editor
@@ -39,7 +64,8 @@ Offen / Hinweise:
 - iOS: Linken und Starten prüft weiterhin nur die iOS-CI
 
 ## Bitte auf dem Handy testen
-1. Neues `overfit.apk` aus Release „latest“ installieren
+1. Falls noch nicht geschehen: einmalig die alte Overfit-App deinstallieren (neuer Signaturschlüssel aus #14), dann
+   `overfit.apk` aus Release „latest“ installieren und das Onboarding durchlaufen
 2. Tab „Übungen“: Katalog erscheint nach kurzem Einrichten, Liste mit Strichgrafiken (Workout Guide, schwarz-weiß)
    und Fotos (free-exercise-db, nur mit Internet)
 3. Suchen: „Klimmzug“, „Bankdrücken“, „Kniebeuge“, „pushup“, „bensh press“ (Tippfehler), „Brust“; Chips für

@@ -37,13 +37,32 @@ jobs:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
 
-      - name: Tests und signiertes Release-APK
-        run: ./gradlew :shared:testAndroidHostTest :app:testDebugUnitTest :app:assembleRelease --console=plain
+      - name: Tests
+        run: ./gradlew :shared:testAndroidHostTest :app:testDebugUnitTest --console=plain
+
+      - name: Signaturschlüssel aus Secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.OVERFIT_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.OVERFIT_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Secrets OVERFIT_KEYSTORE_BASE64 / OVERFIT_KEYSTORE_PASSWORD fehlen (README, Abschnitt Signatur)."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/overfit-release.p12"
+          echo "OVERFIT_KEYSTORE_FILE=$RUNNER_TEMP/overfit-release.p12" >> "$GITHUB_ENV"
+
+      - name: Signiertes Release-APK und App Bundle (Google Play)
+        env:
+          OVERFIT_KEYSTORE_PASSWORD: ${{ secrets.OVERFIT_KEYSTORE_PASSWORD }}
+        run: ./gradlew :app:assembleRelease :app:bundleRelease --console=plain
 
       - name: APK vorbereiten
         id: apk
         run: |
+          rm -f "$RUNNER_TEMP/overfit-release.p12"
           cp app/build/outputs/apk/release/app-release.apk overfit.apk
+          cp app/build/outputs/bundle/release/app-release.aab overfit.aab
           echo "version_name=$(grep -oP '"versionName": "\K[^"]+' app/build/outputs/apk/release/output-metadata.json)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
@@ -52,6 +71,7 @@ jobs:
           name: overfit-${{ github.run_number }}
           path: |
             overfit.apk
+            overfit.aab
             app/build/outputs/mapping/release/mapping.txt
             app/build/reports/tests/
             shared/build/reports/tests/
@@ -59,7 +79,9 @@ jobs:
 
       - name: Testberichte bei Fehler
         if: failure()
-        run: find app/build/test-results -name '*.xml' -exec grep -l '<failure' {} + | xargs -r head -c 4000
+        run: |
+          find app/build/test-results shared/build/test-results -name '*.xml' -exec grep -l '<failure' {} + 2>/dev/null \
+            | xargs -r head -c 4000 || true
 
     outputs:
       version_name: ${{ steps.apk.outputs.version_name }}
@@ -104,5 +126,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           cp overfit.apk "overfit-${GITHUB_REF_NAME}.apk"
-          gh release create "$GITHUB_REF_NAME" "overfit-${GITHUB_REF_NAME}.apk" \
+          cp overfit.aab "overfit-${GITHUB_REF_NAME}.aab"
+          gh release create "$GITHUB_REF_NAME" "overfit-${GITHUB_REF_NAME}.apk" "overfit-${GITHUB_REF_NAME}.aab" \
             --title "Overfit ${GITHUB_REF_NAME}" --generate-notes --verify-tag

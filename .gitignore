@@ -20,3 +20,9 @@ xcuserdata/
 DerivedData/
 /iosApp/Overfit/Info.plist
 tools/catalog/.cache/
+
+# Signaturschlüssel nie einchecken (liegen in GitHub-Secrets)
+/signing/
+*.jks
+*.p12
+*.keystore
