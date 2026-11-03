@@ -54,6 +54,7 @@ private data class FinishData(val summary: WorkoutSummary, val finished: Finishe
  * already stored as finished; "Save" (and back) only add note and feeling. Everything that must
  * survive leaving this screen runs in [appScope].
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun FinishScreen(
     workoutId: String,
@@ -113,6 +114,9 @@ fun FinishScreen(
         }
         Unit
     }
+
+    // System back (Android gesture/button) saves note and feeling like the header back button does.
+    androidx.compose.ui.backhandler.BackHandler(enabled = true, onBack = save)
 
     Screen(
         scroll = true,
