@@ -702,3 +702,13 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 - **Store-Titel** „overfit: Workout & KI-Coach“ / „overfit: Workout & AI Coach“ (je 27 Zeichen), Play-Kurzbeschreibung ≤ 80 geprüft.
 - **`aiSubtitle`:** „kein Abo nötig“ statt „kein Abo“, damit ein späteres optionales Pro-Abo nicht widerspricht (siehe docs/monetization.md).
 - **Onboarding:** Der erste Screen ist die Namensfrage, es gibt keinen Splash und keinen Markentext; nichts geändert (keine Funktionsänderung).
+
+## App-Icon „of“ (Session W)
+- **Konzept B, Standard B1:** Kleinbuchstaben „of“ in Inter Bold, zentriert, weiß auf Schwarz (passt zur Wortmarke „overfit“ und zum Schwarz-Weiß-Designsystem). Welche Variante final gilt, entscheidet Fabian; alle sind eingebaut.
+- **Eine Quelle:** `tools/icon/build_icon.py` liest die Glyphen aus den Inter-OTFs (`tools/icon/fonts/`, OFL-Lizenz liegt dabei), wandelt „of“ in Pfade um (die Schrift steckt nicht im Icon) und erzeugt daraus `design/icon/overfit-icon.svg` (1024²) sowie alle Plattform-Dateien: Android (adaptive Icon: Vordergrund-Vector in der 66-dp-Sicherheitszone, Hintergrund `launcher_background` aus `values/launcher_colors.xml`, Monochrome-Layer für Android-13-Themed-Icons, Splash-Drawable), Play-Store-Icon `docs/store/icon-512.png`, iOS (`AppIcon` 1024 ohne Transparenz plus Dunkel- und Getönt-Variante für iOS 18, Launch-Logo), Web (`favicon.svg/.ico`, `apple-touch-icon.png`, 192/512). Abhängigkeiten nur für das Skript: `pip install fonttools cairosvg pillow`.
+- **Variante wechseln:** `python3 tools/icon/build_icon.py --variant B2` (B1–B6, dazu `--theme light` für weißen Grund oder frei `--weight 800 --size 0.5 --tracking -0.03 --dot`), danach die erzeugten Dateien committen. Die Spezifikation der Varianten steht im Dict `VARIANTS` im Skript.
+- **Kein Legacy-PNG:** minSdk ist 26, dort gibt es adaptive Icons immer; `mipmap-anydpi-v26` genügt.
+- **Android-Splash:** `values-v31` mit schwarzem Grund und kleinem weißem „of“ (`ic_splash`, bewusst immer B1-Schnitt, unabhängig von der Icon-Variante). Vor Android 12 bleibt das schwarze `windowBackground`.
+- **iOS Launch Screen:** `UILaunchScreen` mit schwarzem `LaunchBackground` und `LaunchLogo` (weißes „of“). Das ersetzt den Platzhalter aus #43 (dort weißer/schwarzer Grund je nach Modus); bei Konflikten gilt die Version aus dieser Session. Standard-iOS-Icon ist die gewählte Fassung (dunkel), die Dunkel-Variante bleibt immer schwarz/weiß-Schrift, „Getönt“ ist Graustufen auf Schwarz.
+- **Über-Screen:** hat kein Logo (nur Text), daher keine Änderung.
+- **Angeschnittene Variante B5** wird im Android-Vordergrund per `clip-path` auf die sichtbaren 72 dp begrenzt, damit sie unter jeder Launcher-Maske wie im Master aussieht.
