@@ -1,23 +1,30 @@
-Copyright (c) 2026 Fabian Zänker. Alle Rechte vorbehalten. / All rights reserved.
+MIT License
 
-Dieser Quellcode ist öffentlich einsehbar, aber nicht frei lizenziert. Ohne
-ausdrückliche schriftliche Erlaubnis des Rechteinhabers ist es nicht gestattet,
-den Code oder Teile davon zu kopieren, zu verändern, zu verbreiten, zu
-veröffentlichen, zu unterlizenzieren oder zu verkaufen. Das Ansehen des Codes
-auf GitHub sowie die durch die GitHub-Nutzungsbedingungen erlaubten Handlungen
-(z. B. Ansehen und Forken auf GitHub) bleiben unberührt.
+Copyright (c) 2026 Fabian Zänker
 
-This source code is publicly visible but not licensed for reuse. Without the
-copyright holder's express written permission you may not copy, modify,
-distribute, publish, sublicense or sell this code or any part of it. Viewing
-the code on GitHub and the actions permitted by the GitHub Terms of Service
-(e.g. viewing and forking on GitHub) remain unaffected.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Ausgenommen sind Bestandteile Dritter mit eigener Lizenz / Third-party parts
-under their own licenses are excluded:
-- Übungsgrafiken / exercise illustrations (Workout Guide by Bryl Lim, based on
-  Everkinetic): CC BY-SA 4.0, see
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+Third-party parts keep their own licenses and are not covered by the MIT
+license above:
+- Exercise illustrations (Workout Guide by Bryl Lim, based on Everkinetic):
+  CC BY-SA 4.0, see
   shared/src/commonMain/composeResources/files/catalog/LICENSE-ASSETS-workout-guide.txt
-- Schrift / font Inter: SIL Open Font License 1.1, see licenses/Inter-OFL.txt
-- Bibliotheken / libraries: under their respective licenses (see the app's
-  "About" screen).
+- Font Inter: SIL Open Font License 1.1, see licenses/Inter-OFL.txt
+- Libraries: under their respective licenses (see the app's "About" screen).
