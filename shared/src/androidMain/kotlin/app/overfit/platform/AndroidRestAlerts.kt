@@ -70,25 +70,7 @@ class AndroidRestAlerts(
         val ticksAt = RestTicks.startAt(alert, System.currentTimeMillis())
         if (ticksAt != null) setAlarm(ticksAt, ticksIntent(context, ticksAt)) else alarms.cancel(ticksIntent(context, null))
 
-        val running = NotificationCompat.Builder(context, CHANNEL_RUNNING)
-            .setSmallIcon(iconRes)
-            .setContentTitle(alert.title)
-            .setContentText(alert.body)
-            .setOngoing(true)
-            .setSilent(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setShowWhen(true)
-            .setWhen(alert.endsAt)
-            .setUsesChronometer(true)
-            .setChronometerCountDown(true)
-            .setTimeoutAfter((alert.endsAt - System.currentTimeMillis()).coerceAtLeast(1_000))
-            .setContentIntent(openApp(context))
-            .addAction(0, alert.plusLabel, action(context, ACTION_PLUS))
-            .addAction(0, alert.skipLabel, action(context, ACTION_SKIP))
-            .build()
-        notify(context, ID_RUNNING, running)
+        postRunning(context, runningExtras(alert, iconRes))
     }
 
     private fun setAlarm(at: Long, intent: PendingIntent) {
@@ -176,6 +158,68 @@ class AndroidRestAlerts(
             )
         }
 
+        private const val EXTRA_RUN_TITLE = "runTitle"
+        private const val EXTRA_RUN_BODY = "runBody"
+        private const val EXTRA_ENDS_AT = "endsAt"
+        private const val EXTRA_PLUS = "plus"
+        private const val EXTRA_SKIP = "skip"
+        private const val REQUEST_DISMISSED = 6
+        /** A swipe this close to the end is left alone (the rest is over anyway). */
+        private const val REPOST_MIN_LEFT_MS = 1_000L
+
+        /** Everything needed to (re)build the countdown notification, also after a process kill. */
+        fun runningExtras(alert: RestAlert, iconRes: Int) = android.os.Bundle().apply {
+            putString(EXTRA_RUN_TITLE, alert.title)
+            putString(EXTRA_RUN_BODY, alert.body)
+            putLong(EXTRA_ENDS_AT, alert.endsAt)
+            putString(EXTRA_PLUS, alert.plusLabel)
+            putString(EXTRA_SKIP, alert.skipLabel)
+            putInt(EXTRA_ICON, iconRes)
+        }
+
+        /**
+         * Posts the countdown. Ongoing, and since Android 14 lets users swipe even ongoing
+         * notifications away, its delete intent ([RestDismissedReceiver]) posts it again while
+         * the rest runs. Programmatic cancels (skip, end, finish) and the timeout at the end do
+         * not repost (checked via the end time).
+         */
+        fun postRunning(context: Context, extras: android.os.Bundle) {
+            val endsAt = extras.getLong(EXTRA_ENDS_AT)
+            val dismissed = PendingIntent.getBroadcast(
+                context,
+                REQUEST_DISMISSED,
+                Intent(context, RestDismissedReceiver::class.java).putExtras(extras),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val running = NotificationCompat.Builder(context, CHANNEL_RUNNING)
+                .setSmallIcon(extras.getInt(EXTRA_ICON).takeIf { it != 0 } ?: context.applicationInfo.icon)
+                .setContentTitle(extras.getString(EXTRA_RUN_TITLE))
+                .setContentText(extras.getString(EXTRA_RUN_BODY))
+                .setOngoing(true)
+                .setSilent(true)
+                .setOnlyAlertOnce(true)
+                .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setShowWhen(true)
+                .setWhen(endsAt)
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+                .setTimeoutAfter((endsAt - System.currentTimeMillis()).coerceAtLeast(1_000))
+                .setContentIntent(openApp(context))
+                .setDeleteIntent(dismissed)
+                .addAction(0, extras.getString(EXTRA_PLUS), action(context, ACTION_PLUS))
+                .addAction(0, extras.getString(EXTRA_SKIP), action(context, ACTION_SKIP))
+                .build()
+            notify(context, ID_RUNNING, running)
+        }
+
+        /** Swiped away: back while the rest still runs. */
+        fun onRunningDismissed(context: Context, extras: android.os.Bundle?) {
+            val endsAt = extras?.getLong(EXTRA_ENDS_AT) ?: return
+            if (endsAt - System.currentTimeMillis() < REPOST_MIN_LEFT_MS) return
+            postRunning(context, extras)
+        }
+
         /** The tick alarm; [at] = null only to cancel. */
         internal fun ticksIntent(context: Context, at: Long?): PendingIntent {
             val intent = Intent(context, RestTickReceiver::class.java)
@@ -243,6 +287,13 @@ class RestAlarmReceiver : BroadcastReceiver() {
             .apply { if (vibrate) setVibrate(AndroidHaptics.REST_END_TIMINGS) }
             .build()
         AndroidRestAlerts.notify(context, AndroidRestAlerts.ID_OVER, notification)
+    }
+}
+
+/** Delete intent of the countdown notification (user swiped it away), see [AndroidRestAlerts.postRunning]. */
+class RestDismissedReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        AndroidRestAlerts.onRunningDismissed(context.applicationContext, intent.extras)
     }
 }
 

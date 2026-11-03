@@ -21,7 +21,10 @@ im Profil unter „Vibration“, Standard an. Funktioniert im Hintergrund, in an
 exakter Alarm, Ton über die Medienlautstärke, Musik wird nur kurz leiser; iOS: Benachrichtigung mit eigenem Ton, im Vordergrund spielt
 die App selbst). Ton synthetisch erzeugt. Details und Lautlos-Verhalten in DECISIONS.md. Tests: `RestTicksTest`, `RestTickAlarmTest`
 (Robolectric), Controller- und AppStore-Tests.
-**Offen:** iOS im Lautlos-Modus und App im Hintergrund: kein Ticken (Systemgrenze, nur Vibration).
+Zusatz: Die Pausen-Benachrichtigung (Countdown) kommt nach dem Wegwischen sofort zurück, solange die Pause läuft
+(`RestNotificationTest`).
+**Offen:** iOS im Lautlos-Modus und App im Hintergrund: kein Ticken (Systemgrenze, nur Vibration). Eine Benachrichtigung über das
+ganze Training (auch zwischen den Pausen) gibt es weiterhin nicht – eigenes Feature, falls gewünscht.
 
 ### Bitte auf dem Handy testen (Session AG)
 1. Spotify laufen lassen, Training starten, Satz abhaken (kurze Pause, z. B. 15 s Standardpause im Profil). In eine andere App
@@ -31,6 +34,8 @@ die App selbst). Ton synthetisch erzeugt. Details und Lautlos-Verhalten in DECIS
 4. Während der Pause +15 s / −15 s / Überspringen: Klicks kommen nur zum neuen Ende bzw. gar nicht. Pause auf unter 3 s kürzen: kein Ticken.
 5. Profil → „Ticken vor Pausenende“ aus: keine Klicks mehr, Vibration/Benachrichtigung wie gehabt.
 6. Falls „Genaue Pausen-Benachrichtigungen“ nicht erlaubt ist: Ticken kann entfallen (bewusst, lieber kein als falsches Ticken).
+7. Während einer Pause die Countdown-Benachrichtigung wegwischen: Sie ist sofort wieder da (mehrmals probieren). Nach dem Überspringen
+   oder am Pausenende verschwindet sie normal, nach „Training beenden“ ebenso.
 
 ## Feedback-Runde 4 (Session AF, 3.11.)
 **Erledigt:** Beispiele (Push/Pull/Legs) kommen nach „Daten löschen“ sofort zurück; kein schwarzer Screen mehr nach Workout löschen

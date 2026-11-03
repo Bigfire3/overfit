@@ -1022,6 +1022,17 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   weil iOS Benachrichtigungstöne im Lautlos-Modus stummschaltet – umgehen ließe sich das nur mit „Critical Alerts“ (Apple-Sonderfreigabe
   für Gesundheit/Sicherheit) oder einer dauerhaften Hintergrund-Audiositzung (Store-Ablehnungsrisiko, Akku). Dann bleibt die Vibration
   der Benachrichtigung. Lautstärke im Hintergrund = Klingel-/Hinweislautstärke, nicht Medien (iOS-Vorgabe).
+- **Pausen-Benachrichtigung nicht wegwischbar (Zusatz, Fabian: „Manchmal geht die Notification einfach weg“):** Seit Android 14
+  lassen sich auch `ongoing`-Benachrichtigungen wegwischen (Ausnahme nur Foreground-Services in bestimmten Fällen, und auch die seit
+  14 nicht mehr). Lösung: Die Countdown-Benachrichtigung hat einen Delete-Intent (`RestDismissedReceiver`), der sie sofort neu postet,
+  solange die Pause noch ≥ 1 s läuft. Alle Daten dafür stecken im Intent, es klappt also auch, wenn der Prozess beendet war.
+  Programmatisches Abbrechen (Überspringen, Training beenden/verwerfen) und das Zeitlimit am Pausenende lösen keinen Repost aus.
+  **Kein Foreground-Service:** Er brächte keinen Schutz vor dem Wegwischen (Android 14+), bräuchte einen FGS-Typ (`specialUse` mit
+  Play-Begründung oder `health` mit Sensor-Berechtigung) und eine Dauerbenachrichtigung über das ganze Training; zu arbeiten gibt es
+  im Hintergrund nichts (Alarme erledigen Ende und Ticks). Andere Ursachen fürs Verschwinden geprüft: Sie endet absichtlich am
+  Pausenende (Zeitlimit + Ersatz durch „Pause vorbei“) und gibt es zwischen den Pausen nicht (keine Trainings-Dauerbenachrichtigung).
+  Kanal „Pausentimer“ hat niedrige Wichtigkeit (lautlos), wird dadurch aber nicht ausgeblendet; Doze betrifft nur Alarme, die sind
+  `AllowWhileIdle`. Eine Benachrichtigung über das ganze Training wäre ein eigenes Feature (offen, falls Fabian sie möchte).
 - **Verworfen:** Ticks als drei einzelne Alarme (drei Wakeups, Takt schwankt), Foreground-Service während der Pause (Android 14+
   braucht dafür einen Typ, `shortService` ist begrenzt, dauernd sichtbare Benachrichtigung gibt es schon), Ticks im
   Benachrichtigungskanal (Kanalton läuft über den Klingelstrom und ist im Lautlos-Modus stumm).
