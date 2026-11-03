@@ -13,6 +13,7 @@
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
+| 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite offen (nach Phase 3) |
 
 ## Phase 8: Vorlagen teilen und importieren (Session B)
 - Format `docs/share-format.md`: JSON → Raw Deflate → Base64url im Fragment (`https://bigfire3.github.io/overfit/t#…`,
@@ -35,9 +36,6 @@
    https-Links ohne App im Leeren. Die App öffnet unabhängig davon `overfit://`-Links und `.overfit`-Dateien.
 2. iOS Universal Links (https-Link öffnet direkt die App) brauchen eine Domain, die dir gehört, plus Associated Domains
    und `apple-app-site-association`. Später mit eigener Domain; bis dahin: `overfit://`-Link und Web-Seite mit Knopf.
-| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
-| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
-| 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite offen (nach Phase 3) |
 
 ## Nacht 3.11. – KI-Chat-Verbindungen, Teil 1: Konzept + Backend (Session E)
 Fertig (kein App-Code angefasst):
