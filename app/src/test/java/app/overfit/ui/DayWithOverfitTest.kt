@@ -243,7 +243,7 @@ class DayWithOverfitTest {
         tab("Verlauf")
         tab("Übungen")
         compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty() }
-        tab("Start")
+        tab("Training")
         compose.onNode(hasContentDescription("Training öffnen", substring = true)).performClick()
         waitFor("Nächsten Satz loggen")
         assertEquals(workoutId, deps.workout.state.value.workout!!.id)
