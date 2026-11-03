@@ -31,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -48,6 +49,9 @@ import app.overfit.domain.WorkoutExercise
 import app.overfit.domain.WorkoutSet
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BigInput
+import app.overfit.ui.components.Confirm
+import app.overfit.ui.components.ConfirmButton
+import app.overfit.ui.components.SecondaryButton
 import app.overfit.ui.components.ExerciseImage
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
@@ -108,11 +112,8 @@ fun WorkoutScreen(
     val scope = rememberCoroutineScope()
     val now = produceState(clock()) { while (true) { value = clock(); delay(250) } }
     var collapsed by rememberSaveable { mutableStateOf(listOf<String>()) }
-    var confirmFinish by remember { mutableStateOf(false) }
-    var confirmDiscard by remember { mutableStateOf(false) }
-    LaunchedEffect(confirmFinish) { if (confirmFinish) { delay(4000); confirmFinish = false } }
-    LaunchedEffect(confirmDiscard) { if (confirmDiscard) { delay(4000); confirmDiscard = false } }
 
+    var confirmingFinish by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val reorder = rememberReorderState(listState, canMove = { it is String && workout.exercise(it) != null }) { from, to ->
         controller.edit { w ->
@@ -121,6 +122,7 @@ fun WorkoutScreen(
     }
 
     Screen(
+        compact = true,
         footer = {
             WorkoutFooter(
                 workout = workout,
@@ -136,17 +138,24 @@ fun WorkoutScreen(
             )
         },
     ) {
-        IconButton(Icon.ChevronDown, t.minimizeWorkout, onMinimize)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.m)) {
-            NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.weight(1f))
-            TextButton(
-                if (confirmFinish) t.finishConfirm else t.finishWorkout,
-                { if (confirmFinish) scope.launch { controller.finish() } else confirmFinish = true },
-                tone = if (confirmFinish) Tone.Default else Tone.Muted,
+        // One slim header row: minimize, name + clock, finish.
+        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+            IconButton(Icon.ChevronDown, t.minimizeWorkout, onMinimize)
+            Column(Modifier.weight(1f)) {
+                if (!confirmingFinish) {
+                    NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.fillMaxWidth())
+                    ProgressCaption(workout, now)
+                }
+            }
+            ConfirmButton(
+                label = t.finishWorkout,
+                confirmLabel = t.finishConfirm,
+                onConfirmingChange = { confirmingFinish = it },
+                onConfirm = { scope.launch { controller.finish() } },
+                modifier = Modifier, compact = true, kind = Confirm.Positive,
             )
         }
-        ProgressCaption(workout, now)
-        Spacer(Modifier.height(Space.m))
+        Spacer(Modifier.height(Space.xs))
         Hairline()
 
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(bottom = Space.l)) {
@@ -169,11 +178,8 @@ fun WorkoutScreen(
             }
             item(key = "actions") {
                 ListRow(t.addExercise, onClick = onAddExercises) { LineIcon(Icon.Plus) }
-                ListRow(
-                    if (confirmDiscard) t.discardConfirm else t.discardWorkout,
-                    tone = if (confirmDiscard) Tone.Default else Tone.Muted,
-                    onClick = { if (confirmDiscard) scope.launch { controller.discard() } else confirmDiscard = true },
-                )
+                Spacer(Modifier.height(Space.m))
+                ConfirmButton(t.discardWorkout, t.discardConfirm, onConfirm = { scope.launch { controller.discard() } })
             }
         }
     }
@@ -185,7 +191,7 @@ private fun NameField(id: String, name: String, onChange: (String) -> Unit, modi
     val t = LocalStrings.current
     var text by remember(id) { mutableStateOf(name) }
     Box(modifier) {
-        BigInput(text, { text = it.take(60); onChange(it) }, t.workoutNamePlaceholder, Modifier.fillMaxWidth())
+        BigInput(text, { text = it.take(60); onChange(it) }, t.workoutNamePlaceholder, Modifier.fillMaxWidth(), textStyle = Theme.type.label)
     }
 }
 
@@ -396,21 +402,20 @@ private fun SetRow(
 private fun CheckButton(done: Boolean, description: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(40.dp)
+            .size(48.dp)
             .semantics { contentDescription = description; role = Role.Checkbox }
             .pressableRow(onClick),
         contentAlignment = Alignment.Center,
     ) {
+        // Done = green (meaning: completed); open = grey fill so it reads as a button.
         Box(
             Modifier
-                .size(30.dp)
-                .then(
-                    if (done) Modifier.background(Theme.colors.inverseBackground, CircleShape)
-                    else Modifier.border(1.dp, Theme.colors.muted, CircleShape),
-                ),
+                .size(36.dp)
+                .background(if (done) Theme.colors.positive else Theme.colors.surface, CircleShape)
+                .then(if (done) Modifier else Modifier.border(1.dp, Theme.colors.faint, CircleShape)),
             contentAlignment = Alignment.Center,
         ) {
-            if (done) LineIcon(Icon.Check, size = 20.dp, color = Theme.colors.inverseForeground)
+            if (done) LineIcon(Icon.Check, size = 22.dp, color = Color.White)
         }
     }
 }

@@ -40,7 +40,16 @@ class DiaryCalendarTest {
     @Test fun monthsNewestFirstAcrossYears() {
         val months = DiaryCalendar.months(LocalDate(2025, 11, 20), LocalDate(2026, 2, 3))
         assertEquals(listOf(2026 to 2, 2026 to 1, 2025 to 12, 2025 to 11), months)
-        assertEquals(listOf(2026 to 11), DiaryCalendar.months(null, LocalDate(2026, 11, 3)))
+    }
+
+    @Test fun monthsShowAtLeastThreeEmptyMonthsBack() {
+        val today = LocalDate(2026, 11, 3)
+        val expected = listOf(2026 to 11, 2026 to 10, 2026 to 9, 2026 to 8)
+        assertEquals(expected, DiaryCalendar.months(null, today))
+        // Only training this month: still four months.
+        assertEquals(expected, DiaryCalendar.months(LocalDate(2026, 11, 1), today))
+        // Older training wins, empty months in between are included.
+        assertEquals(6, DiaryCalendar.months(LocalDate(2026, 6, 30), today).size)
     }
 
     private val mon = DayOfWeek.MONDAY

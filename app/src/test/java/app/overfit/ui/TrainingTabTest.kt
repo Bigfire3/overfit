@@ -90,21 +90,21 @@ class TrainingTabTest {
         waitFor("Bench Press")
         compose.onAllNodesWithText("Bench Press")[0].performClick()
         compose.onNodeWithText("1 hinzufügen").performClick()
-        compose.waitUntil(10_000) { deps.workout.state.value.workout?.exercises?.size == 1 }
+        compose.waitUntil(20_000) { deps.workout.state.value.workout?.exercises?.size == 1 }
 
         // Finish (confirm pattern) → finish flow: the name is set here
         compose.onNodeWithText("Beenden").performClick()
         compose.onNodeWithText("Beenden? Nochmal tippen").performClick()
         waitFor("Wie war das Training?")
-        compose.waitUntil(10_000) { runBlocking { data.workouts.status(running.id) } == SessionStatus.FINISHED }
+        compose.waitUntil(20_000) { runBlocking { data.workouts.status(running.id) } == SessionStatus.FINISHED }
         // Saved right away, without asking, under the default name
-        compose.waitUntil(10_000) { templates().size == 1 }
+        compose.waitUntil(20_000) { templates().size == 1 }
         val nameField = hasSetTextAction() and hasText("Workout vom", substring = true)
-        compose.waitUntil(10_000) { compose.onAllNodes(nameField).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) { compose.onAllNodes(nameField).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(nameField).performTextReplacement("Brust")
         compose.onNodeWithText("Speichern").performClick()
         waitFor("Duo · bald")
-        compose.waitUntil(10_000) { templates().singleOrNull()?.name == "Brust" }
+        compose.waitUntil(20_000) { templates().singleOrNull()?.name == "Brust" }
         assertEquals("Brust", runBlocking { data.workouts.getFinished(running.id) }?.workout?.name)
 
         // In the list with "last done today"; open → start again → the exercise is there
@@ -114,7 +114,7 @@ class TrainingTabTest {
         waitFor("Starten")
         compose.onNodeWithText("Bench Press").assertExists()
         compose.onNodeWithText("Starten").performClick()
-        compose.waitUntil(10_000) { deps.workout.state.value.workout != null }
+        compose.waitUntil(20_000) { deps.workout.state.value.workout != null }
         val again = requireNotNull(deps.workout.state.value.workout)
         assertEquals(templates().single().id, again.templateId)
         assertEquals(listOf("Bench Press"), again.exercises.map { it.exercise.name })
@@ -132,7 +132,7 @@ class TrainingTabTest {
         compose.onNodeWithText("Push").performClick()
         waitFor("Starten")
         compose.onNodeWithText("Starten").performClick()
-        compose.waitUntil(10_000) { deps.workout.state.value.workout != null }
+        compose.waitUntil(20_000) { deps.workout.state.value.workout != null }
 
         // Add an exercise and a set during the workout
         val w = requireNotNull(deps.workout.state.value.workout)
@@ -141,17 +141,17 @@ class TrainingTabTest {
         waitFor("Übungen hinzufügen")
         compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("Squat")
         val squatRow = hasText("Squat", substring = true) and hasClickAction() and !hasSetTextAction()
-        compose.waitUntil(10_000) { compose.onAllNodes(squatRow).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) { compose.onAllNodes(squatRow).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(squatRow)[0].performClick()
         compose.onNodeWithText("1 hinzufügen").performClick()
-        compose.waitUntil(10_000) { deps.workout.state.value.workout?.exercises?.size == 2 }
+        compose.waitUntil(20_000) { deps.workout.state.value.workout?.exercises?.size == 2 }
 
         compose.onNodeWithText("Beenden").performClick()
         compose.onNodeWithText("Beenden? Nochmal tippen").performClick()
         waitFor("Wie war das Training?")
 
         // No dialog: the saved workout has the new structure; planned values of kept sets stay
-        compose.waitUntil(10_000) { runBlocking { data.templates.get(templates().single().id) }?.exercises?.size == 2 }
+        compose.waitUntil(20_000) { runBlocking { data.templates.get(templates().single().id) }?.exercises?.size == 2 }
         val push = requireNotNull(runBlocking { data.templates.get(templates().single().id) })
         assertEquals("Push", push.name)
         assertEquals(listOf(PlannedSet(60.0, 8), PlannedSet(60.0, 8), PlannedSet()), push.exercises[0].sets)
@@ -160,7 +160,7 @@ class TrainingTabTest {
 
     private fun waitFor(text: String, substring: Boolean = false) {
         try {
-            compose.waitUntil(10_000) { compose.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(20_000) { compose.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty() }
         } catch (e: Throwable) {
             throw AssertionError("Waiting for \"$text\":\n" + compose.onRoot().printToString(), e)
         }

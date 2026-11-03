@@ -37,6 +37,7 @@ import app.overfit.domain.WeightUnit
 import app.overfit.domain.Workout
 import app.overfit.domain.WorkoutSummary
 import app.overfit.i18n.LocalStrings
+import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
@@ -123,8 +124,6 @@ fun HistoryDetailScreen(
         if (finished == null || summary == null) onBack() else value = DetailData(finished, summary)
     }
     val photos by remember(workoutId) { workouts.observePhotosOf(workoutId) }.collectAsStateWithLifecycle(emptyList())
-    var confirmDelete by remember { mutableStateOf(false) }
-    LaunchedEffect(confirmDelete) { if (confirmDelete) { delay(4000); confirmDelete = false } }
 
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         val d = data ?: return@Screen
@@ -195,16 +194,11 @@ fun HistoryDetailScreen(
         })
         if (onCoach != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.reviewTitle, onClick = onCoach)
         ListRow(h.shareWorkout, onClick = onShare)
-        ListRow(
-            if (confirmDelete) t.deleteConfirm else t.delete,
-            tone = if (confirmDelete) Tone.Default else Tone.Muted,
-            onClick = {
-                if (confirmDelete) {
-                    appScope.launch { workouts.deleteWorkout(workoutId) }
-                    onBack()
-                } else confirmDelete = true
-            },
-        )
+        Spacer(Modifier.height(Space.l))
+        ConfirmButton(t.delete, t.deleteConfirm, onConfirm = {
+            appScope.launch { workouts.deleteWorkout(workoutId) }
+            onBack()
+        })
     }
 }
 
