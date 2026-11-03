@@ -1,7 +1,7 @@
-# Overfit-Backend (Guthaben, Spot, KI-Chat-Verbindung)
+# Overfit-Backend (Guthaben, Einladungen, KI-Chat-Verbindung)
 
-Cloudflare Worker (TypeScript) + D1 (+ R2 für freigegebene Fotos). Schlank, Open Source. Für Guthaben und Spot speichert es nur
-Konto-ID, Saldo, Buchungen und Spot-Zuordnungen – **keine Trainingsinhalte, keine Fotos** (KI-Anfragen werden nur durchgeleitet).
+Cloudflare Worker (TypeScript) + D1 (+ R2 für freigegebene Fotos). Schlank, Open Source. Für Guthaben und Einladungen speichert es nur
+Konto-ID, Saldo, Buchungen und Einladungs-Zuordnungen – **keine Trainingsinhalte, keine Fotos** (KI-Anfragen werden nur durchgeleitet).
 **Ausnahme, nur nach ausdrücklichem Opt-in in der App („KI-Chat verbinden“):** Trainingsdaten (und nur mit eigenem Häkchen
 Körperfotos) werden verschlüsselt gespeichert, damit Claude, ChatGPT und Gemini sie über den MCP-Server unter `/mcp` lesen
 können. Abschalten löscht alles. API-Vertrag: [`docs/backend-api.md`](../docs/backend-api.md).
@@ -30,8 +30,8 @@ PURCHASE_MODE=mock
 Lokal gibt es kein Workers-AI-Binding und kein AI Gateway: die Stufe `lite` ist dort nicht verfügbar, Gemini und Anthropic werden
 direkt angesprochen. Die Tests ersetzen beides durch Mocks (`test/tiers.test.ts`).
 
-Im Dev-Modus akzeptieren Kauf und Spot Token der Form `mock:<id>` statt echter Store-/Attestierungs-Belege. In Produktion
-(`DEV_MODE` nicht `true`) werden die Mock-Modi ignoriert: ohne echte Prüfer sind Käufe und Spot abgeschaltet (503).
+Im Dev-Modus akzeptieren Kauf und Einladung Token der Form `mock:<id>` statt echter Store-/Attestierungs-Belege. In Produktion
+(`DEV_MODE` nicht `true`) werden die Mock-Modi ignoriert: ohne echte Prüfer sind Käufe und Einladungen abgeschaltet (503).
 
 ## Deployment ohne Terminal (empfohlen): der Deploy-Knopf
 
@@ -85,12 +85,12 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
 
 **Testbetrieb (`mode = test`) – für Handys ohne Store-Konten.** Test und Produktion sind getrennte Instanzen (eigener Worker, Datenbank, Bucket),
 Testdaten gelangen nie in die Produktion; beim Wechsel auf `production` ändert sich die Adresse (Schritt 8 wiederholen).
-- Keine Geräteprüfung (Play Integrity/App Attest): Spot geht mit seitlich installierten APKs (Test-Token, ein Spot je Gerät).
+- Keine Geräteprüfung (Play Integrity/App Attest): Einladungen gehen mit seitlich installierten APKs (Test-Token, eine Einladung je Gerät).
 - Jedes neue Konto bekommt **1 € Test-Guthaben** automatisch (Guthaben öffnen → „Guthaben ansehen“). Mehr: Run workflow mit `credit_eur` (z. B. `5`) →
   schreibt allen bestehenden Konten bis zu 10 € gut. Alles Test-Guthaben zusammen ist auf 20 € gedeckelt (`TEST_CREDIT_CAP_MICRO`).
   Ist es aufgebraucht: Instanz zurücksetzen (Datenbank `overfit-test` im Dashboard unter Storage & Databases → D1 löschen, Workflow neu starten).
-- Käufe gibt es im Testbetrieb nicht (kein Store); Guthaben nur so. Niedrige Limits: `max_tokens` 2048, 5 KI-Anfragen/Minute, 3 Spots je Einladendem
-  und Monat, Spot-Gesamtbudget 10 €.
+- Käufe gibt es im Testbetrieb nicht (kein Store); Guthaben nur so. Niedrige Limits: `max_tokens` 2048, 5 KI-Anfragen/Minute, 3 Einladungen je Einladendem
+  und Monat, Gesamtbudget für Einladungsboni 10 €.
 - Markierung: `GET /v1/config` liefert `"mode": "test"`, die App zeigt unter Guthaben „Testserver“. Der Workflow prüft, dass der Modus stimmt.
 - Sicherheit: Der Testmodus braucht `DEPLOY_MODE=test` (exakt). Die Admin-Gutschrift gibt es nur dort und nur mit `ADMIN_SECRET`; in Produktion antwortet
   der Pfad 404 und ein `test:`-Token wird abgelehnt (beides in `backend/test/testmode.test.ts`).
@@ -115,16 +115,16 @@ Secrets (im Workflow oder von Hand):
    |---|---|---|
    | `GEMINI_API_KEY` | Google-AI-Studio-Key des Betreibers | Gemini 3.6 Flash (Google) |
    | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | Claude Sonnet 5.5 (Anthropic) |
-   | `SPOT_SIGNING_KEY` | Zufälliger String ≥ 32 Zeichen (`openssl rand -base64 48`); signiert Spot-Tokens und Challenges | Spot |
+   | `SPOT_SIGNING_KEY` | Zufälliger String ≥ 32 Zeichen (`openssl rand -base64 48`); signiert Einladungs-Tokens und Challenges | Einladungen |
    | `SYNC_ENCRYPTION_KEY` | Zufällige 32 Byte als Base64url; verschlüsselt alle KI-Chat-Daten (die OAuth-Anmeldung des MCP-Servers braucht kein eigenes Geheimnis). **Nie ändern** (sonst sind gespeicherte Daten unlesbar; die App lädt dann beim nächsten Sync neu hoch) | KI-Chat |
    | `ADMIN_SECRET` | ≥ 16 Zeichen, nur Testbetrieb (`POST /v1/admin/credit`) | Test-Guthaben |
    | `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_PACKAGE_NAME` (`app.overfit`) | Dienstkonto mit Play-Developer-API-Zugriff | Käufe Android |
-   | `PLAY_INTEGRITY_SERVICE_ACCOUNT` | Dienstkonto für `decodeIntegrityToken` | Spot Android |
+   | `PLAY_INTEGRITY_SERVICE_ACCOUNT` | Dienstkonto für `decodeIntegrityToken` | Einladungen Android |
    | `APPLE_IAP_KEY`, `APPLE_IAP_KEY_ID`, `APPLE_IAP_ISSUER_ID`, `APPLE_BUNDLE_ID` | App-Store-Server-API-Schlüssel (.p8) | Käufe iOS |
-   | `APPLE_APP_ATTEST_TEAM_ID` | Team-ID für App Attest | Spot iOS |
+   | `APPLE_APP_ATTEST_TEAM_ID` | Team-ID für App Attest | Einladungen iOS |
 
    **Stand:** Die echten Prüfer für Google Play / Apple (`src/verifiers.ts`) sind noch nicht implementiert – nur die
-   Schnittstellen, die Mock-Varianten (Dev) und der Test-Prüfer (Testbetrieb). Käufe und Spot antworten in Produktion daher mit
+   Schnittstellen, die Mock-Varianten (Dev) und der Test-Prüfer (Testbetrieb). Käufe und Einladungen antworten in Produktion daher mit
    `purchases_unavailable` bzw. `attestation_unavailable`, bis die Prüfer mit echten Zugangsdaten nachgezogen werden
    (eigene Aufgabe, setzt die Store-Konten aus Phase 6 voraus). `/v1/messages`, Konten und Wiederherstellung laufen schon
    mit einem KI-Key allein.
@@ -177,8 +177,8 @@ den gleichen OAuth-Ablauf.
 | `MARKUP_BP` | 2800 | Einziger Aufschlag auf alle Modellpreise (Basispunkte, 2800 = 28 %); Herleitung in docs/monetization.md. Web: Guthaben = Preis; Store: Guthaben laut `PACKAGES`, Store-Preis offen darüber |
 | `SPOT_STARTER_MICRO` / `SPOT_REWARD_MICRO` | 1 000 000 | Startguthaben (Eingeladener) / Belohnung (Einladender) |
 | `SPOT_TOKEN_TTL_SEC` | 45 | Gültigkeit des QR-Tokens |
-| `SPOT_MONTHLY_LIMIT_PER_INVITER` | 10 | Spots pro Einladendem und Monat |
-| `SPOT_GLOBAL_MONTHLY_BUDGET_MICRO` | 50 000 000 | Budget für alle Spots im Monat (jeder Spot = Start + Belohnung) |
+| `SPOT_MONTHLY_LIMIT_PER_INVITER` | 10 | Einladungen pro Einladendem und Monat |
+| `SPOT_GLOBAL_MONTHLY_BUDGET_MICRO` | 50 000 000 | Budget für alle Einladungsboni im Monat (jede Einladung = Start + Belohnung) |
 | `SPOT_EXPIRY_DAYS` / `REWARD_EXPIRY_DAYS` | 180 | Verfall der Boni |
 | `MAX_TOKENS_CAP` | 8192 | Obergrenze für `max_tokens` (begrenzt die Reservierung) |
 | `MAX_BODY_BYTES` | 8 388 608 | Größtes Request-Body (Fotos) |
@@ -293,7 +293,7 @@ ADMIN_SECRET=… node scripts/usage-report.mjs https://<worker-domain> 2026-11-0
   Refresh-Rotation) · `pages.ts` Anmeldeseite · `sync.ts` Geräte-Endpunkte · `data.ts` Lesen + Kennzahlen · `vault.ts`
   AES-GCM · `catalog.ts` Übungskatalog (`catalog.gen.json` aus dem App-Katalog, neu erzeugen mit `node scripts/build-catalog.mjs`)
 - `src/index.ts` Router · `auth.ts` Signaturprüfung/Replay-Schutz · `ledger.ts` Saldo, Reservierung, Abrechnung ·
-  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `providers.ts` Stufen, Preise, Anbieter-Adapter · `purchases.ts` · `spot.ts` · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-/Attestierungs-Schnittstellen)
+  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `providers.ts` Stufen, Preise, Anbieter-Adapter · `purchases.ts` · `spot.ts` (Einladungen) · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-/Attestierungs-Schnittstellen)
 - Guthaben als „Posten“ (`lots`): Käufe verfallen nie, Boni nach 180 Tagen; Verbrauch zuerst verfallende Posten. Reservierung =
   ein atomares `INSERT … SELECT … WHERE saldo ≥ betrag` (D1 serialisiert Schreibzugriffe) – parallele Anfragen können nicht überziehen.
   Reservierungen älter als 15 min gelten als verwaist und zählen nicht mehr.

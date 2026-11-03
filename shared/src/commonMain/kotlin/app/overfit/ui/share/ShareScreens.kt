@@ -435,7 +435,7 @@ private fun SharePreview(training: SharedTraining, unit: WeightUnit, language: L
 }
 
 /**
- * Generic QR code for any text (workouts, Spot invites, later Duo): black on white with quiet zone, so every scanner
+ * Generic QR code for any text (workouts, invites, later Duo): black on white with quiet zone, so every scanner
  * reads it regardless of the theme. Round modules; the three finder patterns stay solid squares with rounded corners.
  */
 @Composable

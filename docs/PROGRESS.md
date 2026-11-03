@@ -73,7 +73,7 @@ Steuerberater klären (`scripts/usage-report.mjs` warnt ab 80 %).
 
 ## Marge bei 1:1-Guthaben (Session AA, 3.11.)
 **Erledigt:**
-- Rechnung in docs/monetization.md („Rechnung“, mit Tabellen): USt 19 %, Paddle 5 % + 0,50 € (an paddle.com/pricing geprüft), Store 15 % auf Netto nach USt, Spot-/Startguthaben als 10 % vom Netto, Zielgewinn 7 %. Ergebnis **`MARKUP_BP = 6900` (69 %)**, ein Wert für alle Modelle; Store ist der Engpass.
+- Rechnung in docs/monetization.md („Rechnung“, mit Tabellen): USt 19 %, Paddle 5 % + 0,50 € (an paddle.com/pricing geprüft), Store 15 % auf Netto nach USt, Einladungsboni/Startguthaben als 10 % vom Netto, Zielgewinn 7 %. Ergebnis **`MARKUP_BP = 6900` (69 %)**, ein Wert für alle Modelle; Store ist der Engpass.
 - **Web-Pakete 10/20/50 €** (5 € hätte den Aufschlag auf 74,5 % gehoben); Store-Pakete `overfit.fuel.5`/`.10` bleiben. **Gutschrift überall = Preis**, Store-Formel (doppelter Aufschlag, ohne USt) entfernt, `STORE_FEE_BP` entfällt.
 - App: Kostenschätzungen kommen weiter aus `/v1/config` (jetzt mit 69 %); unter Guthaben ein ehrlicher Satz plus Link „Wie setzen sich die Preise zusammen?“ → `web/preise/` (DE+EN).
 - Tests: `backend/test/pricing.test.ts` (Break-even je Kanal/Paket, Schätzung), Config-, Kauf- und Abrechnungstests angepasst.
@@ -192,7 +192,7 @@ Kosten: Cloudflare Free reicht; KI-Kosten nur bei Fuel (Test: höchstens 20 € 
 ### Bitte auf dem Handy testen (Session V)
 1. Eigener Key (Profil → KI verbinden), Backend-URL gesetzt: Coach-Tab → „KI-Zugang“ zeigt „Eigener Key · …“ und darunter „Deine Daten gehen direkt an <Anbieter>, nicht über overfit-Server.“
 2. Profil → „Fuel“ zeigt keinen Saldo; Tippen zeigt „Fuel ist optional …“ mit „Fuel ansehen“; erst das verbindet mit dem Server.
-3. Mit Testserver: Fuel ansehen → „Testserver“-Hinweis, 1,00 € Saldo; „Fuel nutzen“ im Coach → Antwort kostet Cent-Beträge. Spot einlösen klappt ohne Store-Konto.
+3. Mit Testserver: Fuel ansehen → „Testserver“-Hinweis, 1,00 € Saldo; „Fuel nutzen“ im Coach → Antwort kostet Cent-Beträge. Einladung einlösen klappt ohne Store-Konto.
 
 ## main wieder grün: Wackel-Tests nach #39 (Session S, 3.11.)
 **Erledigt:**
@@ -343,7 +343,7 @@ Erledigt: Minimieren-Knopf im Workout (Pfeil runter) und System-Zurück minimier
 5. Minimiert in anderen Tab, Bildschirm sperren, Benachrichtigung tippen → maximiertes Training. App aus den letzten Apps wischen und neu öffnen → Training maximiert
 
 ## Morgen-Testliste für Fabian (3.11.)
-Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Fuel/Spot); die Demo in 36–38 braucht keinen Server.
+Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Guthaben/Einladungen); die Demo in 36–38 braucht keinen Server.
 Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).
 
 **Installieren und starten**
@@ -397,11 +397,11 @@ Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft di
 34. Mit Backend: „KI-Chat verbinden“ → Zustimmen → Kopplungscode, Connector im Chat anlegen, „Plane mir ein Push-Training“ → Eingang auf dem Start-Tab → Vorschau → Übernehmen
 35. „Trennen“ und „KI-Chat trennen“ (zweimal tippen) → Chat hat keinen Zugriff mehr
 
-**Fuel und Spot**
+**Guthaben und Einladungen**
 36. Profil → „Fuel · startet bald“ → „Demo ansehen“: „Fuel · 4,20 €“, Pakete („Bald im Store“), Buchungen, Wiederherstellungscode
-37. „Freund spotten“: QR mit rotierendem Code, Name; „Ich wurde gespottet“: beliebigen Link einfügen → Einlösen → schwarz, zwei Pulse,
-    Zahl zählt 0,00 → 1,00 €, „Spot von Fabian“, kräftiger Puls; Tippen schließt
-38. „Demo beenden“ → Fuel zeigt wieder „startet bald“. (Echtes Fuel/Spot erst mit Backend, Punkt 1 unten)
+37. „Freunde einladen“ (Profil → Guthaben): QR mit rotierendem Code (`overfit://invite#…`), Name; „Einladung einlösen“: beliebigen Link einfügen → Einlösen → schwarz, zwei Pulse,
+    Zahl zählt 0,00 → 1,00 €, „Einladung von Fabian“, kräftiger Puls; Tippen schließt
+38. „Demo beenden“ → Fuel zeigt wieder „startet bald“. (Echtes Guthaben/Einladungen erst mit Backend, Punkt 1 unten)
 
 **Backup und Löschen**
 39. Profil → „Backup exportieren“ → in Dateien/Drive sichern (Datei lässt sich als ZIP öffnen, kein API-Key drin)
@@ -415,7 +415,7 @@ Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
    `wrangler.jsonc`), Migrationen (inkl. `0002_chat.sql`), Secrets `ANTHROPIC_API_KEY`, `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY`
    (32 Zufallsbytes Base64url, nie ändern), R2 aktivieren + `wrangler r2 bucket create overfit-chat-photos`, `npm run deploy`. Danach
    GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL. Ohne das zeigt die App „startet bald“ + Demo
-   (Fuel, Spot, KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
+   (Guthaben, Einladungen, KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
 2. **GitHub Pages aktivieren** (Repo → Settings → Pages → Source „GitHub Actions“; oder Actions → „Web veröffentlichen“ → Run workflow):
    Web-Fallback `https://bigfire3.github.io/overfit/` und Teilen-Seite `/t` für Links ohne App
 3. **KI-Chat-Connectoren eintragen** (nach 1.): Claude → Connectors → Custom Connector, ChatGPT → Entwicklermodus → Connector,
@@ -425,7 +425,7 @@ Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
 5. **Datenschutzerklärung vor dem Store-Start** um KI-Chat-Verbindung (Art. 9 DSGVO, Opt-in) und Daten an Chat-Anbieter ergänzen
 6. **Store-Konten (Phase 6/7):** Google-Play-Console und Apple-Developer-Konto, Play Billing / StoreKit, Play Integrity (Cloud-Projekt), App Attest,
    Server-Prüfer in `backend/src/verifiers.ts`. Store-Texte DE/EN liegen als Entwurf in `docs/store/store-listing.md`
-7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Spot-Links
+7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Einladungs-Links
    ohne installierte App
 8. iOS: Kamera, Fotoauswahl, Dateiauswahl und Haptik sind nur in der iOS-CI gebaut, nicht auf einem echten iPhone getestet
 
@@ -581,24 +581,24 @@ Offen / Hinweise:
    derselben Übung zeigt „Letztes Mal: …“
 9. Training starten und „Training abbrechen“ (zweimal) → verworfen
 
-## Nacht 3.11. – Fuel & Spot in der App (Session D)
+## Nacht 3.11. – Guthaben & Einladungen in der App (Session D)
 Fertig:
 - Geräte-Identität (Keystore / Secure Enclave), signierte Anfragen nach `docs/backend-api.md`, `FuelApi` (Ktor) mit Re-Registrierung und Zeitkorrektur, Fehlercodes
 - Profil → **Fuel**: Saldo („Fuel · 4,20 €“), verfallendes Guthaben, Pakete 5/10 € („Bald im Store“), Buchungen, Wiederherstellungscode (erzeugen, kopieren, auf neuem Handy eingeben)
-- **Spot**: „Freund spotten“ (Name, QR mit rotierendem Token, Haarlinien-Fortschritt), „Ich wurde gespottet“ (Android: QR scannen oder Link einfügen; iOS: Kamera-App öffnet den Link), Reveal mit Haptik
+- **Einladungen**: „Freunde einladen“ (Name, QR mit rotierendem Token, Haarlinien-Fortschritt), „Einladung einlösen“ (Android: QR scannen oder Link einfügen; iOS: Kamera-App öffnet den Link), Reveal mit Haptik
 - **Demo** (ohne Server): Profil → Fuel → „Demo ansehen“; Backend-URL per CI-Variable `OVERFIT_BACKEND_URL`, versteckter Override (7× Version in „Über“)
 - Fuel als Option im KI-Zugang (`FuelProvider`); Tests: SHA/Signatur/Testvektor, Beträge, Reveal, Fuel-Client (MockEngine), QR, UI-Durchlauf Demo
 
-### Von Fabian zu tun (Fuel/Spot)
+### Von Fabian zu tun (Guthaben/Einladungen)
 1. Backend deployen (siehe oben), dann GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL anlegen. Ohne sie zeigt die App „startet bald“ + Demo.
 2. Play-/Apple-Konten für echte Käufe (Play Billing / StoreKit) und Geräteprüfung (Play Integrity Cloud-Projekt, App Attest); Server-Prüfer ergänzen (Tokenformat siehe DECISIONS).
-3. Optional: Web-Seite für Spot-Links ohne installierte App (QR enthält `overfit://spot#…`).
+3. Optional: Web-Seite für Einladungs-Links ohne installierte App (QR enthält `overfit://invite#…`, alte `overfit://spot#…` werden weiter gelesen).
 
-### Bitte auf dem Handy testen (Fuel/Spot)
+### Bitte auf dem Handy testen (Guthaben/Einladungen)
 1. Profil → „Fuel · startet bald“ öffnen → Text „Fuel startet bald“ → **Demo ansehen**
-2. Demo: „Fuel · 4,20 €“, Pakete mit „Bald im Store“, Buchungen (Verbrauch, Aufladung, Spot), Wiederherstellungscode erzeugen + kopieren
-3. **Freund spotten:** QR erscheint, Haarlinie läuft ab, alle ~30 s neuer Code; Namen eintragen
-4. **Ich wurde gespottet:** beliebigen Link/Code einfügen → Einlösen → Bildschirm schwarz, zwei Herzschlag-Pulse, Zahl zählt 0,00 → 1,00 €, „Spot von Fabian“, kräftiger Puls; Tippen schließt
+2. Demo: „Fuel · 4,20 €“, Pakete mit „Bald im Store“, Buchungen (Verbrauch, Aufladung, Einladungsbonus), Wiederherstellungscode erzeugen + kopieren
+3. **Freunde einladen:** QR erscheint, Haarlinie läuft ab, alle ~30 s neuer Code; Namen eintragen
+4. **Einladung einlösen:** beliebigen Link/Code einfügen → Einlösen → Bildschirm schwarz, zwei Herzschlag-Pulse, Zahl zählt 0,00 → 1,00 €, „Einladung von Fabian“, kräftiger Puls; Tippen schließt
 5. „Demo beenden“ → Fuel zeigt wieder „startet bald“. Version in „Über“ 7× tippen → Abschnitt „Entwickler“ mit Backend-URL
 6. Profil → KI verbinden: erste Zeile „Fuel“ wählbar
 
@@ -650,12 +650,12 @@ Kopplungscode, Verbindungen trennen), Sync, Eingang mit Import-Vorschau, „Kont
    Overfit-Seite „Overfit verbinden“ mit Feld „Kopplungscode“ (Deutsch bei deutscher Browsersprache); falscher Code →
    Hinweis „Code falsch oder abgelaufen“. Der echte Code kommt mit Teil 2 aus der App.
 
-## Nacht 3.11. – Backend Fuel/Spot + Web-Fallback (Session C)
+## Nacht 3.11. – Backend Guthaben/Einladungen + Web-Fallback (Session C)
 Fertig (kein App-Code angefasst):
 - `backend/`: Cloudflare Worker + D1, 42 Tests (Vitest/Miniflare, lokal ohne Cloudflare-Konto): anonyme Geräte-Identität
   (ECDSA P-256, signierte Anfragen mit Nonce/Zeitstempel), Konto mit Saldo/Buchungen in Mikro-Euro, Wiederherstellungscode,
   `POST /v1/messages` als Anthropic-Proxy (atomare Reservierung, Abrechnung nach `usage` + Aufschlag, Freigabe bei Fehlern),
-  Kauf-Verifikation (idempotent, Paket-Gutschrift = Preis × (1 − Store) / (1 + Aufschlag)), Spot (Token, Challenge, Einlösen,
+  Kauf-Verifikation (idempotent, Paket-Gutschrift = Preis × (1 − Store) / (1 + Aufschlag)), Einladungen (Token, Challenge, Einlösen,
   Limits, Budget, Verfall, Belohnung bei der ersten Coach-Anfrage), Rate-Limits, einheitliches Fehlerformat
 - API-Vertrag mit exaktem Signatur-Schema: `docs/backend-api.md` (Grundlage für die App-Session)
 - `web/`: Fallback-Seite `t/index.html` (liest `#payload` laut `docs/share-format.md`, DE/EN, „In Overfit öffnen“, APK-Download)
@@ -663,7 +663,7 @@ Fertig (kein App-Code angefasst):
 - DECISIONS: „Produktentscheidungen Nacht 3.11.“ + Backend-Entscheidungen
 
 Offen: Echte Google-Play-/Apple-Prüfer für Käufe und Play Integrity/App Attest (Schnittstellen + Mocks fertig, Produktion
-antwortet bis dahin 503 `purchases_unavailable` / `attestation_unavailable`); App-Anbindung (`LlmProvider` „Fuel“, Spot-UI) nach `docs/backend-api.md`.
+antwortet bis dahin 503 `purchases_unavailable` / `attestation_unavailable`); App-Anbindung (`LlmProvider` „Fuel“, Einladungs-UI) nach `docs/backend-api.md`.
 
 ### Von Fabian zu tun
 1. **GitHub Pages aktivieren:** Repo → Settings → Pages → Source „GitHub Actions“. Danach läuft `pages.yml` bei jedem Merge
@@ -671,7 +671,7 @@ antwortet bis dahin 503 `purchases_unavailable` / `attestation_unavailable`); Ap
 2. **Cloudflare-Backend deployen** (Schritte und alle Secrets in `backend/README.md`): Konto, `wrangler login`, `wrangler d1 create overfit`
    (ID in `wrangler.jsonc`), Migrationen, `ANTHROPIC_API_KEY` und `SPOT_SIGNING_KEY` als Secrets, `npm run deploy`. Worker-URL
    an die Session für die App-Anbindung geben.
-3. Später für Käufe/Spot in Produktion: Play-Console- und Apple-Developer-Konten (Phase 6), Dienstkonto/Schlüssel als Secrets
+3. Später für Käufe/Einladungen in Produktion: Play-Console- und Apple-Developer-Konten (Phase 6), Dienstkonto/Schlüssel als Secrets
    (Liste in `backend/README.md`), danach die echten Prüfer in `backend/src/verifiers.ts` ergänzen.
 4. Für Android App Links / iOS Universal Links wird eine eigene Domain mit `/.well-known/` gebraucht (unter
    `github.io/overfit/` nicht möglich) – bis dahin öffnet der Button „In Overfit öffnen“.
@@ -772,3 +772,14 @@ Offen / Hinweise:
 4. App starten: Splash schwarz mit kleinem weißen „of“ (Android 12+ und iOS), danach direkt die App
 5. Browser: Favicon im Tab der Webseite, „Zum Home-Bildschirm“ auf dem iPhone zeigt das „of“
 6. Variante gefällt nicht? `python3 tools/icon/build_icon.py --variant B2` (B1–B6, siehe docs/DECISIONS.md), committen
+
+## Session AC – „Spot“ heißt jetzt „Einladung“ (3.11.)
+- Erledigt: Alle sichtbaren Texte (App DE+EN, Webseite, Store-Texte, README, Docs, Deploy-Summary, Buchungsbezeichnungen) sagen „Freunde einladen“, „Einladung einlösen“, „Einladungsbonus“ (EN: Invite friends, Redeem invite, Referral bonus). Neue Links `overfit://invite#…`, alte `overfit://spot#…` werden weiter gelesen. Technik (API, DB, SPOT_*) bleibt, siehe docs/DECISIONS.md.
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Einladungen)
+1. Profil → Guthaben → Bereich „Einladungen“ → „Freunde einladen“: QR und rotierender Code, Namen eintragen
+2. Zweites Handy: QR mit der Kamera-App scannen (Link `overfit://invite#…`) → Overfit öffnet „Einladung einlösen“; alternativ Link einfügen
+3. „Einladung einlösen“ → Einlösen: schwarz, zwei Pulse, Zahl zählt 0,00 → 1,00 €, darunter „Einladung von Fabian“, kräftiger Puls
+4. Guthaben → Buchungen: Eintrag „Einladungsbonus“; beim Einladenden „Einladungsbonus (Freund eingeladen)“ nach der ersten Auswertung des Freundes
+5. Ein alter Link `overfit://spot#…` (aus der Zwischenablage eingefügt) funktioniert weiter; nirgends steht mehr „Spot“

@@ -57,7 +57,7 @@ describe('Testbetrieb (DEPLOY_MODE=test)', () => {
     expect((await credit(testEnv({ ADMIN_SECRET: 'kurz' }), { amountMicro: 1, all: true }, 'kurz')).status).toBe(404);
   });
 
-  it('Spot geht ohne Geräteprüfung mit Test-Token, genau einmal je Gerät', async () => {
+  it('Einladung geht ohne Geräteprüfung mit Test-Token, genau einmal je Gerät', async () => {
     const e = testEnv({ TEST_STARTER_MICRO: '0' });
     const inviter = await Client.create(e);
     const friend = await Client.create(e);

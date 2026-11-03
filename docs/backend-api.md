@@ -1,7 +1,7 @@
-# Overfit-Backend: API-Vertrag (Guthaben, Spot, KI-Chat-Verbindung)
+# Overfit-Backend: API-Vertrag (Guthaben, Einladungen, KI-Chat-Verbindung)
 
 Grundlage für die App-Anbindung. Implementierung: `backend/` (Cloudflare Worker + D1). Basis-URL: `https://<worker-domain>`, alle Pfade unter `/v1`.
-Das Backend speichert **keine Trainingsinhalte und keine Fotos** (Anfragen werden nur durchgeleitet), sondern Konto-ID, Saldo, Buchungen (Modell, Token, Betrag) und Spot-Zuordnungen. **Einzige Ausnahme:** die freiwillige KI-Chat-Verbindung (unten), die der Nutzer ausdrücklich einschaltet; Abschalten löscht alles.
+Das Backend speichert **keine Trainingsinhalte und keine Fotos** (Anfragen werden nur durchgeleitet), sondern Konto-ID, Saldo, Buchungen (Modell, Token, Betrag) und Einladungs-Zuordnungen. **Einzige Ausnahme:** die freiwillige KI-Chat-Verbindung (unten), die der Nutzer ausdrücklich einschaltet; Abschalten löscht alles.
 
 ## Beträge
 
@@ -81,7 +81,7 @@ Jeder Fehler: passender HTTP-Status und
 | 400 | `upstream_rejected` | Anthropic hat die Anfrage abgelehnt, **nichts abgebucht** (`details.upstreamStatus`) |
 | 400 | `unknown_product` | Paket-ID unbekannt |
 | 400 | `invalid_recovery_code` | Format falsch |
-| 400 | `spot_token_invalid`, `spot_self`, `challenge_invalid` | Spot-Code kaputt / eigener Code / Challenge ungültig oder benutzt |
+| 400 | `spot_token_invalid`, `spot_self`, `challenge_invalid` | Einladungscode kaputt / eigener Code / Challenge ungültig oder benutzt |
 | 401 | `unauthorized`, `unknown_device`, `bad_signature`, `replay`, `timestamp_out_of_range` | Signatur-Probleme. `unknown_device` → neu registrieren (`POST /v1/devices`) |
 | 402 | `insufficient_funds` | Guthaben reicht nicht für die Reservierung (`details.requiredMicro`, `availableMicro`) |
 | 402 | `purchase_invalid` | Store bestätigt den Kauf nicht |
@@ -91,12 +91,12 @@ Jeder Fehler: passender HTTP-Status und
 | 403 | `photos_not_enabled` | Foto-Upload ohne Foto-Freigabe |
 | 409 | `chat_not_enabled` | KI-Chat-Verbindung nicht eingeschaltet (`POST /v1/chat/enable`) |
 | 413 | `sync_quota_exceeded`, `doc_too_large`, `photo_too_large` | Speichergrenze der KI-Chat-Verbindung (`details.maxDocs`/`maxBytes`/`maxPhotos`) |
-| 409 | `spot_token_used`, `spot_already_redeemed`, `spot_device_used` | Spot schon eingelöst (Token / dieses Konto / dieses Gerät) |
+| 409 | `spot_token_used`, `spot_already_redeemed`, `spot_device_used` | Einladung schon eingelöst (Token / dieses Konto / dieses Gerät) |
 | 410 | `spot_token_expired` | QR-Code abgelaufen, neu scannen |
 | 413 | `body_too_large` | Anfrage größer als `MAX_BODY_BYTES` (Standard 8 MB) |
 | 429 | `rate_limited` | Zu viele Anfragen (`details.retryAfterSec`) |
-| 429 | `spot_inviter_limit` | Einladender hat diesen Monat alle Spots vergeben |
-| 429 | `spot_budget_exhausted` | Globales Monatsbudget für Spots aufgebraucht |
+| 429 | `spot_inviter_limit` | Einladender hat diesen Monat alle Einladungen vergeben |
+| 429 | `spot_budget_exhausted` | Globales Monatsbudget für Einladungsboni aufgebraucht |
 | 500 | `internal_error` | |
 | 400 | `upstream_rejected` | KI-Anbieter lehnt die Anfrage ab (z. B. Schema), **nichts abgebucht**, kein Ausweichen |
 | 400 | `images_not_supported` | Bilder an eine Stufe ohne Bildverarbeitung (`lite`) |
@@ -104,7 +104,7 @@ Jeder Fehler: passender HTTP-Status und
 | 503 | `not_configured` | Server-Secret fehlt (Betreiberfehler, keine KI-Stufe verfügbar) |
 | 503 | `tier_unavailable` | Angefragte Stufe nicht konfiguriert (`details.available`) |
 | 503 | `purchases_unavailable` | Käufe sind (noch) nicht freigeschaltet → Kauf-UI ausblenden |
-| 503 | `attestation_unavailable` | Spot ist (noch) nicht freigeschaltet |
+| 503 | `attestation_unavailable` | Einladungen sind (noch) nicht freigeschaltet |
 | 504 | `upstream_unavailable` | Zeitüberschreitung, **nichts abgebucht** |
 
 ## Öffentliche Endpunkte (ohne Signatur)
@@ -128,8 +128,8 @@ Jeder Fehler: passender HTTP-Status und
   "spot": { "starterMicro": 1000000, "rewardMicro": 1000000, "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
 }
 ```
-`mode`: `production` oder `test`. **`test` = Testserver** (`DEPLOY_MODE=test`): keine Geräteprüfung beim Spot-Einlösen (Token `test:<geräte-id>`,
-ein Spot je Gerät), neues Konto bekommt Test-Startguthaben (Buchungstyp `test_credit`), niedrige Limits; die App zeigt unter Guthaben „Testserver“.
+`mode`: `production` oder `test`. **`test` = Testserver** (`DEPLOY_MODE=test`): keine Geräteprüfung beim Einlösen einer Einladung (Token `test:<geräte-id>`,
+eine Einladung je Gerät), neues Konto bekommt Test-Startguthaben (Buchungstyp `test_credit`), niedrige Limits; die App zeigt unter Guthaben „Testserver“.
 Produktion kennt kein `test:`-Token. Nur der exakte Wert `test` schaltet den Testbetrieb frei.
 Modellpreise in µ€ je 1 Mio. Token ohne Aufschlag (für Kostenschätzung in der App), jeweils der heute gültige Preis.
 `displayName`/`vendor`/`label`: echter Modellname und Anbieter für die UI (kein Marketingname). `usageProfiles`: typische Token-Mengen je
@@ -178,7 +178,7 @@ Body: `{ "publicKey": "<base64url>" }`. → `201` (neu) oder `200` (schon regist
 `balanceMicro` = nutzbares Guthaben (nicht verfallen) minus laufende Reservierungen. `expiring` = noch offene, verfallende Posten (Startguthaben/Belohnungen).
 
 ### `PUT /v1/account/profile`
-Body `{ "displayName": "Fabian" }` (≤ 24 Zeichen, `null` oder `""` löscht). → `{ "displayName": "Fabian" }`. Der Name wird nur beim Einlösen eines Spots an den Eingeladenen ausgeliefert (freiwillig).
+Body `{ "displayName": "Fabian" }` (≤ 24 Zeichen, `null` oder `""` löscht). → `{ "displayName": "Fabian" }`. Der Name wird nur beim Einlösen einer Einladung an den Eingeladenen ausgeliefert (freiwillig).
 
 ### `GET /v1/account/ledger?limit=50&before=<id>`
 `limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|spot_bonus|spot_reward", "amountMicro": -6956, "model": "gemini-3.6-flash", "tier": "standard", "fallback": false, "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv. Bei `usage`: `model` = tatsächlich genutztes Modell, `tier` = angefragte und abgerechnete Stufe (alte Buchungen: `null`).
@@ -284,7 +284,7 @@ Posten `kind = code` (verfällt nicht), Buchung `type = code_redeem`, `source = 
 
 Buchungen (`/v1/account/ledger`) tragen dafür das Feld `source` (`null` | `web` | `code`).
 
-## Spot (Einladungen)
+## Einladungen (Empfehlungsprogramm; Pfade und Felder heißen aus Kompatibilitätsgründen weiter `spot`)
 
 Ablauf: Einladender holt Token → zeigt QR (Token + Installationslink, alle ~30 s neu holen) → Neuer scannt → App holt Challenge → Play Integrity / App Attest mit der Challenge → Einlösen.
 
@@ -303,7 +303,7 @@ Body:
 ```json
 { "grantedMicro": 1000000, "expiresAt": 1777777777, "inviter": { "displayName": "Fabian" }, "balanceMicro": 1000000 }
 ```
-`inviter.displayName` ist `null`, wenn der Einladende keinen Namen gesetzt hat (Reveal zeigt dann „Spot“ ohne Namen). Regeln: Token gültig & unbenutzt; einmal pro Konto **und** pro Gerät (Gerätekennung aus der Attestierung, übersteht Neuinstallation); höchstens 10 Spots/Monat je Einladendem; globales Monatsbudget (jeder Spot kostet Startguthaben + Belohnung); Startguthaben verfällt nach 180 Tagen, gilt nur für Coach-Anfragen und ist nicht auszahlbar. Der Einladende bekommt seine Gutschrift (1 €, ebenfalls 180 Tage gültig) automatisch bei der **ersten abgerechneten Coach-Anfrage** des Eingeladenen – ohne Meldung an den Eingeladenen. Ohne konfigurierte Attestierung: `503 attestation_unavailable` (sideloaded APKs bekommen kein Startguthaben).
+`inviter.displayName` ist `null`, wenn der Einladende keinen Namen gesetzt hat (Reveal zeigt dann „Einladung“ ohne Namen). Regeln: Token gültig & unbenutzt; einmal pro Konto **und** pro Gerät (Gerätekennung aus der Attestierung, übersteht Neuinstallation); höchstens 10 Einladungen/Monat je Einladendem; globales Monatsbudget (jede Einladung kostet Startguthaben + Belohnung); Startguthaben verfällt nach 180 Tagen, gilt nur für Coach-Anfragen und ist nicht auszahlbar. Der Einladende bekommt seine Gutschrift (1 €, ebenfalls 180 Tage gültig) automatisch bei der **ersten abgerechneten Coach-Anfrage** des Eingeladenen – ohne Meldung an den Eingeladenen. Ohne konfigurierte Attestierung: `503 attestation_unavailable` (sideloaded APKs bekommen kein Startguthaben).
 
 ## Rate-Limits (Standardwerte, konfigurierbar)
 Gerät: 60 Anfragen/min, `/v1/messages`: 10/min, Registrierung: 20/h je IP, Kauf/Challenge/Einlösen/Restore: 10/h je Gerät (Einlösen/Restore zusätzlich 30/h je IP). Überschreitung → `429 rate_limited`.

@@ -183,7 +183,7 @@ fun AboutScreen(versionName: String, onBack: () -> Unit, fuel: FuelAccess? = nul
 
 private const val DEV_TAPS = 7
 
-/** Hidden developer settings: override of the Fuel/Spot backend URL. */
+/** Hidden developer settings: override of the credit/invite backend URL. */
 @Composable
 private fun DeveloperSection(fuel: FuelAccess) {
     val f = LocalFuelStrings.current

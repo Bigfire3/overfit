@@ -3,7 +3,7 @@ import { currentPrices } from './providers';
 
 /**
  * Einziger Aufschlag auf alle Modellpreise (Basispunkte). Herleitung und Tabellen: docs/monetization.md „Rechnung“.
- * 2800 = 28 %: deckt im Web (Stripe, Kleinunternehmer ohne USt) Zahlungsgebühr und Spot-Gutschriften (10 % vom Netto)
+ * 2800 = 28 %: deckt im Web (Stripe, Kleinunternehmer ohne USt) Zahlungsgebühr und Einladungsboni (10 % vom Netto)
  * und lässt beim kleinsten Paket (5 €) noch 5 % vom Netto, ab 10 € über 7 %. Der Store trägt seine USt und Gebühr
  * selbst über einen offen ausgewiesenen Aufpreis (Store-Preis > Guthaben, siehe DEFAULT_PACKAGES).
  */

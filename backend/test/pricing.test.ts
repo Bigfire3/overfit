@@ -6,7 +6,7 @@ import { baseEnv } from './helpers';
 
 /**
  * Die Rechnung aus docs/monetization.md „Rechnung“ als Test: Bei vollständig verbrauchtem Guthaben bleibt in jedem
- * angebotenen Kanal und Paket nach USt (nur Store), Gebühr, Anbieterkosten und Spot-Rücklage mindestens 5 % vom Netto.
+ * angebotenen Kanal und Paket nach USt (nur Store), Gebühr, Anbieterkosten und Rücklage für Einladungsboni mindestens 5 % vom Netto.
  */
 // Web (Stripe, Kleinunternehmer nach § 19 UStG: keine USt). Gebühren laut stripe.com/de/pricing (geprüft 3.11.2026):
 // EWR-Standardkarten 1,5 % + 0,25 €, EWR-Premiumkarten 2,8 % + 0,25 €, UK 2,5 % + 0,25 €, Nicht-EWR 3,15 % + 0,25 €,
@@ -18,7 +18,7 @@ const STRIPE_WORST = [
 ];
 const STORE_FEE = 0.15; // Small-Business-Programm, auf den Preis ohne USt
 const STORE_VAT = [0.19, 0.27]; // DE und höchster EU-Satz (HU)
-const SPOT_SHARE = 0.1; // Spot-/Test-Gutschriften als Anteil am Netto
+const SPOT_SHARE = 0.1; // Einladungsboni/Test-Gutschriften als Anteil am Netto
 const MIN_PROFIT_SHARE = 0.05; // Untergrenze (Ziel: 7 %)
 const TARGET_PROFIT_SHARE = 0.07;
 

@@ -40,7 +40,7 @@ fun <T> rememberLoaded(key: Any?, block: suspend () -> T): Pair<Loaded<T>, () ->
     return state.value to { nonce++ }
 }
 
-/** Two-pixel progress line on a hairline track (rotation of the Spot code, etc.). */
+/** Two-pixel progress line on a hairline track (rotation of the invite code, etc.). */
 @Composable
 fun HairlineProgress(fraction: Float, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(2.dp).background(Theme.colors.hairline)) {
@@ -48,7 +48,7 @@ fun HairlineProgress(fraction: Float, modifier: Modifier = Modifier) {
     }
 }
 
-/** Friendly text for a Spot redeem error. */
+/** Friendly text for an invite redeem error. */
 fun spotErrorText(code: String, t: FuelStrings): String = when (code) {
     "spot_token_invalid", "challenge_invalid", "invalid_request" -> t.spotErrInvalid
     "spot_token_used" -> t.spotErrUsed

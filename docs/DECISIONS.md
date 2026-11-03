@@ -882,6 +882,13 @@ Fabians Entscheidung (Geld): „1:1 mit höherer Marge“. Guthaben = Kaufpreis 
 - **Verworfen:** Abzug beim Kauf (widerspricht 1:1); eigener Aufschlag je Kanal (das Guthaben ist kanalübergreifend dasselbe und wird beim Verbrauch nicht nach Herkunft getrennt; ein Wert ist einfacher und ehrlicher).
 - **Offen für später:** Bei Paddle für kleine Pakete bessere Konditionen anfragen; bei Wechselkurs- oder Preisänderungen der Modelle `backend/test/pricing.test.ts` anpassen und Aufschlag neu rechnen.
 
+## „Spot“ heißt jetzt „Einladung“ (Session AC, 3.11.)
+Fabian: „Benenne Spot um in das, was es ist. Referral-Programm mit Einladung und so weiter.“ Der Name „Spot“ war nicht selbsterklärend.
+- **Sichtbare Begriffe:** DE „Freunde einladen“ (Menüpunkt und Titel), „Einladung einlösen“, „Einladung von <Name>“, „Einladungscode“, Bonus „Einladungsbonus: 1 € Guthaben für dich und deinen Freund“; in erklärenden Texten zusätzlich „Empfehlungsprogramm“. EN „Invite friends“, „Redeem invite“, „Invitation from <name>“, „Referral bonus“, „referral program“. Ledger-Bezeichnungen: „Einladungsbonus“ bzw. „Referral bonus“ (für beide Seiten; der Einladende sieht den Zusatz „Freund eingeladen“). „Spot“ steht in keinem sichtbaren Text mehr (App, Web, Store-Texte, README, Docs, Deploy-Summary).
+- **Technik bleibt bewusst „spot“:** Code-Bezeichner, API-Pfade (`/v1/spot/*`), Fehlercodes (`spot_*`), DB-Spalten/Tabellen, Ledger-Typen (`spot_bonus`, `spot_reward`) und Config-Namen (`SPOT_*`). Ein Umbenennen würde die Server-API, Migrationen und deployte Secrets/Variablen brechen, ohne dass Nutzer etwas davon sehen.
+- **Link-Alias:** Neue QR-Codes/Links erzeugen `overfit://invite#<token>`; die App liest zusätzlich `overfit://spot#…`, damit alte QR-Codes und Links weiter gehen. Beide laufen über denselben URL-Scheme-Handler (`overfit`), das Manifest bzw. die Info.plist bleiben unverändert. Test: `FuelBasicsTest.spotTokenParsing`.
+- Reveal-Animation und Haptik unverändert, nur der Text.
+
 ## Web-Kauf über Stripe, Store-Aufpreis offen, Aufschlag 28 % (Session AB, 3.11.)
 Fabians Entscheidung (Geld): „Ja, mit Stripe umbauen und Store-Aufpreis ausweisen. Ich bin schon Kleinunternehmer.“ Rechnung mit Tabellen:
 docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer und Schwellen“.

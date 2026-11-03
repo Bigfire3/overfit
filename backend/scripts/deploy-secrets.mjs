@@ -93,7 +93,7 @@ export function plan(mode, env, existing) {
   }
   if (skipped.length) {
     notes.push(`Optional übersprungen (kein GitHub-Secret gesetzt): ${skipped.map((n) => `\`${n}\``).join(', ')}. ` +
-      'Das sind die Store-Prüfer für echte Käufe und Spot-Geräteprüfung; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
+      'Das sind die Store-Prüfer für echte Käufe und Geräteprüfung für Einladungen; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
   }
   return { secrets, notes, errors, generated, webPurchase };
 }
