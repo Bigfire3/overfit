@@ -51,10 +51,10 @@ export class Client {
     return c;
   }
 
-  async sign(method: string, path: string, body: string, over: { ts?: number; nonce?: string } = {}) {
+  async sign(method: string, path: string, body: string | Uint8Array, over: { ts?: number; nonce?: string } = {}) {
     const ts = String(over.ts ?? Math.floor(Date.now() / 1000));
     const nonce = over.nonce ?? b64uEncode(crypto.getRandomValues(new Uint8Array(16)));
-    const text = canonicalString(method, path, ts, nonce, hex(await sha256(new TextEncoder().encode(body))));
+    const text = canonicalString(method, path, ts, nonce, hex(await sha256(typeof body === 'string' ? new TextEncoder().encode(body) : body)));
     let sig: Uint8Array = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, this.keys.privateKey, new TextEncoder().encode(text)));
     if (this.der) sig = derFromRaw(sig);
     return {
@@ -71,6 +71,18 @@ export class Client {
     const res = await worker.fetch(new Request('https://x.test' + path, { method, headers, body: text || undefined }), this.env, ctx);
     return { status: res.status, body: (await res.json()) as any, headers: res.headers };
   }
+
+  /** Signierte Anfrage mit Binär-Body (z. B. Foto-Upload). */
+  async callRaw(method: string, path: string, bytes: Uint8Array, contentType = 'image/jpeg'): Promise<RawCallResult> {
+    const headers = { ...(await this.sign(method, path, bytes)), 'content-type': contentType };
+    const res = await worker.fetch(new Request('https://x.test' + path, { method, headers, body: bytes }), this.env, ctx);
+    return { status: res.status, body: (await res.json()) as any };
+  }
+}
+
+export interface RawCallResult {
+  status: number;
+  body: any;
 }
 
 export async function rawFetch(path: string, e: Env, init?: RequestInit) {

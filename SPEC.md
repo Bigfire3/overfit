@@ -21,6 +21,8 @@ Nicht im Onboarding: Sprache (Gerät/Einstellungen), Ziel, Größe, Erfahrung, E
 ## KI-Zugang
 - Zuerst nur eigener API-Key (BYOK). Anbieter austauschbar hinter `LlmProvider` (aktuell OpenRouter, Anthropic, OpenAI). Aufrufe direkt vom Gerät per HTTP (Ktor).
 - Später **Credits** für Nutzer ohne eigenen Key: eigenes Backend als zweite `LlmProvider`-Implementierung. Auf iOS ist dafür In-App-Purchase Pflicht (App Store Guideline 3.1.1), auf Android Google Play Billing. Mit eigenem Key bleibt die App komplett kostenlos. Details unten unter „Coach-Guthaben“.
+- **Fünf Wege zur KI** (Einstellungsseite „KI-Coach“): eigener API-Key, Fuel, und als Chat-Verbindung Claude, ChatGPT,
+  Gemini – dort nutzt man das eigene Chat-Abo, ohne Key und ohne Fuel (Details unter „KI-Chat-Verbindungen“).
 - Jede Anfrage bekommt einen kleinen Profil-Block (Name, Alter aus Geburtsjahr, neuestes Gewicht mit Datum, Antwortsprache, Einheiten, heutiges Datum).
 
 ## Tech-Stack
@@ -110,7 +112,8 @@ API-Key: Eingabe im Onboarding oder in den Einstellungen, Prüfung beim Verbinde
 
 ## Bewusst NICHT
 Login-Accounts, Cloud-Sync, Social-Feed, Gamification, Werbung, Tracking, Übungsanleitungen, Videos, Animationen.
-Erlaubt sind: einzelne Trainings per Link/QR teilen und das optionale Coach-Guthaben mit anonymer Geräte-Identität.
+Erlaubt sind: einzelne Trainings per Link/QR teilen, das optionale Coach-Guthaben mit anonymer Geräte-Identität und die
+ausdrücklich freiwillige KI-Chat-Verbindung (verschlüsselter Upload nur für Claude/ChatGPT/Gemini, siehe unten).
 
 ## Phasen
 0. Projekt-Setup: Gradle-Projekt, App-Gerüst, Keystore, CI mit Release „latest", README, docs/DECISIONS.md → erstes installierbares APK ✔
@@ -124,6 +127,8 @@ Erlaubt sind: einzelne Trainings per Link/QR teilen und das optionale Coach-Guth
 7. Credits-System (eigenes Backend, In-App-Purchase)
 8. Trainings teilen: Share-Link, Share-Sheet (WhatsApp, Quick Share, AirDrop), QR anzeigen/scannen, Import mit Vorschau, Web-Fallback-Seite (kann nach Phase 3 vorgezogen werden)
 9. Einladen per QR mit Startguthaben, Attestierung, Missbrauchsschutz (setzt Phase 6 und 7 voraus)
+10. KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per Remote-MCP): 10a Backend + Konzept ✔ (Nacht 3.11.), 10b App-Seite
+    (Einstellungsseite mit fünf KI-Wegen, Kopplungscode, Sync, Eingang mit Import-Vorschau, „Kontext kopieren“; nach Phase 3)
 Später als Spielerei: NFC-Einladung.
 
 ## Erweiterung: Teilen, Open Source, Coach-Guthaben
@@ -158,3 +163,38 @@ Später als Spielerei: NFC-Einladung.
 - Erledigt: Signatur über GitHub-Secrets mit neuem Schlüssel, `signing/` entfernt, Lizenz Apache-2.0 (`LICENSE`). Die Workout-Guide-Grafiken bleiben CC BY-SA 4.0, Inter bleibt OFL.
 - Vor dem Veröffentlichen: Git-Historie mit `scripts/purge-old-signing-history.sh` bereinigen (alter Schlüssel und Passwort).
 - Vor dem Start des Guthabenverkaufs (nicht Teil des Codes, bitte vorher fachlich prüfen lassen): Gewerbe, Umsatzsteuer, Impressum, Datenschutzerklärung (Körperfotos laufen durch den Proxy: ausdrückliche Einwilligung, keine Speicherung, Auftragsverarbeitung mit Anthropic), AGB/Widerruf für digitale Inhalte.
+
+## KI-Chat-Verbindungen (Phase 10)
+
+Ziel: Wer schon ein Claude-, ChatGPT- oder Gemini-Abo hat, kann dort im normalen Chat mit seinen Overfit-Daten arbeiten –
+Trainings auswerten, über das Training „philosophieren“, den Fortschritt bewerten und neue Vorlagen anlegen – ohne
+eigenen API-Key und ohne Fuel. Die angelegte Vorlage öffnet man danach in der App und trainiert sie einfach.
+
+### Plattformen (Stand Nov. 2026)
+- **Claude:** Custom Connectors = Remote-MCP-Server (Streamable HTTP) mit OAuth 2.1 + PKCE; Client-Registrierung per DCR oder
+  Client ID Metadata Document. Web, Desktop und Mobile; später Eintrag im Connector-Verzeichnis.
+- **ChatGPT:** Apps/Connectors auf Basis von MCP (Apps SDK). Eigene Server über den Entwicklermodus (je nach Tarif, Schreib-
+  Tools teils nur in Business/Enterprise), OAuth mit DCR. Später öffentliche App im Apps-Verzeichnis.
+- **Gemini:** „Eigene Apps“ (Remote-MCP-URL, OAuth) in der Gemini-App, derzeit nur eingeschränkt verfügbar (privates Konto,
+  USA, Englisch). **Ersatzweg überall dort, wo kein Connector geht** (Gemini in DE, ChatGPT ohne Entwicklermodus): ein Gem
+  bzw. Custom GPT mit Anleitung aus der App, „Kontext kopieren“ in der App (kompakter Text: Profil, Gedächtnis, letzte
+  Trainings, Fortschritt der Hauptübungen; Fotos einzeln anhängen) und Rückweg über den Teilen-Link
+  `https://…/t#<payload>` (Antippen oder Zwischenablage → Import-Vorschau).
+
+### Architektur
+- **Ein** Remote-MCP-Server im vorhandenen Backend (`backend/`, Cloudflare Worker) unter `/mcp`, den alle drei Plattformen
+  nutzen. OAuth-Autorisierungsserver im selben Worker (Metadaten, DCR, CIMD, PKCE S256, rotierende Refresh-Tokens, Widerruf).
+- **Ausdrücklich freiwillige Synchronisation** („KI-Chat verbinden“): Die App lädt Profil, Coach-Gedächtnis, Vorlagen und
+  Trainings (inkl. laufendem) hoch, Körperfotos nur mit separatem Häkchen. Gespeichert in D1 (Fotos in R2),
+  AES-256-GCM-verschlüsselt mit kontoabhängigem Schlüssel, gebunden an die anonyme Geräte-Identität. Abschalten löscht
+  serverseitig alles und trennt alle Chats. Keine Ende-zu-Ende-Verschlüsselung (der Server muss für den Chat lesen).
+- **Anmeldung ohne Konto:** Die Plattform öffnet die Overfit-Anmeldeseite; dort tippt man einen 8-stelligen Kopplungscode ein,
+  den die App anzeigt (10 min gültig, einmalig). Verbindungen sind in der App sichtbar und einzeln widerrufbar.
+- **Rückweg in die App:** Der Chat legt Vorlagen (Teilen-Format v1) und Notizen/Auswertungen in einen **Eingang**. Die App
+  holt ihn beim Öffnen ab und zeigt dieselbe Import-Vorschau wie beim Teilen-Link; nichts ändert sich ohne Bestätigung.
+  Jede angelegte Vorlage kommt zusätzlich als Import-Link zurück (funktioniert auch ohne Sync-Abruf).
+- **Tools:** Profil/Ziele/Gedächtnis, Vorlagen, Trainingsliste und -detail, laufendes Training, trainierte Übungen,
+  Fortschritt je Übung (Top-Satz, e1RM, Volumen, Bestwerte, Veränderung), Katalogsuche (gültige IDs), Fotos (nur mit
+  Freigabe, als Bild), Vorlage anlegen/ändern, Notiz hinterlegen. Vertrag: `docs/backend-api.md`.
+- **Fünf Wege nebeneinander:** Der In-App-Coach (Phase 4) läuft weiter über eigenen Key oder Fuel. Die Chat-Verbindung ist
+  zusätzlich; Auswertungen aus dem Chat landen als Notiz am Training, nicht als In-App-Coach-Bewertung.

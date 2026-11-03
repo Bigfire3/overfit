@@ -13,6 +13,33 @@
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | offen |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
+| 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite offen (nach Phase 3) |
+
+## Nacht 3.11. – KI-Chat-Verbindungen, Teil 1: Konzept + Backend (Session E)
+Fertig (kein App-Code angefasst):
+- SPEC „KI-Chat-Verbindungen (Phase 10)“, fünf KI-Wege; DECISIONS inkl. „Zur Prüfung durch Fabian“ (Opt-in-Ausnahme vom
+  „kein Cloud-Sync“)
+- `backend/src/chat/`: Remote-MCP-Server `/mcp` (13 Tools, 3 Prompts), OAuth 2.1 (DCR, Client ID Metadata Documents, PKCE,
+  Refresh-Rotation, Widerruf) mit Anmeldeseite per Kopplungscode, Sync-API (Snapshot/Inkremente, Fotos in R2, Eingang,
+  Abschalten löscht alles), AES-GCM at rest, Limits. Migration `0002_chat.sql` (nur neue Tabellen). 16 neue Tests (58 gesamt)
+- API-Vertrag für Teil 2: `docs/backend-api.md` → „KI-Chat-Verbindung“; Eintragen in Claude/ChatGPT/Gemini: `backend/README.md`
+
+Offen (Teil 2, App): Einstellungsseite „KI-Coach“ mit den fünf Wegen, „KI-Chat verbinden“ (Einwilligung, Foto-Häkchen,
+Kopplungscode, Verbindungen trennen), Sync, Eingang mit Import-Vorschau, „Kontext kopieren“ + Gem-Anleitung.
+
+### Von Fabian zu tun (zusätzlich zu Punkt 2 unten)
+1. Beim Cloudflare-Deployment zusätzlich: Secret `SYNC_ENCRYPTION_KEY` (32 Zufallsbytes Base64url, nie wieder ändern), R2
+   aktivieren und `npx wrangler r2 bucket create overfit-chat-photos`, `npm run db:migrate:remote` (spielt `0002_chat.sql` ein).
+2. Danach Connector eintragen: Claude → Einstellungen → Connectors → Custom Connector, URL `https://<worker>/mcp`; ChatGPT →
+   Entwicklermodus → Connector erstellen (OAuth); Gemini → Eigene Apps (falls im Konto verfügbar). Genaue Schritte in
+   `backend/README.md`. Anmelden geht erst mit Teil 2 (Kopplungscode aus der App); bis dahin testbar mit dem MCP Inspector.
+3. Datenschutzerklärung vor dem Store-Start um die KI-Chat-Verbindung ergänzen (siehe DECISIONS).
+
+### Bitte testen (nach dem Deployment, noch ohne App-Teil 2)
+1. `https://<worker>/.well-known/oauth-authorization-server` im Handy-Browser öffnen → JSON mit `authorization_endpoint`
+2. In claude.ai den Custom Connector mit `https://<worker>/mcp` hinzufügen → „Verbinden“ öffnet die schwarz-weiße
+   Overfit-Seite „Overfit verbinden“ mit Feld „Kopplungscode“ (Deutsch bei deutscher Browsersprache); falscher Code →
+   Hinweis „Code falsch oder abgelaufen“. Der echte Code kommt mit Teil 2 aus der App.
 
 ## Nacht 3.11. – Backend Fuel/Spot + Web-Fallback (Session C)
 Fertig (kein App-Code angefasst):
