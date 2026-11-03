@@ -15,6 +15,23 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Ticken vor Pausenende (Session AG, 3.11.)
+**Erledigt:** In den letzten 3 Sekunden der Pause tickt es (3, 2, 1), danach das gewohnte Pausenende. Schalter „Ticken vor Pausenende“
+im Profil unter „Vibration“, Standard an. Funktioniert im Hintergrund, in anderen Apps und bei gesperrtem Bildschirm (Android: eigener
+exakter Alarm, Ton über die Medienlautstärke, Musik wird nur kurz leiser; iOS: Benachrichtigung mit eigenem Ton, im Vordergrund spielt
+die App selbst). Ton synthetisch erzeugt. Details und Lautlos-Verhalten in DECISIONS.md. Tests: `RestTicksTest`, `RestTickAlarmTest`
+(Robolectric), Controller- und AppStore-Tests.
+**Offen:** iOS im Lautlos-Modus und App im Hintergrund: kein Ticken (Systemgrenze, nur Vibration).
+
+### Bitte auf dem Handy testen (Session AG)
+1. Spotify laufen lassen, Training starten, Satz abhaken (kurze Pause, z. B. 15 s Standardpause im Profil). In eine andere App
+   wechseln: bei 3, 2, 1 s drei Klicks, Musik wird kurz leiser und läuft weiter, dann die „Pause vorbei“-Benachrichtigung.
+2. Dasselbe mit gesperrtem Bildschirm und mit Handy auf lautlos: Klicks trotzdem hörbar (Medienlautstärke > 0).
+3. App offen lassen: Klicks genau einmal (nicht doppelt), Timer läuft im Takt aus.
+4. Während der Pause +15 s / −15 s / Überspringen: Klicks kommen nur zum neuen Ende bzw. gar nicht. Pause auf unter 3 s kürzen: kein Ticken.
+5. Profil → „Ticken vor Pausenende“ aus: keine Klicks mehr, Vibration/Benachrichtigung wie gehabt.
+6. Falls „Genaue Pausen-Benachrichtigungen“ nicht erlaubt ist: Ticken kann entfallen (bewusst, lieber kein als falsches Ticken).
+
 ## Feedback-Runde 3: UI (Session AE, 3.11.)
 **Erledigt** (enthält PR #56: Push/Pull/Legs ab dem ersten Start, keine „Beispiel-Workouts hinzufügen“-Zeile mehr):
 - Übergänge: Ursache (700-ms-Standardüberblendung, Leisten springen, Doppel-Taps wirken) behoben; Tabs sofort, sonst kurzes Fade-through,

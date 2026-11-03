@@ -75,6 +75,9 @@
             android:name="app.overfit.platform.RestAlarmReceiver"
             android:exported="false" />
         <receiver
+            android:name="app.overfit.platform.RestTickReceiver"
+            android:exported="false" />
+        <receiver
             android:name="app.overfit.platform.RestActionReceiver"
             android:exported="false" />
 

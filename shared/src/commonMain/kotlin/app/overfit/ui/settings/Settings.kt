@@ -128,6 +128,10 @@ fun SettingsScreen(
         ListRow(t.vibration) {
             Segmented(state.settings.vibration, listOf(true to t.on, false to t.off), store::setVibration)
         }
+        ListRow(t.restTicks) {
+            Segmented(state.settings.restTicks, listOf(true to t.on, false to t.off), store::setRestTicks)
+        }
+        Text(t.restTicksHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         if (exactAllowed == false) {
             ListRow(t.exactAlarm, t.exactAlarmAllow, onClick = restAlerts::openExactAlarmSettings)
             Text(t.exactAlarmHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)

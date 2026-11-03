@@ -189,6 +189,77 @@ class WorkoutControllerTest {
     }
 
     @Test
+    fun ticks_appPlaysThemThreeSecondsBeforeTheEndWhenThePlatformAsks() = runTest {
+        val e = env()
+        e.alerts.appPlays = true
+        e.started()
+        e.c.toggleSet(e.setId(0, 0))
+        val alert = e.alerts.pending!!
+        assertTrue(alert.ticks)
+        assertEquals("Noch 3 Sekunden", alert.ticksBody)
+        runCurrent()
+        advanceTimeBy(56_999)
+        runCurrent()
+        assertEquals(0, e.alerts.ticksPlayed)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(1, e.alerts.ticksPlayed)
+        advanceTimeBy(3_000)
+        runCurrent()
+        assertNull(e.w.rest)
+        assertEquals(1, e.alerts.ticksPlayed)
+    }
+
+    @Test
+    fun ticks_notWhenOffOrLeftToThePlatform() = runTest {
+        val e = env()
+        e.prefs = WorkoutPrefs(ticks = false)
+        e.alerts.appPlays = true
+        e.started()
+        e.c.toggleSet(e.setId(0, 0))
+        assertFalse(e.alerts.pending!!.ticks)
+        advanceTimeBy(61_000)
+        runCurrent()
+        assertEquals(0, e.alerts.ticksPlayed)
+
+        // On (default), but the platform plays them itself (Android alarm).
+        e.prefs = WorkoutPrefs()
+        e.alerts.appPlays = false
+        e.c.toggleSet(e.setId(0, 1))
+        assertTrue(e.alerts.pending!!.ticks)
+        advanceTimeBy(61_000)
+        runCurrent()
+        assertEquals(0, e.alerts.ticksPlayed)
+    }
+
+    @Test
+    fun ticks_skippedOrExtendedRestTicksOnlyAtTheNewEnd() = runTest {
+        val e = env()
+        e.alerts.appPlays = true
+        e.started()
+        e.c.toggleSet(e.setId(0, 0))
+        runCurrent()
+        advanceTimeBy(50_000)
+        e.c.adjustRest(15) // ends at 75 s now
+        runCurrent()
+        advanceTimeBy(10_000) // 60 s: the old tick time has passed
+        runCurrent()
+        assertEquals(0, e.alerts.ticksPlayed)
+        advanceTimeBy(12_000) // 72 s
+        runCurrent()
+        assertEquals(1, e.alerts.ticksPlayed)
+
+        e.c.toggleSet(e.setId(0, 1))
+        runCurrent()
+        advanceTimeBy(10_000)
+        e.c.skipRest()
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(1, e.alerts.ticksPlayed)
+        assertNull(e.alerts.pending)
+    }
+
+    @Test
     fun adjustRest_plusExtendsAndReschedules() = runTest {
         val e = env()
         e.started()

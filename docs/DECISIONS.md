@@ -996,3 +996,32 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   Rahmen, nicht auf der gleitenden Zeile (sonst schrumpfen die Deltas). Das ×-Icon je Satz entfällt. Tests: Komponente + Editor.
 - **Editor-Kopf:** Name groß als Eingabe mit Stift daneben (fokussiert das Feld), darunter „Bearbeitungsmodus“; Übungsbild mit „?“ öffnet
   die Übungsdetails. Langes Drücken auf den Übungskopf verschiebt weiter per Ziehen.
+
+## Ticken vor Pausenende (Session AG, 3.11.)
+- **Was:** Bei 3, 2 und 1 s Restzeit je ein kurzer Klick, danach wie bisher das Pausenende (Benachrichtigung/Vibration). Schalter
+  „Ticken vor Pausenende“ im Profil unter „Vibration“, Standard an (fehlt das Feld im gespeicherten Zustand, gilt an). Eine Pause, die
+  beim Planen (z. B. nach −15 s) weniger als 3 s übrig hat, tickt nicht (kein halber Countdown).
+- **Ein Ton für alle drei Ticks:** `RestTicks` (commonMain) erzeugt eine 2,06-s-Tonfolge synthetisch (Sinus-Burst 1,8 kHz, 45 ms, schnell
+  abklingend, 0/1/2 s), keine fremden Sounds. So muss jede Plattform nur *einen* Ton zum Zeitpunkt Ende − 3 s starten, und die Ticks
+  bleiben untereinander exakt im Takt. Planung (`RestTicks.startAt`, Toleranz `onTime` 700 ms) ist gemeinsamer, getesteter Code.
+- **Android:** Zweiter exakter Alarm (`setExactAndAllowWhileIdle`, ohne Erlaubnis die inexakte Variante) bei Ende − 3 s auf
+  `RestTickReceiver`. Neu planen ersetzt ihn (gleicher PendingIntent), Überspringen/Verwerfen/Beenden bricht ihn ab, Einstellung aus
+  oder < 3 s übrig = kein Tick-Alarm (Robolectric-Test). Kommt der Alarm mehr als 0,7 s zu spät (keine Exakt-Erlaubnis), entfällt das
+  Ticken, statt falsch zu zählen. Der Receiver spielt per `AudioTrack` mit `USAGE_ASSISTANCE_NAVIGATION_GUIDANCE` (Medienstrom, also
+  Medienlautstärke wie die Musik) und Audiofokus `GAIN_TRANSIENT_MAY_DUCK`: Spotify wird kurz leiser, nicht pausiert. `goAsync()` hält
+  den Broadcast offen, solange der Ton läuft; damit deckt der Wakelock des Alarms die 2 s ab – kein eigener Wakelock, kein
+  Foreground-Service. Der Alarm spielt auch, wenn die App offen ist (die App selbst tickt auf Android nie), so gibt es nie doppelte Ticks.
+  ±15 s während des Tickens stoppt den Ton. **Lautlos-Modus:** Ticks hörbar (Medienstrom ist vom Klingelmodus unabhängig); nur bei
+  Medienlautstärke 0 still. „Bitte nicht stören“ lässt Medien standardmäßig durch.
+- **iOS:** Im Hintergrund läuft kein App-Code, daher eine zweite lokale Benachrichtigung bei Ende − 3 s („Pause · Noch 3 Sekunden“)
+  mit eigenem Ton. Der WAV wird einmal nach `Library/Sounds` geschrieben (dort darf iOS Benachrichtigungstöne laden, kein
+  Bundle-/XcodeGen-Eingriff nötig; Name versioniert, weil iOS Töne cacht). Im Vordergrund zeigt iOS die Benachrichtigung ohne Delegate
+  nicht an, dann spielt die App denselben Ton selbst (`WorkoutController` fragt `RestAlerts.appPlaysTicks()` = App aktiv) über
+  `AVAudioPlayer` mit Kategorie `playback` + `mixWithOthers` + `duckOthers`, danach Sitzung freigeben mit `notifyOthersOnDeactivation`
+  (Musik wird wieder laut). **Lautlos-Modus:** im Vordergrund hörbar (Kategorie playback ignoriert den Schalter); im Hintergrund nicht,
+  weil iOS Benachrichtigungstöne im Lautlos-Modus stummschaltet – umgehen ließe sich das nur mit „Critical Alerts“ (Apple-Sonderfreigabe
+  für Gesundheit/Sicherheit) oder einer dauerhaften Hintergrund-Audiositzung (Store-Ablehnungsrisiko, Akku). Dann bleibt die Vibration
+  der Benachrichtigung. Lautstärke im Hintergrund = Klingel-/Hinweislautstärke, nicht Medien (iOS-Vorgabe).
+- **Verworfen:** Ticks als drei einzelne Alarme (drei Wakeups, Takt schwankt), Foreground-Service während der Pause (Android 14+
+  braucht dafür einen Typ, `shortService` ist begrenzt, dauernd sichtbare Benachrichtigung gibt es schon), Ticks im
+  Benachrichtigungskanal (Kanalton läuft über den Klingelstrom und ist im Lautlos-Modus stumm).

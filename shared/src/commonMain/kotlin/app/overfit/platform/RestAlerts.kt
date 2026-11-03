@@ -18,6 +18,10 @@ data class RestAlert(
     val skipLabel: String,
     val channelRunning: String,
     val channelOver: String,
+    /** Ticks at 3, 2 and 1 s before [endsAt] (setting "Countdown ticks"). */
+    val ticks: Boolean = false,
+    /** "3 seconds left" – text of the tick notification where the platform needs one (iOS). */
+    val ticksBody: String = "",
 )
 
 /**
@@ -39,6 +43,16 @@ interface RestAlerts {
 
     /** Opens the system setting for exact alarms (Android 12+). */
     fun openExactAlarmSettings() = Unit
+
+    /**
+     * Whether the app itself has to play the ticks right now. Android plays them from its tick
+     * alarm (foreground and background alike, so they never play twice) and answers false; iOS
+     * answers true while the app is active, because it does not present its tick notification then.
+     */
+    fun appPlaysTicks(): Boolean = false
+
+    /** Plays the three ticks now (the sound starts with the first one). */
+    fun playTicks() = Unit
 }
 
 object NoRestAlerts : RestAlerts {
@@ -56,7 +70,13 @@ class RecordingRestAlerts : RestAlerts {
     var pending: RestAlert? = null
         private set
 
+    /** What [appPlaysTicks] answers. */
+    var appPlays = false
+    var ticksPlayed = 0
+
     override fun requestPermission() { permissionRequests++ }
+    override fun appPlaysTicks() = appPlays
+    override fun playTicks() { ticksPlayed++ }
     override fun schedule(alert: RestAlert) { scheduled += alert; pending = alert }
     override fun cancel() { cancels++; pending = null }
 }

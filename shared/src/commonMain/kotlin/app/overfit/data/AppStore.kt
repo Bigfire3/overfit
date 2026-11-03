@@ -23,6 +23,8 @@ data class Settings(
     /** Rest when neither template nor exercise sets one. */
     val defaultRestSec: Int = WorkoutPrefs.DEFAULT_REST_SEC,
     val vibration: Boolean = true,
+    /** Short ticks at 3, 2 and 1 s before a rest ends (also in the background). */
+    val restTicks: Boolean = true,
 )
 
 /** Everything except the API key, which lives in [SecretStore]. */
@@ -92,6 +94,7 @@ class AppStore(
     fun setDefaultRest(sec: Int) =
         edit { it.copy(settings = it.settings.copy(defaultRestSec = sec.coerceIn(0, MAX_REST_SEC))) }
     fun setVibration(on: Boolean) = edit { it.copy(settings = it.settings.copy(vibration = on)) }
+    fun setRestTicks(on: Boolean) = edit { it.copy(settings = it.settings.copy(restTicks = on)) }
     fun completeOnboarding() = edit { it.copy(onboardingDone = true) }
 
     fun apiKey(): String? = secrets.load()
