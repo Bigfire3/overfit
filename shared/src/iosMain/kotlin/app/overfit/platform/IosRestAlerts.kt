@@ -17,7 +17,17 @@ import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.dataWithBytes
 import platform.Foundation.writeToFile
+import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
+import platform.UIKit.UIApplicationOpenSettingsURLString
+import platform.UserNotifications.UNAuthorizationStatus
+import platform.UserNotifications.UNAuthorizationStatusAuthorized
+import platform.UserNotifications.UNAuthorizationStatusEphemeral
+import platform.UserNotifications.UNAuthorizationStatusNotDetermined
+import platform.UserNotifications.UNAuthorizationStatusProvisional
+import platform.darwin.dispatch_async
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import platform.UIKit.UIApplicationState
 import platform.UserNotifications.UNAuthorizationOptionAlert
 import platform.UserNotifications.UNAuthorizationOptionSound
@@ -94,6 +104,32 @@ class IosRestAlerts : RestAlerts {
         center.removePendingNotificationRequestsWithIdentifiers(listOf(ID, ID_TICKS))
         center.removeDeliveredNotificationsWithIdentifiers(listOf(ID, ID_TICKS))
         stopTicks()
+    }
+
+    override suspend fun notificationsAllowed(): Boolean = authorization().let {
+        it == UNAuthorizationStatusAuthorized || it == UNAuthorizationStatusProvisional || it == UNAuthorizationStatusEphemeral
+    }
+
+    private suspend fun authorization(): UNAuthorizationStatus = suspendCoroutine { cont ->
+        center.getNotificationSettingsWithCompletionHandler { settings ->
+            cont.resume(settings?.authorizationStatus ?: UNAuthorizationStatusNotDetermined)
+        }
+    }
+
+    /** Never asked: the system dialog. Denied before: the app's page in the Settings app. */
+    override fun allowNotifications() {
+        center.getNotificationSettingsWithCompletionHandler { settings ->
+            val status = settings?.authorizationStatus ?: UNAuthorizationStatusNotDetermined
+            dispatch_async(dispatch_get_main_queue()) {
+                if (status == UNAuthorizationStatusNotDetermined) {
+                    requestPermission()
+                } else {
+                    NSURL.URLWithString(UIApplicationOpenSettingsURLString)?.let {
+                        UIApplication.sharedApplication.openURL(it, options = emptyMap<Any?, Any>(), completionHandler = null)
+                    }
+                }
+            }
+        }
     }
 
     override fun appPlaysTicks(): Boolean =

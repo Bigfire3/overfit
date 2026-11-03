@@ -22,7 +22,8 @@ exakter Alarm, Ton über die Medienlautstärke, Musik wird nur kurz leiser; iOS:
 die App selbst). Ton synthetisch erzeugt. Details und Lautlos-Verhalten in DECISIONS.md. Tests: `RestTicksTest`, `RestTickAlarmTest`
 (Robolectric), Controller- und AppStore-Tests.
 Zusatz: Die Pausen-Benachrichtigung (Countdown) kommt nach dem Wegwischen sofort zurück, solange die Pause läuft
-(`RestNotificationTest`).
+(`RestNotificationTest`). Neuer Einstellungs-Abschnitt „Benachrichtigungen“ (Berechtigung mit „Erlauben“, exakte Alarme,
+Vibration, Ticken, Hinweis zum Countdown).
 **Offen:** iOS im Lautlos-Modus und App im Hintergrund: kein Ticken (Systemgrenze, nur Vibration). Eine Benachrichtigung über das
 ganze Training (auch zwischen den Pausen) gibt es weiterhin nicht – eigenes Feature, falls gewünscht.
 
@@ -36,6 +37,9 @@ ganze Training (auch zwischen den Pausen) gibt es weiterhin nicht – eigenes Fe
 6. Falls „Genaue Pausen-Benachrichtigungen“ nicht erlaubt ist: Ticken kann entfallen (bewusst, lieber kein als falsches Ticken).
 7. Während einer Pause die Countdown-Benachrichtigung wegwischen: Sie ist sofort wieder da (mehrmals probieren). Nach dem Überspringen
    oder am Pausenende verschwindet sie normal, nach „Training beenden“ ebenso.
+8. Profil → Abschnitt „Benachrichtigungen“: „Benachrichtigungen erlauben · Erlaubt“, Vibration, Ticken. Benachrichtigungen in den
+   Android-Einstellungen für Overfit ausschalten, zurück in die App: „Erlauben“ mit Hinweis; antippen → Dialog oder Einstellungen,
+   danach wieder „Erlaubt“.
 
 ## Feedback-Runde 4 (Session AF, 3.11.)
 **Erledigt:** Beispiele (Push/Pull/Legs) kommen nach „Daten löschen“ sofort zurück; kein schwarzer Screen mehr nach Workout löschen

@@ -44,6 +44,15 @@ interface RestAlerts {
     /** Opens the system setting for exact alarms (Android 12+). */
     fun openExactAlarmSettings() = Unit
 
+    /** Whether the app may post notifications; null where unknown (tests). */
+    suspend fun notificationsAllowed(): Boolean? = null
+
+    /**
+     * "Allow" in the settings: the system dialog where it can still appear, otherwise the app's
+     * notification settings (permission denied before).
+     */
+    fun allowNotifications() = Unit
+
     /**
      * Whether the app itself has to play the ticks right now. Android plays them from its tick
      * alarm (foreground and background alike, so they never play twice) and answers false; iOS
@@ -69,6 +78,13 @@ class RecordingRestAlerts : RestAlerts {
     /** The alert currently pending, or null after [cancel]. */
     var pending: RestAlert? = null
         private set
+
+    /** What [notificationsAllowed] answers. */
+    var allowed: Boolean? = null
+    var allowRequests = 0
+
+    override suspend fun notificationsAllowed() = allowed
+    override fun allowNotifications() { allowRequests++ }
 
     /** What [appPlaysTicks] answers. */
     var appPlays = false

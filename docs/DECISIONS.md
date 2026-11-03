@@ -1033,6 +1033,13 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   Pausenende (Zeitlimit + Ersatz durch „Pause vorbei“) und gibt es zwischen den Pausen nicht (keine Trainings-Dauerbenachrichtigung).
   Kanal „Pausentimer“ hat niedrige Wichtigkeit (lautlos), wird dadurch aber nicht ausgeblendet; Doze betrifft nur Alarme, die sind
   `AllowWhileIdle`. Eine Benachrichtigung über das ganze Training wäre ein eigenes Feature (offen, falls Fabian sie möchte).
+- **Abschnitt „Benachrichtigungen“ in den Einstellungen (Fabian: „in den settings soll es ein Notifications Absatz geben“):** eigene
+  Überschrift unter „Training“. Inhalt: Berechtigungsstatus („Erlaubt“ bzw. „Erlauben“ + Hinweis), exakte Alarme (nur wenn nicht
+  erlaubt, Android 12+, nötig für pünktliches Ticken und Pausenende), Vibration (aus „Training“ verschoben, gespeicherter Wert
+  unverändert), Ticken, Hinweis zur Countdown-Benachrichtigung. „Erlauben“: Android 13+ zeigt den Systemdialog; kommt „abgelehnt“
+  in < 400 ms zurück, hat Android keinen Dialog mehr gezeigt (zweimal abgelehnt) → App-Benachrichtigungseinstellungen öffnen.
+  Unter Android 13 gibt es keine Laufzeit-Berechtigung, dann direkt die Einstellungen. iOS: nie gefragt → Systemdialog, sonst
+  die App-Seite in der Einstellungen-App. Status wird bei jedem Zurückkehren in die App neu gelesen.
 - **Verworfen:** Ticks als drei einzelne Alarme (drei Wakeups, Takt schwankt), Foreground-Service während der Pause (Android 14+
   braucht dafür einen Typ, `shortService` ist begrenzt, dauernd sichtbare Benachrichtigung gibt es schon), Ticks im
   Benachrichtigungskanal (Kanalton läuft über den Klingelstrom und ist im Lautlos-Modus stumm).

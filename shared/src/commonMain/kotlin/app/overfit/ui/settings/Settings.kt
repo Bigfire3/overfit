@@ -80,10 +80,15 @@ fun SettingsScreen(
     val storedRest = state.settings.defaultRestSec.toString()
     var restText by remember(storedRest) { mutableStateOf(storedRest) }
     var exactAllowed by remember { mutableStateOf(restAlerts.exactAlarmsAllowed()) }
+    var notificationsAllowed by remember { mutableStateOf<Boolean?>(null) }
+    var resumes by remember { mutableStateOf(0) }
+    // Back from the system dialog or the system settings: show the current permissions.
     LifecycleResumeEffect(restAlerts) {
         exactAllowed = restAlerts.exactAlarmsAllowed()
+        resumes++
         onPauseOrDispose { }
     }
+    LaunchedEffect(restAlerts, resumes) { notificationsAllowed = restAlerts.notificationsAllowed() }
     var confirmReset by remember { mutableStateOf(false) }
     LaunchedEffect(confirmReset) {
         if (confirmReset) { delay(4000); confirmReset = false }
@@ -125,6 +130,20 @@ fun SettingsScreen(
                 restText.toIntOrNull()?.let(store::setDefaultRest) ?: run { restText = storedRest }
             })
         }
+
+        SectionTitle(t.notifications)
+        when (notificationsAllowed) {
+            true -> ListRow(t.notificationsPermission, t.notificationsAllowed)
+            false -> {
+                ListRow(t.notificationsPermission, t.exactAlarmAllow, onClick = restAlerts::allowNotifications)
+                Text(t.notificationsDeniedHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+            }
+            null -> Unit
+        }
+        if (exactAllowed == false) {
+            ListRow(t.exactAlarm, t.exactAlarmAllow, onClick = restAlerts::openExactAlarmSettings)
+            Text(t.exactAlarmHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        }
         ListRow(t.vibration) {
             Segmented(state.settings.vibration, listOf(true to t.on, false to t.off), store::setVibration)
         }
@@ -132,10 +151,7 @@ fun SettingsScreen(
             Segmented(state.settings.restTicks, listOf(true to t.on, false to t.off), store::setRestTicks)
         }
         Text(t.restTicksHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        if (exactAllowed == false) {
-            ListRow(t.exactAlarm, t.exactAlarmAllow, onClick = restAlerts::openExactAlarmSettings)
-            Text(t.exactAlarmHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        }
+        Text(t.notificationsInfo, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
 
         // Everything about the coach and AI access lives in the Coach tab; here only the link (and Fuel, the wallet).
         SectionTitle(t.ai)

@@ -91,6 +91,44 @@ class AndroidRestAlerts(
         }
     }
 
+    override suspend fun notificationsAllowed(): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+    /** When the dialog was last asked for from the settings (see [onPermissionResult]). */
+    private var askedAt = 0L
+
+    override fun allowNotifications() {
+        val requester = permissionRequester
+        if (Build.VERSION.SDK_INT >= 33 && requester != null &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            askedAt = android.os.SystemClock.elapsedRealtime()
+            requester(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            openNotificationSettings()
+        }
+    }
+
+    /**
+     * Result of the permission dialog. Denied twice before, Android shows no dialog and answers
+     * "denied" right away: then the settings open instead, so "Allow" always leads somewhere.
+     */
+    fun onPermissionResult(granted: Boolean) {
+        val asked = askedAt
+        askedAt = 0L
+        if (!granted && asked != 0L && android.os.SystemClock.elapsedRealtime() - asked < NO_DIALOG_MS) openNotificationSettings()
+    }
+
+    private fun openNotificationSettings() {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }.onFailure {
+            val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { context.startActivity(details) }
+        }
+    }
+
     override fun exactAlarmsAllowed(): Boolean? =
         if (Build.VERSION.SDK_INT >= 31) alarms.canScheduleExactAlarms() else null
 
@@ -105,6 +143,8 @@ class AndroidRestAlerts(
         const val CHANNEL_RUNNING = "rest_running"
         const val CHANNEL_OVER = "rest_over"
         const val CHANNEL_OVER_SILENT = "rest_over_silent"
+        /** A "denied" faster than this came without a dialog. */
+        private const val NO_DIALOG_MS = 400L
         const val ID_RUNNING = 1001
         const val ID_OVER = 1002
         const val ACTION_PLUS = "app.overfit.REST_PLUS"
