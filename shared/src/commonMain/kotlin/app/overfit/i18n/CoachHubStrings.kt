@@ -11,6 +11,8 @@ class CoachHubStrings(
     val accessOwnKey: (provider: String) -> String,
     val accessFuel: (balance: String?) -> String,
     val accessNone: String,
+    /** Under "AI access" with an own key: the data goes straight to the provider. */
+    val accessOwnKeyPrivacy: (provider: String) -> String,
     val accessSetup: String,
     val accessChange: String,
     // Coach
@@ -86,6 +88,7 @@ val GermanCoachHub = CoachHubStrings(
     accessOwnKey = { "Eigener Key · $it" },
     accessFuel = { it ?: "Guthaben" },
     accessNone = "Kein KI-Zugang",
+    accessOwnKeyPrivacy = { "Deine Daten gehen direkt an $it, nicht über Overfit-Server." },
     accessSetup = "Einrichten",
     accessChange = "Ändern",
     latestReview = { "Letzte Auswertung · $it" },
@@ -155,6 +158,7 @@ val EnglishCoachHub = CoachHubStrings(
     accessOwnKey = { "Own key · $it" },
     accessFuel = { it ?: "Credit" },
     accessNone = "No AI access",
+    accessOwnKeyPrivacy = { "Your data goes straight to $it, not through Overfit servers." },
     accessSetup = "Set up",
     accessChange = "Change",
     latestReview = { "Latest review · $it" },

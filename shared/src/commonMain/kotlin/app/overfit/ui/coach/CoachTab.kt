@@ -207,6 +207,12 @@ private fun AccessRow(state: AppState, providers: Providers, fuelSession: FuelSe
             }
             Text(if (ready) h.accessChange else h.accessSetup, style = Theme.type.label, tone = Tone.Muted)
         }
+        if (state.hasApiKey && !fuel) {
+            Text(
+                h.accessOwnKeyPrivacy(providers.get(state.providerId).label),
+                Modifier.padding(bottom = Space.m).testTag("coach:access-privacy"), style = Theme.type.caption, tone = Tone.Muted,
+            )
+        }
         Hairline()
     }
 }

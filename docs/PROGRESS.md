@@ -930,7 +930,7 @@ Offen / Hinweise:
 
 ## Session Coach-Story (3.11.)
 - Erledigt: Tipp auf den Titel „Coach“ (mit Info-Icon) öffnet eine Vollbild-Story mit 4 Seiten (Fortschrittsbalken als Haarlinien, Tipp rechts/links = weiter/zurück, Wischen nach unten oder X = schließen, Auto-Weiter nach 6 s). Seite 1: was die KI auswertet; Seiten 2–4: eigener Schlüssel, Guthaben (mit Einladungsbonus), eigenes Abo (Claude/ChatGPT/Gemini) mit Knopf zur passenden Stelle. Beim ersten Öffnen des Coach-Tabs geht sie einmal von selbst auf (Flag `overfit.coachStorySeen`).
-- Coach-Seite entschlackt: Erklär- und Hinweistexte (KI-Zugang ohne Zugang, Datenschutz-Zeile, Prompts-Intro, Verbindungs-Hinweis, Chat-Intro, Hinweiszeilen unter „Letzte Einheit auswerten“/„Fortschritt bewerten“) sind raus; der Inhalt steht in der Story bzw. im KI-Zugang (Profil/Einstellungen).
+- Coach-Seite entschlackt: Erklär- und Hinweistexte (KI-Zugang ohne Zugang, Prompts-Intro, Verbindungs-Hinweis, Chat-Intro, Hinweiszeilen unter „Letzte Einheit auswerten“/„Fortschritt bewerten“) sind raus; der Inhalt steht in der Story bzw. im KI-Zugang (Profil/Einstellungen).
 - Tests: neue `CoachStoryTest`; bestehende Coach-Tests setzen das Erstes-Mal-Flag vorab.
 
 ### Bitte auf dem Handy testen (Coach-Story)

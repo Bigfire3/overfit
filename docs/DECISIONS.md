@@ -1114,4 +1114,4 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - Die Story zeigt vier Wege/Inhalte: Auswertung allgemein, eigener Schlüssel, Guthaben (inkl. Einladungsbonus), eigenes Abo (Prompts/Chat-Verbindungen). Das sind die real vorhandenen Wege im Code. Seite 4 führt zur Claude-Verbindung (Prompts bleiben auf der Seite).
 - Die Story ist eine eigene Route ohne Tab-Leiste (Vollbild). Das Erstes-Mal-Flag liegt im `AppStore` (KeyValueStore), nicht im Profil-State, damit Backup/Restore es nicht beeinflusst.
 - Auto-Weiter nur bis zur letzten Seite; die letzte Seite schließt nie von selbst. Tests schalten das Auto-Weiter per `coachStoryAutoAdvance = false` ab (virtuelle Testuhr würde sonst bei jedem Warten Seiten überspringen).
-- Die Zeile „Deine Daten gehen direkt an …“ ist von der Coach-Seite in Story Seite 2 gewandert; der KI-Zugang-Screen bleibt unverändert.
+- Die Zeile „Deine Daten gehen direkt an …“ bleibt auf der Coach-Seite (Status, vom OwnKeyPrivacyTest geprüft) und steht zusätzlich in Story Seite 2.
