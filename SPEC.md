@@ -1,6 +1,6 @@
 # Overfit – Spezifikation
 
-Öffentliche Open-Source-Fitness-App (Apache-2.0) für **Android und iOS** (keine Accounts, kein eigenes Backend, solange es nur den eigenen API-Key gibt; siehe „Erweiterung: Teilen, Open Source, Coach-Guthaben“). Man loggt Krafttraining und Calisthenics. Im Workout-Modus läuft ein Pausentimer. Nach dem Training bewertet ein KI-Coach das Training inkl. optionalem Körperfoto, pflegt ein Langzeitgedächtnis und passt den Plan fürs nächste Mal an.
+Fitness-App mit öffentlich einsehbarem Code (alle Rechte vorbehalten, keine Open-Source-Lizenz) für **Android und iOS** (keine Accounts, kein eigenes Backend, solange es nur den eigenen API-Key gibt; siehe „Erweiterung: Teilen, Open Source, Coach-Guthaben“). Man loggt Krafttraining und Calisthenics. Im Workout-Modus läuft ein Pausentimer. Nach dem Training bewertet ein KI-Coach das Training inkl. optionalem Körperfoto, pflegt ein Langzeitgedächtnis und passt den Plan fürs nächste Mal an.
 - App-Name: Overfit, Android applicationId und iOS Bundle-ID: `app.overfit`
 - Extrem minimalistisch in Funktion und Design.
 - UI-Sprache **Deutsch und Englisch**: aus der Gerätesprache übernommen, in den Einstellungen umschaltbar. Die App-Sprache ist auch die Antwortsprache des Coaches.
@@ -134,7 +134,7 @@ Später als Spielerei: NFC-Einladung.
 ## Erweiterung: Teilen, Open Source, Coach-Guthaben
 
 ### Grundsätze
-- Die App ist Open Source. Mit eigenem API-Key ist sie komplett kostenlos und spricht nur direkt mit Anthropic.
+- Der Code ist öffentlich einsehbar (keine Open-Source-Lizenz, alle Rechte vorbehalten). Mit eigenem API-Key ist sie komplett kostenlos und spricht nur direkt mit Anthropic.
 - Das Coach-Guthaben ist freiwillig (Arbeitsname, der endgültige Name kommt noch): KI-Anfragen laufen über einen Overfit-Proxy und werden zum API-Preis plus kleinem Aufschlag abgerechnet. Ziel ist, ein paar Prozent der KI-Ausgaben als Einnahme zu behalten, nicht Gewinnmaximierung.
 - Keine Login-Accounts. Das Guthaben hängt an einer anonymen Geräte-Identität (Schlüsselpaar im Android Keystore bzw. in der Secure Enclave). Ein Wiederherstellungscode erlaubt den Umzug auf ein neues Handy.
 
@@ -160,7 +160,7 @@ Später als Spielerei: NFC-Einladung.
 - Missbrauchsschutz (Pflicht, weil echte Kosten entstehen): Geräteattestierung (Play Integrity / App Attest), Bonus einmal pro Gerät (Play Integrity Device Recall bzw. DeviceCheck, beides übersteht Neuinstallation), Token einmalig und kurzlebig, Limit pro Einladendem (z. B. 10 pro Monat) und globales Monatsbudget. Startguthaben gilt nur für Coach-Anfragen, ist nicht auszahlbar und verfällt nach 6 Monaten. Geräteattestierung setzt Store-Installationen voraus: Seitlich installierte APKs bekommen kein Startguthaben.
 
 ### Open Source – Voraussetzungen
-- Erledigt: Signatur über GitHub-Secrets mit neuem Schlüssel, `signing/` entfernt, Lizenz Apache-2.0 (`LICENSE`). Die Workout-Guide-Grafiken bleiben CC BY-SA 4.0, Inter bleibt OFL.
+- Erledigt: Signatur über GitHub-Secrets mit neuem Schlüssel, `signing/` entfernt, Lizenz: zuerst Apache-2.0, seit 3.11. „alle Rechte vorbehalten“ (`LICENSE`, Entscheidung Fabian). Die Workout-Guide-Grafiken bleiben CC BY-SA 4.0, Inter bleibt OFL.
 - Vor dem Veröffentlichen: Git-Historie mit `scripts/purge-old-signing-history.sh` bereinigen (alter Schlüssel und Passwort).
 - Vor dem Start des Guthabenverkaufs (nicht Teil des Codes, bitte vorher fachlich prüfen lassen): Gewerbe, Umsatzsteuer, Impressum, Datenschutzerklärung (Körperfotos laufen durch den Proxy: ausdrückliche Einwilligung, keine Speicherung, Auftragsverarbeitung mit Anthropic), AGB/Widerruf für digitale Inhalte.
 
