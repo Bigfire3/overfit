@@ -94,6 +94,11 @@ class ShareFlowTest {
         compose.onNodeWithText("Übernehmen").performClick()
         // The new workout opens in its plan screen (primary action "Starten" pinned in the footer).
         waitFor("Starten")
+        // The plan screen shows its footer before the workout is loaded: wait for the exact name and "Bearbeiten".
+        compose.waitUntil(20_000) {
+            compose.onAllNodes(androidx.compose.ui.test.hasText("Oberkörper A")).fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodes(androidx.compose.ui.test.hasText("Bearbeiten")).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("Oberkörper A").assertIsDisplayed()
         compose.onNodeWithText("Bearbeiten").assertIsDisplayed()
         assertEquals(1, runBlocking { data.templates.templates.first() }.size)
