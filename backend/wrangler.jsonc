@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "overfit-backend",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "overfit",
+      // Nach `wrangler d1 create overfit` hier die echte ID eintragen (siehe README.md).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Alle Beträge in Mikro-Euro (1 € = 1_000_000). Aufschläge in Basispunkten (100 = 1 %).
+  "vars": {
+    "MARKUP_BP": "800",
+    "STORE_FEE_BP": "1500",
+    "SPOT_STARTER_MICRO": "1000000",
+    "SPOT_REWARD_MICRO": "1000000",
+    "SPOT_TOKEN_TTL_SEC": "45",
+    "SPOT_MONTHLY_LIMIT_PER_INVITER": "10",
+    "SPOT_GLOBAL_MONTHLY_BUDGET_MICRO": "50000000",
+    "SPOT_EXPIRY_DAYS": "180",
+    "REWARD_EXPIRY_DAYS": "180",
+    "MAX_TOKENS_CAP": "8192",
+    "ATTESTATION_MODE": "required",
+    "PURCHASE_MODE": "required"
+  }
+}

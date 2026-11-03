@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Overfit</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+  <div class="brand">Overfit</div>
+  <div id="out"></div>
+  <div class="actions" id="actions">
+    <a class="btn primary" id="open" href="#" hidden></a>
+    <a class="btn secondary" id="dl" href="https://github.com/Bigfire3/overfit/releases/latest/download/overfit.apk"></a>
+  </div>
+  <footer id="foot"></footer>
+</main>
+<script>
+// Fragment → Base64url → Raw Deflate → JSON (siehe docs/share-format.md). Alles läuft lokal im Browser;
+// das Fragment (#…) wird nie an einen Server gesendet.
+(function () {
+  'use strict';
+  var de = (navigator.language || '').toLowerCase().indexOf('de') === 0;
+  if (de) document.documentElement.lang = 'de';
+  var S = de ? {
+    template: 'Vorlage', workout: 'Training', exercises: 'Übungen', rest: 'Pause', open: 'In Overfit öffnen',
+    dl: 'Overfit für Android laden', empty: 'Kein Training im Link gefunden.',
+    emptyHint: 'Öffne den vollständigen Link, den dir jemand geschickt hat.',
+    bad: 'Der Link ist beschädigt oder unvollständig.', badHint: 'Bitte lass dir den Link noch einmal schicken.',
+    newer: 'Dieser Link stammt aus einer neueren Version.', newerHint: 'Aktualisiere Overfit, um ihn zu öffnen.',
+    foot: 'Das Training steckt komplett im Link und wurde nicht an einen Server gesendet.',
+    support: 'Unterstützung', sets: 'Sätze', set: 'Satz'
+  } : {
+    template: 'Template', workout: 'Workout', exercises: 'exercises', rest: 'Rest', open: 'Open in Overfit',
+    dl: 'Get Overfit for Android', empty: 'No workout found in this link.',
+    emptyHint: 'Open the full link that someone sent you.',
+    bad: 'This link is damaged or incomplete.', badHint: 'Please ask for the link again.',
+    newer: 'This link comes from a newer version.', newerHint: 'Update Overfit to open it.',
+    foot: 'The workout is entirely inside the link and was never sent to a server.',
+    support: 'assisted', sets: 'sets', set: 'Set'
+  };
+  var out = document.getElementById('out');
+  document.getElementById('dl').textContent = S.dl;
+  document.getElementById('foot').textContent = S.foot;
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function show(title, hint) {
+    out.appendChild(el('h1', null, title));
+    if (hint) out.appendChild(el('p', 'sub', hint));
+  }
+
+  function b64uToBytes(s) {
+    s = s.replace(/[\s=]/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    if (!/^[A-Za-z0-9_-]+$/.test(s)) throw new Error('b64');
+    var b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4));
+    var u = new Uint8Array(b.length);
+    for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+    return u;
+  }
+  async function inflate(bytes, fmt) {
+    var ds = new DecompressionStream(fmt);
+    var w = ds.writable.getWriter();
+    w.write(bytes).catch(function () {});
+    w.close().catch(function () {});
+    var buf = await new Response(ds.readable).arrayBuffer();
+    if (buf.byteLength > 200 * 1024) throw new Error('too large');
+    return new TextDecoder().decode(buf);
+  }
+  async function decode(payload) {
+    var bytes = b64uToBytes(payload);
+    try { return JSON.parse(await inflate(bytes, 'deflate-raw')); }
+    catch (e) { return JSON.parse(await inflate(bytes, 'deflate')); } // tolerant: zlib-Header
+  }
+
+  function humanize(id) {
+    var s = String(id).replace(/^[^:]*:/, '').replace(/[-_]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+    return s.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+  function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+  function fmtNum(n) { return String(Math.round(n * 100) / 100).replace('.', de ? ',' : '.'); }
+  function fmtRest(sec) { var m = Math.floor(sec / 60), s = Math.round(sec % 60); return m + ':' + (s < 10 ? '0' : '') + s; }
+  function fmtSet(s) {
+    if (!s || typeof s !== 'object') return '–';
+    var parts = [], kg = num(s.kg), reps = num(s.reps), sec = num(s.sec);
+    if (kg !== null) parts.push(kg < 0 ? '−' + fmtNum(-kg) + ' kg (' + S.support + ')' : fmtNum(kg) + ' kg');
+    if (reps !== null) parts.push((kg !== null ? '× ' : '') + fmtNum(reps) + (kg !== null ? '' : '×'));
+    if (sec !== null) parts.push(fmtNum(sec) + ' s');
+    return parts.length ? parts.join(' ') : '–';
+  }
+
+  function render(d) {
+    var customs = {};
+    (Array.isArray(d.custom) ? d.custom : []).forEach(function (c) { if (c && c.ref) customs[c.ref] = c.name; });
+    var list = Array.isArray(d.exercises) ? d.exercises.slice(0, 50) : [];
+    out.appendChild(el('h1', null, String(d.name || '').slice(0, 80) || 'Overfit'));
+    out.appendChild(el('div', 'sub', (d.kind === 'workout' ? S.workout : S.template) + ' · ' + list.length + ' ' + S.exercises));
+    if (d.note) out.appendChild(el('p', 'note', String(d.note).slice(0, 500)));
+    var wrap = el('div');
+    wrap.style.marginTop = '24px';
+    list.forEach(function (x) {
+      if (!x || typeof x !== 'object') return;
+      var name = (x.ref && customs[x.ref]) || (x.id && humanize(x.id)) || x.name || '?';
+      var box = el('div', 'ex');
+      box.appendChild(el('h2', null, String(name).slice(0, 80)));
+      var meta = [];
+      if (num(x.restSec) !== null) meta.push(S.rest + ' ' + fmtRest(x.restSec));
+      if (meta.length) box.appendChild(el('div', 'meta', meta.join(' · ')));
+      var ul = el('ul', 'sets');
+      (Array.isArray(x.sets) ? x.sets.slice(0, 30) : []).forEach(function (s, i) {
+        var li = el('li');
+        li.appendChild(el('span', 'n', String(i + 1)));
+        li.appendChild(el('span', null, fmtSet(s)));
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+      if (x.note) box.appendChild(el('div', 'meta', String(x.note).slice(0, 300)));
+      wrap.appendChild(box);
+    });
+    out.appendChild(wrap);
+  }
+
+  async function main() {
+    var payload = location.hash.replace(/^#/, '');
+    if (!payload) return show(S.empty, S.emptyHint);
+    var d;
+    try { d = await decode(payload); } catch (e) { return show(S.bad, S.badHint); }
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return show(S.bad, S.badHint);
+    if (typeof d.v === 'number' && d.v > 1) return show(S.newer, S.newerHint);
+    if (d.kind !== 'template' && d.kind !== 'workout') return show(S.bad, S.badHint);
+    render(d);
+    var open = document.getElementById('open');
+    open.textContent = S.open;
+    open.href = 'overfit://t#' + payload;
+    open.hidden = false;
+  }
+  main();
+})();
+</script>
+</body>
+</html>

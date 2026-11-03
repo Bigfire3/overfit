@@ -1,0 +1,199 @@
+# Overfit-Backend: API-Vertrag (Fuel & Spot)
+
+Grundlage für die App-Anbindung. Implementierung: `backend/` (Cloudflare Worker + D1). Basis-URL: `https://<worker-domain>`, alle Pfade unter `/v1`.
+Das Backend speichert **keine Trainingsinhalte und keine Fotos** (Anfragen werden nur durchgeleitet), sondern Konto-ID, Saldo, Buchungen (Modell, Token, Betrag) und Spot-Zuordnungen.
+
+## Beträge
+
+- Alle Beträge sind **Integer in Mikro-Euro (µ€)**: `1 € = 1_000_000`. Nie Float. Anzeige in der App: `4_200_000` → „4,20 €“ (kaufmännisch runden, nur zur Anzeige).
+- Felder heißen `…Micro`. Das Backend rechnet immer in Euro; Preise pro Modell in µ€ je 1 Mio. Token stehen in `GET /v1/config`.
+- Aufschlag (`markupBp`) und Store-Gebühr (`storeFeeBp`) in Basispunkten (800 = 8 %). Alles ist serverseitig konfigurierbar; die App liest Werte aus `/v1/config` und rechnet nichts selbst nach.
+
+## Signatur-Schema (alle Endpunkte außer `/v1/health` und `/v1/config`)
+
+Identität = ECDSA-P-256-Schlüsselpaar im Android Keystore bzw. in der Secure Enclave. Der private Schlüssel verlässt das Gerät nie.
+
+**Öffentlicher Schlüssel:** entweder 65 Byte unkomprimierter Punkt (`0x04‖X‖Y`, iOS `x963Representation`) oder SPKI-DER (Android `publicKey.encoded`, 91 Byte), Base64url ohne Padding.
+**Geräte-ID:** `base64url(SHA-256(65-Byte-Rohpunkt))` (ohne Padding, 43 Zeichen).
+
+**Header jeder Anfrage:**
+
+| Header | Inhalt |
+|---|---|
+| `X-Overfit-Device` | Geräte-ID |
+| `X-Overfit-Timestamp` | Unix-Sekunden (dezimal). Abweichung zur Serverzeit höchstens ±300 s, sonst `timestamp_out_of_range` (mit `details.serverTime`) |
+| `X-Overfit-Nonce` | 16–64 Zeichen `[A-Za-z0-9_-]`, zufällig, **pro Anfrage neu** (z. B. 16 Zufallsbytes als Base64url). Wiederverwendung → `replay` |
+| `X-Overfit-Signature` | Base64url (ohne Padding) der ECDSA-SHA-256-Signatur über den kanonischen String. Roh `r‖s` (64 Byte; WebCrypto/CryptoKit `rawRepresentation`) **oder** DER (Android `Signature.getInstance("SHA256withECDSA")`) – beides wird akzeptiert |
+
+**Kanonischer String** (UTF-8, Zeilentrenner `\n`, kein abschließender Zeilenumbruch):
+
+```
+OVERFIT-V1
+<METHODE in Großbuchstaben>
+<Pfad inkl. Query-String, genau wie gesendet, z. B. /v1/account/ledger?limit=20>
+<Timestamp>
+<Nonce>
+<SHA-256 des Request-Bodys als Hex, klein; leerer Body = e3b0c442…b855>
+```
+
+Beispiel (`PUT /v1/account/profile`, Body `{"displayName":"Fabian"}`):
+
+```
+OVERFIT-V1
+PUT
+/v1/account/profile
+1762128000
+q3xK9mZc2YpWb7LdEoT5Ag
+84adfca0d14b5eeabe8c85f59d4ad3aa7975a28d924e5a43d24e268a50bd7b7c
+```
+
+Der Body muss **byte-identisch** gesendet werden wie gehasht (am besten den serialisierten String einmal erzeugen und für Hash und Request verwenden). `Content-Type: application/json`.
+
+```
+PUT /v1/account/profile HTTP/1.1
+X-Overfit-Device: <deviceId>
+X-Overfit-Timestamp: 1762128000
+X-Overfit-Nonce: q3xK9mZc2YpWb7LdEoT5Ag
+X-Overfit-Signature: <base64url(Signatur)>
+Content-Type: application/json
+
+{"displayName":"Fabian"}
+```
+
+Referenzimplementierung des Clients (WebCrypto): `backend/test/helpers.ts` (`Client.sign`).
+
+## Fehlerformat
+
+Jeder Fehler: passender HTTP-Status und
+
+```json
+{ "error": { "code": "insufficient_funds", "message": "Guthaben reicht nicht", "details": { "requiredMicro": 10053, "availableMicro": 200 } } }
+```
+
+`message` ist deutsch und nur für Logs gedacht; die App zeigt eigene Texte pro `code`. 429 enthält zusätzlich `Retry-After` (Sekunden).
+
+| Status | code | Bedeutung / App-Reaktion |
+|---|---|---|
+| 400 | `invalid_request` | Body/Parameter ungültig |
+| 400 | `model_not_allowed` | Modell nicht in der Whitelist (`details.allowed`) |
+| 400 | `invalid_max_tokens` | `max_tokens` fehlt oder > `maxTokensCap` |
+| 400 | `streaming_not_supported` | `stream` ist nicht erlaubt |
+| 400 | `upstream_rejected` | Anthropic hat die Anfrage abgelehnt, **nichts abgebucht** (`details.upstreamStatus`) |
+| 400 | `unknown_product` | Paket-ID unbekannt |
+| 400 | `invalid_recovery_code` | Format falsch |
+| 400 | `spot_token_invalid`, `spot_self`, `challenge_invalid` | Spot-Code kaputt / eigener Code / Challenge ungültig oder benutzt |
+| 401 | `unauthorized`, `unknown_device`, `bad_signature`, `replay`, `timestamp_out_of_range` | Signatur-Probleme. `unknown_device` → neu registrieren (`POST /v1/devices`) |
+| 402 | `insufficient_funds` | Guthaben reicht nicht für die Reservierung (`details.requiredMicro`, `availableMicro`) |
+| 402 | `purchase_invalid` | Store bestätigt den Kauf nicht |
+| 403 | `attestation_failed` | Geräteprüfung fehlgeschlagen (`details.reason`) |
+| 404 | `invalid_recovery_code` | Kein Konto zu diesem Code; `not_found` bei unbekanntem Endpunkt |
+| 405 | `method_not_allowed` | |
+| 409 | `spot_token_used`, `spot_already_redeemed`, `spot_device_used` | Spot schon eingelöst (Token / dieses Konto / dieses Gerät) |
+| 410 | `spot_token_expired` | QR-Code abgelaufen, neu scannen |
+| 413 | `body_too_large` | Anfrage größer als `MAX_BODY_BYTES` (Standard 8 MB) |
+| 429 | `rate_limited` | Zu viele Anfragen (`details.retryAfterSec`) |
+| 429 | `spot_inviter_limit` | Einladender hat diesen Monat alle Spots vergeben |
+| 429 | `spot_budget_exhausted` | Globales Monatsbudget für Spots aufgebraucht |
+| 500 | `internal_error` | |
+| 502 | `upstream_unavailable` | Anthropic nicht verfügbar/überlastet, **nichts abgebucht** |
+| 503 | `not_configured` | Server-Secret fehlt (Betreiberfehler) |
+| 503 | `purchases_unavailable` | Käufe sind (noch) nicht freigeschaltet → Kauf-UI ausblenden |
+| 503 | `attestation_unavailable` | Spot ist (noch) nicht freigeschaltet |
+| 504 | `upstream_unavailable` | Zeitüberschreitung, **nichts abgebucht** |
+
+## Öffentliche Endpunkte (ohne Signatur)
+
+### `GET /v1/health` → `{ "ok": true }`
+
+### `GET /v1/config`
+```json
+{
+  "currency": "EUR", "unit": "micro-euro", "markupBp": 800, "storeFeeBp": 1500, "maxTokensCap": 8192,
+  "models": { "claude-sonnet-5-5": { "in": 1840000, "cacheRead": 184000, "cacheWrite": 2300000, "out": 9200000 } },
+  "packages": [ { "productId": "overfit.fuel.10", "priceMicro": 10000000, "creditMicro": 7870370 } ],
+  "spot": { "starterMicro": 1000000, "rewardMicro": 1000000, "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
+}
+```
+Modellpreise in µ€ je 1 Mio. Token (für Kostenschätzung in der App). `productId` entspricht der Produkt-ID im Play-/App-Store.
+
+## Geräte & Konto
+
+### `POST /v1/devices` – Registrierung
+Signiert mit dem **neuen** Schlüssel (beweist Besitz); `X-Overfit-Device` = daraus abgeleitete Geräte-ID.
+Body: `{ "publicKey": "<base64url>" }`. → `201` (neu) oder `200` (schon registriert, idempotent):
+`{ "deviceId": "...", ...Konto }` (Konto-Objekt siehe unten). Limit pro IP: 20/Stunde (konfigurierbar).
+
+### `GET /v1/account` → Konto
+```json
+{
+  "deviceId": "…", // nur bei /v1/devices
+  "accountId": "…",
+  "balanceMicro": 1000000,
+  "expiring": [ { "amountMicro": 1000000, "expiresAt": 1777777777 } ],
+  "displayName": "Fabian",
+  "hasRecoveryCode": true,
+  "spot": { "invitedThisMonth": 2, "monthlyLimit": 10, "redeemedStarter": false }
+}
+```
+`balanceMicro` = nutzbares Guthaben (nicht verfallen) minus laufende Reservierungen. `expiring` = noch offene, verfallende Posten (Startguthaben/Belohnungen).
+
+### `PUT /v1/account/profile`
+Body `{ "displayName": "Fabian" }` (≤ 24 Zeichen, `null` oder `""` löscht). → `{ "displayName": "Fabian" }`. Der Name wird nur beim Einlösen eines Spots an den Eingeladenen ausgeliefert (freiwillig).
+
+### `GET /v1/account/ledger?limit=50&before=<id>`
+`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|spot_bonus|spot_reward", "amountMicro": -6956, "model": "...", "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv.
+
+## Wiederherstellungscode (Umzug aufs neue Handy)
+
+### `POST /v1/recovery/code`
+Body leer. Erzeugt (oder ersetzt) den Code: `{ "code": "ABCD-EFGH-JKLM-NPQR-STUV-WXYZ" }` (120 Bit, Alphabet ohne 0/O/1/I/L). Der Server speichert nur einen Hash; Klartext wird **nur hier einmal** geliefert. Die App zeigt ihn an und lässt ihn sichern.
+
+### `POST /v1/recovery/restore`
+Das **neue** Gerät registriert sich normal (`POST /v1/devices`, leeres Konto) und ruft dann auf: Body `{ "code": "…" }` (Groß-/Kleinschreibung, Bindestriche und Leerzeichen egal). Wirkung: das aufrufende Gerät übernimmt das Konto (Saldo, Buchungen), **alle anderen Geräte des Kontos werden abgemeldet**, ein Guthaben des vorübergehenden leeren Kontos wird übernommen, der Code wird ungültig (neuen erzeugen!). → Konto-Objekt. Fehler: `400/404 invalid_recovery_code`. Limit: 10 Versuche/Stunde je Gerät.
+
+## KI-Proxy
+
+### `POST /v1/messages`
+Body: Anthropic-Messages-Request, unverändert (`model`, `max_tokens`, `system`, `messages`, `tools` … auch Bilder als Base64). Einschränkungen: `model` in der Whitelist (`/v1/config`), `max_tokens` ≤ `maxTokensCap`, **kein** `stream`. Limit: 10 Anfragen/Minute je Gerät.
+
+Ablauf: Höchstkosten (geschätzte Eingabe + `max_tokens` × Ausgabepreis, mit Aufschlag) werden atomar reserviert (sonst `402 insufficient_funds`), die Anfrage geht an Anthropic, danach wird nach `usage` abgerechnet: `ceil((input×in + cache_read×cacheRead + cache_creation×cacheWrite + output×out) / 1e6 × (1 + markup))`, der Rest der Reservierung wird freigegeben. Bei jedem Fehler (Netz, 5xx, 4xx) wird vollständig freigegeben. Verbrauch → zuerst verfallende Posten (Startguthaben), dann Kauf-Guthaben.
+
+Antwort `200`: die Anthropic-Antwort unverändert, **plus** Feld `overfit`:
+```json
+{ "id": "msg_…", "content": [ … ], "usage": { … }, "overfit": { "costMicro": 6956, "balanceMicro": 7863414, "currency": "EUR" } }
+```
+und Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Fuel · 7,86 €“ und die Kosten der Auswertung daraus. Bilder werden bei der Reservierung pauschal (3000 Token je Bild) gezählt, nicht nach Base64-Länge. Timeout zum Anbieter 120 s.
+
+## Kauf
+
+### `POST /v1/purchases/verify`
+Body `{ "platform": "google"|"apple", "productId": "overfit.fuel.10", "purchaseToken": "<Play purchaseToken | Apple signierte Transaktion (JWS)>" }`.
+→ `{ "productId": "…", "creditedMicro": 7870370, "alreadyCredited": false, "balanceMicro": 7870370 }`.
+Gutschrift = `Preis × (1 − storeFeeBp) / (1 + markupBp)` (abgerundet), **idempotent pro Kauf** (`alreadyCredited: true` bei Wiederholung, auch von anderen Konten – ein Kauf zählt nur einmal). Die App ruft das nach jedem erfolgreichen Store-Kauf auf (und beim Start für noch nicht bestätigte Käufe) und schließt die Transaktion erst danach ab. Ohne Store-Zugangsdaten im Backend: `503 purchases_unavailable`.
+
+## Spot (Einladungen)
+
+Ablauf: Einladender holt Token → zeigt QR (Token + Installationslink, alle ~30 s neu holen) → Neuer scannt → App holt Challenge → Play Integrity / App Attest mit der Challenge → Einlösen.
+
+### `POST /v1/spot/token` (Einladender)
+Body leer. → `{ "token": "<body>.<sig>", "expiresAt": 1762128045, "ttlSec": 45 }`. Server-signiert (HMAC), einmalig einlösbar, gültig `ttlSec` (Standard 45 s). QR-Inhalt wie in der App festgelegt, z. B. `https://<domain>/spot#<token>` (Token ist URL-sicher, besteht aus `[A-Za-z0-9_.-]`). Kein Limit außer dem allgemeinen.
+
+### `POST /v1/spot/challenge` (Eingeladener)
+Body leer. → `{ "challenge": "<opaque>", "expiresAt": … }`. Gültig 5 min, an das Gerät gebunden, einmalig. Die App übergibt sie als Play-Integrity-`nonce` bzw. als App-Attest-`clientDataHash`-Grundlage (Details legt die App-Session mit dem Verifier fest).
+
+### `POST /v1/spot/redeem` (Eingeladener)
+Body:
+```json
+{ "token": "<aus dem QR>", "attestation": { "platform": "google"|"apple", "token": "<Integrity-Token | App-Attest-Objekt>", "challenge": "<von /spot/challenge>" } }
+```
+→ `200`:
+```json
+{ "grantedMicro": 1000000, "expiresAt": 1777777777, "inviter": { "displayName": "Fabian" }, "balanceMicro": 1000000 }
+```
+`inviter.displayName` ist `null`, wenn der Einladende keinen Namen gesetzt hat (Reveal zeigt dann „Spot“ ohne Namen). Regeln: Token gültig & unbenutzt; einmal pro Konto **und** pro Gerät (Gerätekennung aus der Attestierung, übersteht Neuinstallation); höchstens 10 Spots/Monat je Einladendem; globales Monatsbudget (jeder Spot kostet Startguthaben + Belohnung); Startguthaben verfällt nach 180 Tagen, gilt nur für Coach-Anfragen und ist nicht auszahlbar. Der Einladende bekommt seine Gutschrift (1 €, ebenfalls 180 Tage gültig) automatisch bei der **ersten abgerechneten Coach-Anfrage** des Eingeladenen – ohne Meldung an den Eingeladenen. Ohne konfigurierte Attestierung: `503 attestation_unavailable` (sideloaded APKs bekommen kein Startguthaben).
+
+## Rate-Limits (Standardwerte, konfigurierbar)
+Gerät: 60 Anfragen/min, `/v1/messages`: 10/min, Registrierung: 20/h je IP, Kauf/Challenge/Einlösen/Restore: 10/h je Gerät (Einlösen/Restore zusätzlich 30/h je IP). Überschreitung → `429 rate_limited`.
+
+## Lokaler Dev-Modus
+`wrangler dev --var DEV_MODE:true --var ATTESTATION_MODE:mock --var PURCHASE_MODE:mock` (siehe `backend/README.md`): Attestierungs- und Kauf-Token der Form `mock:<id>` werden akzeptiert (nur mit `DEV_MODE=true`; in Produktion werden die Mock-Modi ignoriert). `ANTHROPIC_BASE_URL` kann auf einen lokalen Fake zeigen.

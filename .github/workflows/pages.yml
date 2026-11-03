@@ -1,0 +1,39 @@
+name: Web veröffentlichen (GitHub Pages)
+
+# Veröffentlicht web/ nach https://bigfire3.github.io/overfit/ (Einmalig nötig: Settings → Pages → Source „GitHub Actions“).
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Seite zusammenstellen (Inter aus der App, OFL)
+        run: |
+          mkdir -p _site/fonts
+          cp -r web/index.html web/style.css web/t web/.nojekyll _site/
+          cp shared/src/commonMain/composeResources/font/inter_regular.ttf shared/src/commonMain/composeResources/font/inter_semibold.ttf _site/fonts/
+          cp licenses/Inter-OFL.txt _site/fonts/OFL.txt
+      - uses: actions/configure-pages@v5
+        continue-on-error: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
