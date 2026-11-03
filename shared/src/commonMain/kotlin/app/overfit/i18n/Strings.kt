@@ -12,7 +12,7 @@ import kotlinx.datetime.LocalDate
  * inside the app on Android and iOS alike, and a missing translation is a compile error.
  */
 data class Strings(
-    val appName: String = "Overfit",
+    val appName: String = "overfit",
     val next: String,
     val back: String,
     val comingSoon: String,
@@ -44,6 +44,7 @@ data class Strings(
     val navHistory: String,
     val navExercises: String,
     val navPhotos: String,
+    val navCoach: String,
     val navProfile: String,
 
     // Start
@@ -246,7 +247,7 @@ val German = Strings(
     weightTitle = "Wie viel\nwiegst du?",
     weightError = "Das sieht nicht nach einem realistischen Gewicht aus.",
     aiTitle = "Verbinde\ndeine KI",
-    aiSubtitle = "Overfit nutzt deinen eigenen API-Key. Keine Werbung, kein Abo.",
+    aiSubtitle = "overfit nutzt deinen eigenen API-Key oder Fuel. Keine Werbung, kein Abo nötig.",
     aiKeyPlaceholder = "API-Key einfügen",
     aiHowTo = "Wie bekomme ich einen Key?",
     aiConnect = "Verbinden",
@@ -260,6 +261,7 @@ val German = Strings(
     navHistory = "Verlauf",
     navExercises = "Übungen",
     navPhotos = "Fotos",
+    navCoach = "Coach",
     navProfile = "Profil",
 
     greeting = { "Hallo, $it" },
@@ -425,11 +427,11 @@ val German = Strings(
     reset = "Alle Daten löschen",
     resetConfirm = "Wirklich alles löschen?",
     app = "App",
-    about = "Über Overfit",
+    about = "Über overfit",
 
     coachMemoryEmpty = "Der Coach hat noch nichts gespeichert. Das Gedächtnis entsteht nach dem ersten bewerteten Training.",
     aboutVersion = { "Version $it" },
-    aboutTagline = "Minimalistischer Trainings-Tracker mit KI-Coach.",
+    aboutTagline = "personal training for everyone. Dein Trainer in der Tasche: kennt dein Training, wertet aus und plant.",
     aboutAttribution = "Übungsgrafiken",
     aboutWorkoutGuide = "Workout Guide von Bryl Lim, basierend auf Grafiken von Everkinetic. Lizenz: CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). Die Grafiken werden unverändert mitgeliefert und nur beim Anzeigen eingefärbt.",
     aboutFont = "Schrift: Inter von Rasmus Andersson. Lizenz: SIL Open Font License 1.1.",
@@ -453,7 +455,7 @@ val English = Strings(
     weightTitle = "How much do\nyou weigh?",
     weightError = "That doesn't look like a realistic weight.",
     aiTitle = "Connect\nyour AI",
-    aiSubtitle = "Overfit uses your own API key. No ads, no subscription.",
+    aiSubtitle = "overfit uses your own API key or Fuel. No ads, no subscription required.",
     aiKeyPlaceholder = "Paste API key",
     aiHowTo = "How do I get a key?",
     aiConnect = "Connect",
@@ -467,6 +469,7 @@ val English = Strings(
     navHistory = "History",
     navExercises = "Exercises",
     navPhotos = "Photos",
+    navCoach = "Coach",
     navProfile = "Profile",
 
     greeting = { "Hi, $it" },
@@ -632,11 +635,11 @@ val English = Strings(
     reset = "Delete all data",
     resetConfirm = "Really delete everything?",
     app = "App",
-    about = "About Overfit",
+    about = "About overfit",
 
     coachMemoryEmpty = "The coach hasn't saved anything yet. Its memory starts after your first reviewed workout.",
     aboutVersion = { "Version $it" },
-    aboutTagline = "Minimalist workout tracker with an AI coach.",
+    aboutTagline = "personal training for everyone. Your trainer in your pocket: knows your training, reviews it and plans it.",
     aboutAttribution = "Exercise illustrations",
     aboutWorkoutGuide = "Workout Guide by Bryl Lim, based on illustrations by Everkinetic. License: CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). The illustrations ship unmodified and are only tinted when displayed.",
     aboutFont = "Typeface: Inter by Rasmus Andersson. License: SIL Open Font License 1.1.",

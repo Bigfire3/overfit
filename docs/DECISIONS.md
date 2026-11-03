@@ -596,6 +596,22 @@ Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templat
 - Ehemalige free-exercise-db-Übungen, die du benutzt hast, heißen weiter englisch (z. B. „Barbell Curl“) und haben
   keine Muskeln außer den importierten; du kannst sie wie jede eigene Übung umbenennen.
 
+## Tab „Coach“ mit Chat und sichtbaren Prompts (3.11., Session P)
+- **Tab-Leiste:** Training, Verlauf, Coach, Fotos, Profil. Coach-Icon: Sprechblase mit zwei Textzeilen (`Icon.Coach`). Die bisherige Route `CoachRoute` ist jetzt der Tab; die alte Coach-Startseite bleibt als „Alle Auswertungen“ (`CoachReviewsRoute`).
+- **Aufbau:** KI-Zugang (Statuszeile) → Auswertungen (letzte, „Letztes Training auswerten“, „Fortschritt einschätzen“, alle, Gedächtnis mit Vorschau, Einstellungen) → Chat → Prompts & Vorlagen → KI-Chat-Verbindungen. Der Chat steht als Eingabe mit der letzten Unterhaltung im Tab; die Unterhaltung selbst läuft im eigenen Chat-Screen (`CoachChatRoute`), weil ein Chat mit Tastatur und Verlauf in einer scrollenden Seite mit anderen Abschnitten nicht sauber bedienbar ist.
+- **Profil:** nur noch „Coach & KI“ (Verweis auf den Tab) und Fuel (Guthaben gehört zum Konto). Verbinden/Ändern/Trennen des Keys liegt im Screen „KI-Zugang“ (früher „KI-Coach“), Trennen jetzt mit Bestätigungsmuster.
+- **Chat-Transport:** dieselben Transports wie der Coach (eigener Key: Anthropic, OpenAI, OpenRouter, Gemini; oder Fuel) mit Verlauf (`CoachPrompt.history`, die letzten 20 Nachrichten). Kein Streaming: Fuel liefert die Antwort als Ganzes (inkl. Kosten), und Structured Output lässt sich erst am Ende sicher lesen. Stattdessen „Coach schreibt …“.
+- **Workout-Vorschläge:** Structured Output `{"reply": "...", "workout": ""}`; `workout` ist ein **String** mit JSON im Teilen-Format v1 (leer = kein Vorschlag). Ein String funktioniert im Strict-Modus aller Anbieter, ein verschachteltes optionales Objekt nicht. Fallback ohne Structured Output (400 bei manchen OpenRouter-Modellen): Text mit ```overfit-Block. „Workout übernehmen“ legt das JSON in die `ImportInbox`, damit öffnet sich dieselbe Import-Vorschau wie bei einem Link.
+- **System-Prompt:** Coach-Anweisungen (eigene oder Standard) + Chat-Regeln + Beispiel + Übungsliste (statisch, cachebar), dahinter Profilblock (`aiProfileFacts`, Sprache, Einheiten, heute) und der Stand wie bei „Kontext kopieren“ ohne dessen Antwortanweisung. „Kontext kopieren“ listet jetzt auch die gespeicherten Workouts.
+- **Room v6:** `coach_chat` und `coach_chat_message` (Fremdschlüssel mit Cascade), AutoMigration 5→6, Migrationstest. Antworten, die beim Beenden der App noch liefen, werden beim nächsten Start „fehlgeschlagen“ mit „Erneut versuchen“. Chats sind im Backup (Schlüssel `coachChat`) und werden bei „Alle Daten löschen“ gelöscht.
+- **Demo ohne KI-Zugang:** feste Antwort mit Beispiel-Workout (Bankdrücken, Rudern, Kniebeuge), markiert als Demo, geht nie als Verlauf an eine KI.
+- **Fotos:** nur explizit über „Foto anhängen“ (bis zu 3 der letzten 12 Fotos), unabhängig vom Schalter „Körperfotos senden“ der Auswertung, weil der Nutzer hier jedes Foto selbst wählt.
+- **Prompts sichtbar:** gemeinsame Komponente `PromptView` (Titel, Hinweis, Text in grauer Box, „Mehr/Weniger“, „Kopieren“ → „Kopiert“, optional „Im Chat verwenden“). Genutzt im Coach-Tab, im Import („KI-Prompt kopieren“) und bei den KI-Chat-Verbindungen (Kontext, Gem-Anleitung). Neue Prompts: Training auswerten lassen, Fortschritt der letzten 8 Wochen, Nächste Woche planen, Plateau durchbrechen (jeweils Kontext + Frage).
+
+### Zur Prüfung durch Fabian
+- Der Chat-Verlauf bleibt unbegrenzt lokal gespeichert; im Tab stehen die letzten 5 früheren Chats. Falls gewünscht: Alles-löschen für Chats oder automatisches Aufräumen.
+- Fuel-Kosten stehen je Antwort klein darunter („Kosten: 0,0042 €“). Bei eigenem Key zeigen wir keine Kosten (die Preise kennt nur der Anbieter).
+
 ## Teilen und Import verbessern, Beispiel-Workouts standardmäßig (3.11., Session Q)
 
 **.overfit-Dateien öffnen.** Import-Screen hat „Datei auswählen“ (vorhandenes `rememberFilePicker`: Android `OpenDocument`, iOS
@@ -677,4 +693,12 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 **Entscheidung:**
 - `WorkoutPlanScreen` zeigt den Footer erst, wenn das Workout geladen ist. Es gibt keinen toten Button mehr, auch nicht für schnelle Finger. Der Inhalt erscheint ohnehin erst dann.
 - Das Hinzufügen bzw. Ersetzen aus dem Picker läuft über `WorkoutController.addPicked` im Controller-Scope statt in `rememberCoroutineScope` des Workout-Screens. Das Ergebnis wird ohne Suspend-Punkt aus dem Relay genommen und übergeben, es geht also weder verloren noch wird es doppelt angewendet, wenn der Screen die Komposition verlässt (dieselbe Falle wie in #25).
-- Tests warten auf UI, die nur der Zielzustand zeigt (Kopf „1/5 erledigt“), und prüfen danach den State. Reine State-Waits in Compose-UI-Tests vermeiden (sie pumpen den Main-Looper nicht).
+- Tests warten auf UI, die nur der Zielzustand zeigt (Kopf „1/5 erledigt“), und prüfen danach den State.
+- Wartet ein Test auf State oder Daten statt auf Text, nimmt er `waitUntilState` (app/src/test/.../ui/TestWaits.kt): Der Helfer holt vor jeder Prüfung den Semantik-Baum und pumpt damit den Main-Looper. Ein reines `waitUntil { deps.workout.state … }` läuft sonst in den Timeout, sobald die Arbeit auf `Dispatchers.Main` liegt (so geschehen in TrainingTabTest/DayWithOverfitTest, nachdem `addPicked` in den Controller-Scope gezogen war). Alle bestehenden State-Waits sind umgestellt.
+
+## Marke und Claim (Session T)
+- **Wortmarke „overfit“ immer klein**, auch am Satzanfang und in Fließtexten (wie „eBay“): eine Schreibweise, kein Abwägen im Einzelfall. Geändert: App-Name (`appName`, Android-Label), „Über/About overfit“, Store-Texte, README, Web. Interne Namen (Paket `app.overfit`, Datei `.overfit`, `overfit://`) bleiben unverändert.
+- **Claim „personal training for everyone“** in beiden Sprachen auf Englisch als Markenclaim (30 Zeichen = App-Store-Untertitel). Auf Deutsch zusätzlich eine erklärende Zeile („Dein Trainer in der Tasche …“) statt Übersetzung: ein Claim, überall wiedererkennbar, Store-Suche profitiert von englischem Begriff nicht, aber die Marke bleibt einheitlich.
+- **Store-Titel** „overfit: Workout & KI-Coach“ / „overfit: Workout & AI Coach“ (je 27 Zeichen), Play-Kurzbeschreibung ≤ 80 geprüft.
+- **`aiSubtitle`:** „kein Abo nötig“ statt „kein Abo“, damit ein späteres optionales Pro-Abo nicht widerspricht (siehe docs/monetization.md).
+- **Onboarding:** Der erste Screen ist die Namensfrage, es gibt keinen Splash und keinen Markentext; nichts geändert (keine Funktionsänderung).

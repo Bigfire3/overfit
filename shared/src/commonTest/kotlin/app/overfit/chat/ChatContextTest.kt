@@ -9,6 +9,10 @@ import app.overfit.i18n.ChatGerman
 import app.overfit.share.AiPrompt
 import app.overfit.share.ShareFormat
 import app.overfit.share.ShareParse
+import app.overfit.workout.entry
+import app.overfit.workout.exercise
+import app.overfit.workout.planned
+import app.overfit.workout.templateOf
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
@@ -70,5 +74,29 @@ class ChatContextTest {
         val g = ChatEnglish.gemInstructions(AiPrompt.EXAMPLE)
         assertTrue(g.contains("\"kind\": \"template\""))
         assertTrue(ShareFormat.parseInput(g) is ShareParse.Ok)
+    }
+
+    @Test
+    fun statusWithoutTaskHasNoAnswerInstructions() {
+        val text = ChatContext.status(input(emptyList()), ChatGerman, task = null)
+        assertFalse(text.contains(ChatGerman.ctxTask(AiPrompt.EXAMPLE)))
+        assertFalse(text.contains("Antworte auf Deutsch"))
+        assertTrue(text.contains("Knie schonen"))
+    }
+
+    @Test
+    fun templatesAppearUnderMyWorkouts() {
+        val tpl = templateOf(
+            entry(exercise("e1", name = "Bench"), 90, planned(60.0, 8), planned(60.0, 8), planned(60.0, 8)),
+            name = "Push A",
+        )
+        val withTpl = input(emptyList()).copy(templates = listOf(tpl))
+        val text = ChatContext.status(withTpl, ChatGerman, task = null)
+        val head = "## ${ChatGerman.ctxWorkouts}"
+        assertTrue(text.contains(head))
+        assertTrue(text.substringAfter(head).lineSequence().drop(1).first().startsWith("- Push A: Bench 3×"))
+        assertFalse(ChatContext.status(input(emptyList()), ChatGerman, task = null).contains(head))
+        val en = ChatContext.status(withTpl.copy(language = Language.EN), ChatEnglish, task = null)
+        assertTrue(en.contains("## My workouts"))
     }
 }

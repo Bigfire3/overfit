@@ -228,9 +228,12 @@ fun ImportScreen(
                 Hairline()
             }
             ListRow(s.importPickFile, onClick = { denied = false; pickFile() })
-            ListRow(
-                if (aiCopied) s.aiTemplateCopied else s.aiTemplateCopy,
-                onClick = { copyAiPrompt(share, s); aiCopied = true },
+            // The AI prompt with its full text (shared component with the Coach tab).
+            app.overfit.ui.components.PromptView(
+                title = s.aiTemplateCopy,
+                hint = if (aiCopied) s.aiTemplateCopied else null,
+                text = remember { aiTemplateText(s, share.aiProfile()) },
+                onCopy = { share.platform.copyText(it); aiCopied = true },
             )
             Column(Modifier.padding(vertical = Space.m)) { Text(s.importFileHint, style = Theme.type.caption, tone = Tone.Muted) }
         }
@@ -500,6 +503,11 @@ fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit, showSampl
     val s = LocalStrings.current.share
     var aiCopied by remember { mutableStateOf(false) }
     ListRow(s.importTitle, onClick = onImport)
-    ListRow(if (aiCopied) s.aiTemplateCopied else s.aiTemplateCopy, onClick = { copyAiPrompt(share, s); aiCopied = true })
+    app.overfit.ui.components.PromptView(
+        title = s.aiTemplateCopy,
+        hint = if (aiCopied) s.aiTemplateCopied else null,
+        text = remember { aiTemplateText(s, share.aiProfile()) },
+        onCopy = { share.platform.copyText(it); aiCopied = true },
+    )
     if (showSamples) SamplesRow(share)
 }

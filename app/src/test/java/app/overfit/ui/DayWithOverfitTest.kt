@@ -16,6 +16,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -89,8 +90,17 @@ class DayWithOverfitTest {
     // Coach: offline first (the request waits in the queue), online after the "app restart".
     private var online = false
     private val coachAnswer = """{"rating":8,"summary":"Starkes Training","positives":["Sauber"],"improvements":[],"tips":["Mehr schlafen"],"photo_feedback":null,"next_session":{"exercises":[{"exercise_id":"wg:bench-press","is_new":false,"rest_sec":90,"sets":[{"weight_kg":62.5,"reps":8,"duration_sec":null},{"weight_kg":62.5,"reps":8,"duration_sec":null}],"reason":"Alle Sätze geschafft"}],"note":null},"memory":"Ziel: Kraft."}"""
-    private val coachTransport = FakeCoachTransport { _, _ ->
-        if (!online) throw CoachException(CoachErrorKind.NETWORK, "offline") else CoachReply(coachAnswer, coachAnswer)
+    // The coach chat answers with a workout proposal in the share format v1 (as a JSON string, see CoachChatSchema).
+    private val chatAnswer = kotlinx.serialization.json.buildJsonObject {
+        put("reply", kotlinx.serialization.json.JsonPrimitive("Hier ist ein Vorschlag für morgen."))
+        put("workout", kotlinx.serialization.json.JsonPrimitive(AiPrompt.EXAMPLE.replace("Oberkörper A", "Coach Push")))
+    }.toString()
+    private val coachTransport = FakeCoachTransport { prompt, _ ->
+        when {
+            !online -> throw CoachException(CoachErrorKind.NETWORK, "offline")
+            prompt.schemaName == app.overfit.coach.CoachChatSchema.NAME -> CoachReply(chatAnswer, chatAnswer)
+            else -> CoachReply(coachAnswer, coachAnswer)
+        }
     }
     private var process by mutableIntStateOf(0)
     private lateinit var deps: AppDependencies
@@ -125,7 +135,9 @@ class DayWithOverfitTest {
         node.performClick()
     }
     private fun tab(name: String) {
-        val tabNode = hasText(name, substring = false) and hasClickAction()
+        // Tabs by role: the Training tab also has a "Coach" row.
+        val tabNode = hasText(name, substring = false) and hasClickAction() and
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Tab)
         // Sub-screens hide the tab bar: step back until it is there (screens settle asynchronously).
         repeat(4) {
             if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
@@ -327,7 +339,7 @@ class DayWithOverfitTest {
         tab("Training")
         waitFor("Duo · bald")
         compose.onNodeWithContentDescription("Neues Workout").performClick()
-        click("KI-Prompt kopieren")
+        compose.onNodeWithTag("prompt-copy:KI-Prompt kopieren").performScrollTo().performClick()
         assertTrue(share.clipboard!!.contains("```json"))
         share.clipboard = "Hier dein Plan:\n```json\n${AiPrompt.EXAMPLE}\n```"
         click("Workout importieren")
@@ -355,17 +367,30 @@ class DayWithOverfitTest {
         click("Tippen zum Schließen")
         waitFor("Fuel · 4,20 €", substring = true)
 
-        // KI-Coach → Gemini → copy context: contains the profile and the finished workout
-        tab("Profil")
-        click("KI-Coach")
-        click("Gemini")
-        click("Kontext kopieren")
-        waitFor("Kopiert. Füge den Text in deinen Chat ein.")
+        // Coach tab → prompts show their text → copy context: contains the profile and the finished workout
+        tab("Coach")
+        waitFor("Prompts & Vorlagen", substring = true)
+        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasTestTag("prompt:Kontext kopieren")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("prompt:Kontext kopieren").performScrollTo().assertExists()
+        compose.onNodeWithTag("prompt-copy:Kontext kopieren").performScrollTo().performClick()
         val ctx = share.clipboard.orEmpty()
         assertTrue(ctx, ctx.contains("Fabi"))
         assertTrue(ctx, ctx.contains("Push"))
         assertTrue(ctx, ctx.contains("Bench Press"))
-        back(); back()
+
+        // Coach chat: ask, the answer proposes a workout, "Use workout" opens the import preview
+        compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:tabInput"))).performScrollTo().performTextInput("Was soll ich morgen trainieren?")
+        click("Senden")
+        waitFor("Hier ist ein Vorschlag für morgen.")
+        waitFor("Workout-Vorschlag: Coach Push")
+        val chatPrompt = coachTransport.prompts.last()
+        assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Fabi"))
+        assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Bench Press"))
+        click("Workout übernehmen")
+        waitFor("Coach Push")
+        click("Übernehmen")
+        compose.waitUntilState(10_000) { templates().any { it.name == "Coach Push" } }
+        tab("Coach")
 
         // Duo teaser
         tab("Training")

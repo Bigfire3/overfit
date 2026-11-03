@@ -18,6 +18,7 @@ import app.overfit.domain.buildProfileBlock
 import app.overfit.i18n.coachStringsFor
 import app.overfit.platform.prepareJpeg
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Connects the coach to profile, AI access and database. Access: Fuel when chosen and the backend is configured,
@@ -67,3 +68,57 @@ internal fun createCoach(
         clock = clock,
     )
 }
+
+/**
+ * The coach chat: same access, transports and model as [coach]; the system prompt gets the profile block and the
+ * status of "Copy context" (without its answer instructions). Explicitly attached photos are downscaled like the
+ * coach's.
+ */
+internal fun createCoachChat(
+    store: AppStore,
+    data: AppData,
+    coach: CoachService,
+    chat: app.overfit.chat.ChatFeature,
+    today: () -> LocalDate,
+    clock: () -> Long,
+): app.overfit.coach.CoachChatService = app.overfit.coach.CoachChatService(
+    dao = data.database.coachChatDao(),
+    access = coach::access,
+    transport = coach::transportFor,
+    model = { coach.settings.state.value.model(it) },
+    parts = {
+        val s = store.state.value
+        app.overfit.coach.ChatPromptParts(
+            instructions = coach.instructions(s.language),
+            profileBlock = buildProfileBlock(s.profile, s.weights, s.language, today()),
+            context = chat.contextOnly(app.overfit.i18n.chatStringsFor(s.language), today()),
+            exerciseList = coach.exerciseList(),
+        )
+    },
+    photos = { ids ->
+        val zone = kotlinx.datetime.TimeZone.currentSystemDefault()
+        val all = data.workouts.allPhotos().associateBy { it.id }
+        ids.mapNotNull { id ->
+            val photo = all[id] ?: return@mapNotNull null
+            val jpeg = data.workouts.readPhoto(photo)?.let { prepareJpeg(it, maxEdge = 1500) } ?: return@mapNotNull null
+            val date = kotlin.time.Instant.fromEpochMilliseconds(photo.takenAt).toLocalDateTime(zone).date.toString()
+            app.overfit.coach.CoachImage(date, jpeg)
+        }
+    },
+    demo = {
+        val h = coachStringsFor(store.state.value.language).hub
+        app.overfit.coach.ChatAnswer(h.demoReply, app.overfit.share.ShareFormat.toJson(demoWorkout(h.demoWorkoutName)))
+    },
+    scope = data.scope,
+    clock = clock,
+)
+
+/** Sample proposal of the chat demo (catalogue exercises, so the import preview finds them). */
+internal fun demoWorkout(name: String) = app.overfit.share.SharedTraining(
+    name = name,
+    exercises = listOf(
+        app.overfit.share.SharedExercise(id = "wg:bench-press", name = "Bench Press", restSec = 120, sets = List(3) { app.overfit.share.SharedSet(kg = 50.0, reps = 8) }),
+        app.overfit.share.SharedExercise(id = "wg:barbell-row", name = "Barbell Row", restSec = 120, sets = List(3) { app.overfit.share.SharedSet(kg = 40.0, reps = 10) }),
+        app.overfit.share.SharedExercise(id = "wg:bodyweight-squat", name = "Bodyweight Squat", restSec = 90, sets = List(3) { app.overfit.share.SharedSet(reps = 15) }),
+    ),
+)

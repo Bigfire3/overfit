@@ -78,6 +78,9 @@ class CoachService(
 
     fun access(): CoachAccess = access.invoke()
 
+    /** The transport for [id] (shared with the coach chat). */
+    fun transportFor(id: ProviderId): CoachTransport = transport(id)
+
     /**
      * The coach's AI access for other features (exercise autofill): same provider, key or Fuel, and model. New
      * providers wired into [transport] are picked up automatically.
@@ -289,10 +292,7 @@ class CoachService(
         val same = current?.templateId?.let { dao.finishedOfTemplate(it, current.id, SAME_TEMPLATE).map { r -> r.toRecord() } }.orEmpty()
         val lastOverall = current?.let { c -> dao.latestFinishedExcept(c.id)?.toRecord()?.takeIf { o -> same.none { it.id == o.id } } }
         val recent = dao.finishedSince(now - RECENT_WEEKS * WEEK_MS, RECENT_LIMIT).map { it.toRecord() }
-        val used = dao.usedExerciseIds().toSet()
-        val list = exercises.getActive()
-            .filter { it.id.startsWith("wg:") || it.isCustom || it.id in used }
-            .map { it.id to it.name }
+        val list = exerciseList()
         return CoachContext(
             kind = kind,
             language = p.language,
@@ -309,6 +309,17 @@ class CoachService(
             timeZone = timeZone(),
         )
     }
+
+    /** id → name of the exercises the coach (and the coach chat) may use: catalogue, own ones, used ones. */
+    suspend fun exerciseList(): List<Pair<String, String>> {
+        val used = dao.usedExerciseIds().toSet()
+        return exercises.getActive()
+            .filter { it.id.startsWith("wg:") || it.isCustom || it.id in used }
+            .map { it.id to it.name }
+    }
+
+    /** Coach role and rules: the user's own instructions or the default in [language]. */
+    fun instructions(language: Language): String = settings.state.value.instructions ?: defaultInstructions(language)
 
     private suspend fun CoachDao.finishedOrAny(id: String): SessionRecord? = session(id)?.toRecord()
 

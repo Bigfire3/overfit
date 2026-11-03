@@ -198,3 +198,6 @@ eigenen API-Key und ohne Fuel. Die angelegte Vorlage öffnet man danach in der A
   Freigabe, als Bild), Vorlage anlegen/ändern, Notiz hinterlegen. Vertrag: `docs/backend-api.md`.
 - **Fünf Wege nebeneinander:** Der In-App-Coach (Phase 4) läuft weiter über eigenen Key oder Fuel. Die Chat-Verbindung ist
   zusätzlich; Auswertungen aus dem Chat landen als Notiz am Training, nicht als In-App-Coach-Bewertung.
+
+## Monetarisierung
+Siehe [docs/monetization.md](docs/monetization.md) (Fuel im Store und im Web, später Pro-Abo, Programme, Trainer-Version).

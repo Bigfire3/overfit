@@ -2,6 +2,7 @@ package app.overfit.ui
 
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -76,22 +77,22 @@ class ChatFlowTest {
     @Test
     fun withoutBackendContextAndGemInstructionsStillWork() {
         compose.setContent { OverfitApp(deps()) }
-        compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("KI-Coach").performScrollTo().performClick()
-        compose.onNodeWithText("Im Chat (mit deinem KI-Abo)".uppercase()).assertExists()
-        compose.onNodeWithText("Gemini").performClick()
+        compose.onNodeWithTag("tab:COACH").performClick()
+        compose.onNodeWithText("KI-Chat-Verbindungen".uppercase()).performScrollTo().assertExists()
+        compose.onNodeWithText("Gemini").performScrollTo().performClick()
         await("Startet bald".uppercase())
         compose.onNodeWithText("Ersatzweg für Gemini: eigenes Gem".uppercase()).assertExists()
 
-        compose.onNodeWithText("Kontext kopieren").performScrollTo().performClick()
-        await("Kopiert. Füge den Text in deinen Chat ein.")
+        // The prompt shows its full text before it is copied.
+        compose.onNodeWithTag("prompt:Kontext kopieren").performScrollTo().assertExists()
+        compose.onNodeWithTag("prompt-copy:Kontext kopieren").performScrollTo().performClick()
+        await("Kopiert")
         val ctx = share.clipboard.orEmpty()
         assertTrue(ctx, ctx.contains("Das ist mein Trainingsstand aus der App Overfit"))
         assertTrue(ctx.contains("Fabian"))
         assertTrue(ctx.contains("```json"))
 
-        compose.onNodeWithText("Gem-/GPT-Anleitung kopieren").performScrollTo().performClick()
-        await("Anleitung kopiert", substring = true)
+        compose.onNodeWithTag("prompt-copy:Gem-/GPT-Anleitung kopieren").performScrollTo().performClick()
         assertTrue(share.clipboard.orEmpty().contains("Trainings-Coach"))
     }
 
@@ -109,9 +110,8 @@ class ChatFlowTest {
         }
         val fuel = FuelAccess(kv, "https://backend.test") { url -> FuelApi(HttpClient(engine), url, RequestSigner(TestKey())) }
         compose.setContent { OverfitApp(deps(fuel)) }
-        compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("KI-Coach").performScrollTo().performClick()
-        compose.onNodeWithText("Claude").performClick()
+        compose.onNodeWithTag("tab:COACH").performClick()
+        compose.onNodeWithText("Claude").performScrollTo().performClick()
         await("https://backend.test/mcp", substring = true)
         compose.onNodeWithText("KI-Chat verbinden").performClick()
 
