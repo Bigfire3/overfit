@@ -27,7 +27,7 @@ import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.TextButton
+import app.overfit.ui.components.SecondaryButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.main.RunningWorkoutChoice
@@ -79,9 +79,9 @@ fun WorkoutPlanScreen(
         Title(w.name)
         Spacer(Modifier.height(Space.s))
         Text(lastDone, style = Theme.type.caption, tone = Tone.Muted)
-        Row(Modifier.padding(top = Space.m), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-            TextButton(t.edit, onEdit, tone = Tone.Default)
-            TextButton(t.share.shareTemplate, onShare, tone = Tone.Default)
+        Row(Modifier.padding(top = Space.m), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+            SecondaryButton(t.edit, onEdit, Modifier, compact = true)
+            SecondaryButton(t.share.shareTemplate, onShare, Modifier, compact = true)
         }
         Spacer(Modifier.height(Space.l))
         Hairline()

@@ -379,7 +379,7 @@ private fun ViewerInfo(
         ViewerAction(p.sharePhoto, white) {
             scope.launch { loadJpeg(item.photo.id)?.let { platform.shareBytes("overfit-${item.photo.id}.jpg", it, "image/jpeg") } }
         }
-        ViewerAction(if (confirm) p.deletePhotoConfirm else p.deletePhoto, if (confirm) white else dim) {
+        ViewerAction(if (confirm) p.deletePhotoConfirm else p.deletePhoto, if (confirm) Color(0xFFFF453A) else dim) {
             if (confirm) onDelete(item.photo.id) else confirm = true
         }
     }

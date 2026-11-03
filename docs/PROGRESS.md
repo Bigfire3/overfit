@@ -15,6 +15,18 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## UI-Feinschliff (Session R, 3.11.)
+**Erledigt:** Button-Hierarchie (Primary/Secondary/Tertiary/Destructive/Confirm), 48/40-dp-Höhen, Chevron + Pressed-State für klickbare Zeilen, Chips/Segmente auf `surface`, schlankere Workout-Ansicht (ein Kopf, kompakter Fuß, 48-dp-Haken in Grün), Bestätigungsmuster mit Farbe überall, Diary zeigt mindestens 4 Monate inkl. leere. Vorher/Nachher-Screenshots: `docs/screenshots/before|after` (Test `ScreenshotTest`, nur mit `SCREENSHOT_DIR=…`). Mängelliste in DECISIONS.md.
+
+### Bitte auf dem Handy testen: UI-Feinschliff
+1. Training-Tab: Workout-Zeilen und Coach/Duo haben Chevron; beim Drücken färbt sich die Zeile grau.
+2. Workout öffnen: „Bearbeiten“ und „Teilen“ sind graue Buttons.
+3. Training starten: Kopf ist eine schmale Zeile (Minimieren, Name + Uhr, „Beenden“). Mehr Platz für Sätze, oben kaum Leerraum.
+4. Satz abhaken: großer Kreis, danach grün. „Beenden“ antippen: Button wird grün mit „Beenden? Nochmal tippen“, Name weicht kurz.
+5. Ganz unten „Training verwerfen“ ist grau, nach Tipp rot mit „Nochmal tippen“. Gleiches bei Löschen (Training, Workout, Übung) und Profil → Reset.
+6. Fotos-Tab: auch bei nur einem Training erscheinen die letzten 3 Monate plus der aktuelle, leere Monate inklusive.
+7. Profil: Sprache/Darstellung (Segmente) liegen auf grauer Fläche; in Hell und Dunkel prüfen.
+
 ## Foto-Tagebuch im Stil von BeReal „Memories“ (Session M, 3.11.)
 **Erledigt:** `ui/photos` umgebaut, keine Schemaänderung.
 - Monatsweises Kalender-Raster (7 Spalten, Wochenstart DE Montag / EN Sonntag), neuester Monat zuerst, Monatsname groß.

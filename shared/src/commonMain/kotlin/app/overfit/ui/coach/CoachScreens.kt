@@ -51,6 +51,7 @@ import app.overfit.fuel.formatEuro
 import app.overfit.i18n.CoachStrings
 import app.overfit.i18n.LocalCoachStrings
 import app.overfit.i18n.LocalStrings
+import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
@@ -537,7 +538,6 @@ fun CoachMemoryScreen(coach: CoachService, onBack: () -> Unit) {
     val versions by coach.memoryVersions.collectAsState(initial = emptyList())
     var text by remember(current?.id) { mutableStateOf(current?.text.orEmpty()) }
     var saved by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
     Screen(
         scroll = true,
         header = { BackHeader(t.back, onBack) },
@@ -563,13 +563,7 @@ fun CoachMemoryScreen(coach: CoachService, onBack: () -> Unit) {
         }
         if (current != null) {
             Spacer(Modifier.height(Space.l))
-            ListRow(
-                if (confirmDelete) c.memoryDeleteConfirm else c.memoryDelete,
-                tone = if (confirmDelete) Tone.Default else Tone.Muted,
-                onClick = {
-                    if (confirmDelete) { coach.launch { coach.clearMemory() }; text = ""; confirmDelete = false } else confirmDelete = true
-                },
-            )
+            ConfirmButton(c.memoryDelete, c.memoryDeleteConfirm, onConfirm = { coach.launch { coach.clearMemory() }; text = "" })
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.platform.RestAlerts
+import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.share.SamplesRow
 import app.overfit.ui.share.ShareDependencies
@@ -156,11 +157,8 @@ fun SettingsScreen(
         ListRow(t.photos.backupImport, onClick = onImportBackup)
 
         SectionTitle(t.data)
-        ListRow(
-            if (confirmReset) t.resetConfirm else t.reset,
-            tone = if (confirmReset) Tone.Default else Tone.Muted,
-            onClick = { if (confirmReset) onReset() else confirmReset = true },
-        )
+        Spacer(Modifier.height(Space.s))
+        ConfirmButton(t.reset, t.resetConfirm, onConfirm = onReset)
     }
 }
 

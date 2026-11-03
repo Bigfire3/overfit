@@ -18,6 +18,7 @@ import app.overfit.domain.Numbers
 import app.overfit.domain.SetValues
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.WorkoutStats
+import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.theme.Theme
 import app.overfit.workout.WorkoutFormat
@@ -186,8 +187,6 @@ fun ExerciseDetailScreen(
 
     var tracking by remember(e.id, e.trackingType) { mutableStateOf(e.trackingType) }
     var rest by remember(e.id, e.defaultRestSec) { mutableStateOf(e.defaultRestSec?.toString().orEmpty()) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    LaunchedEffect(confirmDelete) { if (confirmDelete) { delay(4000); confirmDelete = false } }
 
     Screen(
         scroll = true,
@@ -216,11 +215,8 @@ fun ExerciseDetailScreen(
             Text(t.trackingName(e.trackingType))
             e.defaultRestSec?.let { ListRow(t.restTime, it.toString()) }
             SectionTitle(t.data)
-            ListRow(
-                if (confirmDelete) t.deleteConfirm else t.delete,
-                tone = if (confirmDelete) Tone.Default else Tone.Muted,
-                onClick = { if (confirmDelete) viewModel.delete { onBack() } else confirmDelete = true },
-            )
+            Spacer(Modifier.height(Space.s))
+            ConfirmButton(t.delete, t.deleteConfirm, onConfirm = { viewModel.delete { onBack() } })
         } else {
             TrackingChooser(tracking) { tracking = it }
             Spacer(Modifier.height(Space.s))
