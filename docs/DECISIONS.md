@@ -492,3 +492,11 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - **iOS-CI pausiert:** macOS-Minuten kosten 10x und waren am 3.11. rund 90 % der Actions-Kosten. `ios.yml` läuft nur noch
   per „Run workflow“. Ersatz: Die Android-CI kompiliert `iosMain` (`:shared:compileKotlinIosSimulatorArm64`, Linux).
   Gemergt wird bei grüner Android-CI; die iOS-CI vor einem iOS-Release oder nach größeren iOS-Änderungen von Hand starten.
+
+## Workout minimieren (Session L, 3.11.)
+- **Minimiert = reiner UI-Zustand, kein Controller-Zustand.** `WorkoutRoute` ist ein normales Navigationsziel; „minimiert“ heißt: das Training läuft (`WorkoutController.state.workout != null`), aber `WorkoutRoute` ist nicht oben. Die Leiste (`MiniWorkoutBar`) sitzt im `AppScaffold` über der Tab-Leiste und erscheint damit auf allen Hauptscreens. Der WorkoutController, Pausentimer, Benachrichtigungen und Haptik sind unverändert.
+- Minimieren-Knopf (Pfeil nach unten) und System-Zurück machen dasselbe: `popBackStack` auf den Screen darunter (Standardverhalten der Navigation, kein eigener BackHandler nötig). Beenden/Verwerfen bleiben die bestehenden Doppeltipp-Aktionen im Training.
+- Tipp oder Wischen nach oben auf die Leiste → `NavHostController.openWorkout()`: zurück zum Training, falls auf dem Stack, sonst oben drauf (kein doppelter Eintrag).
+- **Benachrichtigung:** Die Tap-Intents (Pausentimer läuft / Pause vorbei) tragen `EXTRA_OPEN_WORKOUT`; `MainActivity` zählt `AppDependencies.openWorkoutRequests` hoch, die UI öffnet daraufhin das maximierte Training. Nach Prozess-Neustart stellt die bestehende Wiederherstellung das Training ohnehin maximiert wieder her.
+- **Zweites Training:** Läuft eins, zeigt der Start-Tab statt „Training starten“ die Wahl „Zum laufenden Training“ / „Laufendes beenden“ (Bestätigungsmuster, Button wechselt Text). „Beenden“ heißt wie sonst auch: Training abschließen und speichern (Beenden-Flow), nicht verwerfen – umkehrbar und ohne Datenverlust. Danach startet man das neue Training vom Start-Tab.
+

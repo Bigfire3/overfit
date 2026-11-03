@@ -164,7 +164,8 @@ class AndroidRestAlerts(
 
         fun openApp(context: Context): PendingIntent? {
             val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                ?.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP) ?: return null
+                ?.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                ?.putExtra(EXTRA_OPEN_WORKOUT, true) ?: return null
             return PendingIntent.getActivity(context, REQUEST_OPEN, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
 
@@ -234,3 +235,6 @@ class RestActionReceiver : BroadcastReceiver() {
         }
     }
 }
+
+/** Set on the notification tap intents: MainActivity then shows the maximized workout. */
+const val EXTRA_OPEN_WORKOUT = "app.overfit.OPEN_WORKOUT"

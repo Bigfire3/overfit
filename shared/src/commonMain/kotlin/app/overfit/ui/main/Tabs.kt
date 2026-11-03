@@ -1,6 +1,15 @@
 package app.overfit.ui.main
 
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextAlign
+import app.overfit.ui.components.TextButton
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -35,6 +44,8 @@ fun StartScreen(
     templates: List<TemplateSummary>?,
     activeWorkout: Boolean,
     onStartWorkout: () -> Unit,
+    onOpenRunning: () -> Unit = {},
+    onEndRunning: () -> Unit = {},
     onOpenTemplate: (Long) -> Unit,
     onNewTemplate: () -> Unit,
     share: ShareDependencies,
@@ -50,7 +61,21 @@ fun StartScreen(
     Screen(
         scroll = true,
         footer = {
-            PrimaryButton(if (activeWorkout) t.continueWorkout else t.startWorkout, onClick = onStartWorkout)
+            if (activeWorkout) {
+                // A workout is running: only the choice "go to it" or "end it" (confirm pattern), no second one in parallel.
+                var confirmEnd by remember { mutableStateOf(false) }
+                LaunchedEffect(confirmEnd) { if (confirmEnd) { delay(4000); confirmEnd = false } }
+                Text(t.runningWorkoutTitle, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
+                Spacer(Modifier.height(Space.s))
+                PrimaryButton(t.toRunningWorkout, onClick = onOpenRunning)
+                TextButton(
+                    if (confirmEnd) t.finishConfirm else t.endRunningWorkout,
+                    { if (confirmEnd) { confirmEnd = false; onEndRunning() } else confirmEnd = true },
+                    tone = if (confirmEnd) Tone.Default else Tone.Muted,
+                )
+            } else {
+                PrimaryButton(t.startWorkout, onClick = onStartWorkout)
+            }
         },
     ) {
         Text(t.greeting(state.profile.name), style = Theme.type.label, tone = Tone.Muted)

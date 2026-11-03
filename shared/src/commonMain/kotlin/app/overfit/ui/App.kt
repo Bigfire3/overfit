@@ -94,7 +94,9 @@ import app.overfit.ui.exercises.ExercisePickerScreen
 import app.overfit.ui.exercises.ExerciseViewModel
 import app.overfit.ui.exercises.ExercisesScreen
 import app.overfit.ui.templates.TemplateEditorScreen
+import app.overfit.ui.workout.MiniWorkoutBar
 import app.overfit.ui.workout.StartWorkoutScreen
+import app.overfit.domain.Workout
 import app.overfit.ui.workout.WorkoutScreen
 import app.overfit.ui.templates.TemplateEditorViewModel
 import app.overfit.ui.history.FinishScreen
@@ -203,6 +205,13 @@ class AppDependencies(
      * [BackupContributor]. Register before the UI starts.
      */
     val backupContributors = mutableListOf<BackupContributor>()
+
+    /**
+     * Counter raised when a notification (rest timer, running workout) is tapped: the UI then always shows
+     * the maximized workout, also from the minimized view. After a process restart the workout comes back maximized anyway.
+     */
+    val openWorkoutRequests = MutableStateFlow(0)
+    fun requestOpenWorkout() { openWorkoutRequests.value += 1 }
 
     /** Backup file picked in the settings, waiting for the import preview ([BackupImportRoute]). */
     val pendingBackup = MutableStateFlow<ByteArray?>(null)
@@ -361,6 +370,14 @@ fun OverfitApp(deps: AppDependencies) {
                 resumeChecked = true
                 if (workoutState.workout != null && state.onboardingDone) nav.navigate(WorkoutRoute)
             }
+            // Tap on the rest/workout notification → maximized workout (from anywhere, also when minimized).
+            val openRequests by deps.openWorkoutRequests.collectAsStateWithLifecycle()
+            var handledOpenRequests by remember { mutableStateOf(openRequests) }
+            LaunchedEffect(openRequests) {
+                if (openRequests == handledOpenRequests) return@LaunchedEffect
+                handledOpenRequests = openRequests
+                if (workoutState.workout != null && state.onboardingDone) nav.openWorkout()
+            }
             // Links, files and scans from outside open the import screen (not during onboarding).
             LaunchedEffect(incoming, state.onboardingDone) {
                 // A Spot link (QR scanned with the camera app) goes to "I was spotted", not to the training import.
@@ -376,7 +393,7 @@ fun OverfitApp(deps: AppDependencies) {
                     nav.navigate(ImportRoute) { launchSingleTop = true }
                 }
             }
-            AppScaffold(nav) {
+            AppScaffold(nav, workoutState.workout, deps.clock, onOpenWorkout = { nav.openWorkout() }) {
                 NavHost(nav, startDestination = start, modifier = Modifier.fillMaxSize()) {
                     composable<NameRoute> {
                         NameStep(state.profile.name, onNext = { deps.store.setName(it); nav.navigate(AgeRoute) })
@@ -419,8 +436,12 @@ fun OverfitApp(deps: AppDependencies) {
                             state = state,
                             templates = templates,
                             activeWorkout = workoutState.workout != null,
-                            onStartWorkout = {
-                                nav.navigate(if (workoutState.workout != null) WorkoutRoute else StartWorkoutRoute)
+                            onStartWorkout = { nav.navigate(StartWorkoutRoute) },
+                            onOpenRunning = { nav.openWorkout() },
+                            onEndRunning = {
+                                // Ends the running workout (saved, finish flow): the workout screen takes it from there. Runs in the app scope.
+                                deps.data.scope.launch { deps.workout.finish() }
+                                nav.openWorkout()
                             },
                             onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
                             onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
@@ -471,6 +492,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onAddExercises = { pendingReplaceId = null; nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { pendingReplaceId = it; nav.navigate(ExercisePickerRoute(single = true)) },
                             onClosed = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
+                            onMinimize = { if (!nav.popBackStack()) nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                             onFinished = { id -> nav.navigate(FinishRoute(id)) { popUpTo(StartRoute) } },
                         )
                     }
@@ -786,15 +808,29 @@ fun OverfitApp(deps: AppDependencies) {
     }
 }
 
+/** Brings the (maximized) workout to the front: back to it if it is on the stack, otherwise open it on top. */
+internal fun NavHostController.openWorkout() {
+    if (currentDestination?.hasRoute(WorkoutRoute::class) == true) return
+    if (!popBackStack(WorkoutRoute, inclusive = false)) navigate(WorkoutRoute) { launchSingleTop = true }
+}
+
 /** Shows the bottom tab bar only on the five top-level screens. */
 @Composable
-private fun AppScaffold(nav: NavHostController, content: @Composable () -> Unit) {
+private fun AppScaffold(
+    nav: NavHostController,
+    runningWorkout: Workout?,
+    clock: () -> Long,
+    onOpenWorkout: () -> Unit,
+    content: @Composable () -> Unit,
+) {
     val entry by nav.currentBackStackEntryAsState()
     val destination = entry?.destination
     val current = Tab.entries.firstOrNull { tab -> destination?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
 
     Column(Modifier.fillMaxSize().background(Theme.colors.background)) {
         Box(Modifier.weight(1f)) { content() }
+        // A running workout that is not on screen (minimized) sits above the tab bar on every main screen.
+        if (current != null && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
         if (current != null) {
             TabBar(current) { tab ->
                 nav.navigate(tab.route) {
