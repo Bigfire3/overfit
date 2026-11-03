@@ -90,6 +90,52 @@ cd iosApp && xcodegen && open Overfit.xcodeproj
 
 In Xcode einen iPhone-Simulator wählen und starten. Der Kotlin-Teil wird beim Build automatisch über Gradle gebaut.
 
+## iPhone: TestFlight
+
+Der Workflow „iOS TestFlight“ (`.github/workflows/ios-testflight.yml`, nur manuell) baut ein signiertes Archiv und lädt
+es zu TestFlight hoch. Build-Nummer = Run-Nummer, Bundle-ID `app.overfit` (änderbar über die Variable `IOS_BUNDLE_ID`).
+Einmalig einrichten:
+
+1. **Apple Developer Program** beitreten: developer.apple.com/programs → „Enroll“ (99 €/Jahr, als Einzelperson mit
+   Apple-ID, Bestätigung dauert meist 1–2 Tage).
+2. **Team-ID** notieren: developer.apple.com/account → Membership details → „Team ID“ (10 Zeichen).
+3. **App ID** (optional, Xcode legt sie sonst beim ersten Lauf selbst an): Certificates, Identifiers & Profiles →
+   Identifiers → „+“ → App IDs → App → Bundle ID „Explicit“ `app.overfit`. Ist sie vergeben, eine andere wählen
+   (z. B. `de.<dein-name>.overfit`) und in GitHub als Variable `IOS_BUNDLE_ID` eintragen.
+4. **App in App Store Connect** anlegen: appstoreconnect.apple.com → Apps → „+“ → Neue App → Plattform iOS,
+   Name „Overfit“ (falls vergeben: „Overfit Training“), Sprache Deutsch, Bundle-ID aus Schritt 3, SKU `overfit`.
+5. **API-Schlüssel**: App Store Connect → Benutzer und Zugriff → Integrationen → App Store Connect API →
+   Team-Schlüssel → „+“ → Name „GitHub“, Zugriff **Admin** → Erzeugen. Die `.p8`-Datei herunterladen (geht nur einmal),
+   „Schlüssel-ID“ und oben „Issuer-ID“ notieren. (Admin statt App Manager: nur damit darf der Schlüssel das
+   Verteilungszertifikat in der Cloud verwalten, das die automatische Signierung braucht; Begründung in DECISIONS.md.)
+6. **Secrets in GitHub**: Repo → Settings → Secrets and variables → Actions → „New repository secret“:
+   - `APP_STORE_CONNECT_KEY_ID` = Schlüssel-ID
+   - `APP_STORE_CONNECT_ISSUER_ID` = Issuer-ID
+   - `APP_STORE_CONNECT_KEY_P8` = kompletter Inhalt der `.p8`-Datei (mit `-----BEGIN PRIVATE KEY-----` und `END`-Zeile)
+   - `APPLE_TEAM_ID` = Team-ID
+7. **Bauen**: Actions → „iOS TestFlight“ → „Run workflow“. Fehlt ein Secret, bricht der Lauf sofort mit Liste der
+   fehlenden Namen ab. Nach dem Upload verarbeitet Apple den Build (5–30 Minuten).
+8. **Interne Tester**: App Store Connect → App → TestFlight → Interne Tests → „+“ Gruppe „Ich“ → dich (deine Apple-ID
+   ist als Kontoinhaber automatisch Benutzer) hinzufügen, Build zur Gruppe hinzufügen. Interne Builds brauchen keine
+   Beta-Review. Die Frage nach Verschlüsselung beantwortet die App selbst (`ITSAppUsesNonExemptEncryption = NO`).
+9. **iPhone**: App „TestFlight“ aus dem App Store laden, mit derselben Apple-ID anmelden → Overfit → „Installieren“.
+   Jeder neue Lauf erscheint dort als Update. TestFlight-Builds laufen 90 Tage.
+
+### iPhone ohne bezahltes Konto (Mac nötig)
+
+Mit einem Mac geht es auch kostenlos, aber umständlicher:
+
+1. Xcode aus dem Mac App Store, dann JDK 21 und XcodeGen (`brew install openjdk@21 xcodegen`).
+2. Repo klonen, `cd iosApp && xcodegen && open Overfit.xcodeproj`.
+3. Xcode → Settings → Accounts → „+“ → Apple-ID (kostenlos) anmelden.
+4. Target „Overfit“ → Signing & Capabilities → Team „<Name> (Personal Team)“, Bundle Identifier eindeutig machen
+   (z. B. `de.<dein-name>.overfit`, die kostenlose Signierung verlangt eine noch nicht vergebene ID).
+5. iPhone per Kabel anschließen, „Vertrauen“ tippen; am iPhone Einstellungen → Datenschutz & Sicherheit →
+   Entwicklermodus einschalten (Neustart).
+6. In Xcode oben das iPhone wählen → Run (⌘R). Beim ersten Start am iPhone: Einstellungen → Allgemein →
+   VPN & Geräteverwaltung → Entwickler-App vertrauen.
+7. Die App läuft **7 Tage**, dann neu aus Xcode installieren. Maximal 3 Apps gleichzeitig pro kostenloser Apple-ID.
+
 ## Übungskatalog neu erzeugen
 
 Der Katalog (`shared/src/commonMain/composeResources/files/catalog/`) wird mit einem Skript aus Workout Guide gebaut
