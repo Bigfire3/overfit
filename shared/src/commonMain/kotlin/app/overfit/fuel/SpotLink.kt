@@ -1,7 +1,12 @@
 package app.overfit.fuel
 
-/** Public page that explains Spot to people without the app; the token travels in the fragment (never sent to a server). */
-const val SPOT_LINK_BASE = "https://bigfire3.github.io/overfit/spot"
+/**
+ * Spot link in the QR code. Custom scheme like trainings on iOS: the camera app opens it straight in Overfit; the in-app
+ * scanner (Android) reads the same text. The token travels in the fragment.
+ */
+const val SPOT_LINK_BASE = "overfit://spot"
+
+fun isSpotLink(text: String): Boolean = text.trim().startsWith(SPOT_LINK_BASE)
 
 fun spotLink(token: String): String = "$SPOT_LINK_BASE#$token"
 

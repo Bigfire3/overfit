@@ -40,6 +40,7 @@ import app.overfit.data.AppStore
 import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.FuelSession
+import app.overfit.fuel.isSpotLink
 import app.overfit.i18n.LocalFuelStrings
 import app.overfit.i18n.fuelStringsFor
 import app.overfit.platform.Haptics
@@ -86,6 +87,15 @@ import app.overfit.ui.onboarding.ONBOARDING_STEPS
 import app.overfit.ui.onboarding.OnboardingHeader
 import app.overfit.ui.onboarding.WeightStep
 import app.overfit.ui.settings.AboutScreen
+import app.overfit.share.ImportInbox
+import app.overfit.share.NoopPlatformShare
+import app.overfit.share.PlatformShare
+import app.overfit.ui.share.DuoScreen
+import app.overfit.ui.share.ImportScreen
+import app.overfit.ui.share.ImportViewModel
+import app.overfit.ui.share.ShareDependencies
+import app.overfit.ui.share.ShareScreen
+import app.overfit.ui.share.ShareViewModel
 import app.overfit.ui.settings.CoachMemoryScreen
 import app.overfit.ui.settings.SettingsScreen
 import app.overfit.ui.theme.OverfitTheme
@@ -104,12 +114,12 @@ class AppDependencies(
     val providers: Providers,
     val data: AppData,
     val versionName: String,
+    val share: PlatformShare = NoopPlatformShare(),
+    val inbox: ImportInbox = ImportInbox(),
     val today: () -> LocalDate = { Clock.System.todayIn(TimeZone.currentSystemDefault()) },
     val haptics: Haptics = NoHaptics,
     /** Fuel/Spot backend (URL from the build, developer override); defaults to "not configured". */
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
-    /** The app's QR scanner (shared with trainings import); null = Spot offers pasting the link only. */
-    val qrScanner: (@Composable (onResult: (String) -> Unit, onClose: () -> Unit) -> Unit)? = null,
 ) {
     val fuelSession = FuelSession(fuel)
 }
@@ -131,8 +141,11 @@ class AppDependencies(
 @Serializable data object LedgerRoute
 @Serializable data object RecoveryRoute
 @Serializable data object SpotInviteRoute
-@Serializable data object SpotRedeemRoute
+@Serializable data class SpotRedeemRoute(val code: String = "")
 @Serializable data class SpotRevealRoute(val amountMicro: Long, val inviterName: String = "")
+@Serializable data object ImportRoute
+@Serializable data object DuoRoute
+@Serializable data class ShareRoute(val templateId: Long)
 @Serializable data class ExerciseDetailRoute(val id: String)
 /** Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). */
 @Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "")
@@ -161,6 +174,8 @@ fun OverfitApp(deps: AppDependencies) {
     val state by deps.store.state.collectAsStateWithLifecycle()
     val templates by deps.data.templates.templates.collectAsStateWithLifecycle(initialValue = null)
     val picked = remember { PickedExercises() }
+    val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox) }
+    val incoming by deps.inbox.pending.collectAsStateWithLifecycle()
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {
@@ -175,6 +190,21 @@ fun OverfitApp(deps: AppDependencies) {
         CompositionLocalProvider(LocalStrings provides stringsFor(state.language), LocalFuelStrings provides fuelStringsFor(state.language)) {
             val nav = rememberNavController()
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
+            // Links, files and scans from outside open the import screen (not during onboarding).
+            LaunchedEffect(incoming, state.onboardingDone) {
+                // A Spot link (QR scanned with the camera app) goes to "I was spotted", not to the training import.
+                val spot = incoming
+                if (spot != null && state.onboardingDone && isSpotLink(spot)) {
+                    deps.inbox.consume()
+                    nav.navigate(SpotRedeemRoute(spot)) { launchSingleTop = true }
+                    return@LaunchedEffect
+                }
+                if (incoming != null && state.onboardingDone &&
+                    nav.currentDestination?.hasRoute(ImportRoute::class) != true
+                ) {
+                    nav.navigate(ImportRoute) { launchSingleTop = true }
+                }
+            }
             AppScaffold(nav) {
                 NavHost(nav, startDestination = start, modifier = Modifier.fillMaxSize()) {
                     composable<NameRoute> {
@@ -219,6 +249,8 @@ fun OverfitApp(deps: AppDependencies) {
                             templates = templates,
                             onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
                             onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
+                            share = share,
+                            onDuo = { nav.navigate(DuoRoute) },
                         )
                     }
                     composable<HistoryRoute> { HistoryScreen() }
@@ -232,6 +264,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onNewCustomExercise = { nav.navigate(CustomExerciseRoute(name = catalog.filter.value.query.trim())) },
                             onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
                             onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
+                            share = share,
+                            onImport = { nav.navigate(ImportRoute) },
                         )
                     }
                     composable<ExerciseDetailRoute> { entry ->
@@ -266,6 +300,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onClose = nav::popBackStack,
                             onAddExercises = { nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
+                            onShare = { nav.navigate(ShareRoute(id)) },
                         )
                     }
                     composable<ExercisePickerRoute> { entry ->
@@ -291,6 +326,7 @@ fun OverfitApp(deps: AppDependencies) {
                             fuelSession = deps.fuelSession,
                             onFuel = { nav.navigate(FuelRoute) },
                             offlineImages = deps.data.offlineImages,
+                            share = share,
                             onReset = {
                                 deps.store.resetAll()
                                 deps.data.scope.launch { deps.data.resetAll() }
@@ -307,6 +343,28 @@ fun OverfitApp(deps: AppDependencies) {
                             onUseFuel = { deps.store.useFuel(); nav.popBackStack(); nav.navigate(FuelRoute) },
                         )
                     }
+                    composable<ImportRoute> {
+                        ImportScreen(
+                            viewModel = viewModel { ImportViewModel(deps.data.importer) },
+                            share = share,
+                            unit = state.profile.unit,
+                            language = state.language,
+                            onBack = nav::popBackStack,
+                            onImported = { id ->
+                                nav.popBackStack()
+                                nav.navigate(TemplateEditorRoute(id))
+                            },
+                        )
+                    }
+                    composable<ShareRoute> { entry ->
+                        val id = entry.toRoute<ShareRoute>().templateId
+                        ShareScreen(
+                            viewModel = viewModel { ShareViewModel(id, deps.data.templates) },
+                            platform = deps.share,
+                            onBack = nav::popBackStack,
+                        )
+                    }
+                    composable<DuoRoute> { DuoScreen(onBack = nav::popBackStack) }
                     composable<CoachMemoryRoute> { CoachMemoryScreen(onBack = nav::popBackStack) }
                     composable<AboutRoute> { AboutScreen(deps.versionName, onBack = nav::popBackStack, fuel = deps.fuel) }
                     composable<FuelRoute> {
@@ -316,17 +374,18 @@ fun OverfitApp(deps: AppDependencies) {
                             onLedger = { nav.navigate(LedgerRoute) },
                             onRecovery = { nav.navigate(RecoveryRoute) },
                             onSpotInvite = { nav.navigate(SpotInviteRoute) },
-                            onSpotRedeem = { nav.navigate(SpotRedeemRoute) },
+                            onSpotRedeem = { nav.navigate(SpotRedeemRoute()) },
                         )
                     }
                     composable<LedgerRoute> { LedgerScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<RecoveryRoute> { RecoveryScreen(deps.fuelSession, onBack = nav::popBackStack, onRestored = {}) }
                     composable<SpotInviteRoute> { SpotInviteScreen(deps.fuelSession, onBack = nav::popBackStack) }
-                    composable<SpotRedeemRoute> {
+                    composable<SpotRedeemRoute> { entry ->
                         SpotRedeemScreen(
+                            canScan = deps.share.canScanInApp,
+                            initialCode = entry.toRoute<SpotRedeemRoute>().code,
                             session = deps.fuelSession,
                             onBack = nav::popBackStack,
-                            scanner = deps.qrScanner,
                             onRedeemed = { micro, name ->
                                 nav.navigate(SpotRevealRoute(micro, name.orEmpty())) { popUpTo<SpotRedeemRoute> { inclusive = true } }
                             },

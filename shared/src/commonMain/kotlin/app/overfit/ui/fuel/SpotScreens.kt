@@ -45,7 +45,10 @@ import app.overfit.platform.Haptics
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.PrimaryButton
-import app.overfit.ui.components.QrCode
+import app.overfit.ui.share.QrView
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
+import app.overfit.share.QrScanner
 import app.overfit.ui.components.RowInput
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
@@ -124,7 +127,7 @@ fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
         val current = token
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (current != null) {
-                QrCode(spotLink(current.token))
+                QrView(spotLink(current.token), Modifier.size(240.dp))
                 Spacer(Modifier.height(Space.m))
                 HairlineProgress(1f - progress, Modifier.padding(horizontal = Space.xl))
                 Spacer(Modifier.height(Space.s))
@@ -151,20 +154,21 @@ fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
 
 /**
  * "Ich wurde gespottet": scan the QR code (when a scanner is available) or paste the link, then redeem.
- * [scanner] is the shared QR scanner of the app; null = only paste is offered.
+ * [canScan]: the in-app QR scanner exists (Android); on iOS the camera app opens the link instead.
  */
 @Composable
 fun SpotRedeemScreen(
     session: FuelSession,
     onBack: () -> Unit,
     onRedeemed: (grantedMicro: Long, inviterName: String?) -> Unit,
-    scanner: (@Composable (onResult: (String) -> Unit, onClose: () -> Unit) -> Unit)? = null,
+    canScan: Boolean = false,
+    initialCode: String = "",
 ) {
     val t = LocalFuelStrings.current
     val s = LocalStrings.current
     val service = session.current()
     val scope = rememberCoroutineScope()
-    var input by remember { mutableStateOf("") }
+    var input by remember { mutableStateOf(initialCode) }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var scanning by remember { mutableStateOf(false) }
@@ -188,8 +192,19 @@ fun SpotRedeemScreen(
         }
     }
 
-    if (scanning && scanner != null) {
-        scanner({ code -> scanning = false; input = code; redeem(code) }, { scanning = false })
+    if (scanning) {
+        Screen(header = { BackHeader(s.back) { scanning = false } }) {
+            Title(t.spotScan)
+            Spacer(Modifier.height(Space.l))
+            Box(Modifier.fillMaxWidth().weight(1f).background(Theme.colors.hairline)) {
+                QrScanner(
+                    Modifier.fillMaxSize(),
+                    onScanned = { code -> scanning = false; input = code; redeem(code) },
+                    onPermissionDenied = { scanning = false; message = t.spotCameraDenied },
+                )
+            }
+            Spacer(Modifier.height(Space.m))
+        }
         return
     }
 
@@ -206,7 +221,7 @@ fun SpotRedeemScreen(
         }
         Text(t.spotRedeemText, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
-        if (scanner != null) {
+        if (canScan) {
             TextButton(t.spotScan, { scanning = true }, tone = Tone.Default)
             Spacer(Modifier.height(Space.m))
         }

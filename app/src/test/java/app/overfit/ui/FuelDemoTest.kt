@@ -84,7 +84,7 @@ class FuelDemoTest {
 
         // Redeem (paste) → reveal
         compose.onNodeWithText("Ich wurde gespottet").performScrollTo().performClick()
-        compose.onNodeWithText("Link oder Code").performTextInput("https://bigfire3.github.io/overfit/spot#demo-spot-token-1")
+        compose.onNodeWithText("Link oder Code").performTextInput("overfit://spot#demo-spot-token-1")
         compose.onNodeWithText("Einlösen").performClick()
         compose.waitUntil(10_000) { shown("Spot von Fabian") }
         assertTrue(HapticPattern.Reveal in haptics.played)

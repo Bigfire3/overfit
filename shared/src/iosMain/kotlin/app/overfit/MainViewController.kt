@@ -14,6 +14,8 @@ import app.overfit.platform.IosHaptics
 import app.overfit.platform.IosKeyValueStore
 import app.overfit.platform.KeychainSecretStore
 import app.overfit.platform.createHttpClient
+import app.overfit.share.IosIncoming
+import app.overfit.share.IosPlatformShare
 import app.overfit.platform.deviceDefaults
 import app.overfit.ui.AppDependencies
 import app.overfit.ui.OverfitApp
@@ -36,6 +38,8 @@ fun MainViewController(): UIViewController {
         versionName = "$version ($build)",
         haptics = IosHaptics(),
         fuel = fuelAccess,
+        share = IosPlatformShare(),
+        inbox = IosIncoming.inbox,
     )
     return ComposeUIViewController { OverfitApp(deps) }
 }

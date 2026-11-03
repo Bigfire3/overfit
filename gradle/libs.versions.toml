@@ -25,6 +25,8 @@ androidxTestRunner = "1.7.0"
 robolectric = "4.17"
 sqlite = "2.6.2"
 playIntegrity = "1.4.0"
+camerax = "1.5.1"
+zxing = "3.5.3"
 
 [libraries]
 # Kotlin Multiplatform (:shared)
@@ -54,6 +56,12 @@ coil-svg-mp = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 play-integrity = { module = "com.google.android.play:integrity", version.ref = "playIntegrity" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+
+# QR scan (Android)
+camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 
 # Android (:app)
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }

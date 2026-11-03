@@ -15,6 +15,9 @@ interface ExerciseDao {
     @Query("SELECT * FROM exercise WHERE isArchived = 0 ORDER BY name COLLATE NOCASE")
     fun observeActive(): Flow<List<ExerciseEntity>>
 
+    @Query("SELECT * FROM exercise WHERE isArchived = 0 ORDER BY name COLLATE NOCASE")
+    suspend fun getActive(): List<ExerciseEntity>
+
     @Query("SELECT * FROM exercise WHERE id = :id")
     suspend fun get(id: String): ExerciseEntity?
 
@@ -60,6 +63,9 @@ data class ExerciseImageRef(val id: String, val imageRef: String)
 interface TemplateDao {
     @Query("SELECT * FROM workout_template ORDER BY position, name COLLATE NOCASE")
     fun observeTemplates(): Flow<List<WorkoutTemplateEntity>>
+
+    @Query("SELECT name FROM workout_template")
+    suspend fun getNames(): List<String>
 
     @Query(
         """SELECT te.templateId AS templateId, e.name AS name FROM template_exercise te

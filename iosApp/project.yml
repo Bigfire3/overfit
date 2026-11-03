@@ -33,6 +33,23 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # Compose Multiplatform: allow 120 Hz on ProMotion devices.
         CADisableMinimumFrameDurationOnPhone: true
+        # overfit://t#… opens the import screen.
+        CFBundleURLTypes:
+          - CFBundleURLName: app.overfit
+            CFBundleURLSchemes: [overfit]
+        # .overfit files (shared workouts) open in Overfit.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: app.overfit.training
+            UTTypeDescription: Overfit Training
+            UTTypeConformsTo: [public.json, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [overfit]
+              public.mime-type: [application/x-overfit]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Overfit Training
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [app.overfit.training]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.overfit
