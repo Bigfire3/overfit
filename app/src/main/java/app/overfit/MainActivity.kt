@@ -22,7 +22,9 @@ import app.overfit.ui.theme.isDark
 
 class MainActivity : ComponentActivity() {
     // Notification permission (Android 13+), asked when the first workout starts.
-    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        ((application as OverfitApp).dependencies.restAlerts as? AndroidRestAlerts)?.onPermissionResult(granted)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))

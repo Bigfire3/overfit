@@ -25,6 +25,28 @@ class AppStoreTest {
     }
 
     @Test
+    fun restTicksOnByDefaultAndPersisted() {
+        val kv = InMemoryKeyValueStore()
+        val secrets = InMemorySecretStore()
+        val store = AppStore(kv, secrets, defaults)
+        assertTrue(store.state.value.settings.restTicks)
+        store.setRestTicks(false)
+        assertFalse(AppStore(kv, secrets, defaults).state.value.settings.restTicks)
+    }
+
+    @Test
+    fun olderStateWithoutRestTicksDecodesWithTicksOn() {
+        val kv = InMemoryKeyValueStore()
+        kv.put(
+            "overfit.state.v1",
+            """{"version":1,"profile":{"name":"Fabi"},"settings":{"language":"DE","vibration":false},"onboardingDone":true}""",
+        )
+        val settings = AppStore(kv, InMemorySecretStore(), defaults).state.value.settings
+        assertFalse(settings.vibration)
+        assertTrue(settings.restTicks)
+    }
+
+    @Test
     fun persistsAcrossInstances() {
         val kv = InMemoryKeyValueStore()
         val secrets = InMemorySecretStore()

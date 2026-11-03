@@ -1,4 +1,4 @@
-# overfit
+# Overfit
 
 **personal training for everyone** – Dein persönlicher Trainer in der Tasche: kennt dein Training, wertet aus und plant.
 Für Android und iOS, schwarz-weiß, Deutsch und Englisch, ohne Werbung, Open Source (MIT). Gebaut mit Kotlin Multiplatform und Compose Multiplatform.

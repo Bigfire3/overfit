@@ -12,7 +12,7 @@ import kotlinx.datetime.LocalDate
  * inside the app on Android and iOS alike, and a missing translation is a compile error.
  */
 data class Strings(
-    val appName: String = "overfit",
+    val appName: String = "Overfit",
     val next: String,
     val back: String,
     val comingSoon: String,
@@ -193,6 +193,17 @@ data class Strings(
     val workoutSettings: String,
     val defaultRest: String,
     val vibration: String,
+    /** Settings section "Notifications": timer alerts, sound, vibration, permissions. */
+    val notifications: String,
+    val notificationsPermission: String,
+    val notificationsAllowed: String,
+    val notificationsDeniedHint: String,
+    val notificationsInfo: String,
+    /** Settings row: ticks in the last 3 s of a rest. */
+    val restTicks: String,
+    val restTicksHint: String,
+    /** Notification text with the ticks (iOS, background): "3 seconds left". */
+    val restTicksBody: String,
     val on: String,
     val off: String,
     val exactAlarm: String,
@@ -257,7 +268,7 @@ val German = Strings(
     weightTitle = "Wie viel\nwiegst du?",
     weightError = "Das sieht nicht nach einem realistischen Gewicht aus.",
     aiTitle = "Verbinde\ndeine KI",
-    aiSubtitle = "overfit nutzt deinen eigenen API-Key oder Guthaben. Keine Werbung, kein Abo nötig.",
+    aiSubtitle = "Overfit nutzt deinen eigenen API-Key oder Guthaben. Keine Werbung, kein Abo nötig.",
     aiKeyPlaceholder = "API-Key einfügen",
     aiHowTo = "Wie bekomme ich einen Key?",
     aiConnect = "Verbinden",
@@ -415,6 +426,14 @@ val German = Strings(
     workoutSettings = "Training",
     defaultRest = "Standard-Pause (Sekunden)",
     vibration = "Vibration",
+    notifications = "Benachrichtigungen",
+    notificationsPermission = "Benachrichtigungen erlauben",
+    notificationsAllowed = "Erlaubt",
+    notificationsDeniedHint = "Ohne diese Erlaubnis meldet sich der Pausentimer nicht, wenn eine andere App offen oder der Bildschirm aus ist.",
+    notificationsInfo = "Während einer Pause zeigt eine Benachrichtigung den Countdown mit +15 s und Überspringen. Sie bleibt, bis die Pause vorbei ist, auch wenn du sie wegwischst.",
+    restTicks = "Ticken vor Pausenende",
+    restTicksHint = "In den letzten 3 Sekunden der Pause tickt es, auch wenn eine andere App offen ist. Musik wird dabei nur kurz leiser.",
+    restTicksBody = "Noch 3 Sekunden",
     on = "An",
     off = "Aus",
     exactAlarm = "Pausenende sekundengenau",
@@ -444,7 +463,7 @@ val German = Strings(
     reset = "Alle Daten löschen",
     resetConfirm = "Wirklich alles löschen?",
     app = "App",
-    about = "Über overfit",
+    about = "Über Overfit",
 
     coachMemoryEmpty = "Der Coach hat noch nichts gespeichert. Das Gedächtnis entsteht nach dem ersten bewerteten Training.",
     aboutVersion = { "Version $it" },
@@ -454,7 +473,7 @@ val German = Strings(
     aboutFont = "Schrift: Inter von Rasmus Andersson. Lizenz: SIL Open Font License 1.1.",
     aboutLibraries = "Verwendete Bibliotheken",
     aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor (Apache License 2.0)",
-    aboutLicense = "overfit ist Open Source unter der MIT-Lizenz.",
+    aboutLicense = "Overfit ist Open Source unter der MIT-Lizenz.",
     aboutRepo = "Quellcode auf GitHub",
 )
 
@@ -474,7 +493,7 @@ val English = Strings(
     weightTitle = "How much do\nyou weigh?",
     weightError = "That doesn't look like a realistic weight.",
     aiTitle = "Connect\nyour AI",
-    aiSubtitle = "overfit uses your own API key or credit. No ads, no subscription required.",
+    aiSubtitle = "Overfit uses your own API key or credit. No ads, no subscription required.",
     aiKeyPlaceholder = "Paste API key",
     aiHowTo = "How do I get a key?",
     aiConnect = "Connect",
@@ -632,6 +651,14 @@ val English = Strings(
     workoutSettings = "Workout",
     defaultRest = "Default rest (seconds)",
     vibration = "Vibration",
+    notifications = "Notifications",
+    notificationsPermission = "Allow notifications",
+    notificationsAllowed = "Allowed",
+    notificationsDeniedHint = "Without this permission the rest timer cannot reach you while another app is open or the screen is off.",
+    notificationsInfo = "During a rest a notification shows the countdown with +15 s and Skip. It stays until the rest is over, even if you swipe it away.",
+    restTicks = "Countdown ticks",
+    restTicksHint = "Ticks in the last 3 seconds of a rest, even while another app is open. Music only gets quieter for a moment.",
+    restTicksBody = "3 seconds left",
     on = "On",
     off = "Off",
     exactAlarm = "Exact rest alerts",
@@ -661,7 +688,7 @@ val English = Strings(
     reset = "Delete all data",
     resetConfirm = "Really delete everything?",
     app = "App",
-    about = "About overfit",
+    about = "About Overfit",
 
     coachMemoryEmpty = "The coach hasn't saved anything yet. Its memory starts after your first reviewed workout.",
     aboutVersion = { "Version $it" },
@@ -671,7 +698,7 @@ val English = Strings(
     aboutFont = "Typeface: Inter by Rasmus Andersson. License: SIL Open Font License 1.1.",
     aboutLibraries = "Libraries used",
     aboutLibrariesText = "Kotlin Multiplatform, Compose Multiplatform, Jetpack (Navigation, Lifecycle), kotlinx (Coroutines, Serialization, Datetime), Ktor (Apache License 2.0)",
-    aboutLicense = "overfit is open source under the MIT License.",
+    aboutLicense = "Overfit is open source under the MIT License.",
     aboutRepo = "Source code on GitHub",
 )
 
