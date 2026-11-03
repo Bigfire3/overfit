@@ -498,3 +498,13 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
   Inter OFL, Bibliotheken). Backend `package.json`: `"license": "UNLICENSED"` (npm-Konvention für „nicht lizenziert“).
   Was vor dem Wechsel unter Apache-2.0 veröffentlicht wurde, bleibt unter Apache-2.0 nutzbar. Das Repo war bis dahin
   privat, deshalb spielt das praktisch keine Rolle.
+- **iOS-CI wieder an (3.11., Fabian):** Seit das Repo öffentlich ist, sind auch macOS-Runner kostenlos. `ios.yml` läuft
+  wieder für PRs nach main, Pushes auf main und per Hand; Merge-Bedingung ist wieder Android- und iOS-CI grün.
+  Der zusätzliche iOS-Kompilierschritt in der Android-CI bleibt als schnelle Vorprüfung.
+- **Lizenz MIT (3.11., Fabian):** „Alle Rechte vorbehalten“ wieder aufgehoben. Jeder soll ohne Fabians Erlaubnis mit dem
+  Code arbeiten können, deshalb MIT: kurz, bekannt, erlaubt Nutzung, Änderung und Weitergabe, auch kommerziell.
+  Drittbestandteile behalten ihre Lizenzen (Workout-Guide-Grafiken CC BY-SA 4.0, Inter OFL, Bibliotheken).
+  Beiträge laufen über Fork und Pull Request (`CONTRIBUTING.md`); Fabian bzw. die Koordination entscheidet über den
+  Merge. Direkten Schreibzugriff für Fremde gibt es nicht, weil Workflows sonst an die Signatur-Secrets kämen.
+- **Fremde PRs und Secrets:** GitHub gibt Workflows aus Fork-PRs keine Secrets. Der signierte Release-Job läuft ohnehin
+  nur auf main. Fork-PRs bauen und testen also ohne Schlüssel.
