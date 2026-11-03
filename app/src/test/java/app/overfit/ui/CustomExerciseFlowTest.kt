@@ -91,9 +91,10 @@ class CustomExerciseFlowTest {
         )
         compose.setContent { OverfitApp(deps) }
 
-        compose.onNodeWithText("Training starten").performClick()
-        waitFor("Freies Training")
+        waitFor("Push")
         compose.onNodeWithText("Push").performClick()
+        waitFor("Starten")
+        compose.onNodeWithText("Starten").performClick()
         waitFor("0/2 erledigt", substring = true)
         compose.onNodeWithContentDescription("Satz 1 abhaken").performClick()
         waitFor("Überspringen")
