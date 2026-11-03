@@ -117,8 +117,11 @@ class CustomExerciseFlowTest {
 
         // Back in the running workout with the new exercise; the set and the rest are untouched
         waitFor("Turkish Get-up Neu")
-        compose.onNodeWithText("1/2 erledigt", substring = true).assertExists()
+        // Check the completed set on the state, not on the "1/2 erledigt" caption: after adding an
+        // exercise the list may scroll so the first exercise's row is not composed (flaky in CI).
+        compose.waitUntil(20_000) { deps.workout.state.value.workout?.exercises?.size == 2 }
         val workout = requireNotNull(deps.workout.state.value.workout)
+        assertEquals(1, workout.completedSets)
         assertEquals(listOf("Bench Press", "Turkish Get-up Neu"), workout.exercises.map { it.exercise.name })
         assertEquals(restBefore, alerts.pending)
 
