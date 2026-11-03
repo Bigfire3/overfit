@@ -19,14 +19,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    signingConfigs {
-        // Bewusst im Repo (privates Repo, rein private App), siehe docs/DECISIONS.md.
-        create("release") {
-            storeFile = rootProject.file("signing/overfit-release.jks")
-            storePassword = "overfit-release-2026"
+    // Signatur nur, wenn Keystore und Passwort von außen kommen (CI: GitHub-Secrets, siehe README).
+    // Ohne diese Angaben entsteht lokal ein unsigniertes Release-Build.
+    val keystoreFile = System.getenv("OVERFIT_KEYSTORE_FILE")?.let(::file)?.takeIf { it.exists() }
+    val keystorePassword = System.getenv("OVERFIT_KEYSTORE_PASSWORD")
+    val releaseSigning = if (keystoreFile != null && !keystorePassword.isNullOrEmpty()) {
+        signingConfigs.create("release") {
+            storeFile = keystoreFile
+            storePassword = keystorePassword
             keyAlias = "overfit"
-            keyPassword = "overfit-release-2026"
+            keyPassword = keystorePassword
         }
+    } else {
+        null
     }
 
     buildTypes {
@@ -34,7 +39,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = releaseSigning
         }
         debug {
             applicationIdSuffix = ".debug"
