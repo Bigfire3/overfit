@@ -13,15 +13,15 @@ import app.overfit.domain.TrackingType
 
 /**
  * Exercise from a catalogue or created by the user.
- * [id] is stable and readable ("wg:bench-press", "fedb:Air_Bike", "custom:<uuid>") so templates,
- * backups and the AI coach use the same IDs.
+ * [id] is stable and readable ("wg:bench-press", "custom:<uuid>") so templates, backups and the AI coach use the
+ * same IDs. Former free-exercise-db exercises that were in use keep their "fedb:…" ID but are custom since v5.
  */
 @Entity(tableName = "exercise", indices = [Index("name")])
 data class ExerciseEntity(
     @PrimaryKey val id: String,
     val name: String,
     val source: ExerciseSource,
-    /** Resource path ("catalog/wg/x.svg"), http(s) URL or null (→ initials tile). */
+    /** Resource path ("catalog/wg/x.svg") or null (→ initials tile). */
     val imageRef: String?,
     /** Muscle keys, see [app.overfit.domain.Muscle]. */
     val primaryMuscles: List<String>,
@@ -35,6 +35,8 @@ data class ExerciseEntity(
     @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
+    /** Short execution note (custom exercises, e.g. filled in by the AI); since v5. */
+    val note: String? = null,
 )
 
 /** Partial update for the catalogue import: user settings (tracking type, rest, archive) are kept. */
@@ -260,6 +262,9 @@ data class WorkoutPhotoEntity(
 )
 
 /** Row of the history list: a finished workout with its key numbers. */
+/** Query result: when a saved workout was last trained (epoch ms of the start). */
+data class TemplateLastDone(val templateId: Long, val lastStartedAt: Long)
+
 data class HistoryRow(
     val id: String,
     val name: String,

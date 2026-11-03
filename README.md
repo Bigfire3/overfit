@@ -92,19 +92,22 @@ In Xcode einen iPhone-Simulator wählen und starten. Der Kotlin-Teil wird beim B
 
 ## Übungskatalog neu erzeugen
 
-Der Katalog (`shared/src/commonMain/composeResources/files/catalog/`) wird mit einem Skript aus zwei fest gepinnten
-Quellen gebaut (Workout Guide und free-exercise-db, Commit-SHAs oben im Skript):
+Der Katalog (`shared/src/commonMain/composeResources/files/catalog/`) wird mit einem Skript aus Workout Guide gebaut
+(302 Übungen mit SVG-Grafik, Commit-SHA oben im Skript). free-exercise-db ist seit 3.11.2026 entfernt; fehlende Übungen
+legt man in der App als eigene Übung an (auf Wunsch per KI ausgefüllt).
 
 ```bash
 python3 tools/catalog/import_catalog.py
 ```
 
-Das Skript braucht nur Python 3. Es lädt die Quellen (Cache unter `tools/catalog/.cache/`), führt Dubletten zusammen
-(Workout Guide hat Vorrang) und schreibt `exercises.json` und die Workout-Guide-SVGs. Beim nächsten Start spielt die
-App einen geänderten Katalog automatisch ein. Eigene Einstellungen an Übungen bleiben dabei erhalten.
+Das Skript braucht nur Python 3. Es lädt die Quelle (Cache unter `tools/catalog/.cache/`) und schreibt `exercises.json`
+und die Workout-Guide-SVGs. Danach den Katalog des Backends neu erzeugen: `cd backend && node scripts/build-catalog.mjs`.
+Beim nächsten Start spielt die App einen geänderten Katalog automatisch ein. Eigene Einstellungen an Übungen bleiben
+dabei erhalten.
 
 ## Lizenzen
 
-Code: [Apache License 2.0](LICENSE).
-Übungsgrafiken: Workout Guide (Bryl Lim, Everkinetic), CC BY-SA 4.0. Ergänzend free-exercise-db (Unlicense).
+Code: [MIT License](LICENSE). Beiträge sind willkommen, siehe [CONTRIBUTING.md](CONTRIBUTING.md).
+Übungsgrafiken: Workout Guide (Bryl Lim), basierend auf Grafiken von Everkinetic, CC BY-SA 4.0 (unverändert
+mitgeliefert, Lizenztext in `shared/src/commonMain/composeResources/files/catalog/LICENSE-ASSETS-workout-guide.txt`).
 Schrift: Inter (SIL Open Font License 1.1, siehe `licenses/Inter-OFL.txt`). Details im „Über"-Screen der App.

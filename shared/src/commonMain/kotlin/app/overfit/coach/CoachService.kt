@@ -1,5 +1,6 @@
 package app.overfit.coach
 
+import app.overfit.ai.AiGateway
 import app.overfit.ai.ProviderId
 import app.overfit.data.ExerciseRepository
 import app.overfit.data.TemplateRepository
@@ -76,6 +77,18 @@ class CoachService(
     val latestFinished = dao.observeLatestFinished()
 
     fun access(): CoachAccess = access.invoke()
+
+    /**
+     * The coach's AI access for other features (exercise autofill): same provider, key or Fuel, and model. New
+     * providers wired into [transport] are picked up automatically.
+     */
+    val ai: AiGateway = object : AiGateway {
+        override fun available(): Boolean = access() is CoachAccess.Ready
+        override suspend fun send(prompt: CoachPrompt, structured: Boolean): CoachReply {
+            val ready = access() as? CoachAccess.Ready ?: throw CoachException(CoachErrorKind.NO_ACCESS)
+            return transport(ready.providerId).send(prompt, settings.state.value.model(ready.providerId), structured)
+        }
+    }
 
     /** Provider the next request goes to (for the settings screen). */
     fun providerId(): ProviderId = (access() as? CoachAccess.Ready)?.providerId ?: currentProvider()
@@ -251,6 +264,20 @@ class CoachService(
         dao.upsert(row.copy(status = ReviewStatus.FAILED, errorKind = kind.name, errorMessage = message, rawResponse = raw, updatedAt = clock()))
     }
 
+    // --- Per exercise ---------------------------------------------------------------------------
+
+    /**
+     * Today vs. last time for every exercise of [sessionId], computed locally (works without AI). [feedback] (the
+     * coach's part) is merged in by exercise ID.
+     */
+    suspend fun comparisons(sessionId: String, feedback: List<ExerciseFeedback> = emptyList()): List<ExerciseComparison> {
+        val current = dao.finishedOrAny(sessionId) ?: return emptyList()
+        val list = ExerciseReviews.compare(current, ::dateOf) { id ->
+            dao.lastFinishedWith(id, current.startedAt, current.id)?.toRecord()
+        }
+        return ExerciseReviews.withFeedback(list, feedback)
+    }
+
     // --- Request building ----------------------------------------------------------------------
 
     suspend fun buildContext(kind: ReviewKind, sessionId: String?): CoachContext {
@@ -278,6 +305,7 @@ class CoachService(
             sameTemplate = same,
             lastOverall = lastOverall,
             recent = if (kind == ReviewKind.PROGRESS) recent else recent.filter { it.id != current?.id },
+            comparisons = if (kind == ReviewKind.SESSION && current != null) comparisons(current.id) else emptyList(),
             timeZone = timeZone(),
         )
     }

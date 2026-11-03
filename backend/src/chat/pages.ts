@@ -9,7 +9,7 @@ const T = {
     title: 'Overfit verbinden',
     wants: (c: string) => `<b>${c}</b> möchte auf deine Overfit-Trainingsdaten zugreifen.`,
     redirect: (h: string) => `Danach geht es zurück zu ${h}.`,
-    can: 'Der Chat kann Profil, Vorlagen, Trainings, Fortschritt und – falls freigegeben – Körperfotos lesen sowie Vorlagen und Notizen in deinen Eingang legen. Trennen jederzeit in der App.',
+    can: 'Der Chat kann Profil, Workouts, Trainings, Fortschritt und – falls freigegeben – Körperfotos lesen sowie Workouts und Notizen in deinen Eingang legen. Trennen jederzeit in der App.',
     label: 'Kopplungscode',
     hint: 'In der App: Profil → KI-Chat verbinden → Code anzeigen',
     allow: 'Verbinden',

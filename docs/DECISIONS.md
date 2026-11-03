@@ -500,3 +500,98 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - **Vergleichen** bleibt erhalten und nimmt im Raster das letzte Foto des Tages.
 - **Bestwerte im Vollbild** werden mit `WorkoutRepository.summary` nachgeladen (max. 3 Zeilen), kein neues Schema.
 - **Teilen eines Fotos** gab es im Viewer bisher nicht; neu über `PlatformShare.shareBytes` (JPEG).
+
+## Workout minimieren (Session L, 3.11.)
+- **Minimiert = reiner UI-Zustand, kein Controller-Zustand.** `WorkoutRoute` ist ein normales Navigationsziel; „minimiert“ heißt: das Training läuft (`WorkoutController.state.workout != null`), aber `WorkoutRoute` ist nicht oben. Die Leiste (`MiniWorkoutBar`) sitzt im `AppScaffold` über der Tab-Leiste und erscheint damit auf allen Hauptscreens. Der WorkoutController, Pausentimer, Benachrichtigungen und Haptik sind unverändert.
+- Minimieren-Knopf (Pfeil nach unten) und System-Zurück machen dasselbe: `popBackStack` auf den Screen darunter (Standardverhalten der Navigation, kein eigener BackHandler nötig). Beenden/Verwerfen bleiben die bestehenden Doppeltipp-Aktionen im Training.
+- Tipp oder Wischen nach oben auf die Leiste → `NavHostController.openWorkout()`: zurück zum Training, falls auf dem Stack, sonst oben drauf (kein doppelter Eintrag).
+- **Benachrichtigung:** Die Tap-Intents (Pausentimer läuft / Pause vorbei) tragen `EXTRA_OPEN_WORKOUT`; `MainActivity` zählt `AppDependencies.openWorkoutRequests` hoch, die UI öffnet daraufhin das maximierte Training. Nach Prozess-Neustart stellt die bestehende Wiederherstellung das Training ohnehin maximiert wieder her.
+- **Zweites Training:** Läuft eins, zeigt der Start-Tab statt „Training starten“ die Wahl „Zum laufenden Training“ / „Laufendes beenden“ (Bestätigungsmuster, Button wechselt Text). „Beenden“ heißt wie sonst auch: Training abschließen und speichern (Beenden-Flow), nicht verwerfen – umkehrbar und ohne Datenverlust. Danach startet man das neue Training vom Start-Tab.
+
+
+- **Lizenz (Entscheidung Fabian, 3.11.):** Apache-2.0 ersetzt durch „Alle Rechte vorbehalten“. Der Code darf öffentlich
+  einsehbar sein (z. B. damit die CI für ein öffentliches Repo kostenlos läuft), aber ohne Erlaubnis nicht kopiert,
+  verändert oder weiterverwendet werden. Drittbestandteile behalten ihre Lizenzen (Workout-Guide-Grafiken CC BY-SA 4.0,
+  Inter OFL, Bibliotheken). Backend `package.json`: `"license": "UNLICENSED"` (npm-Konvention für „nicht lizenziert“).
+  Was vor dem Wechsel unter Apache-2.0 veröffentlicht wurde, bleibt unter Apache-2.0 nutzbar. Das Repo war bis dahin
+  privat, deshalb spielt das praktisch keine Rolle.
+
+## Tab „Training“: Workouts statt Vorlagen (3.11., Session O)
+
+Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templates verstehe ich nicht … Alles soll gespeichert werden.“
+
+- **Begriff:** In der UI heißt ein gespeicherter Plan überall „Workout“ (DE und EN), eine laufende/abgeschlossene Einheit weiter „Training“ (DE) / „workout“ (EN). Intern bleiben `workout_template`, `Template`, `TemplateRepository` – keine Schemaänderung, keine Migration.
+- **Tab 1:** DE „Training“, EN „Workouts“ (im Englischen liest sich der Plural als Liste besser), Icon Blitz. Der Tab zeigt nur noch: laufendes Training oben („Läuft gerade“ + „Training fortsetzen“ als PrimaryButton), Liste der Workouts (Name, Übungen, „zuletzt vor N Tagen“), Coach-Tipps, Duo. Begrüßung und Gewicht sind raus (Gewicht steht im Profil). Der Übungen-Tab zeigt nur noch Übungen.
+- **„+“ oben rechts** öffnet eine eigene Seite (kein Bottom-Sheet, das Designsystem hat keins) mit „Workout erstellen“ (Editor, speichert, startet nicht) und „Leer starten“. Darunter unter „Weitere Wege“ Import, KI-Prompt und Beispiel-Workouts.
+- **Workout-Seite:** Tipp auf ein Workout öffnet eine Ansicht mit „Starten“ (PrimaryButton), „Bearbeiten“, „Teilen“. Import, Chat-Eingang, Coach und „Als Workout speichern“ im Verlauf führen ebenfalls dorthin statt in den Editor.
+- **Automatisch übernehmen (`WorkoutPlan`, `TemplateRepository.adopt`):** Endet ein Training (Beenden *und* Verwerfen), übernimmt sein Workout Übungsliste, Reihenfolge, Satzanzahl, Pausen und Namen – ohne Dialog. Ein leer gestartetes Training mit mindestens einer Übung wird ein neues Workout; die Sitzung bekommt dessen ID (für „zuletzt“, Coach). Zielwerte werden *nicht* aus den Ist-Werten kopiert: Sätze, die bleiben, behalten ihre geplanten Werte, neue Sätze/Übungen bekommen leere Ziele, die beim nächsten Start wie bisher aus der letzten Ausführung kommen.
+- **Coach:** Weil Ist-Werte nicht in die Ziele geschrieben werden, bleiben Zielwerte, die der Coach gesetzt hat, erhalten. Die Übernahme läuft beim Beenden (vor der Coach-Auswertung); ein angenommener Coach-Plan ändert danach die Werte im selben Workout und gewinnt damit für das nächste Mal. Übungsnotizen aus dem Training bleiben beim Training (sie sind oft tagesbezogen), das Workout behält seine eigenen.
+- **Name:** Leer gestartet heißt das Training „Workout vom 3. Nov.“; im Beenden-Flow steht der Name als Eingabefeld oben, eine Änderung benennt Training und Workout um.
+- **Schutzregeln:** Ein Training ohne Übungen leert nie ein Workout und legt keins an. Ein Workout, das während des Trainings gelöscht wurde, wird nicht wiederhergestellt. Gelöschte Workouts bleiben im Verlauf (Sitzungen speichern ihre Werte selbst, `templateId` ohne Fremdschlüssel). „Alle Daten löschen“ verwirft ohne Übernahme. Schlägt die Übernahme fehl, wird trotzdem beendet.
+- **Sicherung:** Das laufende Training wird schon nach jeder Änderung gespeichert (Phase 2); Verwerfen geht nur über das Bestätigungsmuster.
+- **Übungen ohne eigenen Tab** (Fabian: „Der Übungskatalog soll auch nicht mit in der Tableiste sein.“): Tab-Leiste = Training, Verlauf, Fotos, Profil. Der Katalog (eigene Übungen, Suche, Fortschritt je Übung) öffnet über das Hantel-Icon oben im Training-Tab neben „+“ – dort, wo man trainiert, statt versteckt im Profil – und weiterhin über jeden Übungs-Picker.
+
+### Zur Prüfung durch Fabian
+- Auch **Verwerfen** übernimmt die Struktur (ein leer gestartetes, verworfenes Training mit Übungen erscheint als Workout). Begründung: „nichts darf verloren gehen“. Wer das nicht will, löscht das Workout. Alternative: beim Verwerfen nichts übernehmen.
+- Benennt man das Training um (im Training oder beim Beenden), heißt auch das Workout so.
+
+## KI-Kontext, Auswertung je Übung, Gemini (3.11., Session N)
+- **Ein Profil-Block für alle KI-Wege:** `aiProfileFacts` (domain/ModelContext.kt) baut „Name · Alter · Körpergewicht (Stand …)“ und wird überall verwendet: Coach (eigener Key und Fuel, im dynamischen System-Block), „Kontext kopieren“, KI-Vorlage (Teilen/Erstellen), Gem-/GPT-Anleitung (als „Über mich“-Zeile oben) und der Chat-Sync. Fehlende Werte fallen weg, ein unplausibles Alter (außerhalb 13–110) auch. Die Beschriftung folgt der App-Sprache, damit ein eingefügter deutscher Prompt deutsch bleibt. Der Coach-Prompt bleibt englisch. Diese Texte sind KI-Eingaben, keine UI, deshalb stehen sie wie die übrigen Prompt-Regeln im Code und nicht in Strings.kt.
+- **MCP:** Die App lädt die Zeile als `summary` im Profil-Dokument hoch. Das Backend stellt sie als `user` an den Anfang **jeder** Tool-Antwort (bei Foto-Antworten als erste Textzeile). Bei älteren App-Versionen ohne `summary` baut das Backend die Zeile selbst aus Name, Geburtsjahr und Gewicht. Es gibt keine eigene Kontext-Ressource. Die Tool-Antwort ist der Weg, der in Claude, ChatGPT und Gemini sicher ankommt.
+- **Auswertung je Übung ohne Schemaänderung:** Die Zahlen (bester Satz, Sätze, Volumen, e1RM, Wdh., Zeit, Deltas, Einordnung nach Zahlen) rechnet die App beim Anzeigen deterministisch aus der Datenbank (`ExerciseReviews.compare`, „letztes Mal“ = letztes beendetes Training davor mit derselben Übung). Gespeichert wird nur die KI-Antwort (`exercise_reviews` im bestehenden `reviewJson`). Room bleibt deshalb auf dem bisherigen Stand, v6 wird nicht gebraucht.
+- **Einordnung:** Bei Gewichtsübungen entscheidet das e1RM (Epley, 1–12 Wdh.), sonst Wdh. bzw. Sekunden. „Gleich“ heißt bei Gewichtsübungen unter 1 % Unterschied, sonst weniger als 1 Wdh. bzw. 1 s. Ist das Top-Ergebnis gleich, zählen mehr als ±5 % Volumen als besser bzw. schlechter. Die KI startet mit diesem Wert und darf ihn begründet korrigieren. Angezeigt wird die KI-Einordnung, ohne KI die lokale.
+- **Schema:** `exercise_reviews: [{exercise_id, verdict: better|same|worse, comment, next: Satz|null}]` ist im strikten Schema Pflicht. `summary` ist bei Trainings nur noch 1–2 Sätze, positives/improvements/tips höchstens 2 übergreifende Punkte. Alte Auswertungen ohne das Feld zeigen trotzdem die lokalen Zahlen je Übung.
+- **Gemini über den OpenAI-kompatiblen Endpunkt** (`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`, Key als Bearer) statt der nativen API: derselbe Code wie OpenAI/OpenRouter (Bilder als `image_url`-Data-URL, Structured Output über `response_format: json_schema`). Gemini kann laut Doku `anyOf`, `enum`, `additionalProperties` und `["…","null"]`, unser strenges Schema passt also. Fällt Structured Output doch mit 400 aus, wiederholt der Coach die Anfrage wie bei OpenRouter ohne Schema, und der tolerante Parser liest die Antwort. Die Key-Prüfung läuft über `GET …/openai/models`, kostet also keine Tokens. Google meldet einen ungültigen Key mit **400** `API_KEY_INVALID`: Bei der Key-Prüfung zählt 400 als ungültig, beim Coach wird 400 mit API_KEY_INVALID zu AUTH. `max_tokens` liegt bei 16 000, weil Gemini die Denk-Tokens mitzählt.
+- **Standardmodell `gemini-3.6-flash`:** In Googles Modellliste (3.11.) die neueste Flash-Version mit dem Badge „Stable“. `gemini-3.8-flash` steht dort als „New“ ohne GA-Angabe. Das Modell lässt sich in den Coach-Einstellungen ändern.
+
+### Zur Prüfung durch Fabian
+- Standardmodell Gemini: `gemini-3.6-flash` (stabil) oder schon `gemini-3.8-flash`?
+- Gem-/GPT-Anleitung: Die „Über mich“-Zeile steht fest in der Anleitung und veraltet, wenn sich das Gewicht ändert. Aktuell bleibt sie über „Kontext kopieren“.
+
+- **iOS-CI wieder an (3.11., Fabian):** Seit das Repo öffentlich ist, sind auch macOS-Runner kostenlos. `ios.yml` läuft
+  wieder für PRs nach main, Pushes auf main und per Hand; Merge-Bedingung ist wieder Android- und iOS-CI grün.
+  Der zusätzliche iOS-Kompilierschritt in der Android-CI bleibt als schnelle Vorprüfung.
+- **Lizenz MIT (3.11., Fabian):** „Alle Rechte vorbehalten“ wieder aufgehoben. Jeder soll ohne Fabians Erlaubnis mit dem
+  Code arbeiten können, deshalb MIT: kurz, bekannt, erlaubt Nutzung, Änderung und Weitergabe, auch kommerziell.
+  Drittbestandteile behalten ihre Lizenzen (Workout-Guide-Grafiken CC BY-SA 4.0, Inter OFL, Bibliotheken).
+  Beiträge laufen über Fork und Pull Request (`CONTRIBUTING.md`); Fabian bzw. die Koordination entscheidet über den
+  Merge. Direkten Schreibzugriff für Fremde gibt es nicht, weil Workflows sonst an die Signatur-Secrets kämen.
+- **Fremde PRs und Secrets:** GitHub gibt Workflows aus Fork-PRs keine Secrets. Der signierte Release-Job läuft ohnehin
+  nur auf main. Fork-PRs bauen und testen also ohne Schlüssel.
+
+
+
+## Session K (3.11.) – Katalog ohne free-exercise-db, Übungen per KI, eigene Übungen im Workout
+
+- **free-exercise-db entfernt** (Fabian: Fotos passen nicht ins Design). Der Katalog besteht nur noch aus Workout Guide
+  (302 Übungen, SVGs, CC BY-SA 4.0 auf Basis von Everkinetic). Import-Skript, `exercises.json` und
+  `backend/src/catalog.gen.json` neu erzeugt. Weg sind auch „Alle Bilder offline laden“, das Laden von Übungsbildern
+  über HTTP (Coil-Ktor-Fetcher samt Abhängigkeit `coil-network-ktor3`) und der Attributionshinweis im „Über“-Screen.
+- **Migration v5 (manuell):** Benutzte `fedb:*`-Übungen (Vorlage, Training oder als ersetzte Übung) **behalten ihre ID**
+  und werden zu eigenen Übungen (`source = CUSTOM`, kein Bild → Initialen-Kachel). Kein Umschlüsseln: kein
+  Fremdschlüssel ändert sich, Backups, Coach-Texte und alte Teilen-Links mit `fedb:`-ID passen weiter. Unbenutzte
+  `fedb:*` werden gelöscht; der neue Katalog enthält sie nicht, also holt das Seeding sie nicht zurück. Dazu die neue
+  Spalte `exercise.note`. `ExerciseSource.FREE_DB` bleibt nur, damit alte Backups lesbar sind: beim Wiederherstellen
+  werden benutzte FREE_DB-Übungen zu eigenen (ohne Bild), unbenutzte übersprungen.
+- **Eigene Übungen sind vollständiger:** Haupt- und Hilfsmuskeln (mehrere), Equipment, Erfassungsart, Standard-Pause,
+  Ausführungsnotiz. Die Notiz steht in der Übungsdetailseite.
+- **„Mit KI ausfüllen“:** nutzt den Zugang des Coaches (`CoachService.ai`: gleicher Provider, eigener Key oder Fuel,
+  gleiches Modell). Neue Provider, die in die Coach-Transporte eingehängt werden (Session N: Gemini), gehen automatisch
+  mit, wenn sie `CoachPrompt.outputSchema`/`outputSchemaName`/`outputMaxTokens` statt fest `CoachSchema` verwenden.
+  Structured Output mit Enums aus den Muskel-/Equipment-Schlüsseln der App; der Parser verwirft trotzdem Unbekanntes,
+  begrenzt Muskeln und rundet die Pause auf 15 s. Bei HTTP 400 mit Structured Output einmal ohne (wie beim Coach).
+  Ohne KI-Zugang: kurzer Hinweis, manuelle Eingabe.
+- **„Meintest du …?“:** Beim Anlegen zeigt das Formular bis zu drei Treffer der normalen Übungssuche für den
+  eingegebenen Namen (ab 3 Zeichen). Antippen öffnet die vorhandene Übung bzw. nimmt sie im Picker.
+- **Neue Übung aus dem Picker** (Vorlagen-Editor und Workout-Modus): letzte Zeile „„…“ als neue Übung anlegen“ öffnet
+  dasselbe Formular. Nach dem Speichern kommt die Übung über `PickedExercises.created` in den Picker zurück, der sie
+  sofort (zusammen mit schon gewählten) an den Aufrufer gibt. WorkoutScreen und WorkoutRoute bleiben unverändert
+  (konfliktarm zu Session L); das Training läuft im App-weiten Controller weiter.
+- **Teilen eigener Übungen:** `custom[]` bekommt `primary`, `secondary`, `restSec`, `note`; `muscle` wird für alte
+  App-Versionen weiter geschrieben (abwärtskompatibel, Format-Version bleibt 1). Beim Import wird eine gleichnamige
+  eigene Übung (oder eine Katalogübung mit genau dem Namen) wiederverwendet, sonst eine vollständige eigene Übung angelegt.
+
+### Zur Prüfung durch Fabian
+- Die KI-Anfrage beim Ausfüllen kostet mit Fuel einen kleinen Betrag (eine kurze Sonnet-Anfrage, max. 1000 Tokens).
+- Ehemalige free-exercise-db-Übungen, die du benutzt hast, heißen weiter englisch (z. B. „Barbell Curl“) und haben
+  keine Muskeln außer den importierten; du kannst sie wie jede eigene Übung umbenennen.

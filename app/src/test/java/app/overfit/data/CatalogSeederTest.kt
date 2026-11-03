@@ -43,7 +43,9 @@ class CatalogSeederTest {
     @Test
     fun bundledCatalogIsConsistent() = runTest {
         val catalog = seeder.load()
-        assertTrue("Katalog hat ${catalog.exercises.size} Übungen", catalog.exercises.size >= 1000)
+        // Workout Guide only since free-exercise-db was removed (3.11.2026).
+        assertTrue("Katalog hat ${catalog.exercises.size} Übungen", catalog.exercises.size >= 300)
+        assertTrue("nur Workout Guide", catalog.exercises.all { it.source == ExerciseSource.WORKOUT_GUIDE && it.id.startsWith("wg:") })
         assertEquals(catalog.exercises.size, catalog.exercises.map { it.id }.toSet().size)
 
         val problems = mutableListOf<String>()

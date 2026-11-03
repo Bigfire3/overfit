@@ -35,7 +35,7 @@ class ChatContextTest {
             record("w$i", base + i * 7 * day, sets = listOf(SetValues(60.0 + i, 8, null), SetValues(60.0 + i, 7, null)), note = if (i == 11) "Gut drauf" else null)
         } + record("running", base + 100 * day, ended = false)
         val text = ChatContext.build(input(workouts), ChatGerman, AiPrompt.EXAMPLE)
-        assertTrue(text.contains("Fabian · 36 Jahre · Gewicht 81,5 kg (Stand 2026-10-30)"))
+        assertTrue(text.contains("Name: Fabian · Alter: 36 · Körpergewicht: 81,5 kg (Stand 2026-10-30)"))
         assertTrue(text.contains("Knie schonen"))
         // newest first, only 10 workouts, running one excluded
         val recent = text.lines().count { it.startsWith("- ") }

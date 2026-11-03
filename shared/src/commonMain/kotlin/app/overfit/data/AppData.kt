@@ -4,7 +4,6 @@ import app.overfit.coach.CoachSettingsStore
 import app.overfit.data.catalog.CatalogSeeder
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.data.db.transaction
-import app.overfit.data.images.OfflineImages
 import app.overfit.share.TemplateImporter
 import app.overfit.shared.resources.Res
 import kotlinx.coroutines.CoroutineScope
@@ -31,7 +30,6 @@ class AppData(
     val workouts = WorkoutRepository(database, clock, photoFiles)
     val importer = TemplateImporter(exercises, templates, readSample)
     val catalog = CatalogSeeder(database, kv, readCatalog)
-    val offlineImages = OfflineImages(scope, exercises)
     val coachSettings = CoachSettingsStore(kv)
 
     /**

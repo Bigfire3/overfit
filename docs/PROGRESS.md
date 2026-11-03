@@ -32,6 +32,74 @@
 5. Sprache auf English: Woche beginnt am Sonntag.
 6. Scrollen durch viele Monate ruckelt nicht.
 
+## Tab „Training“: Workouts statt Vorlagen (Session O, 3.11.)
+Erledigt: Tab 1 heißt „Training“ (EN „Workouts“) und zeigt die eigenen Workouts mit „zuletzt vor N Tagen“; „+“ → „Workout erstellen“ oder „Leer starten“, darunter Import/KI-Prompt/Beispiele; Workout-Seite mit „Starten“, „Bearbeiten“, „Teilen“. „Vorlage“ ist aus allen Texten raus. Beim Beenden oder Verwerfen übernimmt das Workout die Struktur des Trainings automatisch, ein leer gestartetes Training wird ein Workout (Name im Beenden-Flow). Übungen sind kein Tab mehr, sondern über das Hantel-Icon im Training-Tab erreichbar. Tests: `WorkoutPlanTest`, `WorkoutControllerTest`, `RepositoryTest`, neuer `TrainingTabTest`, bestehende UI-Tests angepasst.
+Offen: Abstimmung mit Session L (Mini-Leiste, „Training beenden“ auf dem Tab) beim Zusammenführen.
+
+### Bitte auf dem Handy testen: Tab „Training“
+1. Erster Tab heißt „Training“ (Blitz-Icon). Leer: „Noch keine Workouts …“ und „Beispiel-Workouts hinzufügen“ → Push/Pull/Legs erscheinen mit „noch nie trainiert“
+2. „+“ oben rechts → „Workout erstellen“: Name, Übungen, Sätze → Speichern → steht in der Liste, kein Training gestartet
+3. „+“ → „Leer starten“ → Übungen hinzufügen, Sätze abhaken → „Beenden“ zweimal → oben Name „Workout vom 3. Nov.“ ändern (z. B. „Brust“) → Speichern → „Brust“ steht in der Liste mit „zuletzt heute“
+4. „Brust“ antippen → „Starten“ → Übungen sind da, Werte von eben vorausgefüllt
+5. Im Training eine Übung hinzufügen, einen Satz hinzufügen, umsortieren → Beenden → Workout öffnen: neue Struktur ist übernommen, ohne Nachfrage
+6. Workout öffnen → „Bearbeiten“ → „Workout löschen“ (zweimal tippen) → Verlauf zeigt die alten Trainings weiterhin
+7. Tab-Leiste hat nur noch Training, Verlauf, Fotos, Profil. Hantel-Icon oben im Training-Tab → Übungskatalog (suchen, „Eigene Übung“, Übung → Fortschritt), Zurück führt zum Training. Nirgends steht mehr „Vorlage“ (auch Teilen, Import, Coach, KI-Chat), in Englisch nirgends „template“
+
+## Feedback-Runde 3.11. – Session K: Katalog ohne free-exercise-db, Übungen per KI, eigene Übungen im Workout
+
+Erledigt:
+- free-exercise-db komplett entfernt: Katalog nur noch Workout Guide (302 Übungen mit SVG), Backend-Katalog neu,
+  „Alle Bilder offline laden“ und Bilder aus dem Netz weg, Lizenzhinweise aktualisiert (Workout Guide/Everkinetic, CC BY-SA 4.0).
+- Datenbank v5: benutzte `fedb:`-Übungen bleiben (gleiche ID) als eigene Übung ohne Bild, unbenutzte sind gelöscht.
+  Migrationstest `migration4to5ConvertsUsedFreeDbExercisesAndDeletesUnusedOnes`.
+- Eigene Übung: Haupt- und Hilfsmuskeln, Equipment, Erfassungsart, Pause, Ausführungsnotiz; „Mit KI ausfüllen“ (eigener
+  Key oder Fuel, Structured Output), „Meintest du …?“ gegen Dubletten.
+- Übungs-Picker (Vorlage und Workout-Modus): „Neue Übung anlegen“ mit demselben Formular; die Übung landet im Katalog
+  und direkt im Training bzw. in der Vorlage.
+- Teilen: eigene Übungen übertragen alle Felder (abwärtskompatibel), beim Import keine Dublette bei gleichem Namen.
+  Alte Links mit `fedb:`-IDs: Fallback über den Namen (docs/share-format.md).
+
+### Bitte auf dem Handy testen (Session K)
+1. Update installieren, App öffnen: Übungen → Katalog zeigt nur noch Grafik-Übungen (302). Hattest du eine
+   free-exercise-db-Übung in einer Vorlage oder einem Training: sie ist noch da, als „Eigene Übung“ mit Buchstaben-Kachel.
+2. Profil → „Alle Bilder offline laden“ gibt es nicht mehr; Profil → Über: nur noch Workout Guide als Bildquelle.
+3. Übungen → „Eigene Übung“ → Name „Bizepscurl am Kabel“ eingeben → unter „Meintest du …?“ erscheinen ähnliche Übungen
+   (antippen öffnet sie). Zurück, Name wieder eingeben → „Mit KI ausfüllen“ (mit Key oder Fuel) → nach ein paar Sekunden
+   sind Erfassungsart, Haupt-/Hilfsmuskeln, Equipment, Pause und Ausführung gefüllt → etwas ändern → Speichern →
+   Übung öffnen: Notiz steht unter den Muskeln.
+4. Ohne KI-Zugang (KI trennen): im Formular steht statt des Knopfs ein Hinweis, alles lässt sich von Hand ausfüllen.
+5. Training starten → „Übung hinzufügen“ → suchen („Turkish Get-up“) → letzte Zeile „„Turkish Get-up“ als neue Übung
+   anlegen“ → ausfüllen (gern mit KI) → Speichern → die Übung steht sofort im laufenden Training; Pausentimer und
+   Benachrichtigung laufen dabei weiter. Dasselbe im Vorlagen-Editor.
+6. Vorlage mit dieser eigenen Übung teilen → auf zweitem Gerät (oder nach Löschen der Übung) importieren → die Übung
+   kommt mit Muskeln, Equipment, Erfassungsart, Pause und Notiz an; nochmal importieren → keine zweite gleichnamige Übung.
+
+## 3.11. – KI-Kontext, Auswertung je Übung, Gemini (Session N)
+Erledigt:
+- **Profil überall:** Name, Alter und aktuelles Körpergewicht (Profil-Einheit) gehen über jeden KI-Weg mit: Coach (eigener Key und Fuel), „Kontext kopieren“, „KI-Vorlage kopieren“, Gem-/GPT-Anleitung (Zeile „Über mich“) und KI-Chat (jede MCP-Tool-Antwort beginnt mit `user`). Alle Wege nutzen eine gemeinsame Funktion (`aiProfileFacts`), fehlende Werte fallen weg.
+- **Auswertung je Übung:** kurzes Gesamtfazit oben, darunter je Übung heute gegen letztes Mal (bester Satz, Sätze, Volumen, e1RM bzw. Wdh./Zeit). Dazu farbige Deltas, ein Badge (Besser grün, Schlechter rot, Gleich grau), ein KI-Kommentar und „Nächstes Mal: kg × Wdh.“. Die Zahlen rechnet die App lokal, deshalb erscheinen sie auch offline, ohne KI und in der Demo. Keine Schemaänderung (Room bleibt v4, v6 nicht gebraucht).
+- „Neue Bestwerte“ beim Beenden zeigen das Plus grün, der Fortschritt je Übung zeigt Deltas zum vorherigen Training in Grün/Rot.
+- **Gemini als Anbieter:** eigener Google-AI-Studio-Key (`AIza…`), Key-Prüfung ohne Token-Kosten, Standardmodell `gemini-3.6-flash`, Structured Output über den OpenAI-kompatiblen Endpunkt (Begründung in DECISIONS.md).
+Offen: Optik auf dem Handy prüfen. Mit echtem Gemini-Key ist die Strecke nur über Tests (gemockte Antworten) geprüft.
+
+### Bitte auf dem Handy testen (Session N)
+1. Profil → KI verbinden → „Gemini“ → Key von aistudio.google.com/apikey einfügen → „Verbunden“. Ein falscher Key zeigt „ungültig“.
+2. Ein Training (z. B. Push) zweimal beenden, beim zweiten Mal bei einer Übung mehr Gewicht, bei einer weniger → „Senden“ → Coach-Auswertung: oben 1–2 Sätze, darunter „Je Übung“ mit Heute/Letztes Mal, grünem „Besser“, rotem „Schlechter“, grauem „Gleich“, Kommentar und „Nächstes Mal: … kg × …“.
+3. Flugmodus an, Training beenden und senden → „Wartet auf Verbindung“, darunter trotzdem „Je Übung“ mit den Zahlen.
+4. KI trennen → Verlauf → Training → Coach-Auswertung → „Demo-Auswertung ansehen“: je Übung mit Demo-Kommentar.
+5. Beenden-Zusammenfassung: „Neue Bestwerte“ mit grünem „+x“. Übungen → Übung → Fortschritt: Deltas grün/rot.
+6. Profil → KI-Coach → „Kontext kopieren“, „Gem-/GPT-Anleitung kopieren“ und Übungen → „KI-Vorlage kopieren“ jeweils in Notizen einfügen: oben Name, Alter und Gewicht.
+7. Mit Backend: im verbundenen Chat „Wer bin ich?“ fragen → Name, Alter und Gewicht kommen ohne weiteres Zutun.
+
+## Session L: Workout minimieren (3.11.)
+Erledigt: Minimieren-Knopf im Workout (Pfeil runter) und System-Zurück minimieren; Leiste über der Tab-Leiste mit Training, Übung/Satz, Zeit oder Pausen-Countdown (tabellarische Ziffern); Tipp/Wischen öffnet; Start-Tab zeigt bei laufendem Training „Zum laufenden Training“ / „Laufendes beenden“; Tipp auf Benachrichtigung öffnet das maximierte Training. Tests: `MinimizeWorkoutTest`, `DayWithOverfitTest` (Minimier-Schritt).
+**Bitte auf dem Handy testen:**
+1. Training starten, Satz abhaken (Pause läuft) → Pfeil oben links tippen → Start-Tab: unten über den Tabs die Leiste mit Countdown
+2. Durch Verlauf, Übungen (Katalog, Vorlagen), Fotos, Profil tippen: Leiste bleibt; Pausenende vibriert wie bisher
+3. Leiste antippen und noch einmal minimieren, dann nach oben wischen → Training offen. System-Zurück-Geste im Training → minimiert, Training läuft weiter
+4. Pause beenden: Leiste zeigt Übung und Satz statt Countdown. Start-Tab: „Laufendes beenden“ zweimal tippen → Beenden-Flow
+5. Minimiert in anderen Tab, Bildschirm sperren, Benachrichtigung tippen → maximiertes Training. App aus den letzten Apps wischen und neu öffnen → Training maximiert
+
 ## Morgen-Testliste für Fabian (3.11.)
 Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Fuel/Spot); die Demo in 36–38 braucht keinen Server.
 Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).

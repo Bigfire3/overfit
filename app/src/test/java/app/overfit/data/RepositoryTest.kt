@@ -37,7 +37,7 @@ class RepositoryTest {
     @After
     fun tearDown() = db.close()
 
-    private fun input(name: String) = CustomExerciseInput(name, TrackingType.WEIGHT_REPS, 60, null, null)
+    private fun input(name: String) = CustomExerciseInput(name, TrackingType.WEIGHT_REPS, 60)
 
     private suspend fun custom(name: String) = exercises.get(exercises.createCustom(input(name)))!!
 
@@ -125,5 +125,47 @@ class RepositoryTest {
         assertTrue(exercises.exercises.first().none { it.id == x.id })
         assertNotNull(exercises.get(x.id))
         assertEquals("X", templates.get(id)!!.exercises.single().exercise.name)
+    }
+
+    @Test
+    fun adopt_emptyStartBecomesSavedWorkout_changesFlowBack_deleteKeepsHistory() = runTest {
+        val a = custom("A")
+        val b = custom("B")
+        val workouts = WorkoutRepository(db, clock = { 5_000L })
+
+        // Started empty, one exercise added → new saved workout, session linked to it
+        var w = app.overfit.domain.Workout.empty("Workout vom 3. Nov.", 1_000L)
+        w = w.addExercise(app.overfit.domain.Workout.added(a, listOf(PlannedSet(40.0, 10))))
+        val adopted = templates.adopt(w)
+        val id = adopted.templateId!!
+        workouts.finish(adopted, 2_000L)
+        val created = templates.get(id)!!
+        assertEquals("Workout vom 3. Nov.", created.name)
+        assertEquals(listOf("A"), created.exercises.map { it.exercise.name })
+        assertEquals(mapOf(id to 1_000L), templates.lastDone.first())
+
+        // Started again from it, exercise B added and a set added → the saved workout follows
+        var again = app.overfit.domain.Workout.fromTemplate(created, 3_000L)
+        again = again.addSet(again.exercises[0].id)
+        again = again.addExercise(app.overfit.domain.Workout.added(b, emptyList()))
+        assertEquals(again, templates.adopt(again))
+        val updated = templates.get(id)!!
+        assertEquals(listOf("A", "B"), updated.exercises.map { it.exercise.name })
+        assertEquals(2, updated.exercises[0].sets.size)
+
+        // Deleted: history stays, the next workout does not bring it back
+        templates.delete(id)
+        assertNotNull(workouts.getFinished(adopted.id))
+        templates.adopt(again)
+        assertTrue(templates.templates.first().isEmpty())
+    }
+
+    @Test
+    fun rename_changesNameOnly() = runTest {
+        val a = custom("A")
+        val id = templates.save(Template(0, "Push", null, listOf(te(a, 10))))
+        templates.rename(id, "  Push schwer ")
+        assertEquals("Push schwer", templates.get(id)!!.name)
+        assertEquals(listOf(10), templates.get(id)!!.exercises.single().sets.map { it.reps })
     }
 }

@@ -24,9 +24,6 @@ interface ExerciseDao {
     @Query("SELECT * FROM exercise WHERE id IN (:ids)")
     suspend fun getAll(ids: List<String>): List<ExerciseEntity>
 
-    @Query("SELECT id, imageRef FROM exercise WHERE isArchived = 0 AND imageRef LIKE 'http%'")
-    suspend fun remoteImages(): List<ExerciseImageRef>
-
     @Query("SELECT COUNT(*) FROM exercise")
     suspend fun count(): Int
 
@@ -67,8 +64,6 @@ interface ExerciseDao {
     )
     suspend fun forBackup(): List<ExerciseEntity>
 }
-
-data class ExerciseImageRef(val id: String, val imageRef: String)
 
 @Dao
 interface TemplateDao {
@@ -192,6 +187,13 @@ interface WorkoutDao {
            FROM workout_session ws WHERE ws.status = 'FINISHED' ORDER BY ws.startedAt DESC""",
     )
     fun observeHistory(): Flow<List<HistoryRow>>
+
+    /** Start of the last finished workout per saved workout ("last time 3 days ago"). */
+    @Query(
+        """SELECT templateId, MAX(startedAt) AS lastStartedAt FROM workout_session
+           WHERE status = 'FINISHED' AND templateId IS NOT NULL GROUP BY templateId""",
+    )
+    fun observeLastDone(): Flow<List<TemplateLastDone>>
 
     @Transaction
     @Query("SELECT * FROM workout_session WHERE status = 'FINISHED' ORDER BY startedAt")

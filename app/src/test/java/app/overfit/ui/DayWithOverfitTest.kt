@@ -102,7 +102,7 @@ class DayWithOverfitTest {
     ).also { deps = it }
 
     private fun shown(text: String, substring: Boolean = false) =
-        compose.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty()
+        compose.onAllNodes(hasText(text, substring = substring, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty()
 
     private fun waitFor(text: String, substring: Boolean = false) {
         try { compose.waitUntil(20_000) { shown(text, substring) } }
@@ -129,7 +129,10 @@ class DayWithOverfitTest {
         // Sub-screens hide the tab bar: step back until it is there (screens settle asynchronously).
         repeat(4) {
             if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
-            if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) back()
+            // The back button can vanish between the check and the click while a screen settles: then just retry.
+            if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) {
+                try { back() } catch (_: AssertionError) {}
+            }
             compose.waitForIdle()
         }
         compose.waitUntil(10_000) { compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty() }
@@ -150,48 +153,47 @@ class DayWithOverfitTest {
         compose.onNodeWithText("75").performTextInput("82,4")
         click("Weiter")
         click("Später einrichten")
-        waitFor("Hallo, Fabi")
+        waitFor("Duo · bald") // Training tab
         assertTrue(store.state.value.onboardingDone)
 
         // --- Samples: Push, Pull, Legs ------------------------------------------------------
-        click("Beispielvorlagen hinzufügen")
+        click("Beispiel-Workouts hinzufügen")
         waitFor("Legs"); waitFor("Pull"); waitFor("Push")
         compose.waitUntil(10_000) { templates().size == 3 }
         val push = templates().first { it.name == "Push" }
 
         // --- Share every template as a link and import it again from the clipboard ----------
         for (name in listOf("Push", "Pull", "Legs")) {
-            tab("Übungen")
-            click("Vorlagen")
+            tab("Training")
             waitFor(name)
-            compose.onAllNodesWithText(name)[0].performScrollTo().performClick()
-            waitFor("Speichern")
+            compose.onAllNodes(hasText(name))[0].performScrollTo().performClick()
+            waitFor("Starten") // the workout plan screen
             click("Teilen")
             waitFor("Link kopieren")
             click("Link kopieren")
             waitFor("Link kopiert")
             val link = share.clipboard.orEmpty()
             assertTrue(link, link.startsWith("http") || link.startsWith("overfit"))
-            back() // share → editor
-            compose.onNodeWithContentDescription("Zurück").performClick() // editor → list
-            waitFor("Neue Vorlage")
-            click("Vorlage importieren")
+            back() // share → plan
+            back() // plan → Training tab
+            waitFor("Duo · bald")
+            compose.onNodeWithContentDescription("Neues Workout").performClick()
+            click("Workout importieren")
             click("Aus Zwischenablage importieren")
             waitFor("Vorschau")
             waitFor(name)
             click("Übernehmen")
-            waitFor("Speichern")
-            click("Speichern")
-            waitFor("Neue Vorlage")
+            waitFor("Starten") // the imported workout opens in its plan screen
             compose.waitUntil(10_000) { templates().size == 3 + listOf("Push", "Pull", "Legs").indexOf(name) + 1 }
         }
         assertEquals(6, templates().size)
 
         // --- Start Push as a workout ----------------------------------------------------------
-        tab("Start")
-        click("Training starten")
-        waitFor("Freies Training")
-        compose.onAllNodesWithText("Push")[0].performClick()
+        tab("Training")
+        waitFor("Push")
+        compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
+        waitFor("Starten")
+        click("Starten")
         waitFor("erledigt", substring = true)
         assertEquals(1, alerts.permissionRequests)
 
@@ -223,11 +225,11 @@ class DayWithOverfitTest {
         val countBefore = deps.workout.state.value.workout!!.exercises.size
         compose.onAllNodesWithText("Ersetzen")[0].performScrollTo().performClick()
         waitFor("Suchen, z. B. Klimmzug")
-        compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("Dips")
-        compose.waitUntil(20_000) { compose.onAllNodes(hasText("Dips", substring = true)).fetchSemanticsNodes().size >= 2 }
-        // [0] is the search field itself (it contains the typed text); the results follow it.
-        compose.onAllNodes(hasText("Dips", substring = true))[1].performClick()
-        try { compose.waitUntil(10_000) { deps.workout.state.value.workout!!.exercises.any { it.exercise.name.startsWith("Dips") } } }
+        compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("Dip")
+        compose.waitUntil(20_000) { compose.onAllNodes(hasText("Dip")).fetchSemanticsNodes().size >= 2 }
+        // [0] is the search field itself (it contains the typed text); the exact result "Dip" follows it.
+        compose.onAllNodes(hasText("Dip"))[1].performClick()
+        try { compose.waitUntil(10_000) { deps.workout.state.value.workout!!.exercises.any { it.exercise.name == "Dip" } } }
         catch (e: Throwable) { throw AssertionError(deps.workout.state.value.workout!!.exercises.map { it.exercise.name }.toString() + compose.onRoot().printToString().take(3000), e) }
         assertEquals(countBefore, deps.workout.state.value.workout!!.exercises.size)
         // reorder (the drag gesture itself is not scriptable here; the same edit the drag handle calls)
@@ -236,6 +238,18 @@ class DayWithOverfitTest {
         compose.waitUntil(10_000) { deps.workout.state.value.workout!!.exercises.map { it.id } == listOf(order[1], order[0]) + order.drop(2) }
         val workoutId = deps.workout.state.value.workout!!.id
         val setsBefore = deps.workout.state.value.workout!!.completedSets
+
+        // --- Minimize: browse the app while the workout keeps running, reopen from the bar -------
+        compose.onNodeWithContentDescription("Minimieren").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        assertNotNull(deps.workout.state.value.workout)
+        tab("Verlauf")
+        tab("Fotos")
+        compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        tab("Training")
+        compose.onNode(hasContentDescription("Training öffnen", substring = true)).performClick()
+        waitFor("Nächsten Satz loggen")
+        assertEquals(workoutId, deps.workout.state.value.workout!!.id)
 
         // --- App restart in the middle: the workout continues ------------------------------
         compose.waitUntil(10_000) { runBlocking { data.workouts.status(workoutId) } == SessionStatus.ACTIVE }
@@ -251,13 +265,18 @@ class DayWithOverfitTest {
         click("Beenden")
         click("Beenden? Nochmal tippen")
         waitFor("Training beendet")
-        compose.waitUntil(10_000) { runBlocking { data.workouts.status(workoutId) } == SessionStatus.FINISHED }
+        // Wait via the UI first (the name field appears once the finished workout is stored): the saved
+        // workout is updated in a DB transaction at the same time, which a blocking query polled on the
+        // test's main thread would stall.
+        compose.waitUntil(20_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        assertEquals(SessionStatus.FINISHED, runBlocking { data.workouts.status(workoutId) })
         compose.onNodeWithContentDescription("Gefühl 4 von 5").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Gefühl 4 von 5").assertIsSelected()
-        compose.onAllNodes(hasSetTextAction())[0].performTextInput("Stark heute")
+        // The name field is the first text field, the note field the second.
+        compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
         runBlocking { data.workouts.addPhoto(workoutId, byteArrayOf(1, 2, 3, 4), takenAt = 1_000L) }
         click("Speichern")
-        waitFor("Training starten")
+        waitFor("Duo · bald") // back on the Training tab
         compose.waitUntil(10_000) { runBlocking { data.workouts.getFinished(workoutId)?.note } == "Stark heute" }
         val finished = runBlocking { data.workouts.getFinished(workoutId) }!!
         assertEquals(4, finished.feeling)
@@ -287,7 +306,7 @@ class DayWithOverfitTest {
         waitFor("Wartet auf Verbindung")
         online = true
         process++ // app restart → the queue is processed
-        waitFor("Hallo, Fabi")
+        waitFor("Duo · bald")
         tab("Verlauf")
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
@@ -297,25 +316,24 @@ class DayWithOverfitTest {
         waitFor("Mehr schlafen")
         waitFor("Alle annehmen")
         click("Alle annehmen")
-        waitFor("Plan übernommen. Die Vorlage ist angepasst.")
+        waitFor("Plan übernommen. Das Workout ist angepasst.")
         compose.waitUntil(10_000) {
             templates().any { t -> runBlocking { data.templates.get(t.id) }?.exercises?.any { e -> e.sets.firstOrNull()?.weightKg == 62.5 } == true }
         }
         back(); back()
 
         // --- AI template: copy the prompt, import a sample answer from the clipboard --------
-        tab("Übungen")
-        click("Vorlagen")
-        waitFor("Neue Vorlage")
-        click("KI-Vorlage kopieren")
+        tab("Training")
+        waitFor("Duo · bald")
+        compose.onNodeWithContentDescription("Neues Workout").performClick()
+        click("KI-Prompt kopieren")
         assertTrue(share.clipboard!!.contains("```json"))
         share.clipboard = "Hier dein Plan:\n```json\n${AiPrompt.EXAMPLE}\n```"
-        click("Vorlage importieren")
+        click("Workout importieren")
         click("Aus Zwischenablage importieren")
         waitFor("Oberkörper A")
         click("Übernehmen")
-        waitFor("Speichern")
-        click("Speichern")
+        waitFor("Starten")
         compose.waitUntil(10_000) { templates().any { it.name == "Oberkörper A" } }
 
         // --- Profile: Fuel demo + Spot reveal, KI-Coach context, Duo teaser ------------------
@@ -349,7 +367,7 @@ class DayWithOverfitTest {
         back(); back()
 
         // Duo teaser
-        tab("Start")
+        tab("Training")
         click("Duo · bald")
         waitFor("Zwei Handys trainieren gemeinsam", substring = true)
         waitFor("Duo ist noch nicht verfügbar", substring = true)
@@ -366,8 +384,8 @@ class DayWithOverfitTest {
         click("English")
         waitFor("Settings")
         assertEquals(Language.EN, store.state.value.language)
-        tab("Start")
-        waitFor("Hi, Fabi")
+        tab("Workouts")
+        waitFor("Latest coach tips")
         tab("History")
         waitFor("Push")
         tab("Profile")

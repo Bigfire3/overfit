@@ -30,6 +30,8 @@ import app.overfit.i18n.Strings
 import app.overfit.platform.prepareJpeg
 import app.overfit.platform.rememberPhotoPicker
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.BigInput
+import app.overfit.domain.Workout
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.MultilineInput
 import app.overfit.ui.components.PrimaryButton
@@ -66,6 +68,8 @@ fun FinishScreen(
     coachSection: @Composable (String) -> Unit,
     onSaved: (String) -> Unit,
     onClose: () -> Unit,
+    /** Renames the finished workout and its saved workout (runs in [appScope]). */
+    rename: suspend (workout: Workout, name: String) -> Unit = { _, _ -> },
 ) {
     val t = LocalStrings.current
     val h = t.history
@@ -80,6 +84,8 @@ fun FinishScreen(
 
     var feeling by rememberSaveable { mutableStateOf<Int?>(null) }
     var note by rememberSaveable { mutableStateOf("") }
+    // The name is set here (an empty start got a default name like "Workout vom 3. Nov.").
+    var name by rememberSaveable { mutableStateOf<String?>(null) }
     var seeded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(data) {
         val d = data ?: return@LaunchedEffect
@@ -88,6 +94,7 @@ fun FinishScreen(
             seeded = true
             if (feeling == null) feeling = d.finished.feeling
             if (note.isEmpty()) note = d.finished.note.orEmpty()
+            if (name == null) name = d.finished.workout.name
         }
     }
     var saving by remember { mutableStateOf(false) }
@@ -104,8 +111,13 @@ fun FinishScreen(
             saving = true
             val noteText = note
             val feelingValue = feeling
+            val newName = name?.trim().orEmpty()
+            val finishedWorkout = data?.finished?.workout
             appScope.launch {
                 if (data != null) workouts.updateDetails(workoutId, noteText, feelingValue)
+                if (finishedWorkout != null && newName.isNotEmpty() && newName != finishedWorkout.name) {
+                    runCatching { rename(finishedWorkout, newName) }
+                }
                 withContext(Dispatchers.Main) {
                     onSaved(workoutId)
                     onClose()
@@ -126,14 +138,18 @@ fun FinishScreen(
         val d = data
         Text(h.finishTitle, tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
-        Title(d?.finished?.workout?.name.orEmpty())
+        if (name != null) {
+            BigInput(name.orEmpty(), { name = it.take(60) }, t.workoutNamePlaceholder, Modifier.fillMaxWidth())
+        } else {
+            Title(d?.finished?.workout?.name.orEmpty())
+        }
         if (d != null) {
             Spacer(Modifier.height(Space.l))
             SummaryRows(d.summary, unit, language, t)
 
             if (d.summary.records.isNotEmpty()) {
                 SectionTitle(h.newRecords)
-                d.summary.records.forEach { r -> ListRow(recordText(r, unit, language, t)) }
+                d.summary.records.forEach { r -> RecordRow(r, unit, language, t) }
             }
         }
 
@@ -177,6 +193,21 @@ internal fun SummaryRows(s: WorkoutSummary, unit: WeightUnit, language: Language
     if (s.skippedSets > 0 || s.addedExercises > 0 || s.replacedExercises > 0) {
         Spacer(Modifier.height(Space.s))
         Text(h.deviations(s.skippedSets, s.addedExercises, s.replacedExercises), style = Theme.type.caption, tone = Tone.Muted)
+    }
+}
+
+@Composable
+private fun RecordRow(r: PersonalRecord, unit: WeightUnit, language: Language, t: Strings) {
+    val delta = r.value - r.previous
+    ListRow(recordText(r, unit, language, t)) {
+        if (delta > 0) {
+            val text = when (r.kind) {
+                RecordKind.WEIGHT, RecordKind.E1RM -> "+" + formatKg(delta, unit, language)
+                RecordKind.REPS -> "+${delta.toInt()} ${t.repsUnit}"
+                RecordKind.DURATION -> "+${delta.toInt()} s"
+            }
+            androidx.compose.foundation.text.BasicText(text, style = Theme.type.caption.copy(color = Theme.colors.positive))
+        }
     }
 }
 

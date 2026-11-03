@@ -15,7 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class ProviderId { OPENROUTER, ANTHROPIC, OPENAI, FUEL }
+enum class ProviderId { OPENROUTER, ANTHROPIC, OPENAI, FUEL, GEMINI }
 
 enum class KeyValidation { OK, INVALID, NETWORK }
 
@@ -39,11 +39,12 @@ interface LlmProvider {
     suspend fun validateKey(apiKey: String): KeyValidation
 }
 
-private suspend fun check(request: suspend () -> HttpResponse): KeyValidation = try {
+private suspend fun check(invalidOnBadRequest: Boolean = false, request: suspend () -> HttpResponse): KeyValidation = try {
     val status = request().status
     when {
         status.isSuccess() -> KeyValidation.OK
         status == HttpStatusCode.Unauthorized || status == HttpStatusCode.Forbidden -> KeyValidation.INVALID
+        invalidOnBadRequest && status == HttpStatusCode.BadRequest -> KeyValidation.INVALID
         else -> KeyValidation.NETWORK
     }
 } catch (e: CancellationException) {
@@ -87,6 +88,23 @@ class OpenAiProvider(private val http: HttpClient) : LlmProvider {
 }
 
 /**
+ * Google AI Studio key (Gemini API), via the OpenAI-compatible endpoint (see docs/DECISIONS.md). Google answers an
+ * invalid key with 400 API_KEY_INVALID instead of 401, so 400 counts as invalid here.
+ */
+class GeminiProvider(private val http: HttpClient) : LlmProvider {
+    override val id = ProviderId.GEMINI
+    override val label = "Gemini"
+    override val keyUrl = "https://aistudio.google.com/apikey"
+    override val keyPlaceholder = "AIza…"
+    override suspend fun validateKey(apiKey: String) = check(invalidOnBadRequest = true) {
+        http.get("$GEMINI_OPENAI_BASE/models") { header(HttpHeaders.Authorization, "Bearer $apiKey") }
+    }
+}
+
+/** OpenAI-compatible base URL of the Gemini API. */
+const val GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
+
+/**
  * Fuel: coach credit through our own backend (POST /v1/messages) instead of the user's own key.
  * "Validating" means: the backend is configured and reachable with this device's identity. The coach (phase 4)
  * sends its requests with [messages].
@@ -121,7 +139,7 @@ class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
 
 class Providers(val http: HttpClient, fuelService: () -> FuelService? = { null }) {
     /** Providers that need the user's own key. */
-    val all: List<LlmProvider> = listOf(OpenRouterProvider(http), AnthropicProvider(http), OpenAiProvider(http))
+    val all: List<LlmProvider> = listOf(OpenRouterProvider(http), AnthropicProvider(http), OpenAiProvider(http), GeminiProvider(http))
     val fuel = FuelProvider(fuelService)
     fun get(id: ProviderId): LlmProvider = if (id == ProviderId.FUEL) fuel else all.first { it.id == id }
 }

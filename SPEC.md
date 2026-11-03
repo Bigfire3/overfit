@@ -1,6 +1,6 @@
 # Overfit – Spezifikation
 
-Öffentliche Open-Source-Fitness-App (Apache-2.0) für **Android und iOS** (keine Accounts, kein eigenes Backend, solange es nur den eigenen API-Key gibt; siehe „Erweiterung: Teilen, Open Source, Coach-Guthaben“). Man loggt Krafttraining und Calisthenics. Im Workout-Modus läuft ein Pausentimer. Nach dem Training bewertet ein KI-Coach das Training inkl. optionalem Körperfoto, pflegt ein Langzeitgedächtnis und passt den Plan fürs nächste Mal an.
+Öffentliche Open-Source-Fitness-App (MIT) für **Android und iOS** (keine Accounts, kein eigenes Backend, solange es nur den eigenen API-Key gibt; siehe „Erweiterung: Teilen, Open Source, Coach-Guthaben“). Man loggt Krafttraining und Calisthenics. Im Workout-Modus läuft ein Pausentimer. Nach dem Training bewertet ein KI-Coach das Training inkl. optionalem Körperfoto, pflegt ein Langzeitgedächtnis und passt den Plan fürs nächste Mal an.
 - App-Name: Overfit, Android applicationId und iOS Bundle-ID: `app.overfit`
 - Extrem minimalistisch in Funktion und Design.
 - UI-Sprache **Deutsch und Englisch**: aus der Gerätesprache übernommen, in den Einstellungen umschaltbar. Die App-Sprache ist auch die Antwortsprache des Coaches.
@@ -45,7 +45,7 @@ Nicht im Onboarding: Sprache (Gerät/Einstellungen), Ziel, Größe, Erfahrung, E
 
 ## Datenmodell (Vorschlag, darfst du verbessern)
 - Übungs-IDs müssen geräteübergreifend stabil sein (z. B. `wg:<slug>`, `fdb:<id>`, eigene Übungen: UUID), damit geteilte Trainings auf anderen Geräten auflösbar sind. Vorlagen und Sessions bekommen ebenfalls eine UUID.
-- Exercise: id, name, source (WORKOUT_GUIDE | FREE_DB | CUSTOM), sourceId?, imageRef, primaryMuscles, equipment, trackingType, defaultRestSec
+- Exercise: id, name, source (WORKOUT_GUIDE | CUSTOM; FREE_DB nur noch in alten Backups), sourceId?, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType, defaultRestSec, note
 - trackingType: WEIGHT_REPS (Gewicht darf negativ sein = Unterstützung, z. B. Band; positiv bei Körpergewichtsübungen = Zusatzgewicht), REPS, TIME (Sekunden, z. B. Handstand-Hold), WEIGHT_TIME
 - WorkoutTemplate + TemplateExercise (Reihenfolge, geplante Sätze, Pausenzeit)
 - WorkoutSession: Start, Ende, templateId?, Notiz, Gefühl 1–5 (optional), photoPath?, aiStatus (NONE, QUEUED, SENT, DONE, FAILED)
@@ -57,8 +57,8 @@ Nicht im Onboarding: Sprache (Gerät/Einstellungen), Ziel, Größe, Erfahrung, E
 
 ## Übungsbilder & Katalog
 - Hauptquelle: Workout Guide (github.com/bryllim/workout-guide, npm @bryllim/workout-guide): 302 Übungen, je 3 schematische SVG-Frames. Nur Frame 1 als Standbild zeigen, keine Animation. SVG beim Rendern in der Theme-Farbe einfärben.
-- Ergänzung für fehlende Übungen: free-exercise-db (github.com/yuhonas/free-exercise-db, Unlicense), erstes Bild.
-- Import-Skript im Repo: beide Kataloge an feste Versionen bzw. Commit-SHAs gepinnt laden, per Namen abgleichen, Dubletten zusammenführen (Workout Guide hat Vorrang), Ergebnis als exercises.json ins App-Asset. Workout-Guide-SVGs offline mitbündeln. free-exercise-db-Bilder lazy laden mit Coil-Disk-Cache, Einstellung „Alle Bilder offline laden".
+- ~~Ergänzung durch free-exercise-db~~ – am 3.11.2026 entfernt (Fotos passten nicht ins Design). Fehlende Übungen legt man als eigene Übung an; „Mit KI ausfüllen“ ergänzt aus dem Namen Erfassungsart, Muskeln, Equipment, Pause und eine Ausführungsnotiz (alles bearbeitbar), vorher „Meintest du …?“ gegen Dubletten. Auch im Workout-Modus über den Übungs-Picker.
+- Import-Skript im Repo: Workout Guide an festen Commit gepinnt laden, Ergebnis als exercises.json ins App-Asset. Workout-Guide-SVGs offline mitbündeln. Keine Bilder aus dem Netz.
 - Lizenz: Workout-Guide-Grafiken sind CC BY-SA 4.0 → Namensnennung (Bryl Lim, Everkinetic) im „Über"-Screen, Dateien unverändert lassen (Einfärben beim Rendern ist erlaubt).
 - Keine Anleitungstexte: nur Name, Bild, Muskelgruppe. Fuzzy-Suche + Filter Muskelgruppe/Equipment.
 - Eigene Übungen: Name, trackingType, Pausenzeit; ohne Bild → Initialen-Kachel (z. B. „HA").
@@ -134,7 +134,7 @@ Später als Spielerei: NFC-Einladung.
 ## Erweiterung: Teilen, Open Source, Coach-Guthaben
 
 ### Grundsätze
-- Die App ist Open Source. Mit eigenem API-Key ist sie komplett kostenlos und spricht nur direkt mit Anthropic.
+- Die App ist Open Source (MIT). Mit eigenem API-Key ist sie komplett kostenlos und spricht nur direkt mit Anthropic.
 - Das Coach-Guthaben ist freiwillig (Arbeitsname, der endgültige Name kommt noch): KI-Anfragen laufen über einen Overfit-Proxy und werden zum API-Preis plus kleinem Aufschlag abgerechnet. Ziel ist, ein paar Prozent der KI-Ausgaben als Einnahme zu behalten, nicht Gewinnmaximierung.
 - Keine Login-Accounts. Das Guthaben hängt an einer anonymen Geräte-Identität (Schlüsselpaar im Android Keystore bzw. in der Secure Enclave). Ein Wiederherstellungscode erlaubt den Umzug auf ein neues Handy.
 
@@ -160,7 +160,7 @@ Später als Spielerei: NFC-Einladung.
 - Missbrauchsschutz (Pflicht, weil echte Kosten entstehen): Geräteattestierung (Play Integrity / App Attest), Bonus einmal pro Gerät (Play Integrity Device Recall bzw. DeviceCheck, beides übersteht Neuinstallation), Token einmalig und kurzlebig, Limit pro Einladendem (z. B. 10 pro Monat) und globales Monatsbudget. Startguthaben gilt nur für Coach-Anfragen, ist nicht auszahlbar und verfällt nach 6 Monaten. Geräteattestierung setzt Store-Installationen voraus: Seitlich installierte APKs bekommen kein Startguthaben.
 
 ### Open Source – Voraussetzungen
-- Erledigt: Signatur über GitHub-Secrets mit neuem Schlüssel, `signing/` entfernt, Lizenz Apache-2.0 (`LICENSE`). Die Workout-Guide-Grafiken bleiben CC BY-SA 4.0, Inter bleibt OFL.
+- Erledigt: Signatur über GitHub-Secrets mit neuem Schlüssel, `signing/` entfernt, Lizenz MIT (`LICENSE`, Entscheidung Fabian 3.11.; vorher Apache-2.0, kurz „alle Rechte vorbehalten“). Die Workout-Guide-Grafiken bleiben CC BY-SA 4.0, Inter bleibt OFL.
 - Vor dem Veröffentlichen: Git-Historie mit `scripts/purge-old-signing-history.sh` bereinigen (alter Schlüssel und Passwort).
 - Vor dem Start des Guthabenverkaufs (nicht Teil des Codes, bitte vorher fachlich prüfen lassen): Gewerbe, Umsatzsteuer, Impressum, Datenschutzerklärung (Körperfotos laufen durch den Proxy: ausdrückliche Einwilligung, keine Speicherung, Auftragsverarbeitung mit Anthropic), AGB/Widerruf für digitale Inhalte.
 

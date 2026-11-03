@@ -98,8 +98,6 @@ class ChatStrings(
     val ctxMemory: String,
     val ctxRecent: String,
     val ctxProgress: String,
-    val ctxAge: (Int) -> String,
-    val ctxWeight: (value: String, date: String) -> String,
     val ctxUnits: String,
     val ctxToday: (String) -> String,
     val ctxSets: (Int) -> String,
@@ -150,7 +148,7 @@ val ChatGerman = ChatStrings(
     wayNotConnected = "Nicht verbunden",
     waySoon = "startet bald",
     wayInAppHint = "Die App wertet dein Training aus. Du zahlst nach Verbrauch: mit eigenem Key beim Anbieter, mit Fuel über Overfit.",
-    wayInChatHint = "Dein Chat liest dein Training (nach deiner Freigabe) und legt Vorlagen und Notizen für dich in Overfit ab.",
+    wayInChatHint = "Dein Chat liest dein Training (nach deiner Freigabe) und legt Workouts und Notizen für dich in Overfit ab.",
     chatTitle = { it },
     chatIntro = { "Nutze Overfit als Erweiterung in $it: Du legst Trainings an, lässt sie auswerten und sprichst über deinen Fortschritt – mit deinem normalen Abo, ohne extra Kosten in Overfit." },
     serverUrl = "Server-Adresse",
@@ -171,7 +169,7 @@ val ChatGerman = ChatStrings(
                 "Öffne chatgpt.com → Einstellungen → Apps & Connectors → Erweitert → „Entwicklermodus“ einschalten.",
                 "Apps & Connectors → „Erstellen“: Name „Overfit“, Adresse $url, Authentifizierung „OAuth“.",
                 "Anmelden: Tippe den Kopplungscode aus der App ein (Button „Mit Chat verbinden“ unten).",
-                "Im Chat „+“ → Entwicklermodus → „Overfit“ wählen. Schreibaktionen (Vorlage, Notiz) fragt ChatGPT vorher ab.",
+                "Im Chat „+“ → Entwicklermodus → „Overfit“ wählen. Schreibaktionen (Workout, Notiz) fragt ChatGPT vorher ab.",
                 "Ohne Entwicklermodus in deinem Tarif: Nutze „Kontext kopieren“ und die GPT-Anleitung weiter unten.",
             )
             else -> listOf(
@@ -182,11 +180,11 @@ val ChatGerman = ChatStrings(
         }
     },
     geminiAltTitle = "Ersatzweg für Gemini: eigenes Gem",
-    geminiAltText = "Wenn Gemini keine eigenen Verbindungen erlaubt (z. B. in Deutschland): 1) Unten „Gem-Anleitung kopieren“ tippen. 2) In Gemini „Gems → Neues Gem“, Name „Overfit Coach“, Anleitung einfügen, speichern. 3) Vor jedem Gespräch hier „Kontext kopieren“ tippen und in den Chat einfügen. Neue Vorlagen kopierst du aus der Antwort und importierst sie in Overfit (Übungen → Vorlagen → Importieren). Fotos hängst du einzeln an.",
+    geminiAltText = "Wenn Gemini keine eigenen Verbindungen erlaubt (z. B. in Deutschland): 1) Unten „Gem-Anleitung kopieren“ tippen. 2) In Gemini „Gems → Neues Gem“, Name „Overfit Coach“, Anleitung einfügen, speichern. 3) Vor jedem Gespräch hier „Kontext kopieren“ tippen und in den Chat einfügen. Neue Workouts kopierst du aus der Antwort und importierst sie in Overfit (Training → „+“ → Aus Link oder QR-Code importieren). Fotos hängst du einzeln an.",
     connectChat = "KI-Chat verbinden",
     consentTitle = "Daten für den KI-Chat freigeben",
     consentPoints = listOf(
-        "Hochgeladen werden Profil, Trainings, Vorlagen und das Coach-Gedächtnis – damit dein Chat sie lesen kann.",
+        "Hochgeladen werden Profil, Trainings, Workouts und das Coach-Gedächtnis – damit dein Chat sie lesen kann.",
         "Die Daten liegen verschlüsselt auf dem Overfit-Server, getrennt von deinem Fuel-Guthaben. Sie werden nicht für Werbung oder zum Training von KI genutzt.",
         "Was du im Chat besprichst, geht an den Anbieter deines Chats (Anthropic, OpenAI oder Google) und unterliegt dessen Regeln.",
         "Du kannst jederzeit abschalten: „KI-Chat trennen“ löscht alles auf dem Server.",
@@ -236,15 +234,13 @@ val ChatGerman = ChatStrings(
     ctxMemory = "Gedächtnis des Coaches",
     ctxRecent = "Letzte Trainings",
     ctxProgress = "Fortschritt der Hauptübungen (bester Satz je Training, älteste zuerst)",
-    ctxAge = { "$it Jahre" },
-    ctxWeight = { value, date -> "Gewicht $value (Stand $date)" },
     ctxUnits = "Einheiten",
     ctxToday = { "Heute: $it" },
     ctxSets = { if (it == 1) "1 Satz" else "$it Sätze" },
     ctxNoWorkouts = "Noch keine abgeschlossenen Trainings.",
     ctxFeeling = { "Gefühl $it/5" },
     ctxTask = { example ->
-        """Antworte auf Deutsch. Wenn du mir eine neue Trainingsvorlage vorschlägst, gib sie als genau einen ```json-Block im Overfit-Format aus, damit ich sie in der App importieren kann:
+        """Antworte auf Deutsch. Wenn du mir ein neues Workout vorschlägst, gib es als genau einen ```json-Block im Overfit-Format aus, damit ich es in der App importieren kann:
 
 ```json
 $example
@@ -254,7 +250,7 @@ Regeln: "v" ist 1, "kind" ist "template". Übungen per "name" mit dem gängigen 
     gemInstructions = { example ->
         """Du bist mein Trainings-Coach für die Tracking-App Overfit. Ich füge dir zu Beginn eines Gesprächs meinen Trainingsstand als Text ein (Profil, Gedächtnis, letzte Trainings, Fortschritt). Arbeite damit: werte Trainings aus, beurteile den Fortschritt, schlage die nächsten Gewichte vor und plane Einheiten. Sei konkret und ehrlich, nenne Zahlen aus meinen Daten und erfinde keine. Fehlt dir etwas (Ziel, Equipment, Zeit, Beschwerden), frag nach. Bei Schmerzen oder Verletzungen empfiehl einen Arzt oder Physiotherapeuten.
 
-Schlägst du eine neue oder geänderte Trainingsvorlage vor, gib sie als genau einen ```json-Block im Overfit-Format aus, damit ich sie in der App importieren kann:
+Schlägst du ein neues oder geändertes Workout vor, gib es als genau einen ```json-Block im Overfit-Format aus, damit ich es in der App importieren kann:
 
 ```json
 $example
@@ -266,12 +262,12 @@ Regeln: "v" ist 1, "kind" ist "template". Übungen per "name" mit dem gängigen 
     inboxEmpty = "Nichts Neues.",
     inboxFrom = { "Von $it" },
     inboxFull = "Dein Eingang ist voll (50 Einträge). Übernimm oder verwirf einige, damit der Chat neue ablegen kann.",
-    inboxAsNew = "Als neue Vorlage",
-    inboxUpdate = "Vorlage aktualisieren",
+    inboxAsNew = "Als neues Workout",
+    inboxUpdate = "Workout aktualisieren",
     inboxDiscard = "Verwerfen",
     inboxAccept = "Übernehmen",
-    inboxSavedAsNew = "Als neue Vorlage gespeichert",
-    inboxUpdated = "Vorlage aktualisiert",
+    inboxSavedAsNew = "Als neues Workout gespeichert",
+    inboxUpdated = "Workout aktualisiert",
     inboxInvalid = "Dieser Eintrag lässt sich nicht lesen.",
     diffTitle = "Änderungen",
     diffAdded = { "+ $it" },
@@ -302,7 +298,7 @@ val ChatEnglish = ChatStrings(
     wayNotConnected = "Not connected",
     waySoon = "coming soon",
     wayInAppHint = "The app analyses your training. You pay as you go: with your own key at the provider, with Fuel through Overfit.",
-    wayInChatHint = "Your chat reads your training (with your permission) and leaves templates and notes for you in Overfit.",
+    wayInChatHint = "Your chat reads your training (with your permission) and leaves workouts and notes for you in Overfit.",
     chatTitle = { it },
     chatIntro = { "Use Overfit as an extension in $it: create workouts, have them analysed and talk about your progress – with your normal subscription, no extra cost in Overfit." },
     serverUrl = "Server address",
@@ -323,7 +319,7 @@ val ChatEnglish = ChatStrings(
                 "Open chatgpt.com → Settings → Apps & Connectors → Advanced → switch on “Developer mode”.",
                 "Apps & Connectors → “Create”: name “Overfit”, address $url, authentication “OAuth”.",
                 "Sign in: enter the pairing code from the app (button “Connect to chat” below).",
-                "In a chat, “+” → Developer mode → choose “Overfit”. ChatGPT asks before write actions (template, note).",
+                "In a chat, “+” → Developer mode → choose “Overfit”. ChatGPT asks before write actions (workout, note).",
                 "No developer mode in your plan? Use “Copy context” and the GPT instructions further down.",
             )
             else -> listOf(
@@ -334,11 +330,11 @@ val ChatEnglish = ChatStrings(
         }
     },
     geminiAltTitle = "Fallback for Gemini: your own Gem",
-    geminiAltText = "If Gemini doesn't allow custom connections (e.g. in Germany): 1) Tap “Copy Gem/GPT instructions” below. 2) In Gemini “Gems → New Gem”, name “Overfit Coach”, paste the instructions, save. 3) Before each chat tap “Copy context” here and paste it into the chat. Copy new templates from the answer and import them in Overfit (Exercises → Templates → Import). Attach photos one by one.",
+    geminiAltText = "If Gemini doesn't allow custom connections (e.g. in Germany): 1) Tap “Copy Gem/GPT instructions” below. 2) In Gemini “Gems → New Gem”, name “Overfit Coach”, paste the instructions, save. 3) Before each chat tap “Copy context” here and paste it into the chat. Copy new workouts from the answer and import them in Overfit (Workouts → “+” → Import from link or QR code). Attach photos one by one.",
     connectChat = "Connect AI chat",
     consentTitle = "Share data with the AI chat",
     consentPoints = listOf(
-        "Your profile, workouts, templates and the coach memory are uploaded so your chat can read them.",
+        "Your profile, past workouts, saved workouts and the coach memory are uploaded so your chat can read them.",
         "The data is stored encrypted on the Overfit server, separate from your Fuel balance. It is not used for advertising or to train AI.",
         "What you discuss in the chat goes to your chat provider (Anthropic, OpenAI or Google) and is subject to their rules.",
         "You can switch it off any time: “Disconnect AI chat” deletes everything on the server.",
@@ -388,15 +384,13 @@ val ChatEnglish = ChatStrings(
     ctxMemory = "Coach memory",
     ctxRecent = "Recent workouts",
     ctxProgress = "Progress of the main exercises (best set per workout, oldest first)",
-    ctxAge = { "$it years" },
-    ctxWeight = { value, date -> "Weight $value (as of $date)" },
     ctxUnits = "Units",
     ctxToday = { "Today: $it" },
     ctxSets = { if (it == 1) "1 set" else "$it sets" },
     ctxNoWorkouts = "No finished workouts yet.",
     ctxFeeling = { "Feeling $it/5" },
     ctxTask = { example ->
-        """Answer in English. If you suggest a new workout template, output it as exactly one ```json block in the Overfit format so I can import it in the app:
+        """Answer in English. If you suggest a new workout, output it as exactly one ```json block in the Overfit format so I can import it in the app:
 
 ```json
 $example
@@ -406,7 +400,7 @@ Rules: "v" is 1, "kind" is "template". Name exercises via "name" using the commo
     gemInstructions = { example ->
         """You are my training coach for the tracking app Overfit. At the start of a conversation I paste my training status as text (profile, memory, recent workouts, progress). Work with it: analyse workouts, judge progress, suggest the next weights and plan sessions. Be concrete and honest, cite numbers from my data and don't invent any. If something is missing (goal, equipment, time, complaints), ask. For pain or injuries, recommend a doctor or physiotherapist.
 
-If you suggest a new or changed workout template, output it as exactly one ```json block in the Overfit format so I can import it in the app:
+If you suggest a new or changed workout, output it as exactly one ```json block in the Overfit format so I can import it in the app:
 
 ```json
 $example
@@ -418,12 +412,12 @@ Rules: "v" is 1, "kind" is "template". Name exercises via "name" using the commo
     inboxEmpty = "Nothing new.",
     inboxFrom = { "From $it" },
     inboxFull = "Your inbox is full (50 items). Accept or discard some so the chat can leave new ones.",
-    inboxAsNew = "As new template",
-    inboxUpdate = "Update template",
+    inboxAsNew = "As new workout",
+    inboxUpdate = "Update workout",
     inboxDiscard = "Discard",
     inboxAccept = "Accept",
-    inboxSavedAsNew = "Saved as new template",
-    inboxUpdated = "Template updated",
+    inboxSavedAsNew = "Saved as new workout",
+    inboxUpdated = "Workout updated",
     inboxInvalid = "This item can't be read.",
     diffTitle = "Changes",
     diffAdded = { "+ $it" },

@@ -69,11 +69,13 @@ import app.overfit.ui.chat.ChatProviderScreen
 import app.overfit.ui.chat.ChatViewModel
 import app.overfit.i18n.LocalChatStrings
 import app.overfit.i18n.chatStringsFor
+import app.overfit.i18n.LocalExerciseFormStrings
+import app.overfit.i18n.exerciseFormStringsFor
+import app.overfit.ai.ExerciseAutofill
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.toRoute
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
-import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,7 +96,11 @@ import app.overfit.ui.exercises.ExercisePickerScreen
 import app.overfit.ui.exercises.ExerciseViewModel
 import app.overfit.ui.exercises.ExercisesScreen
 import app.overfit.ui.templates.TemplateEditorScreen
-import app.overfit.ui.workout.StartWorkoutScreen
+import app.overfit.ui.workout.NewWorkoutScreen
+import app.overfit.ui.templates.WorkoutPlanScreen
+import app.overfit.ui.main.lastDoneText
+import app.overfit.ui.workout.MiniWorkoutBar
+import app.overfit.domain.Workout
 import app.overfit.ui.workout.WorkoutScreen
 import app.overfit.ui.templates.TemplateEditorViewModel
 import app.overfit.ui.history.FinishScreen
@@ -187,6 +193,8 @@ class AppDependencies(
     val fuelSession = FuelSession(fuel)
     /** The AI coach: requests, queue, reviews, memory. Runs in the app scope. */
     val coach: CoachService = createCoach(store, providers, data, today, clock, coachPhotos, coachTransport)
+    /** "Fill in with AI" for custom exercises: same access, provider and model as the coach. */
+    val exerciseAutofill = ExerciseAutofill(coach.ai)
     /** KI-Chat-Verbindung (Claude, ChatGPT, Gemini): sync, inbox, notes. The coach memory goes along as memory/coach. */
     val chat: ChatFeature = ChatFeature(fuel, data, store, kv, data.scope, clock, memory = { coach.memoryText })
 
@@ -203,6 +211,13 @@ class AppDependencies(
      * [BackupContributor]. Register before the UI starts.
      */
     val backupContributors = mutableListOf<BackupContributor>()
+
+    /**
+     * Counter raised when a notification (rest timer, running workout) is tapped: the UI then always shows
+     * the maximized workout, also from the minimized view. After a process restart the workout comes back maximized anyway.
+     */
+    val openWorkoutRequests = MutableStateFlow(0)
+    fun requestOpenWorkout() { openWorkoutRequests.value += 1 }
 
     /** Backup file picked in the settings, waiting for the import preview ([BackupImportRoute]). */
     val pendingBackup = MutableStateFlow<ByteArray?>(null)
@@ -238,6 +253,8 @@ class AppDependencies(
         },
         scope = workoutScope,
         clock = clock,
+        // A workout that ends passes its structure on to its saved workout (or becomes one).
+        plans = { data.templates.adopt(it) },
     )
 }
 
@@ -284,8 +301,13 @@ class AppDependencies(
 @Serializable data class PhotoCompareRoute(val firstId: String, val secondId: String)
 /** Preview and confirm a backup import; the file waits in [AppDependencies.pendingBackup]. */
 @Serializable data object BackupImportRoute
-/** Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). */
-@Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "")
+/**
+ * Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). [pick]: opened from the
+ * exercise picker, the saved exercise goes straight back into the picker's caller (template or running workout).
+ */
+@Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "", val pick: Boolean = false)
+/** A saved workout with "Start", edit and share. */
+@Serializable data class WorkoutPlanRoute(val templateId: Long)
 /** Template editor; [templateId] 0 = new template. */
 @Serializable data class TemplateEditorRoute(val templateId: Long = 0)
 /** Exercise picker; [single] = replace mode. The result goes through [PickedExercises]. */
@@ -294,12 +316,13 @@ class AppDependencies(
 /** Hands the picker's result back to the editor below it on the back stack. */
 class PickedExercises {
     val result = MutableStateFlow<List<String>?>(null)
+    /** Exercise created (or chosen under "Did you mean …?") in the form opened from the picker. */
+    val created = MutableStateFlow<String?>(null)
 }
 
 enum class Tab(val route: Any, val icon: Icon, val label: (Strings) -> String) {
-    START(StartRoute, Icon.Home, { it.navStart }),
+    START(StartRoute, Icon.Training, { it.navStart }),
     HISTORY(HistoryRoute, Icon.History, { it.navHistory }),
-    EXERCISES(ExercisesRoute, Icon.Exercises, { it.navExercises }),
     PHOTOS(PhotosRoute, Icon.Photos, { it.navPhotos }),
     PROFILE(SettingsRoute, Icon.Settings, { it.navProfile });
 
@@ -312,13 +335,15 @@ fun OverfitApp(deps: AppDependencies) {
     val templates by deps.data.templates.templates.collectAsStateWithLifecycle(initialValue = null)
     val picked = remember { PickedExercises() }
     val workoutState by deps.workout.state.collectAsStateWithLifecycle()
-    val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox, deps.data.scope) }
+    val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox, deps.data.scope) {
+        val s = deps.store.state.value
+        app.overfit.domain.aiProfileHeader(s.profile, s.weights, deps.today(), s.language)
+    } }
     val incoming by deps.inbox.pending.collectAsStateWithLifecycle()
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {
                 add(SvgDecoder.Factory())
-                add(KtorNetworkFetcherFactory())
             }
             .crossfade(true)
             .build()
@@ -338,6 +363,7 @@ fun OverfitApp(deps: AppDependencies) {
             LocalFuelStrings provides fuelStringsFor(state.language),
             LocalChatStrings provides chatStringsFor(state.language),
             LocalCoachStrings provides coachStringsFor(state.language),
+            LocalExerciseFormStrings provides exerciseFormStringsFor(state.language),
         ) {
             val nav = rememberNavController()
             val coachNav = remember(nav) {
@@ -350,7 +376,7 @@ fun OverfitApp(deps: AppDependencies) {
                     demo = { nav.navigate(CoachDemoRoute(it)) },
                     memory = { nav.navigate(CoachMemoryRoute) },
                     settings = { nav.navigate(CoachSettingsRoute) },
-                    openTemplate = { nav.navigate(TemplateEditorRoute(it)) },
+                    openTemplate = { nav.navigate(WorkoutPlanRoute(it)) },
                 )
             }
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
@@ -360,6 +386,14 @@ fun OverfitApp(deps: AppDependencies) {
                 if (resumeChecked || !workoutState.loaded) return@LaunchedEffect
                 resumeChecked = true
                 if (workoutState.workout != null && state.onboardingDone) nav.navigate(WorkoutRoute)
+            }
+            // Tap on the rest/workout notification → maximized workout (from anywhere, also when minimized).
+            val openRequests by deps.openWorkoutRequests.collectAsStateWithLifecycle()
+            var handledOpenRequests by remember { mutableStateOf(openRequests) }
+            LaunchedEffect(openRequests) {
+                if (openRequests == handledOpenRequests) return@LaunchedEffect
+                handledOpenRequests = openRequests
+                if (workoutState.workout != null && state.onboardingDone) nav.openWorkout()
             }
             // Links, files and scans from outside open the import screen (not during onboarding).
             LaunchedEffect(incoming, state.onboardingDone) {
@@ -376,7 +410,7 @@ fun OverfitApp(deps: AppDependencies) {
                     nav.navigate(ImportRoute) { launchSingleTop = true }
                 }
             }
-            AppScaffold(nav) {
+            AppScaffold(nav, workoutState.workout, deps.clock, onOpenWorkout = { nav.openWorkout() }) {
                 NavHost(nav, startDestination = start, modifier = Modifier.fillMaxSize()) {
                     composable<NameRoute> {
                         NameStep(state.profile.name, onNext = { deps.store.setName(it); nav.navigate(AgeRoute) })
@@ -415,15 +449,21 @@ fun OverfitApp(deps: AppDependencies) {
                     }
 
                     composable<StartRoute> {
+                        val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = emptyMap())
                         StartScreen(
-                            state = state,
                             templates = templates,
-                            activeWorkout = workoutState.workout != null,
-                            onStartWorkout = {
-                                nav.navigate(if (workoutState.workout != null) WorkoutRoute else StartWorkoutRoute)
+                            lastDone = lastDone,
+                            today = deps.today(),
+                            running = workoutState.workout,
+                            onOpenRunning = { nav.openWorkout() },
+                            onEndRunning = {
+                                // Ends the running workout (saved, finish flow): the workout screen takes it from there. Runs in the app scope.
+                                deps.data.scope.launch { deps.workout.finish() }
+                                nav.openWorkout()
                             },
-                            onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
-                            onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
+                            onNew = { nav.navigate(StartWorkoutRoute) },
+                            onExercises = { nav.navigate(ExercisesRoute) },
+                            onOpenWorkout = { nav.navigate(WorkoutPlanRoute(it)) },
                             share = share,
                             onDuo = { nav.navigate(DuoRoute) },
                             coachTips = latestCoachTips(deps.coach),
@@ -434,17 +474,41 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<StartWorkoutRoute> {
-                        val scope = rememberCoroutineScope()
-                        val openWorkout = { nav.navigate(WorkoutRoute) { popUpTo(StartRoute) } }
-                        StartWorkoutScreen(
-                            templates = templates,
+                        NewWorkoutScreen(
+                            workoutRunning = workoutState.workout != null,
+                            share = share,
                             onBack = nav::popBackStack,
-                            onEmpty = { deps.workout.startEmpty(); openWorkout() },
-                            onTemplate = { id ->
+                            onCreate = { nav.navigate(TemplateEditorRoute()) { popUpTo(StartRoute) } },
+                            onStartEmpty = {
+                                deps.workout.startEmpty()
+                                nav.navigate(WorkoutRoute) { popUpTo(StartRoute) }
+                            },
+                            onImport = { nav.navigate(ImportRoute) { popUpTo(StartRoute) } },
+                            onOpenRunning = { nav.openWorkout() },
+                            onEndRunning = { deps.data.scope.launch { deps.workout.finish() }; nav.openWorkout() },
+                        )
+                    }
+                    composable<WorkoutPlanRoute> { entry ->
+                        val id = entry.toRoute<WorkoutPlanRoute>().templateId
+                        val scope = rememberCoroutineScope()
+                        val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = emptyMap())
+                        WorkoutPlanScreen(
+                            templateId = id,
+                            templates = deps.data.templates,
+                            lastDone = lastDoneText(LocalStrings.current, lastDone[id], deps.today()),
+                            unit = state.profile.unit,
+                            language = state.language,
+                            workoutRunning = workoutState.workout != null,
+                            onBack = nav::popBackStack,
+                            onStart = { template ->
                                 scope.launch {
-                                    deps.data.templates.get(id)?.let { deps.workout.startFromTemplate(it); openWorkout() }
+                                    if (deps.workout.startFromTemplate(template)) nav.navigate(WorkoutRoute) { popUpTo(StartRoute) }
                                 }
                             },
+                            onToRunning = { nav.openWorkout() },
+                            onEndRunning = { deps.data.scope.launch { deps.workout.finish() }; nav.openWorkout() },
+                            onEdit = { nav.navigate(TemplateEditorRoute(id)) },
+                            onShare = { nav.navigate(ShareRoute(id)) },
                         )
                     }
                     composable<WorkoutRoute> {
@@ -471,6 +535,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onAddExercises = { pendingReplaceId = null; nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { pendingReplaceId = it; nav.navigate(ExercisePickerRoute(single = true)) },
                             onClosed = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
+                            onMinimize = { if (!nav.popBackStack()) nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                             onFinished = { id -> nav.navigate(FinishRoute(id)) { popUpTo(StartRoute) } },
                         )
                     }
@@ -485,6 +550,10 @@ fun OverfitApp(deps: AppDependencies) {
                             coachSection = deps.finishCoachSection,
                             onSaved = { id -> deps.workoutSavedListeners.toList().forEach { it(id) } },
                             onClose = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
+                            rename = { w, name ->
+                                deps.data.workouts.rename(w.id, name)
+                                w.templateId?.let { deps.data.templates.rename(it, name) }
+                            },
                         )
                     }
                     composable<HistoryRoute> {
@@ -509,7 +578,7 @@ fun OverfitApp(deps: AppDependencies) {
                             appScope = deps.data.scope,
                             onBack = nav::popBackStack,
                             onOpenPhoto = { nav.navigate(PhotoViewerRoute(it)) },
-                            onTemplateCreated = { nav.navigate(TemplateEditorRoute(it)) },
+                            onTemplateCreated = { nav.navigate(WorkoutPlanRoute(it)) },
                             onShare = { nav.navigate(WorkoutShareRoute(id, withActual = true)) },
                             onCoach = { nav.navigate(CoachSessionRoute(id)) },
                         )
@@ -531,14 +600,10 @@ fun OverfitApp(deps: AppDependencies) {
                         val catalog = viewModel { CatalogViewModel(deps.data.exercises) }
                         ExercisesScreen(
                             catalog = catalog,
-                            templates = templates,
                             language = state.language,
                             onOpenExercise = { nav.navigate(ExerciseDetailRoute(it.id)) },
                             onNewCustomExercise = { nav.navigate(CustomExerciseRoute(name = catalog.filter.value.query.trim())) },
-                            onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
-                            onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
-                            share = share,
-                            onImport = { nav.navigate(ImportRoute) },
+                            onBack = nav::popBackStack,
                         )
                     }
                     composable<ExerciseDetailRoute> { entry ->
@@ -555,10 +620,22 @@ fun OverfitApp(deps: AppDependencies) {
                     composable<CustomExerciseRoute> { entry ->
                         val route = entry.toRoute<CustomExerciseRoute>()
                         CustomExerciseScreen(
-                            viewModel = viewModel { ExerciseViewModel(route.id.ifEmpty { null }, deps.data.exercises) },
+                            viewModel = viewModel { ExerciseViewModel(route.id.ifEmpty { null }, deps.data.exercises, deps.exerciseAutofill) },
                             initialName = route.name,
+                            language = state.language,
                             onBack = nav::popBackStack,
-                            onSaved = { nav.popBackStack() },
+                            onSaved = { id ->
+                                if (route.pick) picked.created.value = id
+                                nav.popBackStack()
+                            },
+                            onPickExisting = { existing ->
+                                if (route.pick) {
+                                    picked.created.value = existing.id
+                                    nav.popBackStack()
+                                } else {
+                                    nav.navigate(ExerciseDetailRoute(existing.id)) { popUpTo<CustomExerciseRoute> { inclusive = true } }
+                                }
+                            },
                         )
                     }
                     composable<TemplateEditorRoute> { entry ->
@@ -581,12 +658,16 @@ fun OverfitApp(deps: AppDependencies) {
                     }
                     composable<ExercisePickerRoute> { entry ->
                         val single = entry.toRoute<ExercisePickerRoute>().single
+                        val pickedCreated by picked.created.collectAsStateWithLifecycle()
                         ExercisePickerScreen(
                             catalog = viewModel { CatalogViewModel(deps.data.exercises) },
                             language = state.language,
                             single = single,
                             onBack = nav::popBackStack,
                             onPicked = { ids -> picked.result.value = ids; nav.popBackStack() },
+                            onCreate = { query -> nav.navigate(CustomExerciseRoute(name = query, pick = true)) },
+                            created = pickedCreated,
+                            onCreatedConsumed = { picked.created.value = null },
                         )
                     }
                     composable<PhotosRoute> {
@@ -659,7 +740,6 @@ fun OverfitApp(deps: AppDependencies) {
                             onFuel = { nav.navigate(FuelRoute) },
                             onAiCoach = { nav.navigate(AiCoachRoute) },
                             onChatNotes = { nav.navigate(ChatNotesRoute) },
-                            offlineImages = deps.data.offlineImages,
                             restAlerts = deps.restAlerts,
                             share = share,
                             exportingBackup = exportingBackup,
@@ -676,7 +756,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onImportBackup = pickBackup,
                             onReset = {
                                 deps.store.resetAll()
-                                deps.data.scope.launch { deps.workout.discard(); deps.data.resetAll() }
+                                deps.data.scope.launch { deps.workout.discard(keepStructure = false); deps.data.resetAll() }
                                 nav.navigate(NameRoute) { popUpTo(0) { inclusive = true } }
                             },
                         )
@@ -719,7 +799,7 @@ fun OverfitApp(deps: AppDependencies) {
                             unit = state.profile.unit,
                             language = state.language,
                             onBack = nav::popBackStack,
-                            onTemplate = { id -> nav.popBackStack(); nav.navigate(TemplateEditorRoute(id)) },
+                            onTemplate = { id -> nav.popBackStack(); nav.navigate(WorkoutPlanRoute(id)) },
                         )
                     }
                     composable<ChatNotesRoute> { ChatNotesScreen(deps.chat, onBack = nav::popBackStack) }
@@ -732,7 +812,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                             onImported = { id ->
                                 nav.popBackStack()
-                                nav.navigate(TemplateEditorRoute(id))
+                                nav.navigate(WorkoutPlanRoute(id))
                             },
                         )
                     }
@@ -798,15 +878,29 @@ fun OverfitApp(deps: AppDependencies) {
     }
 }
 
-/** Shows the bottom tab bar only on the five top-level screens. */
+/** Brings the (maximized) workout to the front: back to it if it is on the stack, otherwise open it on top. */
+internal fun NavHostController.openWorkout() {
+    if (currentDestination?.hasRoute(WorkoutRoute::class) == true) return
+    if (!popBackStack(WorkoutRoute, inclusive = false)) navigate(WorkoutRoute) { launchSingleTop = true }
+}
+
+/** Shows the bottom tab bar only on the four top-level screens. */
 @Composable
-private fun AppScaffold(nav: NavHostController, content: @Composable () -> Unit) {
+private fun AppScaffold(
+    nav: NavHostController,
+    runningWorkout: Workout?,
+    clock: () -> Long,
+    onOpenWorkout: () -> Unit,
+    content: @Composable () -> Unit,
+) {
     val entry by nav.currentBackStackEntryAsState()
     val destination = entry?.destination
     val current = Tab.entries.firstOrNull { tab -> destination?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
 
     Column(Modifier.fillMaxSize().background(Theme.colors.background)) {
         Box(Modifier.weight(1f)) { content() }
+        // A running workout that is not on screen (minimized) sits above the tab bar on every main screen.
+        if (current != null && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
         if (current != null) {
             TabBar(current) { tab ->
                 nav.navigate(tab.route) {

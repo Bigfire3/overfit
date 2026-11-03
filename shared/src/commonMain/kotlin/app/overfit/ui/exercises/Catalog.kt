@@ -48,6 +48,7 @@ import app.overfit.ui.share.TemplateImportRows
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
+import app.overfit.i18n.LocalExerciseFormStrings
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Screen
@@ -89,79 +90,21 @@ class CatalogViewModel(repository: ExerciseRepository) : ViewModel() {
     fun toggleOnlyCustom() = _filter.update { it.copy(onlyCustom = !it.onlyCustom) }
 }
 
-enum class ExercisesSegment { CATALOG, TEMPLATES }
-
-/** Tab "Exercises": catalogue (search, filters, custom exercises) and templates. */
+/** Tab "Exercises": catalogue (search, filters, custom exercises). */
 @Composable
 fun ExercisesScreen(
     catalog: CatalogViewModel,
-    templates: List<TemplateSummary>?,
     language: Language,
     onOpenExercise: (Exercise) -> Unit,
     onNewCustomExercise: () -> Unit,
-    onOpenTemplate: (Long) -> Unit,
-    onNewTemplate: () -> Unit,
-    share: ShareDependencies,
-    onImport: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val t = LocalStrings.current
-    var segment by rememberSaveable { mutableStateOf(ExercisesSegment.CATALOG) }
-    Screen(
-        footer = {
-            if (segment == ExercisesSegment.CATALOG) PrimaryButton(t.newCustomExercise, onNewCustomExercise)
-            else PrimaryButton(t.newTemplate, onNewTemplate)
-        },
-    ) {
+    // Only exercises here; the saved workouts live on the Training tab. Not a tab of its own: opened from Training.
+    Screen(header = { BackHeader(t.back, onBack) }, footer = { PrimaryButton(t.newCustomExercise, onNewCustomExercise) }) {
         Title(t.exercisesTitle)
         Spacer(Modifier.height(Space.m))
-        Segmented(
-            segment,
-            listOf(ExercisesSegment.CATALOG to t.catalog, ExercisesSegment.TEMPLATES to t.templates),
-        ) { segment = it }
-        Spacer(Modifier.height(Space.s))
-        if (segment == ExercisesSegment.CATALOG) {
-            CatalogList(catalog, language, onClick = onOpenExercise)
-        } else {
-            TemplateList(templates, onOpenTemplate, share, onImport)
-        }
-    }
-}
-
-@Composable
-fun ColumnScope.TemplateList(
-    templates: List<TemplateSummary>?,
-    onOpen: (Long) -> Unit,
-    share: ShareDependencies,
-    onImport: () -> Unit,
-) {
-    val t = LocalStrings.current
-    if (templates == null) return
-    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-        if (templates.isEmpty()) {
-            item(key = "empty") { Text(t.templatesTabEmpty, Modifier.padding(vertical = Space.l), tone = Tone.Muted) }
-        }
-        items(templates, key = { it.id }) { template -> TemplateRow(template) { onOpen(template.id) } }
-        item(key = "import") {
-            TemplateImportRows(share, onImport, showSamples = true)
-        }
-    }
-}
-
-@Composable
-fun TemplateRow(template: TemplateSummary, onClick: () -> Unit) {
-    val t = LocalStrings.current
-    Column(Modifier.fillMaxWidth().pressableRow(onClick)) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.m)) {
-            Text(template.name, style = Theme.type.label)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                t.templateSummary(template.exerciseNames.size, template.exerciseNames),
-                style = Theme.type.caption,
-                tone = Tone.Muted,
-                maxLines = 2,
-            )
-        }
-        Hairline()
+        CatalogList(catalog, language, onClick = onOpenExercise)
     }
 }
 
@@ -172,6 +115,8 @@ fun ColumnScope.CatalogList(
     language: Language,
     onClick: (Exercise) -> Unit,
     selectedIds: List<String>? = null,
+    /** Picker: last row "Create new exercise" (with the search text as name). */
+    onCreate: ((String) -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val filter by catalog.filter.collectAsStateWithLifecycle()
@@ -211,6 +156,12 @@ fun ColumnScope.CatalogList(
                     ExerciseRow(exercise, language, selected = selectedIds?.contains(exercise.id)) { onClick(exercise) }
                 }
             }
+        }
+        if (onCreate != null && list != null) item(key = "create") {
+            val f = LocalExerciseFormStrings.current
+            val query = filter.query.trim()
+            Spacer(Modifier.height(Space.s))
+            ListRow(if (query.isEmpty()) f.createInPickerEmpty else f.createInPicker(query), onClick = { onCreate(query) })
         }
     }
 }
@@ -260,9 +211,19 @@ fun ExercisePickerScreen(
     single: Boolean,
     onBack: () -> Unit,
     onPicked: (List<String>) -> Unit,
+    /** Opens the custom-exercise form with the search text; null hides the row. */
+    onCreate: ((String) -> Unit)? = null,
+    /** Exercise just created (or chosen under "Did you mean …?") in the form above; it is added right away. */
+    created: String? = null,
+    onCreatedConsumed: () -> Unit = {},
 ) {
     val t = LocalStrings.current
     val selected = rememberSaveable(saver = selectionSaver) { mutableStateListOf<String>() }
+    LaunchedEffect(created) {
+        val id = created ?: return@LaunchedEffect
+        onCreatedConsumed()
+        onPicked(if (single) listOf(id) else (selected.toList() - id) + id)
+    }
     Screen(
         header = { BackHeader(t.back, onBack) },
         footer = if (single) null else ({
@@ -282,6 +243,7 @@ fun ExercisePickerScreen(
                 }
             },
             selectedIds = selected,
+            onCreate = onCreate,
         )
     }
 }

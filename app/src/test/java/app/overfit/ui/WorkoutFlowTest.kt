@@ -79,10 +79,11 @@ class WorkoutFlowTest {
         )
         compose.setContent { OverfitApp(deps) }
 
-        // Start → choose the template
-        compose.onNodeWithText("Training starten").performClick()
-        waitFor("Freies Training")
-        compose.onNodeWithText("Push").performClick()
+        // Training tab → open the saved workout → "Starten"
+        waitFor("Push", substring = true)
+        compose.onNodeWithText("Push", substring = true).performClick()
+        waitFor("Starten")
+        compose.onNodeWithText("Starten").performClick()
         waitFor("0/2 erledigt", substring = true)
         assertEquals(1, alerts.permissionRequests)
 
@@ -108,9 +109,11 @@ class WorkoutFlowTest {
         compose.onNodeWithText("Beenden? Nochmal tippen").performClick()
         waitFor("Wie war das Training?")
         compose.waitUntil(5_000) { runBlocking { data.workouts.status(id) } == SessionStatus.FINISHED }
-        compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Stark heute")
+        // The name field comes first, the note field second.
+        compose.waitUntil(5_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
         compose.onNodeWithText("Speichern").performClick()
-        waitFor("Training starten")
+        waitFor("Letzte Coach-Tipps")
         compose.waitUntil(5_000) { runBlocking { data.workouts.getFinished(id)?.note } == "Stark heute" }
         val saved = requireNotNull(runBlocking { data.workouts.get(id) })
         assertEquals(2, saved.completedSets)
@@ -124,6 +127,6 @@ class WorkoutFlowTest {
     }
 
     private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {
-        compose.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty()
+        compose.onAllNodes(hasText(text, substring = substring, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty()
     }
 }

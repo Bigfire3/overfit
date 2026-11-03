@@ -58,15 +58,20 @@ object CoachModels {
     const val ANTHROPIC = "claude-sonnet-5-5"
     const val OPENAI = "gpt-5"
     const val OPENROUTER = "anthropic/claude-sonnet-5.5"
+    /** Newest Gemini Flash marked "Stable" in Google's model list (3.8 Flash is still "New"). */
+    const val GEMINI = "gemini-3.6-flash"
     /** The Fuel backend only accepts this model (see backend/src/config.ts). */
     const val FUEL = "claude-sonnet-5-5"
     const val MAX_TOKENS = 8_000
+    /** Gemini counts its thinking tokens into the output limit, so it gets more room. */
+    const val GEMINI_MAX_TOKENS = 16_000
 
     fun default(id: ProviderId) = when (id) {
         ProviderId.ANTHROPIC -> ANTHROPIC
         ProviderId.OPENAI -> OPENAI
         ProviderId.OPENROUTER -> OPENROUTER
         ProviderId.FUEL -> FUEL
+        ProviderId.GEMINI -> GEMINI
     }
 }
 
@@ -83,7 +88,7 @@ private fun ByteArray.base64() = Base64.encode(this)
  */
 fun anthropicBody(prompt: CoachPrompt, model: String, structured: Boolean): JsonObject = buildJsonObject {
     put("model", model)
-    put("max_tokens", CoachModels.MAX_TOKENS)
+    put("max_tokens", prompt.outputMaxTokens)
     putJsonArray("system") {
         add(buildJsonObject {
             put("type", "text"); put("text", prompt.staticSystem)
@@ -111,7 +116,7 @@ fun anthropicBody(prompt: CoachPrompt, model: String, structured: Boolean): Json
     val effort = SUPPORTS_EFFORT.containsMatchIn(model)
     if (structured || effort) putJsonObject("output_config") {
         if (effort) put("effort", "medium")
-        if (structured) putJsonObject("format") { put("type", "json_schema"); put("schema", CoachSchema.schema) }
+        if (structured) putJsonObject("format") { put("type", "json_schema"); put("schema", prompt.outputSchema) }
     }
 }
 
@@ -132,6 +137,8 @@ fun anthropicReply(body: JsonObject, raw: String): CoachReply {
 private fun statusError(status: Int, body: String): CoachException = CoachException(
     when {
         status == 401 || status == 403 -> CoachErrorKind.AUTH
+        // Gemini: invalid key is a 400.
+        status == 400 && ("API_KEY_INVALID" in body || "API key not valid" in body) -> CoachErrorKind.AUTH
         status == 402 -> CoachErrorKind.NO_FUEL
         status == 408 -> CoachErrorKind.TIMEOUT
         status == 429 -> CoachErrorKind.RATE_LIMIT
@@ -197,7 +204,11 @@ open class ChatCompletionsCoach(
 
     fun body(prompt: CoachPrompt, model: String, structured: Boolean): JsonObject = buildJsonObject {
         put("model", model)
-        if (providerId == ProviderId.OPENAI) put("max_completion_tokens", CoachModels.MAX_TOKENS) else put("max_tokens", CoachModels.MAX_TOKENS)
+        when (providerId) {
+            ProviderId.OPENAI -> put("max_completion_tokens", prompt.outputMaxTokens)
+            ProviderId.GEMINI -> put("max_tokens", maxOf(prompt.outputMaxTokens, CoachModels.GEMINI_MAX_TOKENS))
+            else -> put("max_tokens", prompt.outputMaxTokens)
+        }
         putJsonArray("messages") {
             add(buildJsonObject {
                 put("role", "system")
@@ -225,7 +236,7 @@ open class ChatCompletionsCoach(
         }
         if (structured) putJsonObject("response_format") {
             put("type", "json_schema")
-            putJsonObject("json_schema") { put("name", CoachSchema.NAME); put("strict", true); put("schema", CoachSchema.schema) }
+            putJsonObject("json_schema") { put("name", prompt.outputSchemaName); put("strict", true); put("schema", prompt.outputSchema) }
         }
     }
 
@@ -263,6 +274,13 @@ class OpenAiCoach(http: HttpClient, apiKey: () -> String?) :
 
 class OpenRouterCoach(http: HttpClient, apiKey: () -> String?) :
     ChatCompletionsCoach(http, apiKey, ProviderId.OPENROUTER, "https://openrouter.ai/api/v1/chat/completions")
+
+/**
+ * Gemini with the user's Google AI Studio key through the OpenAI-compatible endpoint: same body as OpenAI (images as
+ * data URLs, structured output via `response_format` json_schema), key as Bearer token.
+ */
+class GeminiCoach(http: HttpClient, apiKey: () -> String?) :
+    ChatCompletionsCoach(http, apiKey, ProviderId.GEMINI, "${app.overfit.ai.GEMINI_OPENAI_BASE}/chat/completions")
 
 /** Fuel: the Anthropic body through our backend, which reports cost and the new balance. */
 class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
