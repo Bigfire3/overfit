@@ -4,6 +4,9 @@ on:
   push:
     branches: [main, 'claude/**', 'ccr-*']
     tags: ['v*']
+  # Beiträge aus Forks (Open Source): nur Tests und iOS-Kompilierung, ohne Signatur-Secrets.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,6 +14,8 @@ permissions:
 
 jobs:
   build:
+    # Interne PRs laufen schon über den Push auf den Branch; pull_request nur für Forks.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:
@@ -45,6 +50,7 @@ jobs:
         run: ./gradlew :shared:compileKotlinIosSimulatorArm64 --console=plain
 
       - name: Signaturschlüssel aus Secrets
+        if: github.event_name != 'pull_request'
         env:
           KEYSTORE_BASE64: ${{ secrets.OVERFIT_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.OVERFIT_KEYSTORE_PASSWORD }}
@@ -57,6 +63,7 @@ jobs:
           echo "OVERFIT_KEYSTORE_FILE=$RUNNER_TEMP/overfit-release.p12" >> "$GITHUB_ENV"
 
       - name: Signiertes Release-APK und App Bundle (Google Play)
+        if: github.event_name != 'pull_request'
         env:
           OVERFIT_KEYSTORE_PASSWORD: ${{ secrets.OVERFIT_KEYSTORE_PASSWORD }}
           # Fuel/Spot backend URL (Repository-Variable, optional; leer = "startet bald" in der App)
@@ -64,6 +71,7 @@ jobs:
         run: ./gradlew :app:assembleRelease :app:bundleRelease --console=plain
 
       - name: APK vorbereiten
+        if: github.event_name != 'pull_request'
         id: apk
         run: |
           rm -f "$RUNNER_TEMP/overfit-release.p12"

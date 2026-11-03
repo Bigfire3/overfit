@@ -44,6 +44,15 @@ Erledigt:
 6. Vorlage mit dieser eigenen Übung teilen → auf zweitem Gerät (oder nach Löschen der Übung) importieren → die Übung
    kommt mit Muskeln, Equipment, Erfassungsart, Pause und Notiz an; nochmal importieren → keine zweite gleichnamige Übung.
 
+## Session L: Workout minimieren (3.11.)
+Erledigt: Minimieren-Knopf im Workout (Pfeil runter) und System-Zurück minimieren; Leiste über der Tab-Leiste mit Training, Übung/Satz, Zeit oder Pausen-Countdown (tabellarische Ziffern); Tipp/Wischen öffnet; Start-Tab zeigt bei laufendem Training „Zum laufenden Training“ / „Laufendes beenden“; Tipp auf Benachrichtigung öffnet das maximierte Training. Tests: `MinimizeWorkoutTest`, `DayWithOverfitTest` (Minimier-Schritt).
+**Bitte auf dem Handy testen:**
+1. Training starten, Satz abhaken (Pause läuft) → Pfeil oben links tippen → Start-Tab: unten über den Tabs die Leiste mit Countdown
+2. Durch Verlauf, Übungen (Katalog, Vorlagen), Fotos, Profil tippen: Leiste bleibt; Pausenende vibriert wie bisher
+3. Leiste antippen und noch einmal minimieren, dann nach oben wischen → Training offen. System-Zurück-Geste im Training → minimiert, Training läuft weiter
+4. Pause beenden: Leiste zeigt Übung und Satz statt Countdown. Start-Tab: „Laufendes beenden“ zweimal tippen → Beenden-Flow
+5. Minimiert in anderen Tab, Bildschirm sperren, Benachrichtigung tippen → maximiertes Training. App aus den letzten Apps wischen und neu öffnen → Training maximiert
+
 ## Morgen-Testliste für Fabian (3.11.)
 Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Fuel/Spot); die Demo in 36–38 braucht keinen Server.
 Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).
