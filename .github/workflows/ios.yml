@@ -39,6 +39,7 @@ jobs:
           # Fuel/Spot backend URL (Repository-Variable, optional)
           OVERFIT_BACKEND_URL: ${{ vars.OVERFIT_BACKEND_URL }}
         run: |
+          set -o pipefail
           xcodebuild -project iosApp/Overfit.xcodeproj -scheme Overfit -configuration Debug \
             -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO OVERFIT_BACKEND_URL="$OVERFIT_BACKEND_URL" build | tail -n 60
 

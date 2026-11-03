@@ -45,22 +45,34 @@ class OverfitUITestCase: XCTestCase {
 
     func exists(_ label: String) -> Bool { elements(label).firstMatch.exists }
 
+    /** Element labelled exactly [label], else one whose label starts with it (merged rows, mini bar). */
+    func find(_ label: String) -> XCUIElement {
+        let exact = elements(label).firstMatch
+        if exact.exists { return exact }
+        return app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch
+    }
+
     /** Taps the element labelled [label]; scrolls up to four screens down if it is not visible. */
     func tap(_ label: String, file: StaticString = #filePath, line: UInt = #line) {
+        _ = elements(label).firstMatch.waitForExistence(timeout: 3)
         for _ in 0..<4 {
-            let e = elements(label).firstMatch
-            if e.waitForExistence(timeout: 3) && e.isHittable { e.tap(); return }
+            let e = find(label)
+            if e.exists && e.isHittable { e.tap(); return }
             app.swipeUp()
+            sleep(1)
         }
         waitFor(label, timeout: 5, file: file, line: line).tap()
     }
 
-    /** Taps the bottom-most element with this label (tab bar entries share labels with titles). */
-    func tab(_ label: String) {
-        waitFor(label)
-        let all = elements(label).allElementsBoundByIndex.filter { $0.exists && $0.isHittable }
-        guard let bottom = all.max(by: { $0.frame.midY < $1.frame.midY }) else { XCTFail("Tab \(label)"); return }
-        bottom.tap()
+    /** Taps a tab bar entry by its test tag (`tab:START`, `tab:HISTORY`, `tab:COACH`, `tab:PHOTOS`, `tab:PROFILE`). */
+    func tab(_ id: String, file: StaticString = #filePath, line: UInt = #line) {
+        let button = app.buttons["tab:\(id)"]
+        for _ in 0..<3 where !button.waitForExistence(timeout: 5) {
+            // Tab bar hidden on a pushed screen: go back first.
+            if exists("Zurück") { elements("Zurück").firstMatch.tap() }
+        }
+        guard button.exists else { failShot("tab-\(id)"); XCTFail("Tab \(id) fehlt", file: file, line: line); return }
+        button.tap()
     }
 
     // MARK: Screenshots
@@ -107,14 +119,11 @@ final class ScreenshotTests: OverfitUITestCase {
         waitFor("Später einrichten")
         shot("00c-onboarding-ki")
         tap("Später einrichten")
-        waitFor("Beispiel-Workouts hinzufügen")
+        waitFor("Push") // sample workouts are there on first start
     }
 
     private func screens(_ theme: String) {
         launch(theme: theme)
-        waitFor("Beispiel-Workouts hinzufügen")
-        shot("01-training-leer")
-        tap("Beispiel-Workouts hinzufügen")
         waitFor("Legs")
         shot("02-training")
 
@@ -146,14 +155,14 @@ final class ScreenshotTests: OverfitUITestCase {
         tap("Speichern")
         waitFor("Duo · bald")
 
-        tab("Verlauf")
+        tab("HISTORY")
         waitFor("Push")
         shot("09-verlauf")
         elements("Push").firstMatch.tap()
         waitFor("Teilen")
         shot("10-verlauf-detail")
         tap("Zurück")
-        tab("Coach")
+        tab("COACH")
         sleep(1)
         shot("10b-coach")
         tap("Neuer Chat")
@@ -162,12 +171,12 @@ final class ScreenshotTests: OverfitUITestCase {
         app.typeText("Wie trainiere ich morgen?")
         shot("10c-coach-chat-tastatur")
         tap("Zurück")
-        tab("Fotos")
+        tab("PHOTOS")
         waitFor("Foto-Tagebuch")
         shot("11-fotos")
-        tab("Profil")
+        tab("PROFILE")
         shot("12-profil")
-        tab("Training")
+        tab("START")
         tap("Übungen")
         waitFor("Eigene Übung")
         shot("13-uebungskatalog")
@@ -189,7 +198,6 @@ final class ScreenshotTests: OverfitUITestCase {
 final class SmokeTests: OverfitUITestCase {
     func testWorkoutFlow() {
         launch(theme: "light")
-        tap("Beispiel-Workouts hinzufügen")
         waitFor("Push").tap()
         tap("Starten")
         waitFor("Satz 1 abhaken").tap()
@@ -202,14 +210,13 @@ final class SmokeTests: OverfitUITestCase {
         tap("Beenden? Nochmal tippen")
         waitFor("Training beendet")
         tap("Speichern")
-        tab("Verlauf")
+        tab("HISTORY")
         waitFor("Push")
     }
 
     /** iOS edge swipe = Android back: minimizes the workout, then leaves a pushed screen. */
     func testEdgeSwipeBack() {
         launch(theme: "light")
-        tap("Beispiel-Workouts hinzufügen")
         waitFor("Push").tap()
         tap("Starten")
         waitFor("Nächsten Satz loggen")
@@ -230,7 +237,6 @@ final class SmokeTests: OverfitUITestCase {
     /** The running workout survives the app being killed. */
     func testWorkoutSurvivesRelaunch() {
         launch(theme: "light")
-        tap("Beispiel-Workouts hinzufügen")
         waitFor("Push").tap()
         tap("Starten")
         waitFor("Satz 1 abhaken").tap()
