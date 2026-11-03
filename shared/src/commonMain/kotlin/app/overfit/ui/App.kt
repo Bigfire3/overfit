@@ -186,7 +186,7 @@ class AppDependencies(
     val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     /** Main-thread scope that lives as long as the app (workout state, rest timer). */
     workoutScope: CoroutineScope = MainScope(),
-    /** Fuel/Spot backend (URL from the build, developer override); defaults to "not configured". */
+    /** credit/invite backend (URL from the build, developer override); defaults to "not configured". */
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
     /** Small key-value storage for the chat sync state (not secret). */
     kv: KeyValueStore = InMemoryKeyValueStore(),
@@ -414,7 +414,7 @@ fun OverfitApp(deps: AppDependencies) {
             }
             // Links, files and scans from outside open the import screen (not during onboarding).
             LaunchedEffect(incoming, state.onboardingDone) {
-                // A Spot link (QR scanned with the camera app) goes to "I was spotted", not to the training import.
+                // An invite link (QR scanned with the camera app) goes to "redeem invite", not to the training import.
                 val spot = incoming
                 // Back from the web purchase page (overfit://guthaben): credit screen, which reloads the balance.
                 if (spot != null && state.onboardingDone && app.overfit.fuel.isCreditReturnLink(spot)) {

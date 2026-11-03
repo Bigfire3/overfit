@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-/** Wire models of the Fuel/Spot backend (docs/backend-api.md). All amounts are integer µ€. */
+/** Wire models of the credit/invite backend (docs/backend-api.md). All amounts are integer µ€. */
 @Serializable
 data class ExpiringItem(val amountMicro: Long, val expiresAt: Long)
 

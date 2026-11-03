@@ -1,7 +1,7 @@
 -- Guthaben im Web kaufen (Merchant of Record, zunächst Testmodus/Sandbox) und Guthaben-Codes.
 -- Beträge in Mikro-Euro. Keine Namen, keine E-Mail-Adressen: die Zahlungsdaten bleiben beim Anbieter.
 
--- Quelle einer Buchung: NULL = wie bisher (Store/Spot/Verbrauch), 'web' = Web-Kauf, 'code' = eingelöster Guthaben-Code.
+-- Quelle einer Buchung: NULL = wie bisher (Store/Einladung/Verbrauch), 'web' = Web-Kauf, 'code' = eingelöster Guthaben-Code.
 ALTER TABLE ledger ADD COLUMN source TEXT;
 
 -- Kauflinks aus der App: kurzlebig (15 min), nur der Hash des Tokens liegt hier.

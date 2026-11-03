@@ -20,7 +20,7 @@ function mockAnthropic() {
   );
 }
 
-describe('Spot', () => {
+describe('Einladungen (spot)', () => {
   it('Einlösen: 1 € Startguthaben und Name des Einladenden; Gutschrift erst nach der ersten Coach-Anfrage', async () => {
     mockAnthropic();
     const inviter = await Client.create();
@@ -102,7 +102,7 @@ describe('Spot', () => {
     expect(r.status).toBe(429);
     expect(r.body.error.code).toBe('spot_inviter_limit');
 
-    const e2 = baseEnv({ SPOT_GLOBAL_MONTHLY_BUDGET_MICRO: '2000000' }); // = ein Spot (1 € + 1 € Belohnung)
+    const e2 = baseEnv({ SPOT_GLOBAL_MONTHLY_BUDGET_MICRO: '2000000' }); // = eine Einladung (1 € + 1 € Belohnung)
     const i2 = await Client.create(e2);
     const i3 = await Client.create(e2);
     // Zähler stammt aus dem vorigen Teil (2 Einlösungen im Monat) → Budget bereits erschöpft

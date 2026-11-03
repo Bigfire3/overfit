@@ -8,7 +8,7 @@ Marke: **overfit – personal training for everyone** (siehe DECISIONS.md). Stan
 - Texte versprechen „kein Abo nötig“, nie „nie ein Abo“.
 
 ## Guthaben (heute)
-- Coach-Guthaben in Euro („Guthaben“, EN „Credit“; früher „Fuel“). Kauf **in der App** über Google Play Billing bzw. Apple In-App-Kauf, oder im Web über Paddle. **Guthaben = Kaufpreis, 1:1 in jedem Kanal** (Fabians Entscheidung „1:1 mit höherer Marge“): 10 € bezahlt sind 10 € Guthaben. USt, Zahlungs-/Store-Gebühr, Spot-Gutschriften und Betrieb trägt allein der **Aufschlag auf die Modellpreise** (`MARKUP_BP`), siehe „Rechnung“. Die Store-Produkt-IDs `overfit.fuel.5` / `.10` bleiben (bei den Stores registriert, nicht sichtbar).
+- Coach-Guthaben in Euro („Guthaben“, EN „Credit“; früher „Fuel“). Kauf **in der App** über Google Play Billing bzw. Apple In-App-Kauf, oder im Web über Paddle. **Guthaben = Kaufpreis, 1:1 in jedem Kanal** (Fabians Entscheidung „1:1 mit höherer Marge“): 10 € bezahlt sind 10 € Guthaben. USt, Zahlungs-/Store-Gebühr, Einladungsboni und Betrieb trägt allein der **Aufschlag auf die Modellpreise** (`MARKUP_BP`), siehe „Rechnung“. Die Store-Produkt-IDs `overfit.fuel.5` / `.10` bleiben (bei den Stores registriert, nicht sichtbar).
 - Apple verlangt, dass es das Guthaben **parallel als In-App-Kauf** gibt, sobald die App auf externe Kaufwege verweist.
 
 ### Modelle und Preise (Session Y: echte Namen, keine Stufen; Session AA: Aufschlag 69 %)
@@ -33,11 +33,11 @@ Ziel: Jeder Kauf ist **auch bei vollständig verbrauchtem Guthaben mindestens ko
 - USt **19 % (DE)** als Basis. Andere EU-Sätze (17–27 %) weichen ab; bei 25 % bliebe im Store-Kanal rund 3 % Gewinn, bei 27 % rund 1,6 %, also weiter kein Verlust. Beide Kanäle verkaufen zum Endpreis inkl. USt.
 - **Paddle:** 5 % + 0,50 € je Transaktion, gerechnet auf den Bruttopreis (konservativ; die Preisseite nennt „5 % + 50¢ pro Checkout-Transaktion“ und sagt nichts zur Steuerbasis; für Produkte unter 10 $ bietet Paddle individuelle Preise an, noch nicht angefragt). Geprüft am 3.11.2026 auf paddle.com/pricing. Paddle führt die USt ab (Merchant of Record).
 - **Stores:** Small-Business-Gebühr **15 % auf den Preis ohne USt** (Apple und Google rechnen die Provision auf den Nettopreis; die Stores führen die USt ab). Bisher stand in der Rechnung ein Brutto-Ansatz ohne USt-Abzug, das war falsch.
-- **Spot-Gutschriften (je 1 €) und Test-Startguthaben sind reine Kosten** (Guthaben ohne Einnahme). Annahme: **10 % vom Netto** jedes Kaufs als Rücklage dafür. Das deckt z. B. 1 Starter-/Spot-Euro je 10 verkaufte Euro; real begrenzt `SPOT_GLOBAL_MONTHLY_BUDGET_MICRO` (50 €/Monat) die Summe zusätzlich nach oben.
+- **Einladungsboni (je 1 €) und Test-Startguthaben sind reine Kosten** (Guthaben ohne Einnahme). Annahme: **10 % vom Netto** jedes Kaufs als Rücklage dafür. Das deckt z. B. 1 Starter-/Einladungs-Euro je 10 verkaufte Euro; real begrenzt `SPOT_GLOBAL_MONTHLY_BUDGET_MICRO` (50 €/Monat) die Summe zusätzlich nach oben.
 - Guthaben wird vollständig zum Listenpreis × (1 + Aufschlag) verbraucht, also Anbieterkosten = Guthaben ÷ (1 + Aufschlag). Das ist der ungünstigste Fall (ungenutztes Guthaben ist Gewinn). Wechselkurs 0,92 €/$; Schwankungen und Rückbuchungen fängt der Gewinn auf.
 - **Zielgewinn 7 % vom Netto** (Spanne 5–10 %). Bescheiden, weil die App keine Werbung und kein Abo hat; groß genug, um Betrieb (Cloudflare, klein), Rückbuchungen und Kursschwankungen abzufedern. Untergrenze 5 % ist im Test festgeschrieben.
 
-**Formel:** Netto = Preis − USt − Gebühr. Es muss gelten: Preis ÷ (1 + Aufschlag) = Netto × (1 − 10 % Spot − 7 % Gewinn). Daraus Aufschlag = Preis ÷ (Netto × 0,83) − 1.
+**Formel:** Netto = Preis − USt − Gebühr. Es muss gelten: Preis ÷ (1 + Aufschlag) = Netto × (1 − 10 % Einladungsboni − 7 % Gewinn). Daraus Aufschlag = Preis ÷ (Netto × 0,83) − 1.
 
 | Kanal / Paket | Netto-Anteil vom Preis | nötiger Aufschlag (7 % Gewinn) |
 |---|---|---|
@@ -53,7 +53,7 @@ Der **Store ist der ungünstigste angebotene Kanal** (15 % Gebühr zusätzlich z
 
 **Ergebnis je Kauf bei Aufschlag 69 %, Guthaben voll verbraucht:**
 
-| Kanal | Preis | USt | Gebühr | Netto | Anbieterkosten (Preis ÷ 1,69) | Spot-Rücklage (10 % Netto) | Gewinn | % vom Netto | % vom Preis |
+| Kanal | Preis | USt | Gebühr | Netto | Anbieterkosten (Preis ÷ 1,69) | Rücklage Einladungsboni (10 % Netto) | Gewinn | % vom Netto | % vom Preis |
 |---|---|---|---|---|---|---|---|---|---|
 | Web | 10 € | 1,60 € | 1,00 € | 7,40 € | 5,92 € | 0,74 € | **0,75 €** | 10,1 % | 7,5 % |
 | Web | 20 € | 3,19 € | 1,50 € | 15,31 € | 11,83 € | 1,53 € | **1,94 €** | 12,7 % | 9,7 % |
@@ -65,10 +65,10 @@ Der **Store ist der ungünstigste angebotene Kanal** (15 % Gebühr zusätzlich z
 Kein Kanal macht Verlust. Der Test `backend/test/pricing.test.ts` rechnet diese Tabelle mit den Konstanten nach und schlägt fehl, wenn ein Paket oder der Aufschlag so geändert wird, dass der Gewinn unter 5 % vom Netto fällt.
 
 ### Aufschlag (offen, Transparenz)
-- **69 % Aufschlag** auf den Listenpreis der Anbieter, auf jede Anfrage, für **alle** Modelle gleich. Wofür: **Umsatzsteuer** (rund 16 % des Preises), **Zahlungs- bzw. Store-Gebühr** (im Web 1,00–3,00 €, im Store 15 % vom Netto), **Gutschriften** für Startguthaben und Einladungen (Spot), **Betrieb** und ein kleiner **Gewinn** (7–10 % vom Netto).
+- **69 % Aufschlag** auf den Listenpreis der Anbieter, auf jede Anfrage, für **alle** Modelle gleich. Wofür: **Umsatzsteuer** (rund 16 % des Preises), **Zahlungs- bzw. Store-Gebühr** (im Web 1,00–3,00 €, im Store 15 % vom Netto), **Gutschriften** für Startguthaben und Einladungen (Empfehlungsprogramm), **Betrieb** und ein kleiner **Gewinn** (7–10 % vom Netto).
 - Das Guthaben selbst bleibt 1:1; es gibt keinen versteckten Abzug beim Kauf. Wer 10 € kauft, hat 10 € Guthaben und sieht bei jeder Antwort, was sie gekostet hat.
 - Die App sagt das unter „Guthaben“ in einem kurzen Satz und verlinkt „Wie setzen sich die Preise zusammen?“ auf `https://bigfire3.github.io/overfit/preise/` (DE+EN, Beispielrechnung, ohne Werbesprache).
-- **Verfall:** Startguthaben (Spot) verfällt nach 180 Tagen, gekauftes Guthaben nie.
+- **Verfall:** Startguthaben (Einladungsbonus) verfällt nach 180 Tagen, gekauftes Guthaben nie.
 - **Ausweichung:** Antwortet ein anderes Modell als das gewählte, zahlt der Nutzer höchstens den Preis des gewählten; ist das Ersatzmodell teurer, trägt die Marge die Differenz (sie kann dann negativ sein). Die App sagt dem Nutzer, welches Modell geantwortet hat.
 - **Auswertung für den Betreiber:** `GET /v1/admin/usage` (docs/backend-api.md) zeigt je Modell Anbieterkosten, Berechnetes und Marge, ohne Inhalte.
 - Preise pflegt der Betreiber in `backend/src/providers.ts`, den Aufschlag in `backend/wrangler.jsonc` (`MARKUP_BP`).

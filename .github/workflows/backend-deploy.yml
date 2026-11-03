@@ -1,6 +1,6 @@
 name: Backend deployen
 
-# Deploy-Knopf für das Cloudflare-Backend (Guthaben, Spot, KI-Chat): Actions → „Backend deployen“ → Run workflow.
+# Deploy-Knopf für das Cloudflare-Backend (Guthaben, Einladungen, KI-Chat): Actions → „Backend deployen“ → Run workflow.
 # Anleitung im Browser: backend/README.md → „Deployment ohne Terminal“.
 # Alles ist idempotent: D1-Datenbank, R2-Bucket und AI Gateway werden nur angelegt, wenn sie fehlen; Migrationen laufen nur, wenn neu.
 
@@ -335,7 +335,7 @@ jobs:
               echo "**Testbetrieb:** keine Geräteprüfung, neue Konten bekommen 1 € Test-Guthaben, niedrige Limits, die App zeigt „Testserver“ unter Guthaben. Mehr Test-Guthaben: diesen Workflow mit \`credit_eur\` starten."
               echo "Für den echten Betrieb später mit \`mode = production\` deployen (eigener Worker und eigene Datenbank, die Adresse ändert sich dann)."
             else
-              echo "**Produktion:** Käufe und Spot-Geräteprüfung brauchen die Store-Prüfer (Play/Apple), solange sind Käufe und Spot hier abgeschaltet (siehe backend/README.md)."
+              echo "**Produktion:** Käufe und die Geräteprüfung für Einladungen brauchen die Store-Prüfer (Play/Apple), solange sind Käufe und Einladungen hier abgeschaltet (siehe backend/README.md)."
             fi
             echo
             echo "Beim nächsten Mal dauert dieser Lauf kürzer: Datenbank und Bucket sind da, nur Migrationen und Code werden aktualisiert."

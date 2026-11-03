@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Where the Fuel/Spot backend lives. The URL is baked in at build time (CI variable `OVERFIT_BACKEND_URL`, empty = not
+ * Where the credit/invite backend lives. The URL is baked in at build time (CI variable `OVERFIT_BACKEND_URL`, empty = not
  * configured) and can be overridden by a hidden developer setting (tap the version in "About" seven times).
  */
 class FuelAccess(
@@ -16,7 +16,7 @@ class FuelAccess(
 ) {
     private val _override = MutableStateFlow(kv.get(OVERRIDE_KEY).orEmpty())
 
-    /** The URL the app currently uses; empty = Fuel/Spot not available yet. */
+    /** The URL the app currently uses; empty = credit/invite not available yet. */
     val url: StateFlow<String> get() = _urlFlow
     private val _urlFlow = MutableStateFlow(resolve())
     val overrideUrl: StateFlow<String> = _override.asStateFlow()

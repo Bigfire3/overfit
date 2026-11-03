@@ -3,7 +3,7 @@ package app.overfit.fuel
 import kotlinx.serialization.json.JsonNull
 
 /**
- * Local stand-in for the backend: no network, no real data. Powers "Demo ansehen" so every Fuel/Spot screen
+ * Local stand-in for the backend: no network, no real data. Powers "Demo ansehen" so every credit/invite screen
  * can be tried before the server exists. Nothing here touches the real account.
  */
 class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : FuelService {

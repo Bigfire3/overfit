@@ -33,7 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Profile → Fuel → "Demo ansehen" → balance, Spot invite (QR), redeem → reveal. No server, no real data. */
+/** Profile → Fuel → "Demo ansehen" → balance, invite (QR), redeem → reveal. No server, no real data. */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class FuelDemoTest {
@@ -81,16 +81,16 @@ class FuelDemoTest {
         assertTrue(!shown("Standard", substring = true) && !shown("Lite", substring = true))
         compose.onNodeWithContentDescription("Zurück").performClick()
 
-        // Spot invite shows a rotating code
-        compose.onNodeWithText("Freund spotten").performScrollTo().performClick()
+        // invite screen shows a rotating code
+        compose.onNodeWithText("Freunde einladen").performScrollTo().performClick()
         compose.waitUntil(5_000) { shown("Neuer Code in", substring = true) }
         compose.onNodeWithContentDescription("Zurück").performClick()
 
         // Redeem (paste) → reveal
-        compose.onNodeWithText("Ich wurde gespottet").performScrollTo().performClick()
-        compose.onNodeWithText("Link oder Code").performTextInput("overfit://spot#demo-spot-token-1")
+        compose.onNodeWithText("Einladung einlösen").performScrollTo().performClick()
+        compose.onNodeWithText("Link oder Code").performTextInput("overfit://invite#demo-spot-token-1")
         compose.onNodeWithText("Einlösen").performClick()
-        compose.waitUntil(10_000) { shown("Spot von Fabian") }
+        compose.waitUntil(10_000) { shown("Einladung von Fabian") }
         assertTrue(HapticPattern.Reveal in haptics.played)
     }
 }

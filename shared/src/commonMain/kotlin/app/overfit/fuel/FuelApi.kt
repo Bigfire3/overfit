@@ -30,7 +30,7 @@ import kotlin.random.Random
 import kotlin.time.Clock
 
 /**
- * Client of the Fuel/Spot backend (docs/backend-api.md). Signs every request with the device key.
+ * Client of the credit/invite backend (docs/backend-api.md). Signs every request with the device key.
  * Recovers on its own from `unknown_device` (registers, then retries once) and from clock skew
  * (`timestamp_out_of_range` carries the server time).
  */

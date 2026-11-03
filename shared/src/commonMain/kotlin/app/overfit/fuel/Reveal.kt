@@ -5,7 +5,7 @@ import kotlin.math.pow
 enum class RevealPhase { Black, Counting, Done }
 
 /**
- * Timeline of the Spot reveal: screen goes black and the heartbeat pulses play ([blackMs]), then the number counts up from
+ * Timeline of the invite reveal: screen goes black and the heartbeat pulses play ([blackMs]), then the number counts up from
  * 0,00 to [targetMicro] over [countMs] (ease-out, so the last cents arrive slowly), then a strong pulse. Pure logic, no clock.
  */
 class RevealPlan(val targetMicro: Long, val blackMs: Long = 1_100, val countMs: Long = 2_400) {

@@ -62,7 +62,7 @@ private class PrivacyKey : DeviceKey {
 }
 
 /**
- * Guarantee: with an own API key and without switching on Fuel, Spot, the AI chat connection or a short-code QR,
+ * Guarantee: with an own API key and without switching on credit, invites, the AI chat connection or a short-code QR,
  * the app makes **zero** requests to the overfit backend. A backend URL is configured on purpose and every request
  * of every HttpClient (backend and providers) goes through one counting engine.
  */
