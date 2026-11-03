@@ -167,4 +167,33 @@ class MigrationTest {
     private companion object {
         const val TEST_DB = "migration-test"
     }
+
+    @Test
+    fun migration3to4KeepsPhotosAndAddsEmptyCoachTables() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v3 = helper.createDatabase(3)
+        v3.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1, 2, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 3)",
+        )
+        v3.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p1', 'w1', 'p1.jpg', 2, 0)")
+        v3.close()
+
+        // Validates the migrated schema against schemas/.../4.json.
+        val v4 = helper.runMigrationsAndValidate(4, OverfitDatabase.MIGRATIONS.toList())
+        try {
+            assertEquals(1L, v4.count("workout_session"))
+            assertEquals(1L, v4.count("workout_photo"))
+            assertEquals("coach_review exists and is empty", 0L, v4.count("coach_review"))
+            assertEquals("coach_memory exists and is empty", 0L, v4.count("coach_memory"))
+        } finally {
+            v4.close()
+        }
+    }
 }

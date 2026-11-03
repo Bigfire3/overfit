@@ -39,6 +39,8 @@ fun StartScreen(
     onNewTemplate: () -> Unit,
     share: ShareDependencies,
     onDuo: () -> Unit,
+    coachTips: List<String> = emptyList(),
+    onCoach: () -> Unit = {},
     chatInboxCount: Int = 0,
     chatInboxFull: Boolean = false,
     onChatInbox: () -> Unit = {},
@@ -81,7 +83,9 @@ fun StartScreen(
         templates?.forEach { TemplateRow(it) { onOpenTemplate(it.id) } }
         if (templates != null) ListRow(t.newTemplate, onClick = onNewTemplate) { LineIcon(Icon.Plus) }
         SectionTitle(t.coachTips)
-        Text(t.coachTipsEmpty, tone = Tone.Muted)
+        if (coachTips.isEmpty()) Text(t.coachTipsEmpty, tone = Tone.Muted)
+        coachTips.forEach { Text("– $it", Modifier.padding(vertical = Space.xs)) }
+        ListRow(t.coach, onClick = onCoach)
         Spacer(Modifier.height(Space.xl))
         Hairline()
         ListRow(t.share.duoSoon, onClick = onDuo, tone = Tone.Muted)

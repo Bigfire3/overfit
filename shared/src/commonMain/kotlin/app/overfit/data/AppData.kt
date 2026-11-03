@@ -1,5 +1,6 @@
 package app.overfit.data
 
+import app.overfit.coach.CoachSettingsStore
 import app.overfit.data.catalog.CatalogSeeder
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.data.db.transaction
@@ -31,6 +32,7 @@ class AppData(
     val importer = TemplateImporter(exercises, templates, readSample)
     val catalog = CatalogSeeder(database, kv, readCatalog)
     val offlineImages = OfflineImages(scope, exercises)
+    val coachSettings = CoachSettingsStore(kv)
 
     /**
      * Emits whenever any training data changes (workouts, sets, photos, templates, exercises),
@@ -47,10 +49,13 @@ class AppData(
     /** "Delete all data": workouts, templates and custom exercises go, the catalogue is loaded again. */
     suspend fun resetAll() {
         database.transaction {
+            database.coachDao().deleteAll()
+            database.coachDao().deleteMemory()
             database.workoutDao().deleteAll()
             database.templateDao().deleteAll()
             database.exerciseDao().deleteAll()
         }
+        coachSettings.reset()
         workouts.photoFiles.list().forEach { workouts.photoFiles.delete(it) }
         kv.remove(CatalogSeeder.KEY_VERSION)
         seedCatalog()

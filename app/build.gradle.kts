@@ -90,6 +90,7 @@ dependencies {
     testImplementation(libs.sqlite.framework)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.kotlinx.serialization.json)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(platform(libs.androidx.compose.bom))

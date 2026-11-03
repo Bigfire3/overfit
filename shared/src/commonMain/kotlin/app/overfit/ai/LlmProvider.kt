@@ -119,7 +119,7 @@ class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
         (service() ?: throw FuelException("not_configured", 503)).messages(bodyJson)
 }
 
-class Providers(http: HttpClient, fuelService: () -> FuelService? = { null }) {
+class Providers(val http: HttpClient, fuelService: () -> FuelService? = { null }) {
     /** Providers that need the user's own key. */
     val all: List<LlmProvider> = listOf(OpenRouterProvider(http), AnthropicProvider(http), OpenAiProvider(http))
     val fuel = FuelProvider(fuelService)

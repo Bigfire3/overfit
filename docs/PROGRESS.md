@@ -6,8 +6,8 @@
 | 0b | Kotlin Multiplatform, Schwarz-Weiß-Design, DE/EN, Onboarding, eigener API-Key, iOS-Hülle | erledigt |
 | 1 | Übungskatalog, eigene Übungen, Vorlagen | erledigt |
 | 2 | Workout-Modus, Pausentimer | erledigt |
+| 4 | KI-Coach | erledigt (Session G): Auswertung, Plan-Diff, Gedächtnis, Fortschritt, Warteschlange, Demo |
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
-| 4 | KI-Coach | offen |
 | 5 | Feinschliff | offen |
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
@@ -57,6 +57,48 @@ Mit Backend (nach Deployment):
 7. Ein Training beenden → nach wenigen Sekunden sieht der Chat es („Wie war mein letztes Training?“). Flugmodus an, Satz abhaken, Flugmodus aus, App öffnen → Hinweis verschwindet, Daten kommen an
 8. **Trennen** einer Verbindung; **KI-Chat trennen** (zweimal tippen) → Server leer, Chat hat keinen Zugriff mehr
 
+## Phase 4: KI-Coach (Session G, Nacht 3.11.)
+Fertig:
+- Coach-Auswertung eines beendeten Trainings: Bewertung 1–10, Zusammenfassung, Gut / Besser machen / Tipps, Foto-Feedback
+  (nur mit Einwilligung), **Plan fürs nächste Mal als Diff** („Bench Press: 3 × 8 · 60 kg → 3 × 8 · 62,5 kg“, Neu, Entfällt,
+  Pause) mit Alle annehmen / einzeln / Ablehnen → Vorlage wird angepasst; freies Training → „Als Vorlage speichern“
+- „Fortschritt bewerten“: Einschätzung der letzten 8 Wochen inkl. Verlauf der Hauptübungen (e1RM)
+- Anbieter: eigener Key (Anthropic direkt, OpenAI, OpenRouter) und Fuel (Kosten + Saldo unter der Auswertung);
+  Structured Outputs, robuster Parser, Prompt-Caching, Antwortsprache = App-Sprache
+- Warteschlange: ohne Netz/Timeout/Überlastung wartet die Anfrage und geht beim nächsten Öffnen der App automatisch raus;
+  sonst Fehlertext mit „Erneut versuchen“ (Rohantwort einsehbar)
+- Coach-Gedächtnis: lesen, bearbeiten, Versionen wiederherstellen, löschen; der Coach überarbeitet es nach jeder Auswertung
+- Coach-Einstellungen: Modell je Anbieter, „Körperfotos an Coach senden“ (Standard aus), Coach-Anweisungen editierbar;
+  erreichbar über Profil → KI-Coach (Seite der fünf Wege) und Profil → Coach
+- Coach-Gedächtnis geht bei verbundener KI-Chat-Verbindung als `memory/coach` mit (Sync nach jeder Änderung)
+- Ohne KI-Zugang: Hinweis mit „KI verbinden“ / „Fuel nutzen“ und eine als Demo markierte Beispiel-Auswertung
+- Einstieg: am Ende des Beenden-Flows „An Coach senden: Senden / Später“ (Senden beim Speichern), Verlauf → Training →
+  „Coach-Auswertung“, Start: „Letzte Coach-Tipps“ + Zeile „Coach“, Profil → Coach
+- Backup enthält Coach-Gedächtnis (alle Versionen), Auswertungen und Coach-Einstellungen (keine Keys)
+- Room v4 (`coach_review`, `coach_memory`, nur neue Tabellen, Migrationstest 3→4)
+- Tests: Parser (kaputte/abweichende Antworten), Request-Aufbau, Plan-Diff + Anwenden, Provider gegen MockEngine,
+  Warteschlange/Service mit Room, UI-Durchlauf mit Fake-Provider
+
+Offen / Hinweise:
+- Kein Senden bei geschlossener App (kein WorkManager), siehe DECISIONS
+- Fotos gehen nur mit Einwilligung mit (Profil → KI-Coach → Coach-Einstellungen), erstes Foto des Trainings + Vergleichsfoto ≥ 4 Wochen
+
+## Bitte auf dem Handy testen: KI-Coach (Phase 4)
+1. Profil → KI verbinden → Anthropic + eigener Key (oder Fuel)
+2. Training aus einer Vorlage (z. B. Push) machen, ein paar Sätze abhaken, „Beenden“ → unten im Abschnitt „Coach“ steht
+   „Senden“ ausgewählt → „Speichern“
+3. Verlauf → das Training → „Coach-Auswertung“ (oder Start → „Coach“ → „Letztes Training auswerten“) → nach 10–40 s
+   Bewertung, Tipps und „Nächstes Mal“ mit Änderungen
+4. Einzelne Änderungen abwählen (Kreis rechts) → „N übernehmen“ (oder „Alle annehmen“) → Vorlage öffnen: Werte geändert
+5. Start zeigt unter „Letzte Coach-Tipps“ die Tipps
+6. Flugmodus an → noch ein Training beenden und senden → „Wartet auf Verbindung“; Flugmodus aus, App schließen und
+   öffnen → Auswertung kommt von selbst
+7. Profil → Coach → „Fortschritt bewerten“
+8. Profil → Coach-Gedächtnis: Text ansehen, ändern, Speichern; Versionen wiederherstellen; löschen (zweimal tippen)
+9. Profil → KI-Coach → Coach-Einstellungen: Modell, Fotos (Standard aus), Anweisungen ändern/zurücksetzen
+10. KI trennen → Verlauf → Training → „Coach-Auswertung“ → Hinweis „Kein KI-Zugang“ → „Demo-Auswertung ansehen“
+12. Backup exportieren, „Alle Daten löschen“, Backup importieren → Coach-Gedächtnis und Auswertungen wieder da
+11. Mit Fuel: unter der Auswertung „Fuel · 0,0x € · Saldo …“
 ## Phase 3: Beenden-Flow, Fotos, Verlauf, Backup (Session F, Nacht 3.11.)
 Fertig:
 - Nach „Beenden“: Zusammenfassung (Dauer, Sätze, Volumen, Übungen, Abweichungen), neue Bestwerte (Gewicht, geschätztes 1RM,

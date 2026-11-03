@@ -86,6 +86,8 @@ fun AiCoachScreen(
     onOwnKey: () -> Unit,
     onFuel: () -> Unit,
     onProvider: (ChatProvider) -> Unit,
+    /** In-app coach (phase 4): model, photo consent, instructions. */
+    onCoachSettings: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val c = LocalChatStrings.current
@@ -104,6 +106,7 @@ fun AiCoachScreen(
             onClick = onOwnKey,
         )
         ListRow(c.fuelWay, if (state.providerId == ProviderId.FUEL) c.wayConnected else c.wayNotConnected, onClick = onFuel)
+        if (onCoachSettings != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.settingsTitle, onClick = onCoachSettings)
 
         SectionTitle(c.waysInChat)
         Text(c.wayInChatHint, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)

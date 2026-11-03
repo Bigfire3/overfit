@@ -437,3 +437,47 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - Texte der Einwilligung („Daten gehen an den Chat-Anbieter, nicht für Werbung/KI-Training genutzt“) sind meine Formulierung; vor dem
   Store-Start juristisch prüfen (zusammen mit der Datenschutzerklärung aus Phase 10a).
 - Chat-Anleitungen (Claude/ChatGPT/Gemini-Menüs) entsprechen dem Stand laut `backend/README.md`; die Oberflächen der Anbieter ändern sich oft.
+
+## Phase 4 – KI-Coach (Nacht 3.11., Session G)
+- **Antwortformat: Structured Outputs statt Tool.** Anthropic/Fuel: `output_config.format` (JSON-Schema), OpenAI/OpenRouter:
+  `response_format: json_schema, strict`. Kein erzwungenes `tool_choice` (Sonnet 5.5 lehnt `any`/`tool` mit 400 ab). Der
+  Parser (`coach/CoachParser.kt`) verlässt sich trotzdem nicht darauf: JSON in Fences/Prosa, camelCase, Zahlen als Text,
+  Wrapper-Objekt, Trailing Commas, Werte außerhalb des Bereichs werden geklemmt statt die Auswertung zu verwerfen. Antwortet
+  ein Anbieter auf das Schema mit 400 (manche OpenRouter-Modelle), wird einmal ohne Schema gefragt; ungültige Antwort → ein
+  zweiter Versuch, danach FAILED mit gespeicherter Rohantwort.
+- **Schema:** alle Felder required, optionale als `anyOf [typ, null]`, keine Zahlengrenzen (gemeinsame Teilmenge beider
+  Anbieter im strict-Modus). `next_session` ist die **vollständige** Übungsliste der nächsten Einheit; der Plan-Diff entsteht
+  in der App (`coach/PlanDiff.kt`, Zuordnung per Übungs-ID in Reihenfolge), damit „einzeln annehmen“ zuverlässig ist und
+  unbekannte IDs ignoriert werden.
+- **Prompt-Caching:** statischer System-Block (Coach-Anweisungen, Ausgaberegeln, Übungsliste) mit `cache_control`, danach der
+  Profil-Block mit heutigem Datum ohne Cache. OpenAI cached automatisch, OpenRouter bekommt `cache_control` am System-Teil.
+- **Übungsliste im Prompt:** alle `wg:`-Übungen (302), eigene Übungen und alles, was in Vorlagen/Trainings vorkommt – nicht
+  alle 1.098 (die 796 `fedb:` kosten ~10k Token pro Anfrage, Cache hält nur 5 Minuten, eine Auswertung pro Training).
+- **Modelle:** Standard Anthropic `claude-sonnet-5-5` (SPEC), OpenAI `gpt-5`, OpenRouter `anthropic/claude-sonnet-5.5`, in
+  Profil → Coach → Coach-Einstellungen änderbar. Fuel ist fest `claude-sonnet-5-5` (Backend erlaubt nur dieses). `effort`
+  `medium`, `max_tokens` 8.000 (Fuel-Grenze 8.192).
+- **Warteschlange ohne WorkManager:** Jede Anfrage ist sofort eine Zeile in `coach_review` (QUEUED). Netzfehler, Timeout
+  (150 s), 429, 5xx → bleibt QUEUED und wird beim App-Start und jedem Zurückkommen in den Vordergrund automatisch gesendet;
+  Key ungültig, kein Fuel, kein Zugang, Antwort zweimal unbrauchbar → FAILED mit „Erneut versuchen“. Senden läuft im
+  App-Scope (`AppData.scope`), nie im Screen-Scope. WorkManager (Senden bei geschlossener App) bewusst weggelassen: iOS
+  hätte kein Gegenstück, und der Nutzer öffnet die App nach dem Training ohnehin wieder.
+- **Room v4:** `coach_review` (Anfrage + Ergebnis + Warteschlange, Status, Plan-Status, Fuel-Kosten, Rohantwort) und
+  `coach_memory` (Versionen, neueste = aktuell). Nur neue Tabellen → AutoMigration `3 → 4` (nach Phase 3 = v3).
+- **Coach-Gedächtnis:** Der Coach liefert pro Auswertung die komplette neue Fassung; jede Änderung (Coach oder Hand) wird
+  eine Version. „Löschen“ entfernt alle Versionen (Datenschutz), „Alle Daten löschen“ auch Auswertungen und Coach-Einstellungen.
+- **Fotos nur mit Einwilligung:** Schalter „Körperfotos an Coach senden“ (Standard aus). Dann Trainingsfoto + jüngstes Foto,
+  das mindestens 4 Wochen älter ist (aus `workout_photo` von Phase 3), über `prepareJpeg` auf 1.500 px lange Kante, JPEG 85.
+- **Beenden-Flow:** Abschnitt „Coach“ mit „Senden / Später“ (Standard Senden, nur mit KI-Zugang); gesendet wird beim
+  „Speichern“ (`workoutSavedListeners`), damit Notiz, Gefühl und Fotos schon gespeichert sind und mitgehen.
+- **Backup:** `CoachBackup` (BackupContributor „coach“): Auswertungen, alle Gedächtnis-Versionen, Coach-Einstellungen; ein
+  Backup ohne Coach-Daten leert sie beim Import (Import = „Alle Daten ersetzen“).
+- **Ohne KI-Zugang:** Hinweis mit Wegen zu „KI verbinden“ und Fuel, dazu eine **Demo-Auswertung** aus dem eigenen Training
+  (+2,5 kg auf die erste Gewichtsübung), deutlich als Demo markiert; Plan übernehmen ändert in der Demo nichts.
+- **Coach-Anweisungen editierbar** (SPEC): Standardtext je App-Sprache; wer ihn ändert, behält seine Fassung auch nach einem
+  Sprachwechsel; „Standard wiederherstellen“ setzt zurück.
+- **Freies Training ohne Vorlage:** Der Planvorschlag kann als neue Vorlage „<Name> (Coach)“ gespeichert werden.
+
+### Zur Prüfung durch Fabian
+- Standardmodelle für OpenAI/OpenRouter (`gpt-5`, `anthropic/claude-sonnet-5.5`) sind Annahmen; bei „Anbieter hat die Anfrage
+  abgelehnt“ im Coach-Einstellungen-Screen das Modell anpassen.
+- Kein Senden im Hintergrund bei geschlossener App (siehe oben).

@@ -112,6 +112,8 @@ fun HistoryDetailScreen(
     onShare: () -> Unit,
     /** Accepted notes from the AI chat that belong to this workout. */
     chatNotes: List<ChatNote> = emptyList(),
+    /** Coach review of this workout (phase 4). */
+    onCoach: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val h = t.history
@@ -191,6 +193,7 @@ fun HistoryDetailScreen(
                 withContext(Dispatchers.Main) { onTemplateCreated(id) }
             }
         })
+        if (onCoach != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.reviewTitle, onClick = onCoach)
         ListRow(h.shareWorkout, onClick = onShare)
         ListRow(
             if (confirmDelete) t.deleteConfirm else t.delete,
