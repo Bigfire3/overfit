@@ -168,7 +168,7 @@ class FuelApiTest {
         }
         api.redeemSpot("tokenvalue123")
         val body = log.last().body.toByteArray().decodeToString()
-        assertTrue(body, body.contains("\"token\":\"test:"))
+        assertTrue(body.contains("\"token\":\"test:"), body)
     }
 
     @Test
