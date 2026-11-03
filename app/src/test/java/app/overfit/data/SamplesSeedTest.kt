@@ -50,6 +50,17 @@ class SamplesSeedTest {
     }
 
     @Test
+    fun deleteAllData_bringsSamplesBackWithoutRestart() = runTest {
+        data.seedSamplesOnce()
+        data.templates.delete(data.templates.templates.first().first { it.name == "Pull" }.id)
+        data.resetAll()
+        assertEquals(listOf("Push", "Pull", "Legs"), names())
+        // Restoring a backup starts from a clean slate without samples.
+        data.resetAll(reseedSamples = false)
+        assertEquals(emptyList<String>(), names())
+    }
+
+    @Test
     fun existingInstallGetsThemExactlyOnce() = runTest {
         // An existing install: own workout, no flag yet.
         data.importer.addSamples()

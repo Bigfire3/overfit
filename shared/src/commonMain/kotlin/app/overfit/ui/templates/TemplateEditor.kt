@@ -391,16 +391,12 @@ private fun SetRow(
         if (type.usesWeight) {
             SetField(
                 set.weight,
-                { v -> onChange { it.copy(weight = v.filter { c -> c.isDigit() || c == ',' || c == '.' || c == '-' }.take(8)) } },
+                { v -> onChange { it.copy(weight = v.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(8)) } },
                 unit = unit.symbol,
                 description = t.weightOfSet(number),
                 keyboardType = KeyboardType.Decimal,
                 modifier = Modifier.weight(1.2f),
             )
-            // Many number keyboards have no minus key: negative weight = assistance (e.g. a band).
-            SmallButton("±", {
-                onChange { it.copy(weight = if (it.weight.startsWith("-")) it.weight.removePrefix("-") else "-${it.weight}") }
-            })
         }
         if (type.usesReps) {
             SetField(

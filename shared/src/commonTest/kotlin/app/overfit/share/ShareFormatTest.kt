@@ -105,6 +105,12 @@ class ShareFormatTest {
         assertEquals(ShareFormat.KIND_TEMPLATE, t.kind)
     }
 
+    @Test fun negativeWeightsAreClampedToZero() {
+        val r = ShareFormat.fromJson("""{"v":1,"name":"X","exercises":[{"name":"Pull-up","sets":[{"kg":-20,"reps":8}]}]}""")
+        val t = assertIs<ShareParse.Ok>(r).training
+        assertEquals(listOf(SharedSet(0.0, 8)), t.exercises.single().sets)
+    }
+
     @Test fun versionAndKind() {
         assertEquals(ShareParse.Fail(ShareFailure.TOO_NEW), ShareFormat.fromJson("""{"v":2,"kind":"template","name":"X","exercises":[]}"""))
         assertEquals(ShareParse.Fail(ShareFailure.UNSUPPORTED_KIND), ShareFormat.fromJson("""{"v":1,"kind":"plan","name":"X","exercises":[]}"""))
