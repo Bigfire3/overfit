@@ -103,7 +103,7 @@ class CoachFlowTest {
         compose.onNodeWithText("Alle annehmen").performClick()
         waitFor("Plan übernommen. Das Workout ist angepasst.")
 
-        compose.waitUntil(10_000) {
+        compose.waitUntilState(10_000) {
             runBlocking { data.templates.get(templateId) }?.exercises?.single()?.sets?.first()?.weightKg == 62.5
         }
         val bench = runBlocking { data.templates.get(templateId) }!!.exercises.single()
@@ -134,7 +134,7 @@ class CoachFlowTest {
         compose.onNodeWithTag("coach-memory-input").assertExists()
         compose.onNode(hasSetTextAction()).performTextInput("Ziel: 100 kg Bankdrücken")
         compose.onNodeWithText("Speichern").performClick()
-        compose.waitUntil(10_000) { runBlocking { database.coachDao().currentMemory() }?.text == "Ziel: 100 kg Bankdrücken" }
+        compose.waitUntilState(10_000) { runBlocking { database.coachDao().currentMemory() }?.text == "Ziel: 100 kg Bankdrücken" }
     }
 
     private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {

@@ -158,7 +158,7 @@ class DayWithOverfitTest {
 
         // --- Samples: Push, Pull, Legs are there from the first start on --------------------
         waitFor("Legs"); waitFor("Pull"); waitFor("Push")
-        compose.waitUntil(10_000) { templates().size == 3 }
+        compose.waitUntilState(10_000) { templates().size == 3 }
         val push = templates().first { it.name == "Push" }
 
         // --- Share every template as a link and import it again from the clipboard ----------
@@ -185,7 +185,7 @@ class DayWithOverfitTest {
             waitFor(name)
             click("Übernehmen")
             waitFor("Starten") // the imported workout opens in its plan screen
-            compose.waitUntil(10_000) { templates().size == 3 + listOf("Push", "Pull", "Legs").indexOf(name) + 1 }
+            compose.waitUntilState(10_000) { templates().size == 3 + listOf("Push", "Pull", "Legs").indexOf(name) + 1 }
         }
         assertEquals(6, templates().size)
 
@@ -205,9 +205,9 @@ class DayWithOverfitTest {
         assertNotNull(alerts.pending)
         val before = alerts.pending!!
         click("+15 s")
-        compose.waitUntil(5_000) { alerts.pending?.endsAt == before.endsAt + 15_000 }
+        compose.waitUntilState(5_000) { alerts.pending?.endsAt == before.endsAt + 15_000 }
         click("−15 s")
-        compose.waitUntil(5_000) { alerts.pending?.endsAt == before.endsAt }
+        compose.waitUntilState(5_000) { alerts.pending?.endsAt == before.endsAt }
         click("Überspringen")
         waitGone("Überspringen")
         assertEquals(null, alerts.pending)
@@ -230,13 +230,13 @@ class DayWithOverfitTest {
         compose.waitUntil(20_000) { compose.onAllNodes(hasText("Dip")).fetchSemanticsNodes().size >= 2 }
         // [0] is the search field itself (it contains the typed text); the exact result "Dip" follows it.
         compose.onAllNodes(hasText("Dip"))[1].performClick()
-        try { compose.waitUntil(10_000) { deps.workout.state.value.workout!!.exercises.any { it.exercise.name == "Dip" } } }
+        try { compose.waitUntilState(10_000) { deps.workout.state.value.workout!!.exercises.any { it.exercise.name == "Dip" } } }
         catch (e: Throwable) { throw AssertionError(deps.workout.state.value.workout!!.exercises.map { it.exercise.name }.toString() + compose.onRoot().printToString().take(3000), e) }
         assertEquals(countBefore, deps.workout.state.value.workout!!.exercises.size)
         // reorder (the drag gesture itself is not scriptable here; the same edit the drag handle calls)
         val order = deps.workout.state.value.workout!!.exercises.map { it.id }
         deps.workout.edit { it.moveExercise(0, 1) }
-        compose.waitUntil(10_000) { deps.workout.state.value.workout!!.exercises.map { it.id } == listOf(order[1], order[0]) + order.drop(2) }
+        compose.waitUntilState(10_000) { deps.workout.state.value.workout!!.exercises.map { it.id } == listOf(order[1], order[0]) + order.drop(2) }
         val workoutId = deps.workout.state.value.workout!!.id
         val setsBefore = deps.workout.state.value.workout!!.completedSets
 
@@ -253,9 +253,9 @@ class DayWithOverfitTest {
         assertEquals(workoutId, deps.workout.state.value.workout!!.id)
 
         // --- App restart in the middle: the workout continues ------------------------------
-        compose.waitUntil(10_000) { runBlocking { data.workouts.status(workoutId) } == SessionStatus.ACTIVE }
+        compose.waitUntilState(10_000) { runBlocking { data.workouts.status(workoutId) } == SessionStatus.ACTIVE }
         process++
-        compose.waitUntil(20_000) { deps.workout.state.value.loaded && deps.workout.state.value.workout != null }
+        compose.waitUntilState(20_000) { deps.workout.state.value.loaded && deps.workout.state.value.workout != null }
         assertEquals(workoutId, deps.workout.state.value.workout!!.id)
         assertEquals(setsBefore, deps.workout.state.value.workout!!.completedSets)
         waitFor("erledigt", substring = true)
@@ -278,7 +278,7 @@ class DayWithOverfitTest {
         runBlocking { data.workouts.addPhoto(workoutId, byteArrayOf(1, 2, 3, 4), takenAt = 1_000L) }
         click("Speichern")
         waitFor("Duo · bald") // back on the Training tab
-        compose.waitUntil(10_000) { runBlocking { data.workouts.getFinished(workoutId)?.note } == "Stark heute" }
+        compose.waitUntilState(10_000) { runBlocking { data.workouts.getFinished(workoutId)?.note } == "Stark heute" }
         val finished = runBlocking { data.workouts.getFinished(workoutId) }!!
         assertEquals(4, finished.feeling)
         assertEquals(1, finished.photos.size)
@@ -318,7 +318,7 @@ class DayWithOverfitTest {
         waitFor("Alle annehmen")
         click("Alle annehmen")
         waitFor("Plan übernommen. Das Workout ist angepasst.")
-        compose.waitUntil(10_000) {
+        compose.waitUntilState(10_000) {
             templates().any { t -> runBlocking { data.templates.get(t.id) }?.exercises?.any { e -> e.sets.firstOrNull()?.weightKg == 62.5 } == true }
         }
         back(); back()
@@ -335,7 +335,7 @@ class DayWithOverfitTest {
         waitFor("Oberkörper A")
         click("Übernehmen")
         waitFor("Starten")
-        compose.waitUntil(10_000) { templates().any { it.name == "Oberkörper A" } }
+        compose.waitUntilState(10_000) { templates().any { it.name == "Oberkörper A" } }
 
         // --- Profile: Fuel demo + Spot reveal, KI-Coach context, Duo teaser ------------------
         tab("Profil")
@@ -399,7 +399,7 @@ class DayWithOverfitTest {
         click("Alle Daten löschen")
         click("Wirklich alles löschen?")
         waitFor("Dein Name")
-        compose.waitUntil(10_000) { templates().isEmpty() }
+        compose.waitUntilState(10_000) { templates().isEmpty() }
         assertEquals("", store.state.value.profile.name)
         assertTrue(runBlocking { data.workouts.history.first() }.isEmpty())
         runBlocking { deps.backup.restore(deps.backup.preview(backupBytes).getOrThrow()) }

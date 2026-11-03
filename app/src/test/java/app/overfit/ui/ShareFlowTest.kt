@@ -144,7 +144,7 @@ class ShareFlowTest {
         kv.remove(AppData.KEY_SAMPLES_SEEDED)
         launchOnboarded()
         waitFor("Legs"); waitFor("Pull"); waitFor("Push")
-        compose.waitUntil(10_000) { runBlocking { data.templates.templates.first() }.size == 3 }
+        compose.waitUntilState(10_000) { runBlocking { data.templates.templates.first() }.size == 3 }
         val pull = runBlocking { data.templates.templates.first() }.first { it.name == "Pull" }
         runBlocking { data.templates.delete(pull.id) }
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Pull").fetchSemanticsNodes().isEmpty() }

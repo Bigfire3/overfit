@@ -177,7 +177,7 @@ class AppSmokeTest {
         waitFor("ERFASSUNG")
         compose.onNodeWithText("Gewicht × Wdh.").performClick()
         compose.onNodeWithText("Speichern").performClick()
-        compose.waitUntil(5_000) {
+        compose.waitUntilState(5_000) {
             kotlinx.coroutines.runBlocking { data.exercises.get("wg:pull-up")?.trackingType } == TrackingType.WEIGHT_REPS
         }
 
@@ -188,7 +188,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Klimmzug").assertIsDisplayed()
         compose.onNodeWithText("Zeit").performClick()
         compose.onNodeWithText("Speichern").performClick()
-        compose.waitUntil(5_000) {
+        compose.waitUntilState(5_000) {
             kotlinx.coroutines.runBlocking { database.exerciseDao().count() } > 300 &&
                 kotlinx.coroutines.runBlocking { data.exercises.exercises.first() }.any { it.isCustom && it.name == "Klimmzug" }
         }
@@ -214,7 +214,7 @@ class AppSmokeTest {
 
         // Saving closes the editor; the Training tab lists the workout with its exercise
         waitFor("Letzte Coach-Tipps")
-        compose.waitUntil(5_000) { kotlinx.coroutines.runBlocking { data.templates.templates.first() }.size == 1 }
+        compose.waitUntilState(5_000) { kotlinx.coroutines.runBlocking { data.templates.templates.first() }.size == 1 }
         compose.onNodeWithText("Push", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Bench Press", substring = true).assertIsDisplayed()
     }
