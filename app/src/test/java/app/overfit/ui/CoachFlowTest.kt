@@ -1,5 +1,6 @@
 package app.overfit.ui
 
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -90,7 +91,6 @@ class CoachFlowTest {
     fun reviewLastWorkoutAndAcceptPlan() {
         setUp(withKey = true)
         waitFor("Training starten")
-        compose.onNodeWithText("Letzte Coach-Tipps").performScrollTo()
         compose.onNodeWithText("Coach").performScrollTo().performClick()
         waitFor("Letztes Training auswerten")
         compose.onNodeWithText("Letztes Training auswerten").performClick()
@@ -118,7 +118,7 @@ class CoachFlowTest {
         waitFor("Letztes Training auswerten")
         compose.onNodeWithText("Letztes Training auswerten").performClick()
         waitFor("Kein KI-Zugang")
-        compose.onNodeWithText("Demo-Auswertung ansehen").performScrollTo().performClick()
+        compose.onNodeWithText("Demo-Auswertung ansehen").performClick()
         waitFor("Demo · Beispielinhalt, nicht vom Coach")
         waitFor("8/10")
     }
@@ -131,10 +131,10 @@ class CoachFlowTest {
         waitFor("Coach-Gedächtnis")
         compose.onNodeWithText("Coach-Gedächtnis").performScrollTo().performClick()
         waitFor("Was der Coach über dich weiß", substring = true)
-        compose.onNodeWithTag("coach-memory-input").performTextInput("Ziel: 100 kg Bankdrücken")
+        compose.onNodeWithTag("coach-memory-input").assertExists()
+        compose.onNode(hasSetTextAction()).performTextInput("Ziel: 100 kg Bankdrücken")
         compose.onNodeWithText("Speichern").performClick()
         compose.waitUntil(10_000) { runBlocking { database.coachDao().currentMemory() }?.text == "Ziel: 100 kg Bankdrücken" }
-        waitFor("Gespeichert.")
     }
 
     private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {

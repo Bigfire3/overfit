@@ -171,8 +171,8 @@ class CoachService(
             throw e
         } catch (e: CoachException) {
             if (e.kind.retryable) {
-                dao.upsert(sending.copy(status = ReviewStatus.QUEUED, errorKind = e.kind.name, errorMessage = e.message, updatedAt = clock()))
                 row.sessionId?.let { dao.setAiStatus(it, AiStatus.QUEUED) }
+                dao.upsert(sending.copy(status = ReviewStatus.QUEUED, errorKind = e.kind.name, errorMessage = e.message, updatedAt = clock()))
                 true
             } else {
                 fail(sending, e.kind, e.message)
@@ -216,6 +216,8 @@ class CoachService(
     private suspend fun complete(row: CoachReviewEntity, reply: CoachReply, review: CoachReview) {
         val now = clock()
         val json = CoachParser.extractJsonObject(reply.text)
+        // Session status first: whoever sees the review DONE also sees the session DONE.
+        row.sessionId?.let { dao.setAiStatus(it, AiStatus.DONE) }
         dao.upsert(
             row.copy(
                 status = ReviewStatus.DONE,
@@ -229,7 +231,6 @@ class CoachService(
                 balanceMicro = reply.balanceMicro,
             ),
         )
-        row.sessionId?.let { dao.setAiStatus(it, AiStatus.DONE) }
         val memory = review.memory?.trim()
         if (!memory.isNullOrEmpty() && memory != dao.currentMemory()?.text) {
             dao.insertMemory(CoachMemoryEntity(text = memory, createdAt = now, source = SOURCE_COACH, reviewId = row.id))
@@ -237,8 +238,8 @@ class CoachService(
     }
 
     private suspend fun fail(row: CoachReviewEntity, kind: CoachErrorKind, message: String?, raw: String? = row.rawResponse) {
-        dao.upsert(row.copy(status = ReviewStatus.FAILED, errorKind = kind.name, errorMessage = message, rawResponse = raw, updatedAt = clock()))
         row.sessionId?.let { dao.setAiStatus(it, AiStatus.FAILED) }
+        dao.upsert(row.copy(status = ReviewStatus.FAILED, errorKind = kind.name, errorMessage = message, rawResponse = raw, updatedAt = clock()))
     }
 
     // --- Request building ----------------------------------------------------------------------

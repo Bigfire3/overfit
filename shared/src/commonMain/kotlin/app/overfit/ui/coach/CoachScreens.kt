@@ -501,7 +501,7 @@ fun CoachMemoryScreen(coach: CoachService, onBack: () -> Unit) {
     val current by coach.memory.collectAsState(initial = null)
     val versions by coach.memoryVersions.collectAsState(initial = emptyList())
     var text by remember(current?.id) { mutableStateOf(current?.text.orEmpty()) }
-    var saved by remember(current?.id) { mutableStateOf(false) }
+    var saved by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     Screen(
         scroll = true,
