@@ -56,6 +56,12 @@ fun WebCreditSection(
     var opening by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     if (!isDemo && config != null && config.showsWebPurchase(distribution)) {
+        if (config.webPurchase.packages.isNotEmpty()) {
+            Text(w.webChannel, Modifier.padding(top = Space.m), style = Theme.type.caption, tone = Tone.Muted)
+            config.webPurchase.packages.forEach { p ->
+                ListRow(w.webPackage(formatEuro(p.creditMicro, language), formatEuro(p.priceMicro, language)), Tone.Muted)
+            }
+        }
         ListRow(if (opening) w.webTopUpOpening else w.webTopUp, onClick = {
             if (opening) return@ListRow
             opening = true

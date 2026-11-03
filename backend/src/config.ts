@@ -2,18 +2,26 @@ import type { Config, Env, Price } from './types';
 import { currentPrices } from './providers';
 
 /**
- * Einziger Aufschlag auf alle Modellpreise (Basispunkte). Herleitung und Tabelle: docs/monetization.md „Rechnung“.
- * 6900 = 69 %: deckt im ungünstigsten Kanal (Store, 15 % Gebühr auf Netto nach USt) USt, Gebühr, Einladungsboni
- * (10 % vom Netto) und lässt 7 % vom Netto als Gewinn.
+ * Einziger Aufschlag auf alle Modellpreise (Basispunkte). Herleitung und Tabellen: docs/monetization.md „Rechnung“.
+ * 2800 = 28 %: deckt im Web (Stripe, Kleinunternehmer ohne USt) Zahlungsgebühr und Einladungsboni (10 % vom Netto)
+ * und lässt beim kleinsten Paket (5 €) noch 5 % vom Netto, ab 10 € über 7 %. Der Store trägt seine USt und Gebühr
+ * selbst über einen offen ausgewiesenen Aufpreis (Store-Preis > Guthaben, siehe DEFAULT_PACKAGES).
  */
-export const DEFAULT_MARKUP_BP = 6900;
+export const DEFAULT_MARKUP_BP = 2800;
 
-const DEFAULT_PACKAGES = {
-  'overfit.fuel.5': { priceMicro: 5_000_000 },
-  'overfit.fuel.10': { priceMicro: 10_000_000 },
+/**
+ * Store-Pakete: `priceMicro` = Preis im Store (Endpreis inkl. USt, die Apple/Google als Verkäufer abführen, und
+ * 15 % Store-Gebühr), `creditMicro` = Guthaben. Preisstufen so gewählt, dass der Gewinn auch bei 27 % USt ≥ 5 % vom
+ * Netto bleibt (backend/test/pricing.test.ts). Produkt-IDs bleiben stabil.
+ */
+export const DEFAULT_PACKAGES: Record<string, { priceMicro: number; creditMicro: number }> = {
+  'overfit.fuel.5': { priceMicro: 6_990_000, creditMicro: 5_000_000 },
+  'overfit.fuel.10': { priceMicro: 13_990_000, creditMicro: 10_000_000 },
 };
 
-const DEFAULT_WEB_PACKAGES = {
+/** Web-Pakete (Stripe): Endpreis = Guthaben, 1:1. Kleinunternehmer nach § 19 UStG: keine USt. */
+export const DEFAULT_WEB_PACKAGES: Record<string, { priceMicro: number }> = {
+  'web.5': { priceMicro: 5_000_000 },
   'web.10': { priceMicro: 10_000_000 },
   'web.20': { priceMicro: 20_000_000 },
   'web.50': { priceMicro: 50_000_000 },
@@ -33,6 +41,11 @@ function json<T>(v: unknown, def: T): T {
   } catch {
     return def;
   }
+}
+
+/** Ältere `PACKAGES`-Werte ohne `creditMicro`: Guthaben = Preis. */
+function storePackages(p: Record<string, { priceMicro: number; creditMicro?: number }>) {
+  return Object.fromEntries(Object.entries(p).map(([id, v]) => [id, { priceMicro: v.priceMicro, creditMicro: v.creditMicro ?? v.priceMicro }]));
 }
 
 export function getConfig(env: Env): Config {
@@ -63,7 +76,7 @@ export function getConfig(env: Env): Config {
     imageTokensReserve: int(env.IMAGE_TOKENS_RESERVE, 3000),
     // Preise je Modell in µ€/MTok (Tabelle in providers.ts); PRICE_TABLE überschreibt einzelne Modelle.
     prices: { ...currentPrices(), ...json<Record<string, Price>>(env.PRICE_TABLE, {}) },
-    packages: json(env.PACKAGES, DEFAULT_PACKAGES),
+    packages: storePackages(json<Record<string, { priceMicro: number; creditMicro?: number }>>(env.PACKAGES, DEFAULT_PACKAGES)),
     webPackages: json(env.WEB_PACKAGES, DEFAULT_WEB_PACKAGES),
     webPurchaseOff: env.WEB_PURCHASE === 'off',
     webPurchaseUrl: env.WEB_PURCHASE_URL || 'https://bigfire3.github.io/overfit/guthaben/',

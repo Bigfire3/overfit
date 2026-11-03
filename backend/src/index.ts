@@ -122,7 +122,7 @@ function publicConfig(env: Env, cfg: Config) {
     packages: Object.entries(cfg.packages).map(([productId, p]) => ({
       productId,
       priceMicro: p.priceMicro,
-      creditMicro: packageCreditMicro(p.priceMicro),
+      creditMicro: packageCreditMicro(p),
     })),
     /** Guthaben im Web kaufen (Merchant of Record); `testMode` = Sandbox, keine echte Zahlung. */
     webPurchase: webPurchaseConfig(env, cfg),
@@ -176,7 +176,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
 
   if (path === '/v1/admin/usage') {
     await rateLimit(env, `admin:${clientIp(req)}`, 20, 3600);
-    return handleAdminUsage(req, env, url);
+    return handleAdminUsage(req, env, cfg, url);
   }
 
   if (path === '/v1/devices' && method === 'POST') {

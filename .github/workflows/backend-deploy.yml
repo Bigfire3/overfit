@@ -56,12 +56,14 @@ jobs:
       APPLE_IAP_ISSUER_ID: ${{ secrets.APPLE_IAP_ISSUER_ID }}
       APPLE_BUNDLE_ID: ${{ secrets.APPLE_BUNDLE_ID }}
       APPLE_APP_ATTEST_TEAM_ID: ${{ secrets.APPLE_APP_ATTEST_TEAM_ID }}
-      # Web-Kauf über Paddle (optional; fehlt einer, bleibt der Web-Kauf aus). Sandbox im Testbetrieb.
-      PADDLE_API_KEY: ${{ secrets.PADDLE_API_KEY }}
-      PADDLE_WEBHOOK_SECRET: ${{ secrets.PADDLE_WEBHOOK_SECRET }}
-      PADDLE_CLIENT_TOKEN: ${{ secrets.PADDLE_CLIENT_TOKEN }}
-      # Repo-Variablen: PADDLE_ENV=live nur für echte Zahlungen im Produktionsbetrieb; WEB_PURCHASE_CHANNELS (sideload,store)
-      PADDLE_ENV: ${{ vars.PADDLE_ENV }}
+      # Web-Kauf über Stripe (optional; fehlt einer, bleibt der Web-Kauf aus). Testbetrieb: sk_test_…, Produktion: sk_live_….
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      # Nur Produktion: Live-Werte, haben dort Vorrang vor den Testwerten oben
+      STRIPE_LIVE_SECRET_KEY: ${{ secrets.STRIPE_LIVE_SECRET_KEY }}
+      STRIPE_LIVE_WEBHOOK_SECRET: ${{ secrets.STRIPE_LIVE_WEBHOOK_SECRET }}
+      # Repo-Variablen: WEB_PURCHASE_CHANNELS (sideload,store); STRIPE_INVOICES=on für Stripe-Rechnungen (PDF, kostenpflichtig)
+      STRIPE_INVOICES: ${{ vars.STRIPE_INVOICES }}
       WEB_PURCHASE_CHANNELS: ${{ vars.WEB_PURCHASE_CHANNELS }}
     steps:
       - name: Voraussetzungen prüfen
@@ -268,9 +270,9 @@ jobs:
             echo "### Web-Kauf (Guthaben auf der Webseite)"
             echo
             if [ "$(echo "$WEB" | jq -r '.enabled')" = "true" ]; then
-              if [ "$(echo "$WEB" | jq -r '.testMode')" = "true" ]; then echo "**An, Testmodus (Paddle-Sandbox):** keine echte Zahlung, nur Testkarten."; else echo "**An, echte Zahlungen (Paddle live).**"; fi
+              if [ "$(echo "$WEB" | jq -r '.testMode')" = "true" ]; then echo "**An, Testmodus (Stripe):** keine echte Zahlung, nur Testkarten (4242 4242 4242 4242)."; else echo "**An, echte Zahlungen (Stripe live).**"; fi
               echo
-              echo "Webhook-URL (einmalig bei Paddle eintragen: Developer Tools → Notifications → New destination, Ereignisse \`transaction.completed\`, \`adjustment.created\`, \`adjustment.updated\`):"
+              echo "Webhook-URL (einmalig bei Stripe eintragen: Entwickler → Webhooks → Endpunkt hinzufügen, Ereignisse \`checkout.session.completed\`, \`checkout.session.async_payment_succeeded\`, \`charge.refunded\`, \`charge.dispute.created\`):"
               echo
               echo '```'
               echo "$URL/v1/webhooks/payment"
@@ -278,7 +280,7 @@ jobs:
               echo
               echo "Kaufseite: $(echo "$WEB" | jq -r '.pageUrl') · App-Knopf „Im Web aufladen“ in: $(echo "$WEB" | jq -r '.channels | join(", ")')"
             else
-              echo "**Aus.** Es fehlen Paddle-Secrets (siehe „Secrets“ oben) oder Produktion ohne Repo-Variable \`PADDLE_ENV = live\`."
+              echo "**Aus.** Es fehlen \`STRIPE_SECRET_KEY\` / \`STRIPE_WEBHOOK_SECRET\` (siehe „Secrets“ oben) oder der Schlüssel passt nicht zum Modus (Test: \`sk_test_…\`, Produktion: \`sk_live_…\`)."
               echo "Sobald sie gesetzt sind, lautet die Webhook-URL: \`$URL/v1/webhooks/payment\`"
             fi
             echo

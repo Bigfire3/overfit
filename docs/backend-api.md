@@ -7,7 +7,7 @@ Das Backend speichert **keine Trainingsinhalte und keine Fotos** (Anfragen werde
 
 - Alle Beträge sind **Integer in Mikro-Euro (µ€)**: `1 € = 1_000_000`. Nie Float. Anzeige in der App: `4_200_000` → „4,20 €“ (kaufmännisch runden, nur zur Anzeige).
 - Felder heißen `…Micro`. Das Backend rechnet immer in Euro; Preise pro Modell in µ€ je 1 Mio. Token stehen in `GET /v1/config`.
-- Aufschlag (`markupBp`) in Basispunkten (6900 = 69 %), ein Wert für alle Modelle; die Paket-Gutschrift ist immer 1:1 zum Preis. Alles ist serverseitig konfigurierbar; die App liest Werte aus `/v1/config` und rechnet nichts selbst nach.
+- Aufschlag (`markupBp`) in Basispunkten (2800 = 28 %), ein Wert für alle Modelle; Web-Pakete und Codes 1:1 zum Preis, Store-Pakete mit festem Guthaben unter dem Store-Preis (`priceMicro` > `creditMicro`). Alles ist serverseitig konfigurierbar; die App liest Werte aus `/v1/config` und rechnet nichts selbst nach.
 
 ## Signatur-Schema (alle Endpunkte außer `/v1/health` und `/v1/config`)
 
@@ -115,7 +115,7 @@ Jeder Fehler: passender HTTP-Status und
 ```json
 {
   "mode": "production",
-  "currency": "EUR", "unit": "micro-euro", "markupBp": 6900, "maxTokensCap": 8192,
+  "currency": "EUR", "unit": "micro-euro", "markupBp": 2800, "maxTokensCap": 8192,
   "models": { "gemini-3.6-flash": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 }, "claude-sonnet-5-5": { … }, "@cf/meta/llama-3.1-8b-instruct": { … } },
   "defaultTier": "standard",
   "tiers": {
@@ -143,6 +143,12 @@ Standard: letzte 30 Tage). Antwort `{ from, to, currency, unit, totals: { reques
 chargedMicro, providerCostMicro, marginMicro }, groups: [ { model, tier, fallback, photo, requests, inputTokens, cacheReadTokens, cacheWriteTokens,
 outputTokens, chargedMicro, providerCostMicro, marginMicro } ] }`. `providerCostMicro` = Listenpreis ohne Aufschlag für das tatsächlich genutzte
 Modell, `marginMicro` = berechnet − Anbieterkosten (bei Buchungen vor Migration 0004: `null`). Nie Prompts, Antworten oder Fotos.
+Dazu `webRevenue` (unabhängig von `from`/`to`): `{ environment: sandbox | live, note, thresholds, years: [ { year, orders, totalMicro,
+euCrossBorderMicro, unknownCountryMicro, byCountry: [ { country, orders, totalMicro } ] } ], warnings: [ { code: eu_cross_border |
+small_business_prev_year | small_business_current_year, year, valueMicro, thresholdMicro, share, message } ] }`. Web-Umsatz = bezahlt minus
+erstattet, je Kalenderjahr (UTC) und Rechnungsland, nur die Umgebung des Workers. Warnungen ab 80 % der EU-Lieferschwelle (10.000 €, andere
+EU-Länder, unbekanntes Land zählt mit) und der Kleinunternehmergrenzen (25.000 € / 100.000 €). Werkzeug, keine Steuerberatung
+(docs/monetization.md „Kleinunternehmer und Schwellen“).
 
 ### `POST /v1/admin/credit` (nur Testserver)
 `Authorization: Bearer <ADMIN_SECRET>`, Body `{ "amountMicro": 5000000, "all": true }` oder `{ "amountMicro": …, "accountId": "…" }`
@@ -225,16 +231,16 @@ Anfrage samt Ausweichen 140 s. Anfragen mit Bildern bekommen `cf-aig-collect-log
 ### `POST /v1/purchases/verify`
 Body `{ "platform": "google"|"apple", "productId": "overfit.fuel.10", "purchaseToken": "<Play purchaseToken | Apple signierte Transaktion (JWS)>" }`.
 → `{ "productId": "…", "creditedMicro": 7870370, "alreadyCredited": false, "balanceMicro": 7870370 }`.
-Gutschrift = Preis (1:1, `creditMicro` = `priceMicro`), **idempotent pro Kauf** (`alreadyCredited: true` bei Wiederholung, auch von anderen Konten – ein Kauf zählt nur einmal). Die App ruft das nach jedem erfolgreichen Store-Kauf auf (und beim Start für noch nicht bestätigte Käufe) und schließt die Transaktion erst danach ab. Ohne Store-Zugangsdaten im Backend: `503 purchases_unavailable`.
+Gutschrift = `creditMicro` des Pakets (Store: 5 € für 6,99 €, 10 € für 13,99 €; der Aufpreis deckt USt und Store-Gebühr), **idempotent pro Kauf** (`alreadyCredited: true` bei Wiederholung, auch von anderen Konten – ein Kauf zählt nur einmal). Die App ruft das nach jedem erfolgreichen Store-Kauf auf (und beim Start für noch nicht bestätigte Käufe) und schließt die Transaktion erst danach ab. Ohne Store-Zugangsdaten im Backend: `503 purchases_unavailable`.
 
-## Web-Kauf und Guthaben-Codes (Session Z, Testmodus)
-Siehe docs/monetization.md. Anbieter: Paddle (Merchant of Record), hinter der Schnittstelle `PaymentProvider`
-(`backend/src/payments/`). Im Testbetrieb immer Sandbox; echte Zahlungen nur im Produktionsbetrieb mit `PADDLE_ENV=live`.
-**Guthaben = Endpreis inkl. USt (1:1)**, keine Gebühr wird abgezogen.
+## Web-Kauf und Guthaben-Codes (Session Z, Testmodus; Stripe seit Session AB)
+Siehe docs/monetization.md. Anbieter: **Stripe Checkout** (gehostete Seite), hinter der Schnittstelle `PaymentProvider`
+(`backend/src/payments/`). Der Schlüssel bestimmt den Modus: Testbetrieb nur `sk_test_…`, Produktion nur `sk_live_…`.
+**Guthaben = Endpreis (1:1)**; Kleinunternehmer nach § 19 UStG, keine USt, kein Stripe Tax.
 
-`/v1/config` → `webPurchase`: `{ enabled, testMode, provider, channels: ["sideload"], pageUrl, packages: [{ id, priceMicro, creditMicro }] }`.
-`enabled` = Paddle eingerichtet; `testMode` = Sandbox; `channels` = wo die App „Im Web aufladen“ zeigt (`sideload` = APK von GitHub,
-`store` = Play Store / App Store; Standard nur `sideload`, Repo-Variable `WEB_PURCHASE_CHANNELS`). Pakete: `web.10`, `web.20`, `web.50`.
+`/v1/config` → `webPurchase`: `{ enabled, testMode, provider: "stripe", channels: ["sideload"], pageUrl, packages: [{ id, priceMicro, creditMicro }] }`.
+`enabled` = Stripe eingerichtet; `testMode` = Stripe-Testmodus; `channels` = wo die App „Im Web aufladen“ zeigt (`sideload` = APK von GitHub,
+`store` = Play Store / App Store; Standard nur `sideload`, Repo-Variable `WEB_PURCHASE_CHANNELS`). Pakete: `web.5`, `web.10`, `web.20`, `web.50`.
 
 ### `POST /v1/purchase/web-link` (signiert; Alias `/v1/purchases/web-link`)
 Body `{ "locale": "de" }` → `{ "url": "https://bigfire3.github.io/overfit/guthaben/#t=<token>&lang=de", "expiresAt": …, "ttlSec": 900 }`.
@@ -242,25 +248,33 @@ Token: 24 Zufallsbytes, nur der Hash liegt in D1 (`web_links`), 15 Minuten gült
 ersten bezahlten Zahlung verbraucht. Steht im Fragment (nicht in Server-Logs). `503 web_purchase_unavailable`, wenn nicht eingerichtet.
 
 ### Öffentlich für die Kaufseite (ohne Signatur, CORS `*`, keine Cookies)
-- `POST /v1/web/session` `{ "token"?: … }` → `{ enabled, testMode, client: { provider, environment, clientToken }, packages, link: null | { status: valid | expired | used | invalid, expiresAt } }`
+- `POST /v1/web/session` `{ "token"?: … }` → `{ enabled, testMode, client: { provider, environment }, markupBp, packages, link: null | { status: valid | expired | used | invalid, expiresAt } }`
 - `POST /v1/web/checkout` `{ "token"?, "packageId": "web.10", "kind": "credit" | "code", "locale" }` → `{ orderId, transactionId, checkoutUrl, client, testMode }`.
   `credit` braucht einen gültigen Token (`404 link_invalid`, `410 link_expired | link_used`), `code` nicht. Legt die Bestellung an und
-  erstellt beim Anbieter eine Transaktion (Preis ohne Katalog, `tax_mode: internal`, `custom_data.overfit_order`). Die Seite öffnet
-  sie mit Paddle.js (`Paddle.Checkout.open({ transactionId })`). `502 payment_unavailable` bei Anbieterfehlern. 30/h je IP.
+  erstellt eine Stripe Checkout Session (`mode = payment`, `price_data` ohne Katalog, EUR, ohne `automatic_tax`, Zahlarten aus dem
+  Dashboard, `metadata.overfit_order` auch am PaymentIntent, `custom_text` mit §-19-Hinweis, Idempotency-Key je Bestellung).
+  `success_url` = Kaufseite `?order=<id>&lang=…`, `cancel_url` = Kaufseite `?canceled=1&lang=…` (ohne Token; die Seite merkt ihn sich
+  in `sessionStorage`). Die Seite leitet auf `checkoutUrl` weiter. `502 payment_unavailable` bei Anbieterfehlern. 30/h je IP.
 - `GET /v1/web/orders/<orderId>` → `{ kind, status: open | paid | refunded | chargeback, priceMicro, creditMicro, testMode, code, codeStatus }`.
   `orderId` ist geheim (nur der Käufer kennt sie); `code` erst nach Zahlung, nie nach Sperre.
 
 ### `POST /v1/webhooks/payment` (Signatur des Anbieters)
-Paddle: Header `Paddle-Signature: ts=…;h1=…`, HMAC-SHA256 über `ts:Rohbody` mit dem Webhook-Secret, hex; ±300 s; mehrere `h1`
-(Schlüsselwechsel) erlaubt. Falsch → `401 invalid_signature`.
-- `transaction.completed`: Bestellung über Transaktions-ID (oder `custom_data`), Währung EUR und Betrag ≥ Preis, sonst Vorfall
-  `amount_mismatch` ohne Buchung. **Idempotent** über `web_events` (`paid:<txn>`) in derselben Transaktion wie die Buchung:
-  Wiederholungen und parallele Zustellungen buchen genau einmal (`200 { duplicate: true }`). `credit` → Posten + Buchung
-  `type = purchase`, `source = web`, `ref = paddle:<txn>`. `code` → Guthaben-Code (`credit_codes`).
-- `adjustment.created|updated` mit `status = approved` und `action = refund | chargeback` (idempotent über `adj:<id>`):
-  anteiliges Guthaben zurückholen, von allen Posten des Kontos, **höchstens bis 0** (Buchung `type = refund | chargeback`,
-  `source = web | code`). Bestellung `refunded | chargeback`, `incident` = Aktion, `…:shortfall` wenn das Guthaben schon verbraucht war.
-  Code noch nicht eingelöst → Wert sinkt bzw. Code gesperrt (`revoked`); schon eingelöst → Abzug beim Einlöser.
+Stripe: Header `Stripe-Signature: t=…,v1=…`, HMAC-SHA256 über `t.Rohbody` mit dem Signing secret (`whsec_…`), hex; ±300 s; mehrere `v1`
+(Secret-Wechsel) erlaubt, `v0` wird ignoriert. Prüfung per WebCrypto im Worker (kein SDK). Falsch → `401 invalid_signature`.
+Ereignisse mit falschem `livemode` (Test an Live oder umgekehrt) → `200 { ignored: "livemode_mismatch" }`.
+- `checkout.session.completed` mit `payment_status = paid` bzw. `checkout.session.async_payment_succeeded` (verzögerte Zahlarten wie
+  SEPA): Bestellung über Session-ID (oder `metadata.overfit_order`), Währung EUR und Betrag ≥ Preis, sonst Vorfall `amount_mismatch` ohne
+  Buchung. **Idempotent** über `web_events` (`paid:<cs_…>`) in derselben Transaktion wie die Buchung: Wiederholungen und parallele
+  Zustellungen buchen genau einmal (`200 { duplicate: true }`). Merkt PaymentIntent, bezahlten Betrag und Rechnungsland
+  (`customer_details.address.country`, nur fürs Schwellen-Reporting). `credit` → Posten + Buchung `type = purchase`, `source = web`,
+  `ref = stripe:<cs_…>`. `code` → Guthaben-Code (`credit_codes`). `payment_status = unpaid` → `200 { ignored }`, gebucht wird beim
+  `async_payment_succeeded`.
+- `charge.refunded` (Erstattung, auch teilweise; Stripe meldet die **Summe** `amount_refunded`, gebucht wird nur der neue Teil; idempotent
+  über `adj:refund:<ch_…>:<Summe>`) und `charge.dispute.created` (Chargeback, `adj:dispute:<dp_…>`): Bestellung über PaymentIntent (vor der
+  Zahlungsbestätigung über `metadata.overfit_order`), anteiliges Guthaben zurückholen, von allen Posten des Kontos, **höchstens bis 0**
+  (Buchung `type = refund | chargeback`, `source = web | code`). Bestellung `refunded | chargeback`, `incident` = Aktion,
+  `…:shortfall` wenn das Guthaben schon verbraucht war. Code noch nicht eingelöst → Wert sinkt bzw. Code gesperrt (`revoked`); schon
+  eingelöst → Abzug beim Einlöser.
 - Andere Ereignisse: `200 { ignored }`.
 
 ### `POST /v1/codes/redeem` (signiert)

@@ -100,7 +100,9 @@ class WebCreditTest {
         bodies += bodyOf(req)
         when (req.url.encodedPath) {
             "/v1/config" -> respond(
-                """{"mode":"test","packages":[],"webPurchase":{"enabled":$enabled,"testMode":true,"provider":"paddle","channels":$channels}}""",
+                """{"mode":"test","markupBp":2800,"packages":[{"productId":"overfit.fuel.5","priceMicro":6990000,"creditMicro":5000000}],
+                   "webPurchase":{"enabled":$enabled,"testMode":true,"provider":"stripe","channels":$channels,
+                   "packages":[{"id":"web.5","priceMicro":5000000,"creditMicro":5000000},{"id":"web.10","priceMicro":10000000,"creditMicro":10000000}]}}""",
                 HttpStatusCode.OK, json,
             )
             "/v1/purchase/web-link" -> respond(
@@ -143,6 +145,9 @@ class WebCreditTest {
         showFuel(Distribution.Sideload)
         waitFor("Im Web aufladen")
         assertTrue("test-mode note", shown("Testmodus – keine echte Zahlung"))
+        // Packages per channel with both values: web 1:1, store with the surcharge shown openly.
+        assertTrue("web package", shown("10,00 € Guthaben · 10,00 €"))
+        assertTrue("store package", shown("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)"))
         waitFor("1,00")
         val accountCalls = { requests.count { it == "GET /v1/account" } }
         val before = accountCalls()
@@ -170,6 +175,8 @@ class WebCreditTest {
         compose.waitUntilState { requests.contains("GET /v1/config") }
         compose.waitForIdle()
         assertFalse("store build: no web purchase by default", shown("Im Web aufladen"))
+        assertFalse("no web packages either", shown("10,00 € Guthaben · 10,00 €"))
+        assertTrue("store package with surcharge", shown("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)"))
     }
 
     @Test

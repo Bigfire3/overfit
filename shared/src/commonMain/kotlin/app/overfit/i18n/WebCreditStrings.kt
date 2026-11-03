@@ -8,6 +8,10 @@ import app.overfit.domain.Language
  */
 class WebCreditStrings(
     val webTopUp: String,
+    /** Heading above the web packages. */
+    val webChannel: String,
+    /** One web package: credit and price (1:1). */
+    val webPackage: (credit: String, price: String) -> String,
     val webTopUpNote: String,
     val webTopUpTestNote: String,
     val webTopUpOpening: String,
@@ -29,7 +33,9 @@ class WebCreditStrings(
 
 val GermanWebCredit = WebCreditStrings(
     webTopUp = "Im Web aufladen",
-    webTopUpNote = "Öffnet die Kaufseite im Browser. 10 € zahlen = 10 € Guthaben, ohne Store-Gebühr. Kein Konto nötig.",
+    webChannel = "Im Web",
+    webPackage = { credit, price -> "$credit Guthaben · $price" },
+    webTopUpNote = "Öffnet die Kaufseite im Browser. 10 € zahlen = 10 € Guthaben, ohne Store-Aufpreis. Kein Konto nötig.",
     webTopUpTestNote = "Testmodus – keine echte Zahlung, nur Testkarten.",
     webTopUpOpening = "Kaufseite wird geöffnet …",
     webTopUpFailed = "Die Kaufseite ließ sich nicht öffnen. Bitte später noch einmal versuchen.",
@@ -50,7 +56,9 @@ val GermanWebCredit = WebCreditStrings(
 
 val EnglishWebCredit = WebCreditStrings(
     webTopUp = "Top up on the web",
-    webTopUpNote = "Opens the purchase page in your browser. Pay €10 = €10 of credit, no store fee. No account needed.",
+    webChannel = "On the web",
+    webPackage = { credit, price -> "$credit credit · $price" },
+    webTopUpNote = "Opens the purchase page in your browser. Pay €10 = €10 of credit, no store surcharge. No account needed.",
     webTopUpTestNote = "Test mode – no real payment, test cards only.",
     webTopUpOpening = "Opening the purchase page …",
     webTopUpFailed = "The purchase page could not be opened. Please try again later.",

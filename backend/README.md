@@ -174,7 +174,7 @@ den gleichen OAuth-Ablauf.
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
-| `MARKUP_BP` | 6900 | Einziger Aufschlag auf alle Modellpreise (Basispunkte, 6900 = 69 %); Herleitung in docs/monetization.md. Die Paket-Gutschrift ist immer 1:1 zum Preis |
+| `MARKUP_BP` | 2800 | Einziger Aufschlag auf alle Modellpreise (Basispunkte, 2800 = 28 %); Herleitung in docs/monetization.md. Web: Guthaben = Preis; Store: Guthaben laut `PACKAGES`, Store-Preis offen darüber |
 | `SPOT_STARTER_MICRO` / `SPOT_REWARD_MICRO` | 1 000 000 | Startguthaben (Eingeladener) / Belohnung (Einladender) |
 | `SPOT_TOKEN_TTL_SEC` | 45 | Gültigkeit des QR-Tokens |
 | `SPOT_MONTHLY_LIMIT_PER_INVITER` | 10 | Einladungen pro Einladendem und Monat |
@@ -186,11 +186,11 @@ den gleichen OAuth-Ablauf.
 | `PRICE_TABLE` | Tabelle in `src/providers.ts` | JSON: `{"<modell>":{"in":…,"cacheRead":…,"cacheWrite":…,"out":…}}` in **µ€ je 1 Mio. Token**; überschreibt einzelne Modelle der Tabelle |
 | `AI_GATEWAY_ID` | leer (direkt) | Name des Cloudflare AI Gateways; setzt der Deploy-Workflow (`overfit` bzw. `overfit-test`) |
 | `UPSTREAM_TIMEOUT_MS` / `UPSTREAM_BUDGET_MS` | 100 000 / 140 000 | Zeitlimit je Anbieter-Versuch / für Anfrage samt Ausweichen |
-| `PACKAGES` | 5 € / 10 € | JSON: `{"<store-produkt-id>":{"priceMicro":…}}` |
-| `WEB_PACKAGES` | 10 € / 20 € / 50 € | Pakete der Kaufseite, JSON `{"web.10":{"priceMicro":10000000}}`; Guthaben = Preis (1:1) |
-| `PADDLE_ENV` | Sandbox | `live` = echte Zahlungen, nur im Produktionsbetrieb (Repo-Variable `PADDLE_ENV`); Testbetrieb ist immer Sandbox |
+| `PACKAGES` | 5 € Guthaben für 6,99 € / 10 € für 13,99 € | JSON: `{"<store-produkt-id>":{"priceMicro":<Store-Preis>,"creditMicro":<Guthaben>}}`; ohne `creditMicro` gilt Guthaben = Preis |
+| `WEB_PACKAGES` | 5 € / 10 € / 20 € / 50 € | Pakete der Kaufseite, JSON `{"web.10":{"priceMicro":10000000}}`; Guthaben = Preis (1:1) |
+| `STRIPE_INVOICES` | aus | `on` = zu jedem Web-Kauf eine Stripe-Rechnung (PDF) mit §-19-Fußzeile; kostet bei Stripe extra (Repo-Variable) |
 | `WEB_PURCHASE_CHANNELS` | `sideload` | Wo die App „Im Web aufladen“ zeigt: `sideload` (APK), `store` (Play/App Store); Repo-Variable |
-| `WEB_PURCHASE` | an | `off` schaltet den Web-Kauf ab, auch mit Paddle-Secrets |
+| `WEB_PURCHASE` | an | `off` schaltet den Web-Kauf ab, auch mit Stripe-Secrets |
 | `WEB_PURCHASE_URL` | `https://bigfire3.github.io/overfit/guthaben/` | Adresse der Kaufseite (Ziel des Kauflinks) |
 | `WEB_LINK_TTL_SEC` | 900 | Gültigkeit des Kauflinks aus der App |
 | `CHAT_MAX_DOCS` / `CHAT_MAX_BYTES` | 5000 / 25 MB | Grenzen der KI-Chat-Daten je Konto (ohne Fotos) |
@@ -202,32 +202,57 @@ den gleichen OAuth-Ablauf.
 | `TEST_STARTER_MICRO` / `TEST_CREDIT_CAP_MICRO` | 1 000 000 / 20 000 000 | Test-Startguthaben je Konto / Obergrenze für alles Test-Guthaben |
 | `RL_*` | siehe API-Doku | Rate-Limits (`RL_MCP_PER_MIN` 120 je Verbindung) |
 
-## Web-Kauf (Paddle, Testmodus)
+## Web-Kauf (Stripe, Testmodus)
 
 Guthaben lässt sich auf `https://bigfire3.github.io/overfit/guthaben/` kaufen: aus der App mit Kauflink („Im Web aufladen“,
-15 Minuten gültig, ohne Login) oder ohne App als **Guthaben-Code** (Geschenk, in der App unter „Code einlösen“).
-Paddle ist Merchant of Record (übernimmt USt, Beleg, Erstattungen). Gebucht wird nur per Webhook, idempotent; Erstattung und
-Chargeback holen Guthaben zurück (nie unter 0) und markieren den Vorfall. Vertrag: `docs/backend-api.md` → „Web-Kauf“.
+15 Minuten gültig, ohne Login) oder ohne App als **Guthaben-Code** (Geschenk, in der App unter „Code einlösen“). Bezahlt wird auf der
+gehosteten **Stripe-Checkout-Seite**. Verkäufer ist Fabian als Kleinunternehmer (§ 19 UStG, keine USt, kein Stripe Tax); Stripe ist nur
+Zahlungsdienstleister. Gebucht wird nur per Webhook, idempotent; Erstattung und Chargeback holen Guthaben zurück (nie unter 0) und
+markieren den Vorfall. Vertrag: `docs/backend-api.md` → „Web-Kauf“. Rechnung und Schwellen: docs/monetization.md.
 
-Secrets (alle drei nötig, sonst bleibt der Web-Kauf aus, ohne Abbruch): `PADDLE_API_KEY` (`pdl_sdbx_apikey_…`),
-`PADDLE_CLIENT_TOKEN` (`test_…`, öffentlich, für Paddle.js), `PADDLE_WEBHOOK_SECRET` (`pdl_ntfset_…`). Der Testbetrieb nutzt
-immer die Sandbox (keine echte Zahlung). Ein Produktions-Worker bietet den Web-Kauf nur mit Repo-Variable `PADDLE_ENV = live`
-an, damit Testkarten nie echtes Guthaben erzeugen.
+Secrets (beide nötig, sonst bleibt der Web-Kauf aus, ohne Abbruch): `STRIPE_SECRET_KEY` und `STRIPE_WEBHOOK_SECRET` (`whsec_…`).
+Ein Publishable Key ist nicht nötig (gehosteter Checkout, kein Stripe.js). Der Schlüssel bestimmt den Modus: Der **Testbetrieb** nimmt nur
+`sk_test_…` (bzw. eingeschränkt `rk_test_…`), die **Produktion** nur `sk_live_…`. So erzeugen Testkarten nie echtes Guthaben und echte
+Zahlungen nie bloß Test-Guthaben. Zusätzlich ignoriert der Webhook Ereignisse, deren `livemode` nicht passt.
 
-**Einrichten im Browser (Sandbox):**
-1. **sandbox-login.paddle.com/signup** → Sandbox-Konto anlegen (kostenlos, ohne Prüfung).
-2. Paddle → **Checkout → Checkout settings** → *Default payment link* = `https://bigfire3.github.io/overfit/guthaben/` → Save.
-3. **Developer tools → Authentication → API keys → New API key** (Name `overfit-test`, Recht *Transactions: Write*) → kopieren.
-   **Client-side tokens → New client-side token** → kopieren.
-4. **Developer tools → Notifications → New destination**: Typ *Webhook*, URL = `<Worker-Adresse>/v1/webhooks/payment`
-   (Worker-Adresse = Repo-Variable `OVERFIT_BACKEND_URL`), Ereignisse `transaction.completed`, `adjustment.created`,
-   `adjustment.updated` → Save → Ziel öffnen → *Secret key* kopieren.
-5. GitHub → Settings → Secrets and variables → Actions → New repository secret: `PADDLE_API_KEY`, `PADDLE_CLIENT_TOKEN`,
-   `PADDLE_WEBHOOK_SECRET`.
-6. Actions → **Backend deployen** → Run workflow (`mode` = test). Die Zusammenfassung zeigt „Web-Kauf: An, Testmodus“ und die
-   Webhook-URL (muss mit Schritt 4 übereinstimmen).
-7. Actions → **Web veröffentlichen (GitHub Pages)** → Run workflow, damit die Kaufseite die Backend-Adresse kennt.
-8. Testkauf: Karte `4242 4242 4242 4242`, Ablauf in der Zukunft, CVC `100`, beliebiger Name und E-Mail.
+### Einrichten, alles im Browser (Testmodus)
+1. **dashboard.stripe.com/register** → Konto anlegen (E-Mail bestätigen). Für den Testmodus braucht es noch keine Prüfung.
+   Oben rechts muss **„Testmodus“** (bzw. die Sandbox) aktiv sein.
+2. **Einstellungen → Unternehmen → Öffentliche Unternehmensangaben** (Settings → Business → Public details): *Öffentlicher Name*
+   (z. B. `overfit`, so heißt es im Checkout und auf dem Beleg), Support-E-Mail, Website `https://bigfire3.github.io/overfit/`.
+   *Statement descriptor* (Text auf dem Kontoauszug), z. B. `OVERFIT`.
+3. **§-19-Hinweis auf Belegen und Rechnungen:**
+   - Der Checkout zeigt ihn automatisch (setzt das Backend über `custom_text`), ebenso Kaufseite und Bestätigung.
+   - **Einstellungen → Billing → Rechnungsvorlage** (Settings → Billing → Invoice template): *Standard-Fußzeile* =
+     `Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.` → Speichern. Das gilt für jede Stripe-Rechnung.
+   - **Einstellungen → Unternehmen → Kunden-E-Mails** (Customer emails): *Erfolgreiche Zahlungen* einschalten. Diese Zahlungsbelege haben
+     kein freies Fußzeilenfeld; wer eine Rechnung mit dem Hinweis will, setzt die Repo-Variable `STRIPE_INVOICES = on` (Stripe erzeugt dann
+     zu jedem Kauf eine Rechnung mit der Fußzeile; kostet bei Stripe pro Rechnung extra). Im Testmodus verschickt Stripe keine Belege
+     automatisch; im Zahlungsdetail lässt sich der Beleg ansehen bzw. von Hand senden.
+4. **Einstellungen → Zahlungen → Zahlungsmethoden** (Payment methods): Karten sind an. Optional Apple Pay, Google Pay, Link, Klarna,
+   SEPA-Lastschrift, EPS, iDEAL, Bancontact einschalten; der Checkout zeigt automatisch, was passt. Keine Zahlart mit Zusatzaufwand nötig.
+5. **Entwickler → API-Schlüssel** (Developers → API keys): *Geheimschlüssel* (`sk_test_…`) → Anzeigen → kopieren.
+6. **Entwickler → Webhooks** (je nach Dashboard auch *Workbench → Webhooks*) → **Ziel hinzufügen / Endpunkt hinzufügen**:
+   - URL: `<Worker-Adresse>/v1/webhooks/payment` (Worker-Adresse = Repo-Variable `OVERFIT_BACKEND_URL`; die Deploy-Zusammenfassung nennt die URL),
+   - Ereignisse: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, `charge.dispute.created`,
+   - Speichern → beim Endpunkt *Signaturgeheimnis* (Signing secret, `whsec_…`) → Anzeigen → kopieren.
+7. GitHub → Settings → Secrets and variables → Actions → **New repository secret**: `STRIPE_SECRET_KEY` (Schritt 5),
+   `STRIPE_WEBHOOK_SECRET` (Schritt 6). Alte `PADDLE_*`-Secrets können gelöscht werden.
+8. Actions → **Backend deployen** → Run workflow (`mode` = test). Die Zusammenfassung zeigt „Web-Kauf: An, Testmodus (Stripe)“ und die
+   Webhook-URL (muss mit Schritt 6 übereinstimmen).
+9. Actions → **Web veröffentlichen (GitHub Pages)** → Run workflow, damit die Kaufseite die Backend-Adresse kennt.
+10. Testkauf: Karte `4242 4242 4242 4242`, Ablauf in der Zukunft, beliebige CVC, beliebiger Name/E-Mail/Land.
+    Ablehnung testen: `4000 0000 0000 0002`. Chargeback testen: `4000 0000 0000 0259`.
+11. Erstattung testen: Stripe → **Zahlungen** → Kauf öffnen → **Erstatten** (voll oder teilweise) → Guthaben sinkt um den Betrag (nie unter 0).
+
+### Für echte Zahlungen zusätzlich
+- Stripe → **Konto aktivieren**: Rechtsform (Einzelunternehmen), Identität, Anschrift, Bankkonto, Steuerangaben (Kleinunternehmer,
+  Steuernummer), Produktbeschreibung. Stripe prüft das; erst dann gibt es Live-Schlüssel.
+- Im Live-Modus Schritte 2–6 wiederholen (Schlüssel und Webhook sind je Modus getrennt), dann in GitHub **`STRIPE_LIVE_SECRET_KEY`**
+  (`sk_live_…`) und **`STRIPE_LIVE_WEBHOOK_SECRET`** anlegen und **Backend deployen** mit `mode` = production. Die Testwerte
+  (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) bleiben für den Testbetrieb stehen.
+- Impressum, Datenschutzerklärung, AGB und Widerrufsbelehrung für digitale Inhalte (die Kaufseite zeigt Platzhalter „folgt vor dem
+  Start“), juristische Prüfung. Kleinunternehmer-Schwellen beobachten (`scripts/usage-report.mjs`, docs/monetization.md).
 
 ## KI-Modelle, Preise und AI Gateway
 
