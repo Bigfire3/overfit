@@ -28,7 +28,7 @@ val GermanCoachStory = CoachStoryStrings(
     progress = { page, total -> "Seite $page von $total" },
     whatItDoes = StoryPage(
         "Dein Coach wertet aus",
-        "Trainings, Fortschritt und Gewichte. Er schlägt dir neue Workouts vor und beantwortet Fragen.",
+        "Trainings, Fortschritt und Gewichte. Er schlägt dir neue Workouts vor und beantwortet Fragen. Ohne Zugang siehst du eine Demo.",
     ),
     ownKey = StoryPage(
         "Mit eigenem Schlüssel",
@@ -37,13 +37,13 @@ val GermanCoachStory = CoachStoryStrings(
     ),
     credit = StoryPage(
         "Mit Guthaben",
-        "Kein Schlüssel nötig. Lade Guthaben auf oder lade Freunde ein: Beide bekommen einen Einladungsbonus.",
+        "Kein Schlüssel nötig: Du nutzt Guthaben. Wenn du Freunde einlädst, bekommt ihr beide einen Einladungsbonus.",
         "Zum Guthaben",
     ),
     subscription = StoryPage(
         "Mit deinem Abo",
-        "Kopiere fertige Prompts oder verbinde Claude, ChatGPT und Gemini. Ohne Extrakosten in Overfit.",
-        "Claude verbinden",
+        "Kopiere fertige Prompts in Claude, ChatGPT oder Gemini und nutze dein normales Abo.",
+        "Zu den Verbindungen",
     ),
 )
 
@@ -55,7 +55,7 @@ val EnglishCoachStory = CoachStoryStrings(
     progress = { page, total -> "Page $page of $total" },
     whatItDoes = StoryPage(
         "Your coach evaluates",
-        "Workouts, progress and weights. It suggests new workouts and answers questions.",
+        "Workouts, progress and weights. It suggests new workouts and answers questions. Without access you see a demo.",
     ),
     ownKey = StoryPage(
         "With your own key",
@@ -64,12 +64,12 @@ val EnglishCoachStory = CoachStoryStrings(
     ),
     credit = StoryPage(
         "With credit",
-        "No key needed. Top up credit or invite friends: you both get a referral bonus.",
+        "No key needed: you use credit. When you invite friends, you both get a referral bonus.",
         "Go to credit",
     ),
     subscription = StoryPage(
         "With your subscription",
-        "Copy ready-made prompts or connect Claude, ChatGPT and Gemini. No extra cost in Overfit.",
-        "Connect Claude",
+        "Copy ready-made prompts into Claude, ChatGPT or Gemini and use your normal subscription.",
+        "See connections",
     ),
 )

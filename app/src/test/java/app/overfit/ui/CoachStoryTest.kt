@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.room.Room
@@ -70,6 +71,8 @@ class CoachStoryTest {
         compose.waitForTrainingTab()
     }
 
+    private fun tapRight() = compose.onNodeWithTag("story").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.85f, height * 0.5f)) }
+    private fun tapLeft() = compose.onNodeWithTag("story").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.1f, height * 0.5f)) }
     private fun shown(text: String) = compose.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
     private fun await(text: String) = compose.waitUntil(10_000) { shown(text) }
     private fun storyShown() = compose.onAllNodesWithTag("story").fetchSemanticsNodes().isNotEmpty()
@@ -106,19 +109,19 @@ class CoachStoryTest {
         await(s.whatItDoes.title)
         // Page 1 has no shortcut; the right side goes forward through the ways, the left side back.
         assertTrue(compose.onAllNodesWithTag("story:action").fetchSemanticsNodes().isEmpty())
-        compose.onNodeWithTag("story:next").performClick(); await(s.ownKey.title)
-        compose.onNodeWithTag("story:next").performClick(); await(s.credit.title)
-        compose.onNodeWithTag("story:next").performClick(); await(s.subscription.title)
-        compose.onNodeWithTag("story:back").performClick(); await(s.credit.title)
-        compose.onNodeWithTag("story:back").performClick(); await(s.ownKey.title)
-        compose.onNodeWithTag("story:back").performClick(); await(s.whatItDoes.title)
+        tapRight(); await(s.ownKey.title)
+        tapRight(); await(s.credit.title)
+        tapRight(); await(s.subscription.title)
+        tapLeft(); await(s.credit.title)
+        tapLeft(); await(s.ownKey.title)
+        tapLeft(); await(s.whatItDoes.title)
         // Back on the first page stays there.
-        compose.onNodeWithTag("story:back").performClick(); await(s.whatItDoes.title)
+        tapLeft(); await(s.whatItDoes.title)
 
         // Past the last page closes it.
-        repeat(3) { compose.onNodeWithTag("story:next").performClick() }
+        repeat(3) { tapRight() }
         await(s.subscription.title)
-        compose.onNodeWithTag("story:next").performClick()
+        tapRight()
         awaitStoryGone()
         await("Prompts & Vorlagen".uppercase())
     }
@@ -135,11 +138,36 @@ class CoachStoryTest {
 
         compose.onNodeWithTag("coach:storyOpen").performClick()
         await(s.whatItDoes.title)
-        compose.onNodeWithTag("story:next").performClick()
+        tapRight()
         await(s.ownKey.title)
         compose.onNodeWithTag("story:action").performClick()
         awaitStoryGone()
         await("Wie bekomme ich einen Key?")
+    }
+
+    @Test
+    fun creditShortcutOpensCreditAndTheStoryNeverCallsTheNetwork() {
+        kv.put(AppStore.KEY_COACH_STORY_SEEN, "1")
+        store.connectAi(app.overfit.ai.ProviderId.ANTHROPIC, "sk-test")
+        var calls = 0
+        val deps = AppDependencies(
+            store, Providers(HttpClient(MockEngine { calls++; respond("{}") })), data, versionName = "t",
+            share = NoopPlatformShare(), today = { LocalDate(2026, 11, 3) }, coachStoryAutoAdvance = false,
+        )
+        compose.setContent { OverfitApp(deps) }
+        compose.waitForTrainingTab()
+        compose.onNodeWithTag("tab:COACH").performClick()
+        compose.onNodeWithTag("coach:storyOpen").performClick()
+        await(s.whatItDoes.title)
+        repeat(2) { tapRight() }
+        await(s.credit.title)
+        // Own key: opening and paging through the story makes no request at all.
+        assertEquals(0, calls)
+        compose.onNodeWithTag("story:action").performClick()
+        awaitStoryGone()
+        // Credit screen without a configured backend: its "coming soon" text.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Sobald der Server läuft", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(0, calls)
     }
 
     @Test

@@ -3,7 +3,9 @@ package app.overfit.ui.coach
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +19,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,7 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -80,6 +87,15 @@ fun CoachStoryScreen(
         Modifier
             .fillMaxSize()
             .background(Theme.colors.background)
+            .pointerInput(page) {
+                // Tap right two thirds = next (past the last page = close), left third = back. Buttons take their own taps first.
+                detectTapGestures { at ->
+                    if (at.x < size.width / 3f) { if (page > 0) page -= 1 } else if (page < last) page += 1 else onClose()
+                }
+            }
+            .semantics {
+                onClick(label = s.next) { if (page < last) page += 1 else onClose(); true }
+            }
             .pointerInput(Unit) {
                 var drag = 0f
                 detectVerticalDragGestures(
@@ -90,21 +106,6 @@ fun CoachStoryScreen(
             }
             .testTag("story"),
     ) {
-        // Tap zones: left third = back, rest = next (past the last page = close).
-        Row(Modifier.fillMaxSize()) {
-            val none = remember { MutableInteractionSource() }
-            Box(
-                Modifier.weight(1f).fillMaxSize().testTag("story:back")
-                    .semantics { contentDescription = s.back }
-                    .clickable(none, indication = null) { if (page > 0) page -= 1 },
-            )
-            Box(
-                Modifier.weight(2f).fillMaxSize().testTag("story:next")
-                    .semantics { contentDescription = s.next }
-                    .clickable(none, indication = null) { if (page < last) page += 1 else onClose() },
-            )
-        }
-
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = Space.m)) {
             Spacer(Modifier.height(Space.m))
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
@@ -126,13 +127,13 @@ fun CoachStoryScreen(
 
             val p = pages[page]
             Column(
-                Modifier.weight(1f).fillMaxWidth(),
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 LineIcon(storyIcons[page], size = 96.dp)
                 Spacer(Modifier.height(Space.xl))
-                Text(p.title, style = Theme.type.title, align = TextAlign.Center, modifier = Modifier.testTag("story:title"))
+                Text(p.title, style = Theme.type.title, align = TextAlign.Center, modifier = Modifier.testTag("story:title").semantics { heading() })
                 Spacer(Modifier.height(Space.m))
                 Text(p.text, tone = Tone.Muted, align = TextAlign.Center)
                 val target = storyTargets[page]
@@ -143,7 +144,7 @@ fun CoachStoryScreen(
             }
             Text(
                 s.progress(page + 1, pages.size),
-                Modifier.fillMaxWidth().padding(bottom = Space.m),
+                Modifier.fillMaxWidth().padding(bottom = Space.m).semantics { liveRegion = LiveRegionMode.Polite },
                 style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center,
             )
         }

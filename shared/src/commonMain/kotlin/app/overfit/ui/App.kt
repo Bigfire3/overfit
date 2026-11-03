@@ -886,7 +886,7 @@ fun OverfitApp(deps: AppDependencies) {
                                     when (target) {
                                         StoryTarget.OwnKey -> ConnectRoute
                                         StoryTarget.Credit -> FuelRoute
-                                        StoryTarget.ChatConnections -> ChatProviderRoute(ChatProvider.CLAUDE.name)
+                                        StoryTarget.ChatConnections -> AiCoachRoute
                                     },
                                 )
                             },

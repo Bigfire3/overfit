@@ -937,5 +937,5 @@ Offen / Hinweise:
 1. Neue APK, Tab „Coach“ zum ersten Mal öffnen → Story geht von selbst auf; X oder nach unten wischen schließt
 2. Tab wechseln und zurück → keine Story mehr; Tipp auf „Coach ⓘ“ öffnet sie wieder
 3. Rechts tippen = weiter, links = zurück, nach ca. 6 s geht sie von selbst weiter; auf Seite 4 rechts tippen schließt
-4. Knöpfe auf Seite 2–4: „Schlüssel einrichten“, „Zum Guthaben“, „Claude verbinden“ führen zur passenden Stelle
+4. Knöpfe auf Seite 2–4: „Schlüssel einrichten“, „Zum Guthaben“, „Zu den Verbindungen“ führen zur passenden Stelle
 5. Coach-Seite wirkt ruhiger; Auswerten, Chat, Prompts und Verbindungen funktionieren wie vorher
