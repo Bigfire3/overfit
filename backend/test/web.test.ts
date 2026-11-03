@@ -109,7 +109,9 @@ describe('Kauflink aus der App', () => {
       { id: 'web.20', priceMicro: 20_000_000, creditMicro: 20_000_000 },
     ]);
     expect((await post(e, '/v1/web/session', { token: 'x'.repeat(32) })).body.link.status).toBe('invalid');
-    await DB.prepare('UPDATE web_links SET expires_at = 1').run();
+    // Gerade abgelaufen (nicht expires_at = 1): Die zufällige Aufräumroutine (2 % der Anfragen) löscht Links, die länger als einen
+    // Tag abgelaufen sind; dann käme 404 statt 410.
+    await DB.prepare('UPDATE web_links SET expires_at = ?').bind(Math.floor(Date.now() / 1000) - 60).run();
     expect((await post(e, '/v1/web/session', { token })).body.link.status).toBe('expired');
     const co = await post(e, '/v1/web/checkout', { token, packageId: 'web.5', kind: 'credit' });
     expect(co.status).toBe(410);
