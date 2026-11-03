@@ -1,0 +1,62 @@
+package app.overfit.domain
+
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+
+/** Calendar maths for the photo diary (month grid, week start, week streak). Pure, common tests. */
+object DiaryCalendar {
+    /** Mon–Sun in German, Sun–Sat in English (US convention). */
+    fun weekStart(language: Language): DayOfWeek = if (language == Language.DE) DayOfWeek.MONDAY else DayOfWeek.SUNDAY
+
+    /** The seven weekdays in display order, starting with [weekStart]. */
+    fun weekdays(weekStart: DayOfWeek): List<DayOfWeek> = List(7) { DayOfWeek.entries[(weekStart.ordinal + it) % 7] }
+
+    /**
+     * Cells of one month: leading nulls up to the first weekday, the days, trailing nulls so the
+     * list fills whole rows of 7.
+     */
+    fun monthGrid(year: Int, month: Int, weekStart: DayOfWeek): List<LocalDate?> {
+        val first = LocalDate(year, month, 1)
+        val lead = (first.dayOfWeek.ordinal - weekStart.ordinal + 7) % 7
+        val next = if (month == 12) LocalDate(year + 1, 1, 1) else LocalDate(year, month + 1, 1)
+        val days = first.daysUntil(next)
+        val cells = MutableList<LocalDate?>(lead) { null }
+        for (d in 0 until days) cells += first.plus(DatePeriod(days = d))
+        while (cells.size % 7 != 0) cells += null
+        return cells
+    }
+
+    /** Months from [today]'s month back to the month of [earliest], newest first, as (year, month). */
+    fun months(earliest: LocalDate?, today: LocalDate): List<Pair<Int, Int>> {
+        val start = earliest?.takeIf { it <= today } ?: today
+        val out = mutableListOf<Pair<Int, Int>>()
+        var y = today.year
+        var m = today.monthNumber
+        while (y > start.year || (y == start.year && m >= start.monthNumber)) {
+            out += y to m
+            if (m == 1) { m = 12; y-- } else m--
+        }
+        return out
+    }
+
+    /** First day of the week containing [date]. */
+    fun weekOf(date: LocalDate, weekStart: DayOfWeek): LocalDate =
+        date.minus(DatePeriod(days = (date.dayOfWeek.ordinal - weekStart.ordinal + 7) % 7))
+
+    /**
+     * Current streak in weeks with at least one workout. The running week counts if it has one;
+     * if it has none yet, the streak is not broken until the week is over.
+     */
+    fun streakWeeks(trainingDays: Collection<LocalDate>, today: LocalDate, weekStart: DayOfWeek): Int {
+        val weeks = trainingDays.map { weekOf(it, weekStart) }.toSet()
+        var week = weekOf(today, weekStart)
+        if (week !in weeks) week = week.minus(DatePeriod(days = 7))
+        var n = 0
+        while (week in weeks) { n++; week = week.minus(DatePeriod(days = 7)) }
+        return n
+    }
+}

@@ -493,6 +493,14 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
   per „Run workflow“. Ersatz: Die Android-CI kompiliert `iosMain` (`:shared:compileKotlinIosSimulatorArm64`, Linux).
   Gemergt wird bei grüner Android-CI; die iOS-CI vor einem iOS-Release oder nach größeren iOS-Änderungen von Hand starten.
 
+## Foto-Tagebuch wie BeReal (Session M, 3.11.)
+- **Wochenstart nach Sprache:** DE Montag, EN Sonntag (US-Konvention); die Spec nennt „Mo–So“, die englische Fassung folgt der Sprache wie gefordert.
+- **Serie:** Wochen in Folge mit mindestens einem Training. Die laufende Woche ohne Training bricht die Serie nicht, bis sie vorbei ist.
+- **Tippziel:** Tag mit Foto öffnet das Vollbild beim ältesten Foto des Tages; Tag nur mit Training öffnet das Training im Verlauf.
+- **Vergleichen** bleibt erhalten und nimmt im Raster das letzte Foto des Tages.
+- **Bestwerte im Vollbild** werden mit `WorkoutRepository.summary` nachgeladen (max. 3 Zeilen), kein neues Schema.
+- **Teilen eines Fotos** gab es im Viewer bisher nicht; neu über `PlatformShare.shareBytes` (JPEG).
+
 ## Workout minimieren (Session L, 3.11.)
 - **Minimiert = reiner UI-Zustand, kein Controller-Zustand.** `WorkoutRoute` ist ein normales Navigationsziel; „minimiert“ heißt: das Training läuft (`WorkoutController.state.workout != null`), aber `WorkoutRoute` ist nicht oben. Die Leiste (`MiniWorkoutBar`) sitzt im `AppScaffold` über der Tab-Leiste und erscheint damit auf allen Hauptscreens. Der WorkoutController, Pausentimer, Benachrichtigungen und Haptik sind unverändert.
 - Minimieren-Knopf (Pfeil nach unten) und System-Zurück machen dasselbe: `popBackStack` auf den Screen darunter (Standardverhalten der Navigation, kein eigener BackHandler nötig). Beenden/Verwerfen bleiben die bestehenden Doppeltipp-Aktionen im Training.

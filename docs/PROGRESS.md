@@ -15,6 +15,23 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Foto-Tagebuch im Stil von BeReal „Memories“ (Session M, 3.11.)
+**Erledigt:** `ui/photos` umgebaut, keine Schemaänderung.
+- Monatsweises Kalender-Raster (7 Spalten, Wochenstart DE Montag / EN Sonntag), neuester Monat zuerst, Monatsname groß.
+- Tag mit Foto: Hochformat-Kachel mit runden Ecken (zentriert zugeschnitten), Tageszahl darüber, Zähl-Badge bei mehreren Fotos. Training ohne Foto: graue Kachel (`surface`). Sonst nur Zahl in `faint`; heute mit Haarlinie.
+- Kopf: Trainings gesamt, Fotos gesamt, Serie in Wochen. Leerer Zustand mit Hinweis aufs Foto beim Beenden.
+- Vollbild: Wischen links/rechts = nächster/vorheriger Foto-Tag, mehrere Fotos eines Tages vertikal (mit Punkten). Darunter Datum, Training, Dauer, Volumen, neue Bestwerte, „Training ansehen“, „Foto teilen“ (neu), „Foto löschen“ (Bestätigungsmuster).
+- „Vergleichen“ bleibt (wählt das letzte Foto eines Tages).
+- Logik in `domain/DiaryCalendar.kt` (Raster, Wochenstart, Serie), Tests: `DiaryCalendarTest` (common), `DiaryScreenTest` (Robolectric).
+
+### Bitte auf dem Handy testen: Foto-Tagebuch
+1. Fotos-Tab: Monatsraster, aktueller Monat oben; heute hat eine Haarlinie. Kopf zeigt Trainings, Fotos, Wochen-Serie.
+2. Tage mit Foto zeigen die Kachel, mit Training ohne Foto grau; Tipp auf grauen Tag öffnet das Training.
+3. Tipp auf Foto-Tag: Vollbild. Nach links/rechts wischen springt zum nächsten/vorherigen Foto-Tag; bei mehreren Fotos senkrecht blättern.
+4. Unter dem Foto: Dauer, Volumen, ggf. neue Bestwerte. „Training ansehen“ führt in den Verlauf; „Foto teilen“ öffnet das Share-Sheet; Löschen braucht zwei Tipps.
+5. Sprache auf English: Woche beginnt am Sonntag.
+6. Scrollen durch viele Monate ruckelt nicht.
+
 ## Tab „Training“: Workouts statt Vorlagen (Session O, 3.11.)
 Erledigt: Tab 1 heißt „Training“ (EN „Workouts“) und zeigt die eigenen Workouts mit „zuletzt vor N Tagen“; „+“ → „Workout erstellen“ oder „Leer starten“, darunter Import/KI-Prompt/Beispiele; Workout-Seite mit „Starten“, „Bearbeiten“, „Teilen“. „Vorlage“ ist aus allen Texten raus. Beim Beenden oder Verwerfen übernimmt das Workout die Struktur des Trainings automatisch, ein leer gestartetes Training wird ein Workout (Name im Beenden-Flow). Übungen sind kein Tab mehr, sondern über das Hantel-Icon im Training-Tab erreichbar. Tests: `WorkoutPlanTest`, `WorkoutControllerTest`, `RepositoryTest`, neuer `TrainingTabTest`, bestehende UI-Tests angepasst.
 Offen: Abstimmung mit Session L (Mini-Leiste, „Training beenden“ auf dem Tab) beim Zusammenführen.

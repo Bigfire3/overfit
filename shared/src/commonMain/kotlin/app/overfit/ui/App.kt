@@ -672,18 +672,30 @@ fun OverfitApp(deps: AppDependencies) {
                     }
                     composable<PhotosRoute> {
                         val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
+                        val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
                         PhotosScreen(
                             photos = photos,
+                            history = history,
+                            language = state.language,
+                            today = deps.today(),
                             onOpen = { nav.navigate(PhotoViewerRoute(it)) },
+                            onWorkout = { nav.navigate(HistoryDetailRoute(it)) },
                             onCompare = { a, b -> nav.navigate(PhotoCompareRoute(a, b)) },
                         )
                     }
                     composable<PhotoViewerRoute> { entry ->
                         val id = entry.toRoute<PhotoViewerRoute>().photoId
                         val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
+                        val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
                         PhotoViewerScreen(
                             photos = photos,
+                            history = history,
                             photoId = id,
+                            language = state.language,
+                            unit = state.profile.unit,
+                            platform = deps.share,
+                            loadSummary = { deps.data.workouts.summary(it) },
+                            loadJpeg = { deps.data.workouts.photoJpeg(it) },
                             onBack = nav::popBackStack,
                             onWorkout = { nav.navigate(HistoryDetailRoute(it)) },
                             onDelete = { photoId ->
