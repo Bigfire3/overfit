@@ -26,3 +26,4 @@ tools/catalog/.cache/
 *.jks
 *.p12
 *.keystore
+__pycache__/
