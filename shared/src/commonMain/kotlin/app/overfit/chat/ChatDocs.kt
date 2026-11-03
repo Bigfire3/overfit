@@ -10,6 +10,8 @@ import app.overfit.domain.WeightUnit
 import app.overfit.domain.WorkoutExercise
 import app.overfit.domain.WorkoutSet
 import app.overfit.domain.ExerciseOrigin
+import app.overfit.domain.aiProfileFacts
+import kotlinx.datetime.toLocalDateTime
 import app.overfit.fuel.Sha256
 import app.overfit.fuel.toHex
 import kotlinx.serialization.json.JsonNull
@@ -21,6 +23,11 @@ import kotlinx.serialization.json.put
 
 /** Maps the app's data to the sync documents of docs/backend-api.md. Weights in kg, times in ms. Pure functions. */
 object ChatDocs {
+    private fun today(now: Long, timeZone: String): kotlinx.datetime.LocalDate {
+        val tz = runCatching { kotlinx.datetime.TimeZone.of(timeZone) }.getOrDefault(kotlinx.datetime.TimeZone.UTC)
+        return kotlin.time.Instant.fromEpochMilliseconds(now).toLocalDateTime(tz).date
+    }
+
     const val PROFILE_ID = "me"
     const val MEMORY_ID = "coach"
 
@@ -31,6 +38,8 @@ object ChatDocs {
             put("unit", if (profile.unit == WeightUnit.KG) "kg" else "lb")
             put("language", if (language == Language.DE) "de" else "en")
             put("timeZone", timeZone)
+            // Same line as in every other AI path; the backend adds it to every MCP tool answer.
+            aiProfileFacts(profile, weights, today(now, timeZone), language)?.let { put("summary", it) }
             put("bodyweight", buildJsonArray {
                 weights.sortedBy { it.date }.forEach { add(buildJsonObject { put("date", it.date); put("kg", it.kg) }) }
             })

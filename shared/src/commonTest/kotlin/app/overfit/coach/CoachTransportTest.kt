@@ -1,6 +1,7 @@
 package app.overfit.coach
 
 import app.overfit.ai.FuelProvider
+import app.overfit.ai.ProviderId
 import app.overfit.fuel.FuelAccount
 import app.overfit.fuel.FuelConfig
 import app.overfit.fuel.FuelException
@@ -194,6 +195,44 @@ class CoachTransportTest {
 
         val err = """{"error":{"code":429,"message":"slow down"}}"""
         assertEquals(CoachErrorKind.RATE_LIMIT, errorKind { OpenRouterCoach(client(response = err)) { "k" }.send(prompt, "m") })
+    }
+
+    // ---- Gemini ----
+
+    @Test
+    fun geminiRequestAndReply() = runTest {
+        val rec = Recorder()
+        val p = prompt.copy(images = listOf(CoachImage("today", byteArrayOf(1, 2, 3))))
+        val reply = GeminiCoach(client(rec, response = chatOk)) { "AIza-x" }.send(p, CoachModels.default(ProviderId.GEMINI))
+        assertEquals("hello", reply.text)
+        assertFalse(reply.truncated)
+        assertEquals("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", rec.last.url.toString())
+        assertEquals("Bearer AIza-x", rec.last.headers[HttpHeaders.Authorization])
+        val b = rec.body
+        assertEquals("gemini-3.6-flash", b["model"]!!.jsonPrimitive.content)
+        assertEquals(16000, b["max_tokens"]!!.jsonPrimitive.content.toInt())
+        assertFalse(b.containsKey("max_completion_tokens"))
+        val rf = b["response_format"]!!.jsonObject
+        assertEquals("json_schema", rf["type"]!!.jsonPrimitive.content)
+        assertEquals("true", rf["json_schema"]!!.jsonObject["strict"]!!.jsonPrimitive.content)
+        val user = b["messages"]!!.jsonArray.last().jsonObject["content"]!!.jsonArray
+        val url = user.map { it.jsonObject }.first { it["type"]!!.jsonPrimitive.content == "image_url" }["image_url"]!!.jsonObject["url"]!!.jsonPrimitive.content
+        assertTrue(url.startsWith("data:image/jpeg;base64,"), url)
+    }
+
+    @Test
+    fun geminiInvalidKeyIs400AuthError() = runTest {
+        val body = """{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}"""
+        val c = GeminiCoach(client(status = HttpStatusCode.BadRequest, response = body)) { "bad" }
+        assertEquals(CoachErrorKind.AUTH, errorKind { c.send(prompt, "gemini-3.6-flash") })
+        val other = GeminiCoach(client(status = HttpStatusCode.BadRequest, response = """{"error":{"message":"bad schema"}}""")) { "k" }
+        assertTrue(errorKind { other.send(prompt, "gemini-3.6-flash") } != CoachErrorKind.AUTH)
+    }
+
+    @Test
+    fun geminiDefaultModelAndMissingKey() = runTest {
+        assertEquals("gemini-3.6-flash", CoachModels.default(ProviderId.GEMINI))
+        assertEquals(CoachErrorKind.NO_ACCESS, errorKind { GeminiCoach(client(response = chatOk)) { null }.send(prompt, "m") })
     }
 
     // ---- Fuel ----

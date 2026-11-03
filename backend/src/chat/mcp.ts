@@ -11,7 +11,7 @@ export const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'];
 const SERVER_INFO = { name: 'overfit', title: 'Overfit', version: '1.0.0' };
 
 const INSTRUCTIONS = `Overfit is the user's strength-training and calisthenics log (phone app). These tools give you their profile, coach memory, templates, full workout history with every set, per-exercise progress and – if shared – body photos.
-Typical flow: get_profile first (answer in the user's app language, respect injuries/limitations) → list_workouts / get_workout / get_exercise_progress to analyse → create_template to propose a plan (it lands in the app inbox; the user accepts it there and then simply trains it) → add_note to store an evaluation in the app.
+Every tool answer starts with "user" (name, age, current body weight) – address the user by name and take age and weight into account. Typical flow: get_profile first (answer in the user's app language, respect injuries/limitations) → list_workouts / get_workout / get_exercise_progress to analyse → create_template to propose a plan (it lands in the app inbox; the user accepts it there and then simply trains it) → add_note to store an evaluation in the app.
 Rules: weights are kg; convert for lb users. Suggest realistic progressions (e.g. +2.5 kg or +1 rep), detect plateaus, consider calisthenics progressions. Photos: factual, kind, focus on visible change. Data reflects the last sync from the phone.`;
 
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };

@@ -9,6 +9,7 @@ import app.overfit.coach.CoachProfile
 import app.overfit.coach.CoachService
 import app.overfit.coach.CoachTransport
 import app.overfit.coach.FuelCoach
+import app.overfit.coach.GeminiCoach
 import app.overfit.coach.OpenAiCoach
 import app.overfit.coach.OpenRouterCoach
 import app.overfit.data.AppData
@@ -38,6 +39,7 @@ internal fun createCoach(
             ProviderId.OPENAI -> OpenAiCoach(providers.http, store::apiKey)
             ProviderId.OPENROUTER -> OpenRouterCoach(providers.http, store::apiKey)
             ProviderId.FUEL -> FuelCoach(providers.fuel)
+            ProviderId.GEMINI -> GeminiCoach(providers.http, store::apiKey)
         }
     }
     return CoachService(
