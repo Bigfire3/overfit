@@ -67,7 +67,7 @@ class OverfitUITestCase: XCTestCase {
     }
 
     /** Confirm buttons change their label and reset after 4 s: tap twice on the same spot, screenshot in between. */
-    func confirm(_ label: String, shotName: String) {
+    func confirm(_ label: String, shotName: String? = nil) {
         guard let button = find(label) else { waitFor(label); return }
         // Absolute screen point: after the first tap the button has a new label, an element-relative
         // coordinate would be resolved again and not find it.
@@ -75,8 +75,7 @@ class OverfitUITestCase: XCTestCase {
         let spot = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX, dy: frame.midY))
         spot.tap()
         usleep(400_000)
-        let screenshot = XCUIScreen.main.screenshot()
-        save(screenshot, name: shotName)
+        if let shotName { save(XCUIScreen.main.screenshot(), name: shotName) }
         spot.tap()
     }
 
@@ -222,10 +221,11 @@ final class ScreenshotTests: OverfitUITestCase {
         sleep(1)
         app.typeText("Wie trainiere ich morgen?")
         shot("10c-coach-tastatur")
-        tap("Senden")
-        waitFor("Zurück")
-        shot("10d-coach-chat")
-        tap("Zurück")
+        // While the text field has focus, Compose's accessibility snapshot lists the text buttons
+        // below it without labels; restart with the same data instead of searching "Senden".
+        app.terminate()
+        launch(theme: theme, keepData: true)
+        waitFor("Legs")
         tab("PHOTOS")
         waitFor("Foto-Tagebuch")
         shot("11-fotos")
@@ -262,8 +262,7 @@ final class SmokeTests: OverfitUITestCase {
         waitFor("Zum laufenden Training")
         tap("Training öffnen")
         waitFor("Nächsten Satz loggen")
-        tap("Beenden")
-        tap("Beenden? Nochmal tippen")
+        confirm("Beenden")
         waitFor("Training beendet")
         tap("Speichern")
         tab("HISTORY")
