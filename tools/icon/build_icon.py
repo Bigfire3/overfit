@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Erzeugt das Overfit-App-Icon („of“ aus Inter-Glyphen als Pfade) und alle Plattform-Dateien aus EINER Quelle.
 
-    python3 tools/icon/build_icon.py                 # Variante B1, dunkel
+    python3 tools/icon/build_icon.py                 # Variante B5, dunkel
     python3 tools/icon/build_icon.py --variant B2    # andere Variante
     python3 tools/icon/build_icon.py --variant B1 --theme light
     python3 tools/icon/build_icon.py --weight 800 --size 0.5 --tracking -0.03 --dot   # frei
@@ -34,7 +34,8 @@ class Variant:
     dx: float = 0.0          # Versatz der Schrift (Anteil der Kante, negativ = links)
     dot: bool = False        # runder Punkt rechts unten auf Grundlinienhöhe
     circle: float = 0.0      # >0: Kreis mit diesem Radius (Anteil der Kante) in Schriftfarbe, Text in Grundfarbe
-    anchor: str = "center"   # "center" oder "bottom-left" (angeschnitten)
+    anchor: str = "center"   # "center" oder "left" (linke Tintenkante bei `left`)
+    left: float = 0.0        # nur anchor="left": linke Tintenkante als Anteil der Kante
 
 
 VARIANTS = {
@@ -42,7 +43,7 @@ VARIANTS = {
     "B2": Variant(weight=900, size=0.46, tracking=-0.035),
     "B3": Variant(weight=600, size=0.36, tracking=-0.01),
     "B4": Variant(weight=800, size=0.42, tracking=-0.025, dx=-0.03, dot=True),
-    "B5": Variant(weight=800, size=0.58, tracking=-0.025, anchor="bottom-left", baseline=1.04),
+    "B5": Variant(weight=800, size=0.58, tracking=-0.04, anchor="left", left=0.19, baseline=0.77),  # unten links
     "B6": Variant(weight=800, size=0.28, tracking=-0.015, circle=0.30, baseline=0.58),
 }
 DARK = ("#000000", "#FFFFFF")   # (Grund, Schrift)
@@ -74,8 +75,8 @@ def layout(v: Variant):
         x0, x1 = min(x0, ox + bp.bounds[0]), max(x1, ox + bp.bounds[2])
     if v.anchor == "center":
         left = N / 2 - (x0 + x1) / 2 * k + v.dx * N
-    else:  # unten links angeschnitten: Anfang knapp links der Kante
-        left = -x0 * k - 0.05 * N
+    else:  # linke Tintenkante bei v.left
+        left = v.left * N - x0 * k
     base = v.baseline * N
     pen = SVGPathPen(gs, ntos=f)
     for n, ox in zip(names, xs):
@@ -92,10 +93,15 @@ def circle_d(cx, cy, r):
 
 
 def master_svg(v, bg, fg, rx=0.0):
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {N} {N}" width="{N}" height="{N}">'
+            + inner_svg(v, bg, fg, rx, "c") + "</svg>\n")
+
+
+def inner_svg(v, bg, fg, rx, cid):
     d, dot = layout(v)
-    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {N} {N}" width="{N}" height="{N}">']
-    clip = ' clip-path="url(#c)"'
-    parts.append(f'<defs><clipPath id="c"><rect width="{N}" height="{N}" rx="{f(rx * N)}"/></clipPath></defs>')
+    parts = []
+    clip = f' clip-path="url(#{cid})"'
+    parts.append(f'<defs><clipPath id="{cid}"><rect width="{N}" height="{N}" rx="{f(rx * N)}"/></clipPath></defs>')
     parts.append(f'<g{clip}><rect width="{N}" height="{N}" fill="{bg}"/>')
     if v.circle:
         parts.append(f'<path d="{circle_d(N / 2, N / 2, v.circle * N)}" fill="{fg}"/>')
@@ -104,8 +110,25 @@ def master_svg(v, bg, fg, rx=0.0):
         parts.append(f'<path d="{d}" fill="{fg}"/>')
         if dot:
             parts.append(f'<circle cx="{f(dot[0])}" cy="{f(dot[1])}" r="{f(dot[2])}" fill="{fg}"/>')
-    parts.append("</g></svg>\n")
+    parts.append("</g>")
     return "".join(parts)
+
+
+MASKS = [("Kreis", 0.5), ("Squircle", 0.34), ("Abgerundet", 0.22), ("iOS", 0.225), ("Rechteck", 0.0)]
+
+
+def previews(v):
+    """Masken-Vorschauen: Android-Masken, iOS-Radius, Monochrome und helle Fassung (design/icon/previews/)."""
+    cell, pad = 256, 24
+    rows = [("dark", DARK, False), ("light", LIGHT, False), ("mono", ("#C9D6FF", "#1A1F36"), True)]
+    w = pad + len(MASKS) * (cell + pad)
+    for name, (bg, fg), _ in rows:
+        body = [f'<rect width="{w}" height="{cell + 2 * pad}" fill="#808080"/>']
+        for i, (_, rx) in enumerate(MASKS):
+            x = pad + i * (cell + pad)
+            body.append(f'<g transform="translate({x},{pad}) scale({cell / N})">' + inner_svg(v, bg, fg, rx, f"m{i}") + "</g>")
+        svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{cell + 2 * pad}">' + "".join(body) + "</svg>"
+        png(svg, w, f"design/icon/previews/masks-{name}.png", height=cell + 2 * pad)
 
 
 def write(path, data, binary=False):
@@ -115,11 +138,11 @@ def write(path, data, binary=False):
         fh.write(data)
 
 
-def png(svg, size, path, alpha=False):
+def png(svg, size, path, alpha=False, height=None):
     import cairosvg
     from PIL import Image
     import io
-    raw = cairosvg.svg2png(bytestring=svg.encode(), output_width=size, output_height=size)
+    raw = cairosvg.svg2png(bytestring=svg.encode(), output_width=size, output_height=height or size)
     im = Image.open(io.BytesIO(raw))
     if not alpha:
         im = im.convert("RGB")  # ohne Transparenz
@@ -180,7 +203,7 @@ def build_android(v, bg, fg):
 # ---- Hauptprogramm ----------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--variant", default="B1", choices=sorted(VARIANTS))
+    ap.add_argument("--variant", default="B5", choices=sorted(VARIANTS))
     ap.add_argument("--theme", default="dark", choices=["dark", "light"])
     ap.add_argument("--weight", type=int, choices=sorted(WEIGHTS))
     ap.add_argument("--size", type=float, help="Schriftgröße als Anteil der Kante, z. B. 0.40")
@@ -198,6 +221,7 @@ def main():
     svg = master_svg(v, bg, fg)
     write("design/icon/overfit-icon.svg", svg)
     build_android(v, bg, fg)
+    previews(v)
 
     # Play Store 512 × 512 (Quadrat, ohne eigene Maske)
     png(svg, 512, "docs/store/icon-512.png")
