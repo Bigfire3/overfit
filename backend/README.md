@@ -29,34 +29,94 @@ PURCHASE_MODE=mock
 Im Dev-Modus akzeptieren Kauf und Spot Token der Form `mock:<id>` statt echter Store-/Attestierungs-Belege. In Produktion
 (`DEV_MODE` nicht `true`) werden die Mock-Modi ignoriert: ohne echte Prüfer sind Käufe und Spot abgeschaltet (503).
 
-## Deployment (braucht Fabians Cloudflare-Konto)
+## Deployment ohne Terminal (empfohlen): der Deploy-Knopf
 
-1. Cloudflare-Konto anlegen (Free reicht), `npx wrangler login`.
-2. Datenbank: `npx wrangler d1 create overfit` → die ausgegebene `database_id` in `backend/wrangler.jsonc` eintragen.
+Alles im Browser, nichts installieren. Der Workflow `.github/workflows/backend-deploy.yml` legt Datenbank und Bucket an, spielt die
+Migrationen ein, deployt, überträgt die Secrets und prüft `/v1/health` und `/v1/config`. Er ist idempotent: beliebig oft startbar.
+
+**Kosten:** Cloudflare Free reicht (Workers, D1, R2 haben ein kostenloses Kontingent, keine Kreditkarte nötig für den Free-Tarif).
+KI-Kosten entstehen nur, wenn jemand Fuel nutzt (dann über Fuel-Guthaben abgerechnet, mit 8 % Aufschlag) – wer seinen eigenen Key nutzt,
+verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb sind Limit und Gesamt-Guthaben niedrig (siehe unten).
+
+**Einmalig einrichten**
+
+1. **Cloudflare-Konto:** dash.cloudflare.com → Sign up (E-Mail, Passwort, Free-Tarif).
+2. **workers.dev-Subdomain wählen:** im Dashboard links „Workers & Pages“ → Subdomain-Namen vergeben (z. B. `fabian`). Deine Worker-Adresse
+   wird `https://overfit-backend-test.fabian.workers.dev` (Test) bzw. `https://overfit-backend.fabian.workers.dev` (Produktion).
+3. **R2 aktivieren** (für KI-Chat-Fotos): links „R2 Object Storage“ → Free-Tarif wählen.
+4. **Account-ID kopieren:** „Workers & Pages“ → rechts „Account ID“ (Kopieren-Symbol).
+5. **API-Token erstellen:** oben rechts Profil → My Profile → API Tokens → Create Token → „Create Custom Token“ (ganz unten):
+   Berechtigungen (jeweils Zeile „Account“):
+   - **Workers Scripts – Edit**
+   - **D1 – Edit**
+   - **Workers R2 Storage – Edit**
+   - **Account Settings – Read**
+
+   Account Resources: „Include → dein Konto“ → Continue to summary → Create Token → den Wert **sofort kopieren** (wird nur einmal gezeigt).
+6. **GitHub-Secrets eintragen:** GitHub → Repo → Settings → Secrets and variables → Actions → **New repository secret**:
+
+   | Secret | Pflicht | Inhalt |
+   |---|---|---|
+   | `CLOUDFLARE_API_TOKEN` | ja | der Token aus Schritt 5 |
+   | `CLOUDFLARE_ACCOUNT_ID` | ja | Account-ID aus Schritt 4 |
+   | `ANTHROPIC_API_KEY` | ja (nur beim ersten Mal, danach merkt sich der Worker ihn) | Anthropic-API-Key für Fuel (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit) |
+   | `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY` | nein | werden, wenn nicht gesetzt, einmalig zufällig erzeugt und im Worker gespeichert. `SYNC_ENCRYPTION_KEY` nie ändern |
+   | `ADMIN_SECRET` | nein | nur Testbetrieb; sonst bei jedem Lauf neu erzeugt |
+   | `GOOGLE_PLAY_*`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_*` | nein | Store-Prüfer (siehe Tabelle unten); fehlen sie, überspringt der Workflow sie mit Hinweis |
+
+   Fehlt ein Pflicht-Secret, bricht der Lauf mit einer Anleitung in der Zusammenfassung ab.
+7. **Run workflow:** GitHub → Actions → „Backend deployen“ → Run workflow → `mode` = **test** → Run. Nach 2–3 Minuten steht in der
+   Zusammenfassung (oben auf der Lauf-Seite) die Worker-Adresse.
+8. **`OVERFIT_BACKEND_URL` setzen:** GitHub → Settings → Secrets and variables → Actions → Tab **Variables** → New repository variable:
+   Name `OVERFIT_BACKEND_URL`, Wert = die Adresse aus der Zusammenfassung (ohne `/` am Ende). Das kann der Workflow nicht selbst (GITHUB_TOKEN
+   darf keine Variablen schreiben), steht deshalb als letzter Schritt in der Zusammenfassung.
+9. **Nächsten App-Build abwarten:** nach dem nächsten Merge nach main baut „Android“ ein neues APK (oder Actions → Android → Run workflow);
+   dann „Overfit latest“ installieren. Ab jetzt zeigt Fuel den Server („Testserver“-Hinweis im Testbetrieb).
+
+**Testbetrieb (`mode = test`) – für Handys ohne Store-Konten.** Test und Produktion sind getrennte Instanzen (eigener Worker, Datenbank, Bucket),
+Testdaten gelangen nie in die Produktion; beim Wechsel auf `production` ändert sich die Adresse (Schritt 8 wiederholen).
+- Keine Geräteprüfung (Play Integrity/App Attest): Spot geht mit seitlich installierten APKs (Test-Token, ein Spot je Gerät).
+- Jedes neue Konto bekommt **1 € Test-Guthaben** automatisch (Fuel öffnen → „Fuel ansehen“). Mehr: Run workflow mit `credit_eur` (z. B. `5`) →
+  schreibt allen bestehenden Konten bis zu 10 € gut. Alles Test-Guthaben zusammen ist auf 20 € gedeckelt (`TEST_CREDIT_CAP_MICRO`).
+  Ist es aufgebraucht: Instanz zurücksetzen (Datenbank `overfit-test` im Dashboard unter Storage & Databases → D1 löschen, Workflow neu starten).
+- Käufe gibt es im Testbetrieb nicht (kein Store); Guthaben nur so. Niedrige Limits: `max_tokens` 2048, 5 KI-Anfragen/Minute, 3 Spots je Einladendem
+  und Monat, Spot-Gesamtbudget 10 €.
+- Markierung: `GET /v1/config` liefert `"mode": "test"`, die App zeigt unter Fuel „Testserver“. Der Workflow prüft, dass der Modus stimmt.
+- Sicherheit: Der Testmodus braucht `DEPLOY_MODE=test` (exakt). Die Admin-Gutschrift gibt es nur dort und nur mit `ADMIN_SECRET`; in Produktion antwortet
+  der Pfad 404 und ein `test:`-Token wird abgelehnt (beides in `backend/test/testmode.test.ts`).
+
+**Produktion (`mode = production`)** erst, wenn Play-/Apple-Konten und die Store-Prüfer (`src/verifiers.ts`, noch nicht implementiert) da sind.
+
+**Automatisch deployen:** Repo-Variable `BACKEND_DEPLOY_MODE` = `test` (oder `production`) anlegen, dann deployt jeder Merge nach main, der
+`backend/` ändert, von allein. Ohne die Variable oder ohne Cloudflare-Secrets passiert nichts.
+
+## Deployment von Hand (Terminal, Alternative)
+
+1. Cloudflare-Konto anlegen, `npx wrangler login`.
+2. Datenbank: `npx wrangler d1 create overfit` → die ausgegebene `database_id` lokal in `backend/wrangler.jsonc` eintragen (nicht committen).
 3. Migrationen einspielen: `npm run db:migrate:remote`.
-4. Secrets setzen (`npx wrangler secret put <NAME>`):
+4. Secrets setzen (`npx wrangler secret put <NAME>`), Tabelle unten.
+5. KI-Chat: R2 aktivieren und `npx wrangler r2 bucket create overfit-chat-photos`. Optional `PUBLIC_BASE_URL` in `vars`.
+6. `npm run deploy` → Worker-URL als Repo-Variable `OVERFIT_BACKEND_URL` eintragen.
+
+Secrets (im Workflow oder von Hand):
 
    | Secret | Zweck | Nötig für |
    |---|---|---|
-   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | `/v1/messages` |
+   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | `/v1/messages` (Fuel) |
    | `SPOT_SIGNING_KEY` | Zufälliger String ≥ 32 Zeichen (`openssl rand -base64 48`); signiert Spot-Tokens und Challenges | Spot |
-   | `GOOGLE_PLAY_SERVICE_ACCOUNT` | JSON des Dienstkontos mit Play-Developer-API-Zugriff | Käufe Android |
-   | `GOOGLE_PLAY_PACKAGE_NAME` | `app.overfit` | Käufe Android |
+   | `SYNC_ENCRYPTION_KEY` | Zufällige 32 Byte als Base64url; verschlüsselt alle KI-Chat-Daten (die OAuth-Anmeldung des MCP-Servers braucht kein eigenes Geheimnis). **Nie ändern** (sonst sind gespeicherte Daten unlesbar; die App lädt dann beim nächsten Sync neu hoch) | KI-Chat |
+   | `ADMIN_SECRET` | ≥ 16 Zeichen, nur Testbetrieb (`POST /v1/admin/credit`) | Test-Guthaben |
+   | `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_PACKAGE_NAME` (`app.overfit`) | Dienstkonto mit Play-Developer-API-Zugriff | Käufe Android |
    | `PLAY_INTEGRITY_SERVICE_ACCOUNT` | Dienstkonto für `decodeIntegrityToken` | Spot Android |
    | `APPLE_IAP_KEY`, `APPLE_IAP_KEY_ID`, `APPLE_IAP_ISSUER_ID`, `APPLE_BUNDLE_ID` | App-Store-Server-API-Schlüssel (.p8) | Käufe iOS |
    | `APPLE_APP_ATTEST_TEAM_ID` | Team-ID für App Attest | Spot iOS |
 
    **Stand:** Die echten Prüfer für Google Play / Apple (`src/verifiers.ts`) sind noch nicht implementiert – nur die
-   Schnittstellen und die Mock-Varianten für Tests. Käufe und Spot antworten in Produktion daher mit
+   Schnittstellen, die Mock-Varianten (Dev) und der Test-Prüfer (Testbetrieb). Käufe und Spot antworten in Produktion daher mit
    `purchases_unavailable` bzw. `attestation_unavailable`, bis die Prüfer mit echten Zugangsdaten nachgezogen werden
    (eigene Aufgabe, setzt die Store-Konten aus Phase 6 voraus). `/v1/messages`, Konten und Wiederherstellung laufen schon
    mit `ANTHROPIC_API_KEY` allein.
-   | `SYNC_ENCRYPTION_KEY` | Zufällige 32 Byte als Base64url (`openssl rand 32 \| basenc --base64url \| tr -d =`); verschlüsselt alle KI-Chat-Daten. **Nie ändern** (sonst sind gespeicherte Daten unlesbar; die App lädt dann beim nächsten Sync neu hoch) | KI-Chat |
-5. Für die KI-Chat-Verbindung: R2 aktivieren (Dashboard → R2, kostenloses Kontingent reicht) und
-   `npx wrangler r2 bucket create overfit-chat-photos`. Optional in `wrangler.jsonc` unter `vars` `PUBLIC_BASE_URL` auf die
-   endgültige Adresse setzen (z. B. `https://api.overfit.app`), sonst gilt die Adresse der jeweiligen Anfrage.
-6. `npm run deploy` → die Worker-URL (`https://overfit-backend.<konto>.workers.dev`) der App-Session mitteilen
-   (oder eigene Domain unter Workers & Routes verbinden).
 
 ## KI-Chat als Connector eintragen (nach dem Deployment)
 
@@ -117,6 +177,8 @@ den gleichen OAuth-Ablauf.
 | `CHAT_INBOX_MAX` | 50 | Offene Eingangs-Einträge, bevor der Chat nichts mehr ablegen kann |
 | `PUBLIC_BASE_URL` | Origin der Anfrage | Issuer/Resource für OAuth (bei eigener Domain setzen) |
 | `SHARE_BASE_URL` | `https://bigfire3.github.io/overfit/t` | Basis der Import-Links, die `create_template` liefert |
+| `DEPLOY_MODE` | `production` | `test` = Testbetrieb (siehe oben); setzt der Deploy-Workflow |
+| `TEST_STARTER_MICRO` / `TEST_CREDIT_CAP_MICRO` | 1 000 000 / 20 000 000 | Test-Startguthaben je Konto / Obergrenze für alles Test-Guthaben |
 | `RL_*` | siehe API-Doku | Rate-Limits (`RL_MCP_PER_MIN` 120 je Verbindung) |
 
 Preise ändern oder Modelle ergänzen: `PRICE_TABLE` setzen (Wechselkurs und Listenpreise selbst pflegen) und neu deployen.

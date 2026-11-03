@@ -899,6 +899,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onRecovery = { nav.navigate(RecoveryRoute) },
                             onSpotInvite = { nav.navigate(SpotInviteRoute) },
                             onSpotRedeem = { nav.navigate(SpotRedeemRoute()) },
+                            fuelActive = state.providerId == ProviderId.FUEL,
                         )
                     }
                     composable<LedgerRoute> { LedgerScreen(deps.fuelSession, onBack = nav::popBackStack) }

@@ -15,6 +15,29 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Deploy-Knopf und Datenschutz-Garantie (Session V, 3.11.)
+**Erledigt:**
+- **Deploy-Knopf** `.github/workflows/backend-deploy.yml` (Actions → „Backend deployen“ → Run workflow, `mode` test | production): legt D1 und R2 an, falls sie fehlen, spielt Migrationen ein, deployt, überträgt Secrets, prüft `/v1/health` und `/v1/config`, nennt die Worker-URL in der Zusammenfassung. Idempotent, `database_id` nur zur Laufzeit. Pflicht-Secret fehlt → Abbruch mit Anleitung.
+- **Testbetrieb** (`mode = test`): keine Geräteprüfung, 1 € Test-Guthaben je neuem Konto, Eingabefeld `credit_eur` für mehr, niedrige Limits, `/v1/config` meldet `"mode":"test"`, die App zeigt „Testserver“ unter Fuel. Eigener Worker und eigene Datenbank, nie in Produktion. Tests: `backend/test/testmode.test.ts`.
+- **Garantie eigener Key:** Zwei Abweichungen behoben (Profilzeile „Fuel“ und Fuel-Screen riefen das Backend schon beim Öffnen), Test `OwnKeyPrivacyTest` zählt Backend-Anfragen (= 0), Hinweis „Deine Daten gehen direkt an <Anbieter>, nicht über overfit-Server.“ im Coach-Tab.
+- Optional: automatisches Deploy bei Änderungen unter `backend/`, nur mit Repo-Variable `BACKEND_DEPLOY_MODE`.
+**Offen:** Store-Prüfer für Produktion (Phase 6/7). Der Workflow selbst ist nur gegen `wrangler deploy --dry-run` und Hilfsskripte geprüft, der erste echte Lauf braucht Fabians Cloudflare-Konto.
+
+### Von Fabian zu tun: Backend im Browser deployen (Details: `backend/README.md`)
+1. cloudflare.com → Konto anlegen (Free). Dashboard → **Workers & Pages** → workers.dev-Subdomain wählen. **R2 Object Storage** aktivieren (Free).
+2. **Account ID** kopieren (Workers & Pages, rechts). **API-Token**: Profil → API Tokens → Create Custom Token mit *Workers Scripts: Edit*, *D1: Edit*, *Workers R2 Storage: Edit*, *Account Settings: Read* → kopieren.
+3. GitHub → Settings → Secrets and variables → Actions → Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ANTHROPIC_API_KEY`.
+4. Actions → **Backend deployen** → Run workflow → `mode` = test → in der Zusammenfassung die Worker-URL kopieren.
+5. Settings → Secrets and variables → Actions → **Variables** → `OVERFIT_BACKEND_URL` = diese URL.
+6. Nächsten App-Build abwarten (Merge nach main oder Actions → Android → Run workflow), APK aus „Overfit latest“ installieren.
+7. Mehr Test-Guthaben: Run workflow mit `credit_eur` = 5.
+Kosten: Cloudflare Free reicht; KI-Kosten nur bei Fuel (Test: höchstens 20 € Guthaben insgesamt); eigener Key kostet dich nichts.
+
+### Bitte auf dem Handy testen (Session V)
+1. Eigener Key (Profil → KI verbinden), Backend-URL gesetzt: Coach-Tab → „KI-Zugang“ zeigt „Eigener Key · …“ und darunter „Deine Daten gehen direkt an <Anbieter>, nicht über overfit-Server.“
+2. Profil → „Fuel“ zeigt keinen Saldo; Tippen zeigt „Fuel ist optional …“ mit „Fuel ansehen“; erst das verbindet mit dem Server.
+3. Mit Testserver: Fuel ansehen → „Testserver“-Hinweis, 1,00 € Saldo; „Fuel nutzen“ im Coach → Antwort kostet Cent-Beträge. Spot einlösen klappt ohne Store-Konto.
+
 ## main wieder grün: Wackel-Tests nach #39 (Session S, 3.11.)
 **Erledigt:**
 - Ursache der roten Android-CI gefunden (siehe DECISIONS „Wackel-Tests nach #39“): Es waren zwei Rennen in den Tests. Ein App-Fehler war nicht die Ursache. Die Übung landete im Training, nur zu spät für den Test.
@@ -232,11 +255,11 @@ Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft di
 
 ### Von Fabian zu tun (nach Wichtigkeit, dedupliziert)
 Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
-1. **Cloudflare-Backend deployen** (Schritte und Secrets in `backend/README.md`): Konto, `wrangler login`, `wrangler d1 create overfit` (ID in
+1. **Cloudflare-Backend deployen** – jetzt per Deploy-Knopf im Browser, siehe Abschnitt „Session V“ oben bzw. `backend/README.md`. (Alter Weg per Terminal: Konto, `wrangler login`, `wrangler d1 create overfit` (ID in
    `wrangler.jsonc`), Migrationen (inkl. `0002_chat.sql`), Secrets `ANTHROPIC_API_KEY`, `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY`
    (32 Zufallsbytes Base64url, nie ändern), R2 aktivieren + `wrangler r2 bucket create overfit-chat-photos`, `npm run deploy`. Danach
    GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL. Ohne das zeigt die App „startet bald“ + Demo
-   (Fuel, Spot, KI-Chat-Verbindung bleiben dann lokal/ohne Server)
+   (Fuel, Spot, KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
 2. **GitHub Pages aktivieren** (Repo → Settings → Pages → Source „GitHub Actions“; oder Actions → „Web veröffentlichen“ → Run workflow):
    Web-Fallback `https://bigfire3.github.io/overfit/` und Teilen-Seite `/t` für Links ohne App
 3. **KI-Chat-Connectoren eintragen** (nach 1.): Claude → Connectors → Custom Connector, ChatGPT → Entwicklermodus → Connector,

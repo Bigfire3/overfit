@@ -13,6 +13,7 @@ import {
   setProfile,
 } from './account';
 import { handleMessages } from './messages';
+import { handleAdminCredit } from './admin';
 import { handleVerifyPurchase } from './purchases';
 import { createChallenge, createSpotToken, redeemSpot } from './spot';
 import { packageCreditMicro } from './money';
@@ -63,6 +64,8 @@ const PHOTO_ROUTE = /^\/v1\/chat\/photos\/([A-Za-z0-9_.:-]{1,80})$/;
 
 function publicConfig(cfg: Config) {
   return {
+    /** `test` = Testbetrieb (keine Geräteprüfung, Test-Guthaben); die App zeigt dann einen Hinweis. */
+    mode: cfg.testMode ? 'test' : 'production',
     currency: 'EUR',
     unit: 'micro-euro',
     markupBp: cfg.markupBp,
@@ -105,10 +108,15 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     return out;
   }
 
+  if (path === '/v1/admin/credit') {
+    await rateLimit(env, `admin:${clientIp(req)}`, 20, 3600);
+    return handleAdminCredit(req, env, cfg, new Uint8Array(await req.arrayBuffer()));
+  }
+
   if (path === '/v1/devices' && method === 'POST') {
     await rateLimit(env, `reg:${clientIp(req)}`, cfg.rlRegisterPerHourIp, 3600);
     const { deviceId, publicKeyRaw } = await authenticateRegistration(env, req, cfg);
-    const r = await registerDevice(env, deviceId, publicKeyRaw);
+    const r = await registerDevice(env, deviceId, publicKeyRaw, cfg);
     const device = { id: deviceId, accountId: r.accountId };
     return Response.json({ deviceId, ...(await accountSummary(env, cfg, device.accountId)) }, { status: r.created ? 201 : 200 });
   }

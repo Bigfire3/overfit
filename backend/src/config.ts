@@ -31,8 +31,12 @@ export function getConfig(env: Env): Config {
   const devMode = env.DEV_MODE === 'true';
   // Mock-Modi gibt es nur im Dev-Modus; sonst zählt immer „required“.
   const mock = (v: string | undefined) => (devMode && v === 'mock' ? 'mock' : 'required');
+  const testMode = env.DEPLOY_MODE === 'test';
   return {
     devMode,
+    testMode,
+    testStarterMicro: int(env.TEST_STARTER_MICRO, 1_000_000),
+    testCreditCapMicro: int(env.TEST_CREDIT_CAP_MICRO, 20_000_000),
     attestationMode: mock(env.ATTESTATION_MODE),
     purchaseMode: mock(env.PURCHASE_MODE),
     anthropicBaseUrl: env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',

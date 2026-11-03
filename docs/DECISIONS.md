@@ -702,3 +702,47 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 - **Store-Titel** „overfit: Workout & KI-Coach“ / „overfit: Workout & AI Coach“ (je 27 Zeichen), Play-Kurzbeschreibung ≤ 80 geprüft.
 - **`aiSubtitle`:** „kein Abo nötig“ statt „kein Abo“, damit ein späteres optionales Pro-Abo nicht widerspricht (siehe docs/monetization.md).
 - **Onboarding:** Der erste Screen ist die Namensfrage, es gibt keinen Splash und keinen Markentext; nichts geändert (keine Funktionsänderung).
+
+## Deploy-Knopf und Datenschutz-Garantie für den eigenen Key (Session V, 3.11.)
+
+### Deploy-Workflow (`.github/workflows/backend-deploy.yml`)
+- **Ein Knopf, alles idempotent.** `workflow_dispatch` mit `mode` (test | production) und `credit_eur`. Reihenfolge: Voraussetzungen prüfen → Typprüfung und Tests →
+  D1 anlegen, falls es fehlt (ID per `wrangler d1 list --json`) → R2-Bucket anlegen (Fehler „already exists“ wird toleriert) → `wrangler.generated.jsonc` erzeugen
+  (`scripts/deploy-config.mjs`; die `database_id` steht nie in `wrangler.jsonc`, die erzeugte Datei ist gitignored) → Migrationen `--remote` → Deploy → Secrets
+  (`wrangler secret bulk`) → Health und `/v1/config` (Modus muss stimmen) → Zusammenfassung mit Worker-URL.
+- **Test und Produktion sind getrennte Instanzen** (`overfit-backend-test`/`overfit-test`/`overfit-chat-photos-test` gegen `overfit-backend`/`overfit`/`overfit-chat-photos`).
+  Begründung: „nie versehentlich in Produktion“ lässt sich am sichersten dadurch garantieren, dass Testdaten und Test-Guthaben in einer anderen Datenbank liegen. Preis:
+  Beim Wechsel auf Produktion ändert sich die Adresse, `OVERFIT_BACKEND_URL` muss neu gesetzt werden.
+- **Secrets:** Pflicht ist nur `ANTHROPIC_API_KEY` (aus GitHub oder schon im Worker). `SPOT_SIGNING_KEY` und `SYNC_ENCRYPTION_KEY` erzeugt der Workflow einmalig zufällig, wenn weder ein
+  GitHub-Secret noch ein Worker-Secret existiert (Fabian soll nichts im Terminal erzeugen müssen); bestehende Worker-Secrets werden nie überschrieben, `SYNC_ENCRYPTION_KEY` auch dann nicht.
+  Ein separates „OAuth-Geheimnis für MCP“ gibt es im Code nicht (die Anmeldung läuft über Kopplungscode, Tokens liegen gehasht in D1), also kein Secret dafür.
+  Optionale Store-Prüfer (`GOOGLE_PLAY_*`, `PLAY_INTEGRITY_*`, `APPLE_*`) werden nur übertragen, wenn gesetzt; sonst Hinweis in der Zusammenfassung. Werte werden im Log maskiert.
+- **`OVERFIT_BACKEND_URL`:** `GITHUB_TOKEN` darf keine Repo-Variablen schreiben (dafür gibt es keine Workflow-Berechtigung, nur ein PAT mit „Variables: write“). Ich habe bewusst keinen PAT-Weg
+  und keinen Umweg über Release-Assets eingebaut (mehr bewegliche Teile in android.yml und ios.yml, die Session U gerade anfasst). Die Zusammenfassung nennt die URL, den Link
+  zur Variablen-Seite und erkennt, wenn die Variable schon stimmt.
+- **Automatisches Deploy** bei Änderungen unter `backend/` auf main nur, wenn die Repo-Variable `BACKEND_DEPLOY_MODE` gesetzt ist und die Cloudflare-Secrets existieren (sonst Hinweis, kein Fehler).
+  Ohne diese bewusste Variable deployt nie etwas von allein, ein versehentliches Produktions-Deploy ist so ausgeschlossen.
+
+### Testbetrieb (`DEPLOY_MODE=test`)
+- Nur der exakte Wert `test` schaltet ihn ein, unabhängig von `DEV_MODE` (der bleibt `false`; die `mock:`-Token der Entwicklung gibt es dort weiter nicht).
+- Geräteprüfung entfällt: `testAttestationVerifier` akzeptiert `test:<geräte-id>` (Schlüssel `test-<id>`, also weiter höchstens ein Spot je Gerät). Die App nimmt diesen Weg nur, wenn die
+  Geräteprüfung nichts liefert (seitlich installiertes APK) **und** `/v1/config` `mode: "test"` meldet; Produktion lehnt `test:`-Token ab (Test).
+- Fuel nur über Test-Guthaben: neues Konto bekommt `TEST_STARTER_MICRO` (1 €), dazu `POST /v1/admin/credit` (Bearer `ADMIN_SECRET`, nur Testbetrieb, ≤ 10 € je Aufruf, „all“ ≤ 100 Konten).
+  Der Workflow ruft ihn mit `credit_eur` selbst auf und erzeugt `ADMIN_SECRET` bei jedem Lauf neu, Fabian muss also kein Geheimnis kennen und keine Konto-ID suchen.
+  Gesamtdeckel für alles Test-Guthaben: `TEST_CREDIT_CAP_MICRO` = 20 €. Kein Testkauf, weil die App ohne Store keinen Kaufweg hat.
+- Niedrige Limits im Testbetrieb: `MAX_TOKENS_CAP` 2048, 5 KI-Anfragen/Minute, 10 Registrierungen/Stunde/IP, 3 Spots je Einladendem, Spot-Budget 10 €.
+- Markiert: `/v1/config` → `"mode": "test"`, die App zeigt unter Fuel „Testserver“.
+
+### Garantie: eigener Key = null Anfragen an das Backend
+Prüfung des Codes (Start, Vordergrund, Fuel-Konto, Registrierung, `/v1/config`, Coach, Chat, KI-Übung, Teilen):
+- `ChatFeature.onForeground`/`onBackground` → `sync.flush()` und `inbox.refresh()` sind ohne eingeschaltete KI-Chat-Verbindung (`enabled`) wirkungslos. Die Chat-Screens laden erst bei `enabled`.
+- Coach, Coach-Chat, KI-Übung und Warteschlange sprechen über `Providers`/`CoachTransport` direkt mit dem Anbieter; nur `ProviderId.FUEL` geht über das Backend.
+- Teilen: `ShortCodeService` ist in der App noch `NoShortCodes`, der Kurz-Code-QR lädt also nichts hoch (und würde nur bei ausdrücklichem Einschalten laufen).
+- **Abweichung 1 (behoben):** Die Profilzeile „Fuel“ rief bei konfigurierter Backend-URL `account()` auf, also schon beim bloßen Öffnen des Profil-Tabs eine Geräteregistrierung und
+  einen Kontoabruf, auch mit eigenem Key. Jetzt lädt die Zeile nur, wenn Fuel der gewählte KI-Zugang ist (oder die Demo läuft).
+- **Abweichung 2 (behoben):** Der Fuel-Screen lud beim Öffnen sofort Konto und Config. Mit eigenem Key zeigt er jetzt zuerst einen Hinweis („Fuel ist optional … geht nichts über overfit-Server“) und
+  erst „Fuel ansehen“ verbindet sich mit dem Server. Spot, Wiederherstellung und Buchungen sind nur von dort erreichbar.
+- Test: `OwnKeyPrivacyTest` (Robolectric) konfiguriert eine Backend-URL und führt alle Requests aller `HttpClient`s durch eine zählende `MockEngine`. Start, Vordergrund/Hintergrund, Coach-Queue, alle Tabs, Coach-Chat,
+  Profil und der Fuel-Hinweis ergeben **0** Anfragen an den Backend-Host; als Gegenprobe erzeugt „Fuel ansehen“ danach Anfragen.
+- In der App (Coach-Tab → KI-Zugang, nur bei eigenem Key): „Deine Daten gehen direkt an <Anbieter>, nicht über overfit-Server.“ (DE/EN).
+- Bewusst nicht Teil der Garantie: Fuel, Spot, KI-Chat-Verbindung und Kurz-Code-QR – sie sind ausdrückliche Opt-ins und sprechen mit dem Backend.
