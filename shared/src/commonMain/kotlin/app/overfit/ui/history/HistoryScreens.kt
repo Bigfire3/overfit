@@ -1,5 +1,7 @@
 package app.overfit.ui.history
 
+import app.overfit.chat.ChatNote
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -108,6 +110,8 @@ fun HistoryDetailScreen(
     onOpenPhoto: (String) -> Unit,
     onTemplateCreated: (Long) -> Unit,
     onShare: () -> Unit,
+    /** Accepted notes from the AI chat that belong to this workout. */
+    chatNotes: List<ChatNote> = emptyList(),
 ) {
     val t = LocalStrings.current
     val h = t.history
@@ -132,6 +136,15 @@ fun HistoryDetailScreen(
         d.finished.note?.let {
             SectionTitle(h.note)
             Text(it)
+        }
+        if (chatNotes.isNotEmpty()) {
+            SectionTitle(h.chatNotes)
+            chatNotes.forEach { n ->
+                n.title?.let { Text(it, style = Theme.type.label) }
+                Text(n.text)
+                if (n.clientName.isNotBlank()) Text(n.clientName, style = Theme.type.caption, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.m))
+            }
         }
 
         if (photos.isNotEmpty()) {

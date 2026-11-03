@@ -28,13 +28,16 @@ class TemplateImporter(
         return list
     }
 
-    /** Creates the new own exercises (once per name) and saves the template. Returns the template ID. */
-    suspend fun accept(preview: ImportPreview): Long {
+    /**
+     * Creates the new own exercises (once per name) and saves the template. Returns the template ID.
+     * With [replaceId] the existing template with that ID is overwritten instead of adding a new one.
+     */
+    suspend fun accept(preview: ImportPreview, replaceId: Long? = null): Long {
         val created = LinkedHashMap<String, String>()
         preview.exercises.mapNotNull { it.newExercise }.forEach { input ->
             created.getOrPut(input.name.lowercase()) { exercises.createCustom(input) }
         }
-        return templates.save(ShareMapper.toTemplate(preview, created))
+        return templates.save(ShareMapper.toTemplate(preview, created).let { if (replaceId != null) it.copy(id = replaceId) else it })
     }
 
     /** Adds the sample templates that are missing (matched by name). Returns how many were added. */

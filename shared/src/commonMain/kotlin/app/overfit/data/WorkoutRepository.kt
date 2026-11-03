@@ -66,8 +66,10 @@ class WorkoutRepository(
     }
 
     /** Note (blank = none) and feeling 1–5 (null = none) after finishing. */
-    suspend fun updateDetails(id: String, note: String?, feeling: Int?) =
+    suspend fun updateDetails(id: String, note: String?, feeling: Int?) {
         dao.updateDetails(id, note?.trim()?.ifEmpty { null }, feeling?.coerceIn(1, 5), clock())
+        onChanged?.invoke(id, true)
+    }
 
     suspend fun rename(id: String, name: String) {
         val trimmed = name.trim()
@@ -79,6 +81,7 @@ class WorkoutRepository(
         val photos = dao.photosOf(id)
         dao.delete(id)
         photos.forEach { photoFiles.delete(it.fileName) }
+        onChanged?.invoke(id, true)
     }
 
     /** Completed sets of an exercise in finished workouts, newest workout first. */
@@ -119,11 +122,25 @@ class WorkoutRepository(
 
     fun readPhoto(photo: WorkoutPhoto): ByteArray? = photoFiles.read(photo.fileName)
 
+    /** All photos, oldest first (AI chat sync). */
+    suspend fun allPhotos(): List<WorkoutPhoto> = dao.allPhotos().map { it.toPhoto() }
+
+    /** JPEG of a photo by id, null if it is gone. */
+    suspend fun photoJpeg(id: String): ByteArray? = dao.getPhoto(id)?.let { photoFiles.read(it.fileName) }
+
     private fun WorkoutPhotoEntity.toPhoto() = WorkoutPhoto(id, sessionId, fileName, takenAt, photoFiles.path(fileName))
+    /** Called after a workout was saved, finished or deleted (KI-Chat sync); `finished` = ended or discarded. */
+    var onChanged: ((id: String, finished: Boolean) -> Unit)? = null
 
     override suspend fun loadActive(): Workout? = dao.getActive()?.toDomain()
 
     suspend fun get(id: String): Workout? = dao.get(id)?.toDomain()
+
+    /** One workout with the facts the domain model does not carry (end time, feeling); null if it does not exist. */
+    suspend fun record(id: String): WorkoutRecord? = dao.get(id)?.toRecord()
+
+    /** All workouts (running and finished) for the KI-Chat sync. */
+    suspend fun allRecords(): List<WorkoutRecord> = dao.getAll().map { it.toRecord() }
 
     suspend fun status(id: String): SessionStatus? = dao.get(id)?.session?.status
 
@@ -132,7 +149,10 @@ class WorkoutRepository(
      * sets are rewritten. A workout has a few dozen rows, so this stays fast and leaves no
      * half-saved state behind if the process dies.
      */
-    override suspend fun save(workout: Workout) = db.transaction { write(workout) }
+    override suspend fun save(workout: Workout) {
+        db.transaction { write(workout) }
+        onChanged?.invoke(workout.id, false)
+    }
 
     private suspend fun write(workout: Workout) {
         val existing = dao.get(workout.id)?.session
@@ -192,12 +212,18 @@ class WorkoutRepository(
         )
     }
 
-    override suspend fun finish(workout: Workout, endedAt: Long) = db.transaction {
-        write(workout)
-        dao.finish(workout.id, endedAt)
+    override suspend fun finish(workout: Workout, endedAt: Long) {
+        db.transaction {
+            write(workout)
+            dao.finish(workout.id, endedAt)
+        }
+        onChanged?.invoke(workout.id, true)
     }
 
-    override suspend fun delete(id: String) = dao.delete(id)
+    override suspend fun delete(id: String) {
+        dao.delete(id)
+        onChanged?.invoke(id, true)
+    }
 
     override suspend fun lastSets(exerciseId: String): List<SetValues> =
         dao.lastCompletedSets(exerciseId).map { SetValues(it.weightKg, it.reps, it.durationSec) }
@@ -224,6 +250,16 @@ data class WorkoutPhoto(
 data class DiaryPhoto(val photo: WorkoutPhoto, val workoutName: String)
 
 internal fun ExerciseSetRow.toLogged() = LoggedSet(exerciseId, SetValues(weightKg, reps, durationSec))
+
+/** A workout plus what the sync needs: [endedAt] is null while it runs. */
+data class WorkoutRecord(val workout: Workout, val endedAt: Long?, val feeling: Int?, val updatedAt: Long)
+
+private fun SessionWithExercises.toRecord() = WorkoutRecord(
+    workout = toDomain(),
+    endedAt = if (session.status == SessionStatus.FINISHED) session.endedAt else null,
+    feeling = session.feeling,
+    updatedAt = session.updatedAt,
+)
 
 internal fun SessionWithExercises.toDomain(): Workout {
     val restStart = session.restStartedAt

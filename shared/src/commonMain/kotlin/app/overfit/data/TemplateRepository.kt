@@ -19,6 +19,9 @@ class TemplateRepository(
 ) {
     private val dao = db.templateDao()
 
+    /** Called after a template was saved or deleted (KI-Chat sync). */
+    var onChanged: (() -> Unit)? = null
+
     val templates: Flow<List<TemplateSummary>> =
         combine(dao.observeTemplates(), dao.observeTemplateExerciseNames()) { templates, names ->
             val byTemplate = names.groupBy({ it.templateId }, { it.name })
@@ -27,6 +30,9 @@ class TemplateRepository(
 
     /** One-shot list of all template names. */
     suspend fun names(): List<String> = dao.getNames()
+
+    /** All templates in display order (KI-Chat sync). */
+    suspend fun all(): List<Template> = dao.getIds().mapNotNull { get(it) }
 
     suspend fun get(id: Long): Template? {
         val full = dao.getWithExercises(id) ?: return null
@@ -50,7 +56,9 @@ class TemplateRepository(
      * and sets are rewritten; workouts store their planned values themselves and do not reference
      * these rows.
      */
-    suspend fun save(template: Template): Long = db.transaction {
+    suspend fun save(template: Template): Long = saveInternal(template).also { onChanged?.invoke() }
+
+    private suspend fun saveInternal(template: Template): Long = db.transaction {
         val now = clock()
         val id = if (template.id == 0L) {
             dao.insertTemplate(
@@ -95,5 +103,8 @@ class TemplateRepository(
         id
     }
 
-    suspend fun delete(id: Long) = dao.deleteTemplate(id)
+    suspend fun delete(id: Long) {
+        dao.deleteTemplate(id)
+        onChanged?.invoke()
+    }
 }

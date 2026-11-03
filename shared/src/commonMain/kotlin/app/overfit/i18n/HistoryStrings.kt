@@ -2,6 +2,7 @@ package app.overfit.i18n
 
 /** Texts for the finish flow, history, workout detail and exercise progress (part of [Strings.history]). */
 data class HistoryStrings(
+    val chatNotes: String,
     // Finish flow
     val finishTitle: String,
     val duration: String,
@@ -54,6 +55,7 @@ data class HistoryStrings(
 )
 
 val HistoryGerman = HistoryStrings(
+    chatNotes = "Notizen aus dem KI-Chat",
     finishTitle = "Training beendet",
     duration = "Dauer",
     setsLabel = "Sätze",
@@ -109,6 +111,7 @@ val HistoryGerman = HistoryStrings(
 )
 
 val HistoryEnglish = HistoryStrings(
+    chatNotes = "Notes from the AI chat",
     finishTitle = "Workout done",
     duration = "Duration",
     setsLabel = "Sets",

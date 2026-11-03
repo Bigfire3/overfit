@@ -64,6 +64,8 @@ fun SettingsScreen(
     onAbout: () -> Unit,
     fuelSession: FuelSession,
     onFuel: () -> Unit,
+    onAiCoach: () -> Unit = {},
+    onChatNotes: () -> Unit = {},
     offlineImages: OfflineImages,
     restAlerts: RestAlerts,
     share: ShareDependencies,
@@ -133,6 +135,7 @@ fun SettingsScreen(
         }
 
         SectionTitle(t.ai)
+        ListRow(app.overfit.i18n.LocalChatStrings.current.aiCoach, onClick = onAiCoach)
         FuelRow(fuelSession, onFuel)
         ListRow(providers.get(state.providerId).label, if (state.hasApiKey || state.providerId == ProviderId.FUEL) t.connected else t.notConnected)
         ListRow(if (state.hasApiKey) t.change else t.connect, onClick = onConnect)
@@ -140,6 +143,7 @@ fun SettingsScreen(
 
         SectionTitle(t.coach)
         ListRow(t.coachMemory, onClick = onCoachMemory)
+        ListRow(app.overfit.i18n.LocalChatStrings.current.notesTitle, onClick = onChatNotes)
 
         SectionTitle(t.app)
         ListRow(t.about, onClick = onAbout)
