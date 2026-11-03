@@ -84,7 +84,9 @@ class CoachService(
     fun launch(block: suspend () -> Unit): Job = scope.launch { block() }
 
     /** Non-suspending entry for the UI: queue a session review and send it in the app scope. */
-    fun startSessionReview(sessionId: String): Job = scope.launch { requestSessionReview(sessionId) }
+    fun startSessionReview(sessionId: String): Job = scope.launch {
+        try { requestSessionReview(sessionId) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+    }
 
     /** Non-suspending entry for the UI; the id is known right away so the screen can observe it. */
     fun startProgressReview(): String {
@@ -105,19 +107,21 @@ class CoachService(
     // --- Requests ------------------------------------------------------------------------------
 
     /**
-     * Queues a review of [sessionId] and starts sending. If the workout already has a review that is done or on its
+     * Queues a review of [sessionId] and sends it (suspends until the queue is through). If the workout already has a review that is done or on its
      * way, that one is returned instead (no double costs).
      */
     suspend fun requestSessionReview(sessionId: String): String {
         dao.latestForSession(sessionId)?.let { existing ->
-            if (existing.status != ReviewStatus.FAILED) return existing.id
-            retry(existing.id)
+            if (existing.status == ReviewStatus.FAILED) {
+                dao.upsert(existing.copy(status = ReviewStatus.QUEUED, errorKind = null, errorMessage = null, updatedAt = clock()))
+                sendPending()
+            }
             return existing.id
         }
         val id = newId()
         dao.upsert(newRow(id, sessionId, ReviewKind.SESSION))
         dao.setAiStatus(sessionId, AiStatus.QUEUED)
-        processQueue()
+        sendPending()
         return id
     }
 
@@ -125,7 +129,7 @@ class CoachService(
     suspend fun requestProgressReview(): String {
         val id = newId()
         dao.upsert(newRow(id, null, ReviewKind.PROGRESS))
-        processQueue()
+        sendPending()
         return id
     }
 
