@@ -685,6 +685,17 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 ### Zur Prüfung durch Fabian
 - Unterstrichene Textlinks vs. eigene Pill-Buttons: Seiten-Aktionen (Bearbeiten/Teilen) sind jetzt graue Pills, Inline-Aktionen in Listen unterstrichen. Leicht umkehrbar in `Components.kt`.
 
+## Wackel-Tests nach #39 (Session S, 3.11.)
+**Befund** (lokal reproduziert in der Gesamtsuite, etwa jeder zweite Lauf; die Klasse allein bleibt grün; mit Log-Ausgaben und State-Dump beim Timeout):
+1. `CustomExerciseFlowTest`: Nach „Speichern“ fand `waitFor("Turkish Get-up Neu")` den Namen sofort im Formular bzw. im Suchfeld des Pickers, obwohl das Speichern (Room-Write im `viewModelScope`, Rückkehr auf dem Main-Looper) noch lief. Die Prüfung danach kam zu früh. Der Umbau auf `waitUntil { state … }` (PR #41) lief in den Timeout, weil eine reine State-Bedingung unter Robolectric den Main-Looper nicht pumpt (erst `fetchSemanticsNodes` synchronisiert). Laut Log kam `onSaved` erst **nach** den 20 s, danach landete die Übung korrekt im Training. Die App hatte hier also keinen Fehler.
+2. `WorkoutFlowTest`, `ShareFlowTest` und alle anderen „Starten“-Tests: Der Footer mit „Starten“ war sichtbar, bevor das Workout aus Room geladen war, aber noch `enabled = false`. Ein Klick in diesem Fenster verpuffte (Test hängt nach „Starten“), und der Titel fehlte noch („Oberkörper A … is not displayed“).
+
+**Entscheidung:**
+- `WorkoutPlanScreen` zeigt den Footer erst, wenn das Workout geladen ist. Es gibt keinen toten Button mehr, auch nicht für schnelle Finger. Der Inhalt erscheint ohnehin erst dann.
+- Das Hinzufügen bzw. Ersetzen aus dem Picker läuft über `WorkoutController.addPicked` im Controller-Scope statt in `rememberCoroutineScope` des Workout-Screens. Das Ergebnis wird ohne Suspend-Punkt aus dem Relay genommen und übergeben, es geht also weder verloren noch wird es doppelt angewendet, wenn der Screen die Komposition verlässt (dieselbe Falle wie in #25).
+- Tests warten auf UI, die nur der Zielzustand zeigt (Kopf „1/5 erledigt“), und prüfen danach den State.
+- Wartet ein Test auf State oder Daten statt auf Text, nimmt er `waitUntilState` (app/src/test/.../ui/TestWaits.kt): Der Helfer holt vor jeder Prüfung den Semantik-Baum und pumpt damit den Main-Looper. Ein reines `waitUntil { deps.workout.state … }` läuft sonst in den Timeout, sobald die Arbeit auf `Dispatchers.Main` liegt (so geschehen in TrainingTabTest/DayWithOverfitTest, nachdem `addPicked` in den Controller-Scope gezogen war). Alle bestehenden State-Waits sind umgestellt.
+
 ## Marke und Claim (Session T)
 - **Wortmarke „overfit“ immer klein**, auch am Satzanfang und in Fließtexten (wie „eBay“): eine Schreibweise, kein Abwägen im Einzelfall. Geändert: App-Name (`appName`, Android-Label), „Über/About overfit“, Store-Texte, README, Web. Interne Namen (Paket `app.overfit`, Datei `.overfit`, `overfit://`) bleiben unverändert.
 - **Claim „personal training for everyone“** in beiden Sprachen auf Englisch als Markenclaim (30 Zeichen = App-Store-Untertitel). Auf Deutsch zusätzlich eine erklärende Zeile („Dein Trainer in der Tasche …“) statt Übersetzung: ein Claim, überall wiedererkennbar, Store-Suche profitiert von englischem Begriff nicht, aber die Marke bleibt einheitlich.

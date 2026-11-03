@@ -136,14 +136,14 @@ class CoachTabTest {
         assertTrue(first.staticSystem.contains("wg:bench-press | Bench Press"))
         input("coach:chatInput").performTextInput("Und mit weniger Gewicht?")
         compose.onNodeWithText("Senden").performClick()
-        compose.waitUntil(10_000) { fake.prompts.size >= 2 }
+        compose.waitUntilState(10_000) { fake.prompts.size >= 2 }
         assertEquals(2, fake.prompts.last().history.size)
 
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Workout übernehmen").fetchSemanticsNodes().size == 2 }
         compose.onAllNodesWithText("Workout übernehmen")[1].performClick()
         waitFor("Coach Oberkörper")
         compose.onNodeWithText("Übernehmen").performClick()
-        compose.waitUntil(10_000) { runBlocking { data.templates.templates.first() }.any { it.name == "Coach Oberkörper" } }
+        compose.waitUntilState(10_000) { runBlocking { data.templates.templates.first() }.any { it.name == "Coach Oberkörper" } }
     }
 
     @Test
@@ -164,13 +164,13 @@ class CoachTabTest {
         waitFor("Plane meine nächste Trainingswoche", substring = true)
         compose.onNodeWithText("Senden").performClick()
         waitFor("Probier das hier.")
-        compose.waitUntil(10_000) { runBlocking { database.coachChatDao().allChats() }.size == 1 }
+        compose.waitUntilState(10_000) { runBlocking { database.coachChatDao().allChats() }.size == 1 }
 
         compose.onNodeWithText("Chat löschen").performClick()
         waitFor("Wirklich löschen?")
         assertEquals(1, runBlocking { database.coachChatDao().allChats() }.size)
         compose.onNodeWithText("Wirklich löschen?").performClick()
-        compose.waitUntil(10_000) { runBlocking { database.coachChatDao().allChats() }.isEmpty() }
+        compose.waitUntilState(10_000) { runBlocking { database.coachChatDao().allChats() }.isEmpty() }
         assertTrue(runBlocking { database.coachChatDao().allMessages() }.isEmpty())
     }
 

@@ -563,6 +563,30 @@ class WorkoutControllerTest {
     }
 
     @Test
+    fun addPicked_completesEvenIfTheCallerIsCancelled() = runTest {
+        // The workout screen hands the picker's result over and may leave the composition right away.
+        val e = env()
+        e.started()
+        val loaded = kotlinx.coroutines.CompletableDeferred<List<app.overfit.domain.Exercise>>()
+        val caller = launch { e.c.addPicked(null) { loaded.await() }.join() }
+        runCurrent()
+        caller.cancel()
+        loaded.complete(listOf(exercise("row", name = "Row")))
+        runCurrent()
+        assertEquals(listOf("bench", "squat", "row"), e.w.exercises.map { it.exercise.id })
+    }
+
+    @Test
+    fun addPicked_withEntryReplacesIt() = runTest {
+        val e = env()
+        e.started()
+        val entryId = e.w.exercises[0].id
+        e.c.addPicked(entryId) { listOf(exercise("dips", TrackingType.REPS), exercise("row")) }
+        runCurrent()
+        assertEquals(listOf("dips", "squat"), e.w.exercises.map { it.exercise.id })
+    }
+
+    @Test
     fun replaceExercise_marksReplacedAndPersists() = runTest {
         val e = env()
         e.started()

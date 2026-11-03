@@ -272,6 +272,17 @@ class WorkoutController(
         edit { w -> exercises.fold(w) { acc, e -> acc.addExercise(Workout.added(e, last[e.id].orEmpty())) } }
     }
 
+    /**
+     * Adds exercises chosen in the picker, or with [replaceEntryId] swaps that entry for the first one.
+     * Runs in the controller's own scope: the screen that asked may leave the composition right away
+     * (minimize, back), which must not cancel the add halfway (the trap from #25).
+     */
+    fun addPicked(replaceEntryId: String?, load: suspend () -> List<Exercise>): Job = scope.launch {
+        val exercises = load()
+        if (replaceEntryId != null) exercises.firstOrNull()?.let { replaceExercise(replaceEntryId, it) }
+        else addExercises(exercises)
+    }
+
     suspend fun replaceExercise(entryId: String, replacement: Exercise) {
         if (workout == null) return
         loadLastTime(listOf(replacement.id))

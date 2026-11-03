@@ -15,6 +15,17 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## main wieder grün: Wackel-Tests nach #39 (Session S, 3.11.)
+**Erledigt:**
+- Ursache der roten Android-CI gefunden (siehe DECISIONS „Wackel-Tests nach #39“): Es waren zwei Rennen in den Tests. Ein App-Fehler war nicht die Ursache. Die Übung landete im Training, nur zu spät für den Test.
+- Workout-Detail zeigt „Starten“ erst, wenn das Workout geladen ist (vorher war der Button kurz sichtbar, aber deaktiviert, und frühe Taps verpufften).
+- Übungen aus dem Picker (auch frisch angelegte) fügt jetzt der WorkoutController in seinem eigenen Scope hinzu. Das Hinzufügen bricht also nicht mehr ab, wenn man das Training sofort minimiert.
+- `CustomExerciseFlowTest` wartet auf den Kopf „1/5 erledigt“, den nur das Training mit beiden Übungen zeigt, und prüft dann den State. Neue Tests: `addPicked_*` im `WorkoutControllerTest`.
+**Offen:** –
+
+### Bitte auf dem Handy testen
+1. Training starten, Satz 1 abhaken, „Übung hinzufügen“ → Suchtext eingeben → „… als neue Übung anlegen“ → Speichern: Du bist zurück im Training, die neue Übung steht unten, der Haken und die Pause laufen weiter. Direkt danach minimieren: Beim Öffnen ist die Übung trotzdem da.
+
 ## Tab „Coach“: Chat, sichtbare Prompts, KI-Zugang an einem Ort (Session P, 3.11.)
 Erledigt:
 - Neuer Tab **Coach** (Training, Verlauf, Coach, Fotos, Profil). Oben die Statuszeile KI-Zugang (eigener Key mit Anbieter, Fuel mit Saldo oder „Kein KI-Zugang“) → Einrichten/Ändern/Trennen.
