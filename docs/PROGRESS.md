@@ -7,13 +7,50 @@
 | 1 | Übungskatalog, eigene Übungen, Vorlagen | erledigt |
 | 2 | Workout-Modus, Pausentimer | erledigt |
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | offen |
-| 4 | KI-Coach | offen |
+| 4 | KI-Coach | erledigt (Session G): Auswertung, Plan-Diff, Gedächtnis, Fortschritt, Warteschlange, Demo |
 | 5 | Feinschliff | offen |
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite offen (nach Phase 3) |
+
+## Phase 4: KI-Coach (Session G, Nacht 3.11.)
+Fertig:
+- Coach-Auswertung eines beendeten Trainings: Bewertung 1–10, Zusammenfassung, Gut / Besser machen / Tipps, Foto-Feedback
+  (nur mit Einwilligung), **Plan fürs nächste Mal als Diff** („Bench Press: 3 × 8 · 60 kg → 3 × 8 · 62,5 kg“, Neu, Entfällt,
+  Pause) mit Alle annehmen / einzeln / Ablehnen → Vorlage wird angepasst; freies Training → „Als Vorlage speichern“
+- „Fortschritt bewerten“: Einschätzung der letzten 8 Wochen inkl. Verlauf der Hauptübungen (e1RM)
+- Anbieter: eigener Key (Anthropic direkt, OpenAI, OpenRouter) und Fuel (Kosten + Saldo unter der Auswertung);
+  Structured Outputs, robuster Parser, Prompt-Caching, Antwortsprache = App-Sprache
+- Warteschlange: ohne Netz/Timeout/Überlastung wartet die Anfrage und geht beim nächsten Öffnen der App automatisch raus;
+  sonst Fehlertext mit „Erneut versuchen“ (Rohantwort einsehbar)
+- Coach-Gedächtnis: lesen, bearbeiten, Versionen wiederherstellen, löschen; der Coach überarbeitet es nach jeder Auswertung
+- Coach-Einstellungen: Modell je Anbieter, „Körperfotos an Coach senden“ (Standard aus), Coach-Anweisungen editierbar
+- Ohne KI-Zugang: Hinweis mit „KI verbinden“ / „Fuel nutzen“ und eine als Demo markierte Beispiel-Auswertung
+- Start: „Letzte Coach-Tipps“ aus der neuesten Auswertung, Zeile „Coach“; Profil → Coach
+- Room v4 (`coach_review`, `coach_memory`, nur neue Tabellen, Migrationstest)
+- Tests: Parser (kaputte/abweichende Antworten), Request-Aufbau, Plan-Diff + Anwenden, Provider gegen MockEngine,
+  Warteschlange/Service mit Room, UI-Durchlauf mit Fake-Provider
+
+Offen / Hinweise:
+- Kein Senden bei geschlossener App (kein WorkManager), siehe DECISIONS
+- Coach-Tabellen sind noch nicht im Backup (Phase 3) enthalten
+
+## Bitte auf dem Handy testen: KI-Coach (Phase 4)
+1. Profil → KI verbinden → Anthropic + eigener Key (oder Fuel)
+2. Training aus einer Vorlage (z. B. Push) machen, ein paar Sätze abhaken, „Beenden“
+3. Start → Zeile „Coach“ → „Letztes Training auswerten“ → „An Coach senden“ → nach 10–40 s Bewertung, Tipps und
+   „Nächstes Mal“ mit Änderungen
+4. Einzelne Änderungen abwählen (Kreis rechts) → „N übernehmen“ (oder „Alle annehmen“) → Vorlage öffnen: Werte geändert
+5. Start zeigt unter „Letzte Coach-Tipps“ die Tipps
+6. Flugmodus an → noch ein Training beenden und senden → „Wartet auf Verbindung“; Flugmodus aus, App schließen und
+   öffnen → Auswertung kommt von selbst
+7. Profil → Coach → „Fortschritt bewerten“
+8. Profil → Coach-Gedächtnis: Text ansehen, ändern, Speichern; Versionen wiederherstellen; löschen (zweimal tippen)
+9. Profil → Coach → Coach-Einstellungen: Modell, Fotos (Standard aus), Anweisungen ändern/zurücksetzen
+10. KI trennen → Coach → „Letztes Training auswerten“ → Hinweis „Kein KI-Zugang“ → „Demo-Auswertung ansehen“
+11. Mit Fuel: unter der Auswertung „Fuel · 0,0x € · Saldo …“
 
 ## Phase 2: Workout-Modus und Pausentimer (Session A)
 Phase 2 abgeschlossen:

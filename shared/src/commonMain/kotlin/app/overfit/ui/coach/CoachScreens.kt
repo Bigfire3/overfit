@@ -564,7 +564,7 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
         if (provider == app.overfit.ai.ProviderId.FUEL) {
             Text(c.modelFuelFixed, tone = Tone.Muted)
         } else {
-            ListRow(provider.name.lowercase().replaceFirstChar(Char::uppercase)) {
+            ListRow(providerLabel(provider)) {
                 app.overfit.ui.components.RowInput(model, { model = it.trim().take(100) }, onCommit = { coach.settings.setModel(provider, model) })
             }
             Text(c.modelHint(app.overfit.coach.CoachModels.default(provider)), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
@@ -590,4 +590,11 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
 fun latestCoachTips(coach: CoachService): List<String> {
     val reviews by coach.reviews.collectAsState(initial = emptyList())
     return reviews.firstOrNull { it.status == ReviewStatus.DONE && it.review != null }?.review?.tips.orEmpty().take(3)
+}
+
+private fun providerLabel(id: app.overfit.ai.ProviderId) = when (id) {
+    app.overfit.ai.ProviderId.ANTHROPIC -> "Anthropic"
+    app.overfit.ai.ProviderId.OPENAI -> "OpenAI"
+    app.overfit.ai.ProviderId.OPENROUTER -> "OpenRouter"
+    app.overfit.ai.ProviderId.FUEL -> "Fuel"
 }

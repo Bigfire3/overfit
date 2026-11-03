@@ -167,8 +167,7 @@ class CoachService(
             complete(sending, reply, parsed)
             false
         } catch (e: CancellationException) {
-            // Process ends: stays in the queue, sent again on the next start.
-            dao.upsert(sending.copy(status = ReviewStatus.QUEUED))
+            // Scope ends: the row stays SENDING and counts as pending, so it is sent again on the next start.
             throw e
         } catch (e: CoachException) {
             if (e.kind.retryable) {

@@ -12,6 +12,7 @@ import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.FuelApi
 import app.overfit.fuel.RequestSigner
 import app.overfit.platform.AndroidAttestor
+import app.overfit.platform.AndroidCoachPhotos
 import app.overfit.platform.AndroidDeviceKey
 import app.overfit.platform.AndroidHaptics
 import app.overfit.platform.AndroidKeyValueStore
@@ -47,5 +48,6 @@ fun androidDependencies(
     fuel = fuel,
     share = AndroidPlatformShare(context),
     inbox = ImportInbox(),
+    coachPhotos = AndroidCoachPhotos(),
     )
 }
