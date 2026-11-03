@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -69,11 +70,28 @@ fun FuelScreen(
     onRecovery: () -> Unit,
     onSpotInvite: () -> Unit,
     onSpotRedeem: () -> Unit,
+    /** True when Fuel is the chosen AI access. With an own key the screen asks first (no request before). */
+    fuelActive: Boolean = true,
 ) {
     val t = LocalFuelStrings.current
     val language = t.language
     val isDemo by session.demo.collectAsStateWithLifecycle()
     val service = remember(isDemo) { session.current() } // re-evaluated when the demo starts/ends
+    var optedIn by rememberSaveable { mutableStateOf(false) }
+
+    if (service != null && !isDemo && !fuelActive && !optedIn) {
+        Screen(
+            header = { BackHeader(LocalStrings.current.back, onBack) },
+            footer = { PrimaryButton(t.optInButton, onClick = { optedIn = true }) },
+        ) {
+            Title(t.fuel)
+            Spacer(Modifier.height(Space.m))
+            Text(t.fuelTagline, tone = Tone.Muted)
+            Spacer(Modifier.height(Space.xl))
+            Text(t.optInText, tone = Tone.Muted)
+        }
+        return
+    }
 
     if (service == null) {
         Screen(
@@ -97,6 +115,9 @@ fun FuelScreen(
         Title(t.fuel)
         Spacer(Modifier.height(Space.s))
         if (isDemo) DemoBanner(session, t)
+        if ((config as? Loaded.Ready<FuelConfig>)?.value?.mode == "test") {
+            Text(t.testModeNote, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        }
         when (val a = account) {
             is Loaded.Loading -> Text(t.loading, tone = Tone.Muted)
             is Loaded.Failed -> ErrorBlock(t, reload)

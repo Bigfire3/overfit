@@ -1,7 +1,7 @@
 import { ApiError } from './errors';
 import type { Config, Device, Env } from './types';
 import { b64uEncode, randomId, sha256, hex } from './crypto';
-import { availableMicro, expiringLots, monthKey, now } from './ledger';
+import { availableMicro, expiringLots, grantStatements, monthKey, now } from './ledger';
 
 export function json(req: Uint8Array): Record<string, unknown> {
   try {
@@ -39,7 +39,7 @@ export async function accountSummary(env: Env, cfg: Config, accountId: string) {
   };
 }
 
-export async function registerDevice(env: Env, deviceId: string, publicKeyRaw: Uint8Array) {
+export async function registerDevice(env: Env, deviceId: string, publicKeyRaw: Uint8Array, cfg?: Config) {
   const existing = await env.DB.prepare('SELECT account_id FROM devices WHERE id = ?')
     .bind(deviceId)
     .first<{ account_id: string }>();
@@ -55,7 +55,18 @@ export async function registerDevice(env: Env, deviceId: string, publicKeyRaw: U
       t,
     ),
   ]);
+  if (cfg?.testMode && cfg.testStarterMicro > 0) await grantTestCredit(env, cfg, accountId, cfg.testStarterMicro, 'starter');
   return { accountId, created: true };
+}
+
+/** Test-Guthaben (nur Testbetrieb), begrenzt durch `testCreditCapMicro` über alle Konten. Gibt den gutgeschriebenen Betrag zurück. */
+export async function grantTestCredit(env: Env, cfg: Config, accountId: string, amountMicro: number, ref: string): Promise<number> {
+  if (!cfg.testMode) throw new ApiError(404, 'not_found', 'Unbekannter Endpunkt');
+  const used = await env.DB.prepare("SELECT COALESCE(SUM(amount_micro), 0) AS s FROM ledger WHERE type = 'test_credit'").first<{ s: number }>();
+  const amount = Math.min(amountMicro, Math.max(cfg.testCreditCapMicro - (used?.s ?? 0), 0));
+  if (amount <= 0) return 0;
+  await env.DB.batch(grantStatements(env, accountId, 'test_credit', amount, now() + 60 * 86_400, `test:${ref}`));
+  return amount;
 }
 
 export async function setProfile(env: Env, device: Device, body: Record<string, unknown>) {

@@ -51,10 +51,22 @@ export const mockAttestationVerifier: AttestationVerifier = {
   },
 };
 
+/**
+ * Testbetrieb (`DEPLOY_MODE=test`): keine Geräteprüfung. Token `test:<geräte-id>`; pro Gerät höchstens ein Spot
+ * (Schlüssel `test-<id>`). Nur für die Test-Instanz, die Limits dort sind niedrig. Siehe docs/DECISIONS.md.
+ */
+export const testAttestationVerifier: AttestationVerifier = {
+  async verify({ token }) {
+    const m = /^test:([A-Za-z0-9_-]{16,64})$/.exec(token);
+    return m ? { ok: true, deviceKey: `test-${m[1]}` } : { ok: false, reason: 'test_token_invalid' };
+  },
+};
+
 export function getPurchaseVerifier(env: Env, cfg: Config, platform: Platform): PurchaseVerifier | null {
   return cfg.purchaseMode === 'mock' ? mockPurchaseVerifier : purchaseVerifier(env, platform);
 }
 
 export function getAttestationVerifier(env: Env, cfg: Config, platform: Platform): AttestationVerifier | null {
+  if (cfg.testMode) return testAttestationVerifier;
   return cfg.attestationMode === 'mock' ? mockAttestationVerifier : attestationVerifier(env, platform);
 }

@@ -138,7 +138,7 @@ fun SettingsScreen(
         val hub = app.overfit.i18n.LocalCoachStrings.current.hub
         ListRow(hub.profileLink, onClick = onCoach)
         Text(hub.profileLinkHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        FuelRow(fuelSession, onFuel)
+        FuelRow(fuelSession, fuelActive = state.providerId == app.overfit.ai.ProviderId.FUEL, onClick = onFuel)
 
         SectionTitle(t.app)
         ListRow(t.about, onClick = onAbout)
@@ -202,13 +202,16 @@ private fun DeveloperSection(fuel: FuelAccess) {
 
 /** Profile → "Fuel · 4,20 €" (or "coming soon" / "Demo"). */
 @Composable
-private fun FuelRow(session: FuelSession, onClick: () -> Unit) {
+private fun FuelRow(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit) {
     val f = LocalFuelStrings.current
     val demo by session.demo.collectAsStateWithLifecycle()
     val service = session.current()
-    val (account, _) = rememberLoaded(service to demo) { service?.account() }
+    // Only ask the server for the balance when the user actually uses Fuel (or looks at the demo): own key = no request.
+    val load = service != null && (fuelActive || demo)
+    val (account, _) = rememberLoaded(service to load) { if (load) service?.account() else null }
     val value = when {
         service == null -> f.fuelRowSoon
+        !load -> ""
         else -> ((account as? Loaded.Ready)?.value?.balanceMicro?.let { formatEuro(it, f.language) } ?: "") +
             if (demo) " · ${f.fuelRowDemo}" else ""
     }
