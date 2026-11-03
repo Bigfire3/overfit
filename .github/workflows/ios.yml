@@ -35,6 +35,9 @@ jobs:
           cd iosApp && xcodegen
 
       - name: App für den Simulator bauen
+        env:
+          # Fuel/Spot backend URL (Repository-Variable, optional)
+          OVERFIT_BACKEND_URL: ${{ vars.OVERFIT_BACKEND_URL }}
         run: |
           xcodebuild -project iosApp/Overfit.xcodeproj -scheme Overfit -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -n 60
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO OVERFIT_BACKEND_URL="$OVERFIT_BACKEND_URL" build | tail -n 60

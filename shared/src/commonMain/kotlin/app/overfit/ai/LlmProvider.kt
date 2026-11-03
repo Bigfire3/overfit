@@ -1,5 +1,8 @@
 package app.overfit.ai
 
+import app.overfit.fuel.FuelException
+import app.overfit.fuel.FuelMessageResult
+import app.overfit.fuel.FuelService
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -12,14 +15,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class ProviderId { OPENROUTER, ANTHROPIC, OPENAI }
+enum class ProviderId { OPENROUTER, ANTHROPIC, OPENAI, FUEL }
 
 enum class KeyValidation { OK, INVALID, NETWORK }
 
 /**
  * Everything the app needs from an LLM backend. Implementations:
  * - direct providers with the user's own key (BYOK), below
- * - later: a credits proxy via our own backend (issue #13)
+ * - Fuel: credits proxy via our own backend ([FuelProvider])
  *
  * Kotlin Multiplatform has no official Anthropic SDK for iOS, so all providers use plain HTTP via Ktor.
  */
@@ -30,6 +33,8 @@ interface LlmProvider {
     val keyUrl: String
     /** Example prefix shown as input placeholder. */
     val keyPlaceholder: String
+    /** False for Fuel: no key of the user, the device identity pays from the Fuel balance. */
+    val usesKey: Boolean get() = true
     /** Checks the key without spending tokens. */
     suspend fun validateKey(apiKey: String): KeyValidation
 }
@@ -81,7 +86,42 @@ class OpenAiProvider(private val http: HttpClient) : LlmProvider {
     }
 }
 
-class Providers(http: HttpClient) {
+/**
+ * Fuel: coach credit through our own backend (POST /v1/messages) instead of the user's own key.
+ * "Validating" means: the backend is configured and reachable with this device's identity. The coach (phase 4)
+ * sends its requests with [messages].
+ */
+class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
+    override val id = ProviderId.FUEL
+    override val label = "Fuel"
+    override val keyUrl = ""
+    override val keyPlaceholder = ""
+    override val usesKey = false
+
+    val available: Boolean get() = service() != null
+
+    override suspend fun validateKey(apiKey: String): KeyValidation {
+        val s = service() ?: return KeyValidation.NETWORK
+        return try {
+            s.account()
+            KeyValidation.OK
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: FuelException) {
+            if (e.code == "network" || e.status >= 500) KeyValidation.NETWORK else KeyValidation.INVALID
+        } catch (_: Exception) {
+            KeyValidation.NETWORK
+        }
+    }
+
+    /** Sends an Anthropic Messages request through Fuel; the result carries cost and new balance. */
+    suspend fun messages(bodyJson: String): FuelMessageResult =
+        (service() ?: throw FuelException("not_configured", 503)).messages(bodyJson)
+}
+
+class Providers(http: HttpClient, fuelService: () -> FuelService? = { null }) {
+    /** Providers that need the user's own key. */
     val all: List<LlmProvider> = listOf(OpenRouterProvider(http), AnthropicProvider(http), OpenAiProvider(http))
-    fun get(id: ProviderId): LlmProvider = all.first { it.id == id }
+    val fuel = FuelProvider(fuelService)
+    fun get(id: ProviderId): LlmProvider = if (id == ProviderId.FUEL) fuel else all.first { it.id == id }
 }
