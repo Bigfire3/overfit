@@ -115,10 +115,13 @@ class CustomExerciseFlowTest {
         assertTrue(fake.prompts.single().user.contains("Turkish Get-up Neu"))
         compose.onNodeWithText("Speichern").performClick()
 
-        // Back in the running workout with the new exercise; the set and the rest are untouched
-        waitFor("Turkish Get-up Neu")
-        compose.onNodeWithText("1/2 erledigt", substring = true).assertExists()
+        // Back in the running workout with the new exercise; the set and the rest are untouched.
+        // Wait for the header only the workout with both exercises shows (1 of 2 + 3 sets done): the name alone
+        // also matches the form and the picker's search field while the save is still running. A wait on the
+        // state alone would not do either: it does not pump the main looper, so the save would never finish.
+        waitFor("1/5 erledigt", substring = true)
         val workout = requireNotNull(deps.workout.state.value.workout)
+        assertEquals(1, workout.completedSets)
         assertEquals(listOf("Bench Press", "Turkish Get-up Neu"), workout.exercises.map { it.exercise.name })
         assertEquals(restBefore, alerts.pending)
 

@@ -668,3 +668,13 @@ löschen“ setzt das Flag zurück (wie ein frischer Start, sie erscheinen beim 
 
 ### Zur Prüfung durch Fabian
 - Unterstrichene Textlinks vs. eigene Pill-Buttons: Seiten-Aktionen (Bearbeiten/Teilen) sind jetzt graue Pills, Inline-Aktionen in Listen unterstrichen. Leicht umkehrbar in `Components.kt`.
+
+## Wackel-Tests nach #39 (Session S, 3.11.)
+**Befund** (lokal reproduziert in der Gesamtsuite, etwa jeder zweite Lauf; die Klasse allein bleibt grün; mit Log-Ausgaben und State-Dump beim Timeout):
+1. `CustomExerciseFlowTest`: Nach „Speichern“ fand `waitFor("Turkish Get-up Neu")` den Namen sofort im Formular bzw. im Suchfeld des Pickers, obwohl das Speichern (Room-Write im `viewModelScope`, Rückkehr auf dem Main-Looper) noch lief. Die Prüfung danach kam zu früh. Der Umbau auf `waitUntil { state … }` (PR #41) lief in den Timeout, weil eine reine State-Bedingung unter Robolectric den Main-Looper nicht pumpt (erst `fetchSemanticsNodes` synchronisiert). Laut Log kam `onSaved` erst **nach** den 20 s, danach landete die Übung korrekt im Training. Die App hatte hier also keinen Fehler.
+2. `WorkoutFlowTest`, `ShareFlowTest` und alle anderen „Starten“-Tests: Der Footer mit „Starten“ war sichtbar, bevor das Workout aus Room geladen war, aber noch `enabled = false`. Ein Klick in diesem Fenster verpuffte (Test hängt nach „Starten“), und der Titel fehlte noch („Oberkörper A … is not displayed“).
+
+**Entscheidung:**
+- `WorkoutPlanScreen` zeigt den Footer erst, wenn das Workout geladen ist. Es gibt keinen toten Button mehr, auch nicht für schnelle Finger. Der Inhalt erscheint ohnehin erst dann.
+- Das Hinzufügen bzw. Ersetzen aus dem Picker läuft über `WorkoutController.addPicked` im Controller-Scope statt in `rememberCoroutineScope` des Workout-Screens. Das Ergebnis wird ohne Suspend-Punkt aus dem Relay genommen und übergeben, es geht also weder verloren noch wird es doppelt angewendet, wenn der Screen die Komposition verlässt (dieselbe Falle wie in #25).
+- Tests warten auf UI, die nur der Zielzustand zeigt (Kopf „1/5 erledigt“), und prüfen danach den State. Reine State-Waits in Compose-UI-Tests vermeiden (sie pumpen den Main-Looper nicht).

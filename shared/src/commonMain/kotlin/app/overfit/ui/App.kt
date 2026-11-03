@@ -513,7 +513,6 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<WorkoutRoute> {
-                        val scope = rememberCoroutineScope()
                         var pendingReplaceId by rememberSaveable { mutableStateOf<String?>(null) }
                         val result by picked.result.collectAsStateWithLifecycle()
                         LaunchedEffect(result) {
@@ -522,11 +521,9 @@ fun OverfitApp(deps: AppDependencies) {
                             val replaceId = pendingReplaceId
                             pendingReplaceId = null
                             if (ids.isEmpty()) return@LaunchedEffect
-                            scope.launch {
-                                val exercises = deps.data.exercises.getAll(ids)
-                                if (replaceId != null) exercises.firstOrNull()?.let { deps.workout.replaceExercise(replaceId, it) }
-                                else deps.workout.addExercises(exercises)
-                            }
+                            // Taken from the relay and handed to the controller without a suspension point in between,
+                            // so the pick is neither lost nor applied twice if this screen leaves the composition.
+                            deps.workout.addPicked(replaceId) { deps.data.exercises.getAll(ids) }
                         }
                         WorkoutScreen(
                             controller = deps.workout,
