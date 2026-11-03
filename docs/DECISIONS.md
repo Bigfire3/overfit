@@ -916,7 +916,7 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   ≥ 5 % Gewinn lässt (6,49 bzw. 13,49 € reichen nicht). Produkt-IDs bleiben; Store-Kauf ist noch nicht live, also bricht nichts.
 - **Aufschlag 28 % (`MARKUP_BP = 2800`).** Stripe-Gebühr konservativ gemischt mit 2,5 % + 0,25 € (Preisseite: EWR 1,5 %, Premium 2,8 %,
   UK 2,5 %, Nicht-EWR 3,15 %, Umrechnung + 2 %, jeweils + 0,25 €); jede einzelne Zahlart muss ohne Verlust bleiben. Sonst dieselben
-  Annahmen wie AA (10 % Spot-Rücklage, Ziel 7 %, Untergrenze 5 % vom Netto). 28 % ist der kleinste ganze Wert, mit dem jedes Web-Paket
+  Annahmen wie AA (10 % Rücklage für Startguthaben und Einladungsbonus, Ziel 7 %, Untergrenze 5 % vom Netto). 28 % ist der kleinste ganze Wert, mit dem jedes Web-Paket
   ≥ 5 % behält; ab 10 € > 7 %. Coach-Auswertung Gemini 3.6 Flash damit ≈ 1,8 ct statt 2,4 ct.
 - **5 € im Web wieder drin:** kostet alle nur einen Punkt (27 % → 28 %) statt 5,8 Punkte wie bei Paddle; ein niedriger Einstieg ist für
   eine App ohne Abo den Punkt wert. Vorgewählt bleibt 10 €.

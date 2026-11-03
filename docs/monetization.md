@@ -41,7 +41,7 @@ Bis Session AA trug ein einziger Aufschlag (69 %) auch den Store, den teuersten 
 - **Stores:** Apple und Google sind Verkäufer (Kommissionär), führen die USt des Käuferlands ab und nehmen **15 % vom Preis ohne USt**
   (Small-Business-Programme). Fabians Kleinunternehmerstatus ändert daran nichts. Store-Preise sind in allen Euro-Ländern gleich, die
   USt nicht: gerechnet mit **19 % (DE)** und **27 % (höchster EU-Satz)**.
-- **Spot-/Startguthaben: 10 % vom Netto** als Rücklage. **Zielgewinn 7 % vom Netto**, Untergrenze **5 %** (im Test festgeschrieben).
+- **Startguthaben und Einladungsbonus: 10 % vom Netto** als Rücklage. **Zielgewinn 7 % vom Netto**, Untergrenze **5 %** (im Test festgeschrieben).
 - Guthaben wird vollständig zum Listenpreis × (1 + Aufschlag) verbraucht (ungünstigster Fall), Wechselkurs 0,92 €/$.
 
 **Formel:** Netto = Preis − USt − Gebühr. Gewinn = Netto − Guthaben ÷ (1 + Aufschlag) − 10 % × Netto.
@@ -75,7 +75,7 @@ passen, und den zahlten dann alle, auch im Web. Ein 20-€-Store-Paket ist nicht
 
 **Ergebnis je Kauf bei Aufschlag 28 %, Guthaben voll verbraucht:**
 
-| Kanal | Preis | Guthaben | USt | Gebühr | Netto | Anbieterkosten (Guthaben ÷ 1,28) | Spot-Rücklage | Gewinn | % vom Netto |
+| Kanal | Preis | Guthaben | USt | Gebühr | Netto | Anbieterkosten (Guthaben ÷ 1,28) | Rücklage Einladungsbonus | Gewinn | % vom Netto |
 |---|---|---|---|---|---|---|---|---|---|
 | Web | 5 € | 5 € | – | 0,38 € | 4,63 € | 3,91 € | 0,46 € | **0,26 €** | 5,5 % |
 | Web | 10 € | 10 € | – | 0,50 € | 9,50 € | 7,81 € | 0,95 € | **0,74 €** | 7,8 % |
@@ -86,7 +86,7 @@ passen, und den zahlten dann alle, auch im Web. Ein 20-€-Store-Paket ist nicht
 | Store (27 %) | 6,99 € | 5 € | 1,49 € | 0,83 € | 4,68 € | 3,91 € | 0,47 € | **0,30 €** | 6,5 % |
 
 Teuerste einzelne Zahlart im Web (Nicht-EWR-Karte + Umrechnung): 5 € → 3,0 %, 10 € → 5,4 %, 50 € → 7,2 %, kein Verlust. Ein Chargeback
-(20 € Gebühr) frisst den Gewinn vieler Käufe; das fängt nur die Summe auf, deshalb bleibt die Spot-Rücklage konservativ.
+(20 € Gebühr) frisst den Gewinn vieler Käufe; das fängt nur die Summe auf, deshalb bleibt die Rücklage für Startguthaben und Einladungsbonus konservativ.
 
 Der Test `backend/test/pricing.test.ts` rechnet das mit den Konstanten nach: jedes Web- und Store-Paket ≥ 5 % (Store bei 19 % und 27 % USt),
 keine Zahlart im Verlust, Store-Preise auf x,99 € und jeweils die niedrigste Stufe, die reicht, und der Aufschlag ist der kleinste ganze
@@ -94,12 +94,12 @@ Prozentwert, der alle Web-Pakete trägt.
 
 ### Aufschlag (offen, Transparenz)
 - **28 % Aufschlag** auf den Listenpreis der Anbieter, auf jede Anfrage, für **alle** Modelle und Kanäle gleich. Wofür: **Zahlungsgebühr**
-  (im Web 0,38–1,50 € je Kauf), **Gutschriften** für Startguthaben und Einladungen (Spot), **Betrieb** und ein kleiner **Gewinn**
+  (im Web 0,38–1,50 € je Kauf), **Gutschriften** für Startguthaben und Einladungsbonus, **Betrieb** und ein kleiner **Gewinn**
   (5–10 % vom Netto). USt fällt im Web nicht an (Kleinunternehmer); im Store tragen USt und Store-Gebühr der offene Aufpreis.
 - Im Web bleibt das Guthaben 1:1; im Store steht der Aufpreis bei jedem Paket („5 € Guthaben · 6,99 € (inkl. Store-Gebühr)“).
 - Die App sagt das unter „Guthaben“ und verlinkt „Wie setzen sich die Preise zusammen?“ auf `https://bigfire3.github.io/overfit/preise/`
   (DE+EN, je ein Beispiel Web und Store, ohne Werbesprache).
-- **Verfall:** Startguthaben (Spot) verfällt nach 180 Tagen, gekauftes Guthaben nie.
+- **Verfall:** Startguthaben und Einladungsbonus verfallen nach 180 Tagen, gekauftes Guthaben nie.
 - **Ausweichung:** Antwortet ein anderes Modell als das gewählte, zahlt der Nutzer höchstens den Preis des gewählten; ist das Ersatzmodell teurer, trägt die Marge die Differenz (sie kann dann negativ sein). Die App sagt dem Nutzer, welches Modell geantwortet hat.
 - **Auswertung für den Betreiber:** `GET /v1/admin/usage` (docs/backend-api.md) zeigt je Modell Anbieterkosten, Berechnetes und Marge, ohne Inhalte, und den Web-Umsatz je Jahr und Land.
 - Preise pflegt der Betreiber in `backend/src/providers.ts`, den Aufschlag in `backend/wrangler.jsonc` (`MARKUP_BP`), die Pakete in `backend/src/config.ts`.
