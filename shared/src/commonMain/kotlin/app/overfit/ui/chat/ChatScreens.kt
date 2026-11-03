@@ -30,6 +30,7 @@ import app.overfit.i18n.LocalChatStrings
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
 import app.overfit.share.PlatformShare
+import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.ListRow
@@ -95,8 +96,6 @@ fun AiCoachScreen(
     val t = LocalStrings.current
     val c = LocalChatStrings.current
     val sync by chat.sync.state.collectAsStateWithLifecycle()
-    var confirmDisconnect by remember { mutableStateOf(false) }
-    LaunchedEffect(confirmDisconnect) { if (confirmDisconnect) { delay(4000); confirmDisconnect = false } }
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         Title(c.aiCoach)
         Spacer(Modifier.height(Space.m))
@@ -112,11 +111,8 @@ fun AiCoachScreen(
         )
         ListRow(c.fuelWay, if (state.providerId == ProviderId.FUEL) c.wayConnected else c.wayNotConnected, onClick = onFuel)
         if (onDisconnect != null && state.hasApiKey) {
-            ListRow(
-                if (confirmDisconnect) app.overfit.i18n.LocalCoachStrings.current.hub.disconnectConfirm else t.disconnect,
-                tone = if (confirmDisconnect) Tone.Default else Tone.Muted,
-                onClick = { if (confirmDisconnect) { confirmDisconnect = false; onDisconnect() } else confirmDisconnect = true },
-            )
+            Spacer(Modifier.height(Space.m))
+            app.overfit.ui.components.ConfirmButton(t.disconnect, app.overfit.i18n.LocalCoachStrings.current.hub.disconnectConfirm, onDisconnect)
         }
         if (onCoachSettings != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.settingsTitle, onClick = onCoachSettings)
 
@@ -153,12 +149,10 @@ fun ChatProviderScreen(
     val scope = rememberCoroutineScope()
     var consent by remember { mutableStateOf(false) }
     var photos by remember { mutableStateOf(false) }
-    var confirmDisable by remember { mutableStateOf(false) }
     var copied by remember { mutableStateOf<String?>(null) }
     val url = chat.serverUrl()
 
     LaunchedEffect(sync.enabled) { if (chat.configured && sync.enabled) viewModel.refresh() }
-    LaunchedEffect(confirmDisable) { if (confirmDisable) { delay(4000); confirmDisable = false } }
 
     if (consent && !sync.enabled) {
         Screen(
@@ -267,11 +261,7 @@ fun ChatProviderScreen(
 
         if (chat.configured && sync.enabled) {
             Spacer(Modifier.height(Space.l))
-            ListRow(
-                if (confirmDisable) c.disableConfirm else c.disableChat,
-                tone = if (confirmDisable) Tone.Default else Tone.Muted,
-                onClick = { if (confirmDisable) { confirmDisable = false; viewModel.disable() } else confirmDisable = true },
-            )
+            ConfirmButton(c.disableChat, c.disableConfirm, onConfirm = { viewModel.disable() })
             Text(c.disableHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         }
     }

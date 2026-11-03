@@ -611,3 +611,25 @@ Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templat
 ### Zur Prüfung durch Fabian
 - Der Chat-Verlauf bleibt unbegrenzt lokal gespeichert; im Tab stehen die letzten 5 früheren Chats. Falls gewünscht: Alles-löschen für Chats oder automatisches Aufräumen.
 - Fuel-Kosten stehen je Antwort klein darunter („Kosten: 0,0042 €“). Bei eigenem Key zeigen wir keine Kosten (die Preise kennt nur der Anbieter).
+
+## UI-Feinschliff (Session R, 3.11.)
+**Mängelliste aus den Screenshots** (`docs/screenshots/before/`, Test `ScreenshotTest`, hell + dunkel):
+1. Textaktionen („Beenden“, „Bearbeiten“, „Teilen“, „Satz hinzufügen“, „Ersetzen“) sahen aus wie Fließtext, nicht klickbar.
+2. Klickbare Zeilen (Workouts, Coach, Profil, Teilen) ohne Chevron und ohne Pressed-State.
+3. Segmente und Chips nur mit Haarlinie, Chips ohne Fläche.
+4. Workout-Ansicht: Minimieren-Zeile + 34-sp-Namensfeld + Beenden + Zeile mit Uhr + Fuß mit 56-dp-Button; oben zu viel Luft.
+5. Satz-Haken: leerer Kreis mit Haarlinie, 40 dp; erledigt nur schwarz (keine Bedeutung).
+6. Bestätigungsmuster nur Textwechsel, ohne Farbe.
+7. Diary: Raster zeigte nur Monate mit Daten.
+
+**Umsetzung:**
+- Buttons: `PrimaryButton` (48 dp, inverse), `SecondaryButton` (`surface`), `TertiaryButton`/`TextButton` (unterstrichen, ≥ 44 dp), `DestructiveButton`, `ConfirmButton` (Textwechsel + Farbe: rot `negative` bei Zerstörung, grün `positive` bei Beenden/Speichern; 4 s Zurücksetzen). Kompakt = 40 dp. `IconButton` und `BackHeader` 44 dp. API rückwärtskompatibel (`PrimaryButton` hat nur optionale neue Parameter; `TextButton` ist jetzt standardmäßig `Default`-Ton statt `Muted`).
+- `ListRow` mit `onClick` bekommt automatisch einen Chevron und beim Drücken eine `surface`-Fläche (`pressableRow`); `WorkoutRow` ebenso. Segmente und Chips liegen auf `surface`.
+- Workout-Ansicht: `Screen(compact = true)`, ein Kopf (Minimieren, Name + Uhr, „Beenden“ als kompakter grüner Bestätigungsbutton; während der Bestätigung weicht der Name), Fuß mit engerem Abstand. Satz abhaken: 48 dp, erledigt = `positive`. „Training verwerfen“ ist ein `ConfirmButton` (rot).
+- Bestätigungsmuster überall auf `ConfirmButton` umgestellt (Workout beenden/verwerfen, Löschen von Übung/Training/Workout, Reset, KI-Chat trennen, Coach-Gedächtnis, laufendes Training beenden); Foto löschen im Vollbild rot.
+- Diary: `DiaryCalendar.months` liefert mindestens die letzten 3 Monate plus den aktuellen und alle leeren Monate dazwischen bis zum ersten Training (Test `monthsShowAtLeastThreeEmptyMonthsBack`). Die Liste ist lazy; weiter zurück gibt es nur, wenn Daten dort liegen.
+- Wackel-Tests `TrainingTabTest` und `CustomExerciseFlowTest`: Wartezeiten 10 → 20 s (Timing, nicht abgeschaltet).
+- Nicht angefasst (Session Q arbeitet dort): `ui/share`.
+
+### Zur Prüfung durch Fabian
+- Unterstrichene Textlinks vs. eigene Pill-Buttons: Seiten-Aktionen (Bearbeiten/Teilen) sind jetzt graue Pills, Inline-Aktionen in Listen unterstrichen. Leicht umkehrbar in `Components.kt`.

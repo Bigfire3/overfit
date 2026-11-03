@@ -13,6 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
+import app.overfit.ui.components.Confirm
+import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.TextButton
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.height
@@ -125,11 +127,15 @@ fun StartScreen(
 fun WorkoutRow(workout: TemplateSummary, lastDone: String, onClick: () -> Unit) {
     val t = LocalStrings.current
     Column(Modifier.fillMaxWidth().pressableRow(onClick)) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.m)) {
-            Text(workout.name, style = Theme.type.label)
-            Spacer(Modifier.height(2.dp))
-            Text(t.templateSummary(workout.exerciseNames.size, workout.exerciseNames), style = Theme.type.caption, tone = Tone.Muted, maxLines = 2)
-            Text(lastDone, style = Theme.type.caption, tone = Tone.Muted)
+        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(workout.name, style = Theme.type.label)
+                Spacer(Modifier.height(2.dp))
+                Text(t.templateSummary(workout.exerciseNames.size, workout.exerciseNames), style = Theme.type.caption, tone = Tone.Muted, maxLines = 2)
+                Text(lastDone, style = Theme.type.caption, tone = Tone.Muted)
+            }
+            Spacer(Modifier.width(Space.m))
+            LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
         }
         Hairline()
     }
@@ -149,14 +155,7 @@ fun lastDoneText(t: Strings, lastStartedAt: Long?, today: LocalDate): String {
 @Composable
 fun ColumnScope.RunningWorkoutChoice(onOpenRunning: () -> Unit, onEndRunning: () -> Unit) {
     val t = LocalStrings.current
-    var confirmEnd by remember { mutableStateOf(false) }
-    LaunchedEffect(confirmEnd) { if (confirmEnd) { delay(4000); confirmEnd = false } }
     Text(t.runningWorkoutTitle, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
     PrimaryButton(t.toRunningWorkout, onClick = onOpenRunning)
-    TextButton(
-        if (confirmEnd) t.finishConfirm else t.endRunningWorkout,
-        { if (confirmEnd) { confirmEnd = false; onEndRunning() } else confirmEnd = true },
-        Modifier.align(Alignment.CenterHorizontally),
-        tone = if (confirmEnd) Tone.Default else Tone.Muted,
-    )
+    ConfirmButton(t.endRunningWorkout, t.finishConfirm, onConfirm = onEndRunning, kind = Confirm.Positive, textOnly = true, modifier = Modifier.align(Alignment.CenterHorizontally))
 }

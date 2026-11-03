@@ -304,10 +304,8 @@ fun CoachChatScreen(
     val t = LocalStrings.current
     var id by rememberSaveable { mutableStateOf(chatId) }
     var input by rememberSaveable { mutableStateOf(draft) }
-    var confirmDelete by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf(false) }
     val attached = remember { mutableStateListOf<String>() }
-    LaunchedEffect(confirmDelete) { if (confirmDelete) { delay(4000); confirmDelete = false } }
     val messages by remember(id) { if (id.isEmpty()) flowOf(emptyList()) else chat.messages(id) }.collectAsState(initial = emptyList())
     val list = rememberLazyListState()
     // New message or an answer that arrived: show the end of the chat.
@@ -321,7 +319,7 @@ fun CoachChatScreen(
             MultilineInput(input, { input = it }, h.chatPlaceholder, Modifier.testTag("coach:chatInput"), minHeight = 48.dp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(h.attachPhoto, { picking = !picking }, tone = if (picking) Tone.Default else Tone.Muted)
-                TextButton(h.chatSend, {
+                app.overfit.ui.components.PrimaryButton(h.chatSend, {
                     val text = input.trim()
                     if (text.isNotEmpty()) {
                         val (newId, _) = chat.send(id.ifEmpty { null }, text, attached.toList())
@@ -330,7 +328,7 @@ fun CoachChatScreen(
                         attached.clear()
                         picking = false
                     }
-                }, tone = if (input.isBlank()) Tone.Muted else Tone.Default)
+                }, enabled = input.isNotBlank(), modifier = Modifier, compact = true)
             }
         },
     ) {
@@ -339,12 +337,10 @@ fun CoachChatScreen(
             if (id.isNotEmpty()) {
                 TextButton(h.chatNew, { id = ""; input = ""; attached.clear() })
                 Spacer(Modifier.width(Space.m))
-                TextButton(
-                    if (confirmDelete) h.chatDeleteConfirm else h.chatDelete,
-                    {
-                        if (confirmDelete) { confirmDelete = false; chat.delete(id); id = "" } else confirmDelete = true
-                    },
-                    tone = if (confirmDelete) Tone.Default else Tone.Muted,
+                // Confirm pattern from the design system: first tap turns red with "Really delete?".
+                app.overfit.ui.components.ConfirmButton(
+                    h.chatDelete, h.chatDeleteConfirm, { chat.delete(id); id = "" },
+                    Modifier, compact = true, textOnly = true,
                 )
             }
         }
