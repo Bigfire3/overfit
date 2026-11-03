@@ -1,0 +1,126 @@
+{
+ "v": 1,
+ "kind": "template",
+ "name": "Push",
+ "note": "Brust, Schultern, Trizeps – Hypertrophie, 8–12 Wiederholungen (Beispielwerte, an dich anpassen)",
+ "exercises": [
+  {
+   "id": "wg:bench-press",
+   "restSec": 150,
+   "sets": [
+    {
+     "kg": 60,
+     "reps": 8
+    },
+    {
+     "kg": 60,
+     "reps": 8
+    },
+    {
+     "kg": 60,
+     "reps": 8
+    },
+    {
+     "kg": 60,
+     "reps": 8
+    }
+   ],
+   "note": "Schulterblätter zusammen, kontrolliert absenken"
+  },
+  {
+   "id": "wg:incline-dumbbell-press",
+   "restSec": 120,
+   "sets": [
+    {
+     "kg": 22,
+     "reps": 10
+    },
+    {
+     "kg": 22,
+     "reps": 10
+    },
+    {
+     "kg": 22,
+     "reps": 10
+    }
+   ]
+  },
+  {
+   "id": "wg:overhead-press",
+   "restSec": 120,
+   "sets": [
+    {
+     "kg": 40,
+     "reps": 8
+    },
+    {
+     "kg": 40,
+     "reps": 8
+    },
+    {
+     "kg": 40,
+     "reps": 8
+    }
+   ]
+  },
+  {
+   "id": "wg:cable-fly",
+   "restSec": 75,
+   "sets": [
+    {
+     "kg": 15,
+     "reps": 12
+    },
+    {
+     "kg": 15,
+     "reps": 12
+    },
+    {
+     "kg": 15,
+     "reps": 12
+    }
+   ]
+  },
+  {
+   "id": "wg:lateral-raise",
+   "restSec": 60,
+   "sets": [
+    {
+     "kg": 8,
+     "reps": 15
+    },
+    {
+     "kg": 8,
+     "reps": 15
+    },
+    {
+     "kg": 8,
+     "reps": 15
+    },
+    {
+     "kg": 8,
+     "reps": 15
+    }
+   ],
+   "note": "Leicht nach vorn gebeugt, ohne Schwung"
+  },
+  {
+   "id": "wg:rope-tricep-pushdown",
+   "restSec": 75,
+   "sets": [
+    {
+     "kg": 25,
+     "reps": 12
+    },
+    {
+     "kg": 25,
+     "reps": 12
+    },
+    {
+     "kg": 25,
+     "reps": 12
+    }
+   ]
+  }
+ ]
+}

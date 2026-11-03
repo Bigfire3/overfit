@@ -22,6 +22,9 @@ class ExerciseRepository(
     /** All exercises that are not archived, alphabetically. */
     val exercises: Flow<List<Exercise>> = dao.observeActive().map { list -> list.map { it.toDomain() } }
 
+    /** One-shot snapshot of [exercises]. */
+    suspend fun getActive(): List<Exercise> = dao.getActive().map { it.toDomain() }
+
     suspend fun get(id: String): Exercise? = dao.get(id)?.toDomain()
 
     suspend fun getAll(ids: List<String>): List<Exercise> {

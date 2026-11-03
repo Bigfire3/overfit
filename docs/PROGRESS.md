@@ -11,7 +11,31 @@
 | 5 | Feinschliff | offen |
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
-| 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | offen |
+| 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | Vorlagen erledigt (Session B), abgeschlossene Trainings folgen mit Phase 3 |
+| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
+
+## Phase 8: Vorlagen teilen und importieren (Session B)
+- Format `docs/share-format.md`: JSON → Raw Deflate → Base64url im Fragment (`https://bigfire3.github.io/overfit/t#…`,
+  `overfit://t#…`), Übungen per Katalog-ID, Name (DE/EN, unscharf aufgelöst) oder eigene Übung; Version und `kind`
+  (später `workout`) werden geprüft
+- Teilen: Vorlage öffnen → „Teilen“ → QR-Code, „Link teilen“ (System-Share-Sheet), „Link kopieren“, „Als Datei teilen“
+  (`.overfit`); QR nur bis 1.000 Zeichen
+- Import mit Vorschau (Name, Übungen, Sätze, was neu angelegt wird) aus Link, `.overfit`-Datei, QR-Scan (Android) und
+  Zwischenablage (Link, Base64, JSON, auch im ```json-Block mit Text drumherum)
+- „KI-Vorlage kopieren“: Prompt in App-Sprache für ChatGPT/Claude/Gemini; Antwort danach aus der Zwischenablage importieren
+- Beispielvorlagen Push/Pull/Legs (je 6 Übungen, Katalog-IDs): im leeren Vorlagen-Zustand auf Start, in Übungen →
+  Vorlagen und im Profil „Beispielvorlagen hinzufügen“ (idempotent)
+- „Duo · bald“ auf dem Startbildschirm → Teaser-Screen
+- Tests: Deflate, Format, Parser, Mapper, AI-Prompt (Common); QR gegen ZXing; Samples laden, Teilen→Import
+  ergibt dieselbe Vorlage, Import-Flows in der UI (Robolectric)
+- iOS: kein In-App-QR-Scanner (Kamera-App öffnet den `overfit://`-Link), Begründung in DECISIONS.md
+
+**Von Fabian zu tun (Phase 8):**
+1. Web-Fallback `https://bigfire3.github.io/overfit/t` muss live sein (GitHub Pages, aus PR #20), sonst öffnen
+   https-Links ohne App im Leeren. Die App öffnet unabhängig davon `overfit://`-Links und `.overfit`-Dateien.
+2. iOS Universal Links (https-Link öffnet direkt die App) brauchen eine Domain, die dir gehört, plus Associated Domains
+   und `apple-app-site-association`. Später mit eigener Domain; bis dahin: `overfit://`-Link und Web-Seite mit Knopf.
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig (Nacht 3.11.), App-Anbindung offen |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | offen |
 
 ## Nacht 3.11. – Backend Fuel/Spot + Web-Fallback (Session C)
@@ -112,3 +136,19 @@ Offen / Hinweise:
 8. Profil → Einheit auf lb → Vorlage öffnen: Gewichte in lb; zurück auf kg
 9. Profil → „Alle Bilder offline laden“ (im WLAN) → Fortschritt; danach im Flugmodus Fotos weiter sichtbar
 10. App schließen und neu öffnen → Vorlagen und eigene Übungen sind noch da; Sprache auf English → Übungen-Tab englisch
+
+## Bitte auf dem Handy testen: Teilen und Import (Phase 8)
+1. Start: Bei leerer Vorlagenliste „Beispielvorlagen hinzufügen“ → Push, Pull, Legs erscheinen; nochmal tippen (Profil
+   → Vorlagen) → „schon da“, nichts doppelt
+2. Vorlage Push öffnen → „Teilen“: QR-Code, „Link teilen“ → WhatsApp/Notizen/Mail; der Text enthält einen Link
+3. QR-Code mit einem zweiten Handy (Kamera-App) scannen → Browser/Web-Seite zeigt die Vorlage; dort „In Overfit
+   öffnen“ bzw. Link `overfit://t#…` antippen → Overfit öffnet die Vorschau
+4. Übungen → Vorlagen → „Vorlage importieren“ → „QR-Code scannen“ (Android, Kamera-Erlaubnis) mit dem QR eines anderen
+   Handys oder Bildschirms → Vorschau → „Übernehmen“ → Editor mit der neuen Vorlage
+5. Link in die Zwischenablage kopieren (z. B. aus WhatsApp) → „Aus Zwischenablage importieren“
+6. „KI-Vorlage kopieren“ → in ChatGPT/Claude/Gemini einfügen, Ziel/Equipment beantworten, Antwort („```json“-Block)
+   kopieren → „Aus Zwischenablage importieren“ → Vorschau zeigt Übungen (neu = eigene Übung) → „Übernehmen“
+7. Vorlage → „Teilen“ → „Als Datei teilen“ → `.overfit` an sich selbst mailen/in Dateien speichern, antippen → Overfit
+   öffnet die Vorschau
+8. Startbildschirm ganz unten: „Duo · bald“ → Erklärtext
+9. Zwischenablage leer oder Text ohne Training → verständliche Fehlermeldung

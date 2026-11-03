@@ -25,6 +25,9 @@ class TemplateRepository(
             templates.map { TemplateSummary(it.id, it.name, byTemplate[it.id].orEmpty()) }
         }
 
+    /** One-shot list of all template names. */
+    suspend fun names(): List<String> = dao.getNames()
+
     suspend fun get(id: Long): Template? {
         val full = dao.getWithExercises(id) ?: return null
         return Template(

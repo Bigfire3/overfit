@@ -73,6 +73,15 @@ import app.overfit.ui.onboarding.ONBOARDING_STEPS
 import app.overfit.ui.onboarding.OnboardingHeader
 import app.overfit.ui.onboarding.WeightStep
 import app.overfit.ui.settings.AboutScreen
+import app.overfit.share.ImportInbox
+import app.overfit.share.NoopPlatformShare
+import app.overfit.share.PlatformShare
+import app.overfit.ui.share.DuoScreen
+import app.overfit.ui.share.ImportScreen
+import app.overfit.ui.share.ImportViewModel
+import app.overfit.ui.share.ShareDependencies
+import app.overfit.ui.share.ShareScreen
+import app.overfit.ui.share.ShareViewModel
 import app.overfit.ui.settings.CoachMemoryScreen
 import app.overfit.ui.settings.SettingsScreen
 import app.overfit.ui.theme.OverfitTheme
@@ -91,6 +100,8 @@ class AppDependencies(
     val providers: Providers,
     val data: AppData,
     val versionName: String,
+    val share: PlatformShare = NoopPlatformShare(),
+    val inbox: ImportInbox = ImportInbox(),
     val today: () -> LocalDate = { Clock.System.todayIn(TimeZone.currentSystemDefault()) },
 )
 
@@ -107,6 +118,9 @@ class AppDependencies(
 @Serializable data object ConnectRoute
 @Serializable data object CoachMemoryRoute
 @Serializable data object AboutRoute
+@Serializable data object ImportRoute
+@Serializable data object DuoRoute
+@Serializable data class ShareRoute(val templateId: Long)
 @Serializable data class ExerciseDetailRoute(val id: String)
 /** Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). */
 @Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "")
@@ -135,6 +149,8 @@ fun OverfitApp(deps: AppDependencies) {
     val state by deps.store.state.collectAsStateWithLifecycle()
     val templates by deps.data.templates.templates.collectAsStateWithLifecycle(initialValue = null)
     val picked = remember { PickedExercises() }
+    val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox) }
+    val incoming by deps.inbox.pending.collectAsStateWithLifecycle()
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {
@@ -149,6 +165,14 @@ fun OverfitApp(deps: AppDependencies) {
         CompositionLocalProvider(LocalStrings provides stringsFor(state.language)) {
             val nav = rememberNavController()
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
+            // Links, files and scans from outside open the import screen (not during onboarding).
+            LaunchedEffect(incoming, state.onboardingDone) {
+                if (incoming != null && state.onboardingDone &&
+                    nav.currentDestination?.hasRoute(ImportRoute::class) != true
+                ) {
+                    nav.navigate(ImportRoute) { launchSingleTop = true }
+                }
+            }
             AppScaffold(nav) {
                 NavHost(nav, startDestination = start, modifier = Modifier.fillMaxSize()) {
                     composable<NameRoute> {
@@ -192,6 +216,8 @@ fun OverfitApp(deps: AppDependencies) {
                             templates = templates,
                             onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
                             onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
+                            share = share,
+                            onDuo = { nav.navigate(DuoRoute) },
                         )
                     }
                     composable<HistoryRoute> { HistoryScreen() }
@@ -205,6 +231,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onNewCustomExercise = { nav.navigate(CustomExerciseRoute(name = catalog.filter.value.query.trim())) },
                             onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
                             onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
+                            share = share,
+                            onImport = { nav.navigate(ImportRoute) },
                         )
                     }
                     composable<ExerciseDetailRoute> { entry ->
@@ -239,6 +267,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onClose = nav::popBackStack,
                             onAddExercises = { nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
+                            onShare = { nav.navigate(ShareRoute(id)) },
                         )
                     }
                     composable<ExercisePickerRoute> { entry ->
@@ -262,6 +291,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onCoachMemory = { nav.navigate(CoachMemoryRoute) },
                             onAbout = { nav.navigate(AboutRoute) },
                             offlineImages = deps.data.offlineImages,
+                            share = share,
                             onReset = {
                                 deps.store.resetAll()
                                 deps.data.scope.launch { deps.data.resetAll() }
@@ -277,6 +307,28 @@ fun OverfitApp(deps: AppDependencies) {
                             onConnected = { id, key -> deps.store.connectAi(id, key); nav.popBackStack() },
                         )
                     }
+                    composable<ImportRoute> {
+                        ImportScreen(
+                            viewModel = viewModel { ImportViewModel(deps.data.importer) },
+                            share = share,
+                            unit = state.profile.unit,
+                            language = state.language,
+                            onBack = nav::popBackStack,
+                            onImported = { id ->
+                                nav.popBackStack()
+                                nav.navigate(TemplateEditorRoute(id))
+                            },
+                        )
+                    }
+                    composable<ShareRoute> { entry ->
+                        val id = entry.toRoute<ShareRoute>().templateId
+                        ShareScreen(
+                            viewModel = viewModel { ShareViewModel(id, deps.data.templates) },
+                            platform = deps.share,
+                            onBack = nav::popBackStack,
+                        )
+                    }
+                    composable<DuoRoute> { DuoScreen(onBack = nav::popBackStack) }
                     composable<CoachMemoryRoute> { CoachMemoryScreen(onBack = nav::popBackStack) }
                     composable<AboutRoute> { AboutScreen(deps.versionName, onBack = nav::popBackStack) }
                 }
