@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -187,25 +188,28 @@ fun SetField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
+            maxLines = 1,
             textStyle = style,
             cursorBrush = SolidColor(c.foreground),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier
+                // Never narrower than "102.5" needs: the row stays one line, the value fully readable.
                 .weight(1f)
+                .widthIn(min = 52.dp)
                 .clip(BlockShape.field)
                 .background(c.background)
                 .semantics { contentDescription = description }
-                .padding(horizontal = Space.s, vertical = 6.dp),
+                .padding(horizontal = Space.xs, vertical = 6.dp),
             decorationBox = { inner ->
-                Box(contentAlignment = Alignment.CenterEnd) {
-                    if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = c.faint))
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = c.faint), maxLines = 1, softWrap = false)
                     inner()
                 }
             },
         )
         if (unit.isNotEmpty()) {
             Spacer(Modifier.width(Space.xs))
-            BasicText(unit.uppercase(), style = Theme.type.caption.copy(color = c.muted))
+            BasicText(unit.uppercase(), style = Theme.type.caption.copy(color = c.muted), maxLines = 1, softWrap = false)
         }
     }
 }

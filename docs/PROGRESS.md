@@ -25,6 +25,7 @@ Gewichte nur noch Plus (± entfernt). Details in DECISIONS.md. Tests: `SamplesSe
 2. Workout öffnen → Mülleimer → bestätigen: Du landest in der Workout-Liste, nicht auf schwarzem Screen. Auch Training im Verlauf, eigene Übung, Foto löschen.
 3. Fotos-Tab ohne Foto: Kalender ist da. Tag mit Training ohne Foto: gefüllter Punkt. Tag mit Foto + Training: Bild mit kleinem Punkt.
 4. Satz-Eingabe (Editor und Training): kein ±-Knopf, im Gewichtsfeld ist kein Minus möglich.
+5. Training starten (Weighted Pull-up, Englisch und Deutsch): Satzzeile einzeilig, Felder breit genug für „102.5“, Platzhalter „–“ statt senkrechtem „kg“, Zeit-Übung (Plank) ebenso.
 
 ## Feedback-Runde 3: UI (Session AE, 3.11.)
 **Erledigt** (enthält PR #56: Push/Pull/Legs ab dem ersten Start, keine „Beispiel-Workouts hinzufügen“-Zeile mehr):

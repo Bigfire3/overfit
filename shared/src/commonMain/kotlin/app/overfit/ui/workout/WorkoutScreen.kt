@@ -386,7 +386,7 @@ private fun SetRow(
                     filter = { s -> s.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(8) },
                     unit = unit.symbol,
                     keyboardType = KeyboardType.Decimal,
-                    placeholder = target.weightKg?.let { Numbers.formatWeight(it, unit, language) } ?: unit.symbol,
+                    placeholder = target.weightKg?.let { Numbers.formatWeight(it, unit, language) } ?: "–",
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -402,7 +402,7 @@ private fun SetRow(
                 filter = { s -> s.filter(Char::isDigit).take(4) },
                 unit = t.repsUnit,
                 keyboardType = KeyboardType.Number,
-                placeholder = target.reps?.toString() ?: t.repsUnit,
+                placeholder = target.reps?.toString() ?: "–",
                 modifier = Modifier.weight(1f),
             )
         }
@@ -417,7 +417,7 @@ private fun SetRow(
                 filter = { s -> s.filter { c -> c.isDigit() || c == ':' }.take(6) },
                 unit = t.secondsUnit,
                 keyboardType = KeyboardType.Number,
-                placeholder = target.durationSec?.toString() ?: t.secondsUnit,
+                placeholder = target.durationSec?.toString() ?: "–",
                 modifier = Modifier.weight(1f),
             )
         }
