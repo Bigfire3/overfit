@@ -3,6 +3,11 @@
 
     <!-- KI-Anbieter (Ktor) und Übungsbilder der free-exercise-db (Coil). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Pausentimer: Benachrichtigung (ab Android 13 mit Abfrage), Vibration, exakter Alarm zum Pausenende
+         (vom Nutzer erlaubt; ohne Erlaubnis inexakt). Kein Foreground-Service, kein Wakelock. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
         android:name=".OverfitApp"
@@ -21,6 +26,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name="app.overfit.platform.RestAlarmReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="app.overfit.platform.RestActionReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

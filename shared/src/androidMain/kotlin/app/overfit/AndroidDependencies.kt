@@ -8,7 +8,9 @@ import app.overfit.data.KeyValueStore
 import app.overfit.data.SecretStore
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.data.db.buildDatabase
+import app.overfit.platform.AndroidHaptics
 import app.overfit.platform.AndroidKeyValueStore
+import app.overfit.platform.AndroidRestAlerts
 import app.overfit.platform.AndroidSecretStore
 import app.overfit.platform.createHttpClient
 import app.overfit.platform.deviceDefaults
@@ -21,9 +23,13 @@ fun androidDependencies(
     kv: KeyValueStore = AndroidKeyValueStore(context),
     secrets: SecretStore = AndroidSecretStore(context),
     database: OverfitDatabase = buildDatabase(context),
+    /** Monochrome status bar icon for the rest timer notifications. */
+    restIcon: Int = context.applicationInfo.icon,
 ): AppDependencies = AppDependencies(
     store = AppStore(kv, secrets, deviceDefaults()),
     providers = Providers(createHttpClient()),
     data = AppData(database, kv),
     versionName = versionName,
+    haptics = AndroidHaptics(context),
+    restAlerts = AndroidRestAlerts(context, restIcon),
 )

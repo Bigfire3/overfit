@@ -21,15 +21,17 @@ class AppData(
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val exercises = ExerciseRepository(database, clock)
     val templates = TemplateRepository(database, clock)
+    val workouts = WorkoutRepository(database, clock)
     val catalog = CatalogSeeder(database, kv, readCatalog)
     val offlineImages = OfflineImages(scope, exercises)
 
     /** Loads the bundled catalogue if it changed. Failures are not fatal (the list just stays empty). */
     suspend fun seedCatalog(): Result<Boolean> = runCatching { catalog.seedIfNeeded(clock()) }
 
-    /** "Delete all data": templates and custom exercises go, the catalogue is loaded again. */
+    /** "Delete all data": workouts, templates and custom exercises go, the catalogue is loaded again. */
     suspend fun resetAll() {
         database.transaction {
+            database.workoutDao().deleteAll()
             database.templateDao().deleteAll()
             database.exerciseDao().deleteAll()
         }

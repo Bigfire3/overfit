@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +56,11 @@ import app.overfit.ui.components.SmallInput
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.TextButton
 import app.overfit.ui.components.Tone
+import app.overfit.ui.components.dragHandle
+import app.overfit.ui.components.ReorderState
 import app.overfit.ui.components.pressableRow
+import app.overfit.ui.components.reorderableItem
+import app.overfit.ui.components.rememberReorderState
 import app.overfit.ui.templates.TemplateDraft.DraftExercise
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
@@ -167,6 +172,15 @@ fun TemplateEditorScreen(
     LaunchedEffect(backArmed) { if (backArmed) { delay(4000); backArmed = false } }
     LaunchedEffect(confirmDelete) { if (confirmDelete) { delay(4000); confirmDelete = false } }
 
+    val listState = rememberLazyListState()
+    val reorder = rememberReorderState(listState, canMove = { it is Long }) { from, to ->
+        viewModel.edit { d ->
+            val a = d.exercises.indexOfFirst { it.key == from }
+            val b = d.exercises.indexOfFirst { it.key == to }
+            if (a < 0 || b < 0) d else d.moveExercise(from as Long, b - a)
+        }
+    }
+
     val back = { if (state.dirty && !backArmed) backArmed = true else onClose() }
     BackHandler(enabled = state.dirty, onBack = back)
 
@@ -182,7 +196,7 @@ fun TemplateEditorScreen(
         },
     ) {
         if (state.loading) return@Screen
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = Space.l)) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(bottom = Space.l)) {
             item(key = "name") {
                 Text(if (draft.isNew) t.newTemplate else t.editTemplate, tone = Tone.Muted)
                 Spacer(Modifier.height(Space.s))
@@ -192,6 +206,8 @@ fun TemplateEditorScreen(
             }
             itemsIndexed(draft.exercises, key = { _, e -> e.key }) { index, entry ->
                 ExerciseSection(
+                    modifier = Modifier.then(reorderableItem(reorder, entry.key)),
+                    reorder = reorder,
                     entry = entry,
                     unit = unit,
                     expanded = entry.key !in collapsed,
@@ -223,6 +239,8 @@ private fun TemplateDraft.Problem.describe(t: Strings): String = when (this) {
 
 @Composable
 private fun ExerciseSection(
+    modifier: Modifier,
+    reorder: ReorderState,
     entry: DraftExercise,
     unit: WeightUnit,
     expanded: Boolean,
@@ -235,7 +253,7 @@ private fun ExerciseSection(
     val t = LocalStrings.current
     val key = entry.key
     val type = entry.exercise.trackingType
-    Column(Modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 64.dp).pressableRow(onToggle).padding(vertical = Space.s),
             verticalAlignment = Alignment.CenterVertically,
@@ -247,6 +265,10 @@ private fun ExerciseSection(
                 val rest = entry.rest.toIntOrNull()?.let { t.restSummary(Numbers.formatDuration(it)) }
                 Text(listOfNotNull(t.setCount(entry.sets.size), rest).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
             }
+            Box(
+                Modifier.size(40.dp).dragHandle(reorder, key).semantics { contentDescription = t.reorder },
+                contentAlignment = Alignment.Center,
+            ) { LineIcon(Icon.Drag, color = Theme.colors.muted) }
             LineIcon(if (expanded) Icon.ChevronUp else Icon.ChevronDown, size = 20.dp, color = Theme.colors.muted)
         }
         if (expanded) {

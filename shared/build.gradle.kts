@@ -45,6 +45,9 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
+            // Notifications (NotificationCompat) and Dispatchers.Main for the workout controller.
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.kotlinx.coroutines.android)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

@@ -2,7 +2,9 @@ package app.overfit.ui.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.overfit.platform.RestAlerts
 import app.overfit.data.images.OfflineImages
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.pressableRow
@@ -52,12 +54,20 @@ fun SettingsScreen(
     onCoachMemory: () -> Unit,
     onAbout: () -> Unit,
     offlineImages: OfflineImages,
+    restAlerts: RestAlerts,
     onReset: () -> Unit,
 ) {
     val t = LocalStrings.current
     val storedAge = state.profile.birthYear?.let { ageFromBirthYear(it, today).toString() } ?: ""
     var name by remember(state.profile.name) { mutableStateOf(state.profile.name) }
     var age by remember(storedAge) { mutableStateOf(storedAge) }
+    val storedRest = state.settings.defaultRestSec.toString()
+    var restText by remember(storedRest) { mutableStateOf(storedRest) }
+    var exactAllowed by remember { mutableStateOf(restAlerts.exactAlarmsAllowed()) }
+    LifecycleResumeEffect(restAlerts) {
+        exactAllowed = restAlerts.exactAlarmsAllowed()
+        onPauseOrDispose { }
+    }
     var confirmReset by remember { mutableStateOf(false) }
     LaunchedEffect(confirmReset) {
         if (confirmReset) { delay(4000); confirmReset = false }
@@ -91,6 +101,20 @@ fun SettingsScreen(
         }
         ListRow(t.unit) {
             Segmented(state.profile.unit, listOf(WeightUnit.KG to "kg", WeightUnit.LB to "lb"), store::setUnit)
+        }
+
+        SectionTitle(t.workoutSettings)
+        ListRow(t.defaultRest) {
+            RowInput(restText, { restText = it.filter(Char::isDigit).take(4) }, keyboardType = KeyboardType.Number, onCommit = {
+                restText.toIntOrNull()?.let(store::setDefaultRest) ?: run { restText = storedRest }
+            })
+        }
+        ListRow(t.vibration) {
+            Segmented(state.settings.vibration, listOf(true to t.on, false to t.off), store::setVibration)
+        }
+        if (exactAllowed == false) {
+            ListRow(t.exactAlarm, t.exactAlarmAllow, onClick = restAlerts::openExactAlarmSettings)
+            Text(t.exactAlarmHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         }
 
         SectionTitle(t.ai)

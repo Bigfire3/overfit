@@ -18,7 +18,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -63,6 +67,8 @@ import app.overfit.ui.exercises.ExercisePickerScreen
 import app.overfit.ui.exercises.ExerciseViewModel
 import app.overfit.ui.exercises.ExercisesScreen
 import app.overfit.ui.templates.TemplateEditorScreen
+import app.overfit.ui.workout.StartWorkoutScreen
+import app.overfit.ui.workout.WorkoutScreen
 import app.overfit.ui.templates.TemplateEditorViewModel
 import app.overfit.ui.main.HistoryScreen
 import app.overfit.ui.main.PhotosScreen
@@ -82,6 +88,14 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import kotlinx.serialization.Serializable
+import app.overfit.platform.Haptics
+import app.overfit.platform.NoHaptics
+import app.overfit.platform.NoRestAlerts
+import app.overfit.platform.RestAlerts
+import app.overfit.workout.WorkoutController
+import app.overfit.workout.WorkoutPrefs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainScope
 import kotlin.reflect.KClass
 import kotlin.time.Clock
 
@@ -92,7 +106,25 @@ class AppDependencies(
     val data: AppData,
     val versionName: String,
     val today: () -> LocalDate = { Clock.System.todayIn(TimeZone.currentSystemDefault()) },
-)
+    val haptics: Haptics = NoHaptics,
+    val restAlerts: RestAlerts = NoRestAlerts,
+    val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    /** Main-thread scope that lives as long as the app (workout state, rest timer). */
+    workoutScope: CoroutineScope = MainScope(),
+) {
+    /** The running workout; created once per process, loads the stored workout right away. */
+    val workout: WorkoutController = WorkoutController(
+        store = data.workouts,
+        alerts = restAlerts,
+        haptics = haptics,
+        prefs = {
+            val s = store.state.value
+            WorkoutPrefs(s.settings.defaultRestSec, s.settings.vibration, s.profile.unit, s.language)
+        },
+        scope = workoutScope,
+        clock = clock,
+    )
+}
 
 // Type-safe routes.
 @Serializable data object NameRoute
@@ -100,6 +132,8 @@ class AppDependencies(
 @Serializable data object WeightRoute
 @Serializable data object AiRoute
 @Serializable data object StartRoute
+@Serializable data object StartWorkoutRoute
+@Serializable data object WorkoutRoute
 @Serializable data object HistoryRoute
 @Serializable data object ExercisesRoute
 @Serializable data object PhotosRoute
@@ -135,6 +169,7 @@ fun OverfitApp(deps: AppDependencies) {
     val state by deps.store.state.collectAsStateWithLifecycle()
     val templates by deps.data.templates.templates.collectAsStateWithLifecycle(initialValue = null)
     val picked = remember { PickedExercises() }
+    val workoutState by deps.workout.state.collectAsStateWithLifecycle()
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {
@@ -149,6 +184,13 @@ fun OverfitApp(deps: AppDependencies) {
         CompositionLocalProvider(LocalStrings provides stringsFor(state.language)) {
             val nav = rememberNavController()
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
+            // Pick up a running workout after the app was killed: once, as soon as it is loaded.
+            var resumeChecked by rememberSaveable { mutableStateOf(false) }
+            LaunchedEffect(workoutState.loaded) {
+                if (resumeChecked || !workoutState.loaded) return@LaunchedEffect
+                resumeChecked = true
+                if (workoutState.workout != null && state.onboardingDone) nav.navigate(WorkoutRoute)
+            }
             AppScaffold(nav) {
                 NavHost(nav, startDestination = start, modifier = Modifier.fillMaxSize()) {
                     composable<NameRoute> {
@@ -190,8 +232,52 @@ fun OverfitApp(deps: AppDependencies) {
                         StartScreen(
                             state = state,
                             templates = templates,
+                            activeWorkout = workoutState.workout != null,
+                            onStartWorkout = {
+                                nav.navigate(if (workoutState.workout != null) WorkoutRoute else StartWorkoutRoute)
+                            },
                             onOpenTemplate = { nav.navigate(TemplateEditorRoute(it)) },
                             onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
+                        )
+                    }
+                    composable<StartWorkoutRoute> {
+                        val scope = rememberCoroutineScope()
+                        val openWorkout = { nav.navigate(WorkoutRoute) { popUpTo(StartRoute) } }
+                        StartWorkoutScreen(
+                            templates = templates,
+                            onBack = nav::popBackStack,
+                            onEmpty = { deps.workout.startEmpty(); openWorkout() },
+                            onTemplate = { id ->
+                                scope.launch {
+                                    deps.data.templates.get(id)?.let { deps.workout.startFromTemplate(it); openWorkout() }
+                                }
+                            },
+                        )
+                    }
+                    composable<WorkoutRoute> {
+                        val scope = rememberCoroutineScope()
+                        var pendingReplaceId by rememberSaveable { mutableStateOf<String?>(null) }
+                        val result by picked.result.collectAsStateWithLifecycle()
+                        LaunchedEffect(result) {
+                            val ids = result ?: return@LaunchedEffect
+                            picked.result.value = null
+                            val replaceId = pendingReplaceId
+                            pendingReplaceId = null
+                            if (ids.isEmpty()) return@LaunchedEffect
+                            scope.launch {
+                                val exercises = deps.data.exercises.getAll(ids)
+                                if (replaceId != null) exercises.firstOrNull()?.let { deps.workout.replaceExercise(replaceId, it) }
+                                else deps.workout.addExercises(exercises)
+                            }
+                        }
+                        WorkoutScreen(
+                            controller = deps.workout,
+                            unit = state.profile.unit,
+                            language = state.language,
+                            clock = deps.clock,
+                            onAddExercises = { pendingReplaceId = null; nav.navigate(ExercisePickerRoute(single = false)) },
+                            onReplaceExercise = { pendingReplaceId = it; nav.navigate(ExercisePickerRoute(single = true)) },
+                            onClosed = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                         )
                     }
                     composable<HistoryRoute> { HistoryScreen() }
@@ -262,9 +348,10 @@ fun OverfitApp(deps: AppDependencies) {
                             onCoachMemory = { nav.navigate(CoachMemoryRoute) },
                             onAbout = { nav.navigate(AboutRoute) },
                             offlineImages = deps.data.offlineImages,
+                            restAlerts = deps.restAlerts,
                             onReset = {
                                 deps.store.resetAll()
-                                deps.data.scope.launch { deps.data.resetAll() }
+                                deps.data.scope.launch { deps.workout.discard(); deps.data.resetAll() }
                                 nav.navigate(NameRoute) { popUpTo(0) { inclusive = true } }
                             },
                         )

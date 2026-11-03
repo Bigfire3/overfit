@@ -5,7 +5,9 @@ import app.overfit.ai.Providers
 import app.overfit.data.AppData
 import app.overfit.data.AppStore
 import app.overfit.data.db.buildDatabase
+import app.overfit.platform.IosHaptics
 import app.overfit.platform.IosKeyValueStore
+import app.overfit.platform.IosRestAlerts
 import app.overfit.platform.KeychainSecretStore
 import app.overfit.platform.createHttpClient
 import app.overfit.platform.deviceDefaults
@@ -25,6 +27,8 @@ fun MainViewController(): UIViewController {
         providers = Providers(createHttpClient()),
         data = AppData(buildDatabase(), kv),
         versionName = "$version ($build)",
+        haptics = IosHaptics(),
+        restAlerts = IosRestAlerts(),
     )
     return ComposeUIViewController { OverfitApp(deps) }
 }
