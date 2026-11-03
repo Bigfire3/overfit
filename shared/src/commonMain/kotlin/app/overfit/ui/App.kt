@@ -102,7 +102,22 @@ import app.overfit.ui.share.ImportViewModel
 import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.share.ShareScreen
 import app.overfit.ui.share.ShareViewModel
-import app.overfit.ui.settings.CoachMemoryScreen
+import app.overfit.ai.ProviderId
+import app.overfit.coach.CoachPhotoLoader
+import app.overfit.coach.CoachService
+import app.overfit.coach.CoachTransport
+import app.overfit.i18n.LocalCoachStrings
+import app.overfit.i18n.coachStringsFor
+import app.overfit.ui.coach.CoachDemoScreen
+import app.overfit.ui.coach.CoachHomeScreen
+import app.overfit.ui.coach.CoachMemoryScreen
+import app.overfit.ui.coach.CoachNav
+import app.overfit.ui.coach.CoachReviewScreen
+import app.overfit.ui.coach.CoachSessionScreen
+import app.overfit.ui.coach.CoachSettingsScreen
+import app.overfit.ui.coach.createCoach
+import app.overfit.ui.coach.latestCoachTips
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.overfit.ui.settings.SettingsScreen
 import app.overfit.ui.theme.OverfitTheme
 import app.overfit.ui.theme.Space
@@ -136,8 +151,14 @@ class AppDependencies(
     workoutScope: CoroutineScope = MainScope(),
     /** Fuel/Spot backend (URL from the build, developer override); defaults to "not configured". */
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
+    /** Downscaled body photos for the coach (platform). */
+    coachPhotos: CoachPhotoLoader = CoachPhotoLoader { null },
+    /** Replaces the real providers (tests). */
+    coachTransport: ((ProviderId) -> CoachTransport)? = null,
 ) {
     val fuelSession = FuelSession(fuel)
+    /** The AI coach: requests, queue, reviews, memory. Runs in the app scope. */
+    val coach: CoachService = createCoach(store, providers, data, today, clock, coachPhotos, coachTransport)
     /** The running workout; created once per process, loads the stored workout right away. */
     val workout: WorkoutController = WorkoutController(
         store = data.workouts,
@@ -166,6 +187,11 @@ class AppDependencies(
 @Serializable data object SettingsRoute
 @Serializable data object ConnectRoute
 @Serializable data object CoachMemoryRoute
+@Serializable data object CoachRoute
+@Serializable data object CoachSettingsRoute
+@Serializable data class CoachSessionRoute(val sessionId: String)
+@Serializable data class CoachReviewRoute(val reviewId: String)
+@Serializable data class CoachDemoRoute(val sessionId: String)
 @Serializable data object AboutRoute
 @Serializable data object FuelRoute
 @Serializable data object LedgerRoute
@@ -217,9 +243,31 @@ fun OverfitApp(deps: AppDependencies) {
             .build()
     }
     LaunchedEffect(Unit) { deps.data.seedCatalog() }
+    // Queued coach requests go out on app start and whenever the app comes back to the foreground.
+    LifecycleResumeEffect(deps) {
+        deps.coach.processQueue()
+        onPauseOrDispose { }
+    }
     OverfitTheme(state.settings.theme) {
-        CompositionLocalProvider(LocalStrings provides stringsFor(state.language), LocalFuelStrings provides fuelStringsFor(state.language)) {
+        CompositionLocalProvider(
+            LocalStrings provides stringsFor(state.language),
+            LocalFuelStrings provides fuelStringsFor(state.language),
+            LocalCoachStrings provides coachStringsFor(state.language),
+        ) {
             val nav = rememberNavController()
+            val coachNav = remember(nav) {
+                CoachNav(
+                    back = { nav.popBackStack() },
+                    connect = { nav.navigate(ConnectRoute) },
+                    fuel = { nav.navigate(FuelRoute) },
+                    openReview = { nav.navigate(CoachReviewRoute(it)) },
+                    openSession = { nav.navigate(CoachSessionRoute(it)) },
+                    demo = { nav.navigate(CoachDemoRoute(it)) },
+                    memory = { nav.navigate(CoachMemoryRoute) },
+                    settings = { nav.navigate(CoachSettingsRoute) },
+                    openTemplate = { nav.navigate(TemplateEditorRoute(it)) },
+                )
+            }
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
             // Pick up a running workout after the app was killed: once, as soon as it is loaded.
             var resumeChecked by rememberSaveable { mutableStateOf(false) }
@@ -293,6 +341,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onNewTemplate = { nav.navigate(TemplateEditorRoute()) },
                             share = share,
                             onDuo = { nav.navigate(DuoRoute) },
+                            coachTips = latestCoachTips(deps.coach),
+                            onCoach = { nav.navigate(CoachRoute) },
                         )
                     }
                     composable<StartWorkoutRoute> {
@@ -404,6 +454,7 @@ fun OverfitApp(deps: AppDependencies) {
                             today = deps.today(),
                             onConnect = { nav.navigate(ConnectRoute) },
                             onCoachMemory = { nav.navigate(CoachMemoryRoute) },
+                            onCoach = { nav.navigate(CoachRoute) },
                             onAbout = { nav.navigate(AboutRoute) },
                             fuelSession = deps.fuelSession,
                             onFuel = { nav.navigate(FuelRoute) },
@@ -448,7 +499,18 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<DuoRoute> { DuoScreen(onBack = nav::popBackStack) }
-                    composable<CoachMemoryRoute> { CoachMemoryScreen(onBack = nav::popBackStack) }
+                    composable<CoachMemoryRoute> { CoachMemoryScreen(deps.coach, onBack = nav::popBackStack) }
+                    composable<CoachRoute> { CoachHomeScreen(deps.coach, coachNav) }
+                    composable<CoachSettingsRoute> { CoachSettingsScreen(deps.coach, onBack = nav::popBackStack) }
+                    composable<CoachSessionRoute> { entry ->
+                        CoachSessionScreen(deps.coach, entry.toRoute<CoachSessionRoute>().sessionId, state.profile.unit, state.language, coachNav)
+                    }
+                    composable<CoachReviewRoute> { entry ->
+                        CoachReviewScreen(deps.coach, entry.toRoute<CoachReviewRoute>().reviewId, state.profile.unit, state.language, coachNav)
+                    }
+                    composable<CoachDemoRoute> { entry ->
+                        CoachDemoScreen(deps.coach, entry.toRoute<CoachDemoRoute>().sessionId, state.profile.unit, state.language, coachNav)
+                    }
                     composable<AboutRoute> { AboutScreen(deps.versionName, onBack = nav::popBackStack, fuel = deps.fuel) }
                     composable<FuelRoute> {
                         FuelScreen(

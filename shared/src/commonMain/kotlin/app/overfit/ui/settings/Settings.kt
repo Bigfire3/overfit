@@ -61,6 +61,7 @@ fun SettingsScreen(
     today: LocalDate,
     onConnect: () -> Unit,
     onCoachMemory: () -> Unit,
+    onCoach: () -> Unit = {},
     onAbout: () -> Unit,
     fuelSession: FuelSession,
     onFuel: () -> Unit,
@@ -136,6 +137,7 @@ fun SettingsScreen(
         if (state.hasApiKey) ListRow(t.disconnect, tone = Tone.Muted, onClick = store::disconnectAi)
 
         SectionTitle(t.coach)
+        ListRow(t.coach, onClick = onCoach)
         ListRow(t.coachMemory, onClick = onCoachMemory)
 
         SectionTitle(t.app)
@@ -151,16 +153,6 @@ fun SettingsScreen(
             tone = if (confirmReset) Tone.Default else Tone.Muted,
             onClick = { if (confirmReset) onReset() else confirmReset = true },
         )
-    }
-}
-
-@Composable
-fun CoachMemoryScreen(onBack: () -> Unit) {
-    val t = LocalStrings.current
-    Screen(header = { BackHeader(t.back, onBack) }) {
-        Title(t.coachMemory)
-        Spacer(Modifier.height(Space.l))
-        Text(t.coachMemoryEmpty, tone = Tone.Muted)
     }
 }
 

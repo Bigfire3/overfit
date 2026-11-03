@@ -20,11 +20,14 @@ import androidx.room.useWriterConnection
         WorkoutSessionEntity::class,
         SessionExerciseEntity::class,
         SetEntryEntity::class,
+        CoachReviewEntity::class,
+        CoachMemoryEntity::class,
     ],
-    version = 2,
+    version = 4,
     exportSchema = true,
     // v1 → v2 only adds the workout tables (nothing is dropped or rewritten).
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    // v2 → v4 only adds the coach tables (v3 is reserved for phase 3 and replaced by 2 → 3 → 4 once it is merged).
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 4)],
 )
 @TypeConverters(Converters::class)
 @ConstructedBy(OverfitDatabaseConstructor::class)
@@ -32,6 +35,7 @@ abstract class OverfitDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
     abstract fun templateDao(): TemplateDao
     abstract fun workoutDao(): WorkoutDao
+    abstract fun coachDao(): CoachDao
 
     companion object {
         const val NAME = "overfit.db"

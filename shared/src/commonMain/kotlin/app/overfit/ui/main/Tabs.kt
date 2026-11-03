@@ -2,6 +2,7 @@ package app.overfit.ui.main
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
@@ -38,6 +39,8 @@ fun StartScreen(
     onNewTemplate: () -> Unit,
     share: ShareDependencies,
     onDuo: () -> Unit,
+    coachTips: List<String> = emptyList(),
+    onCoach: () -> Unit = {},
 ) {
     val t = LocalStrings.current
     val latest = latestWeight(state.weights)
@@ -69,7 +72,9 @@ fun StartScreen(
         templates?.forEach { TemplateRow(it) { onOpenTemplate(it.id) } }
         if (templates != null) ListRow(t.newTemplate, onClick = onNewTemplate) { LineIcon(Icon.Plus) }
         SectionTitle(t.coachTips)
-        Text(t.coachTipsEmpty, tone = Tone.Muted)
+        if (coachTips.isEmpty()) Text(t.coachTipsEmpty, tone = Tone.Muted)
+        coachTips.forEach { Text("– $it", Modifier.padding(vertical = Space.xs)) }
+        ListRow(t.coach, onClick = onCoach)
         Spacer(Modifier.height(Space.xl))
         Hairline()
         ListRow(t.share.duoSoon, onClick = onDuo, tone = Tone.Muted)
