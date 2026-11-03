@@ -4,7 +4,8 @@
 //
 //   node scripts/deploy-secrets.mjs <test|production> <vorhandene-secrets.json> <ausgabe.json> <zusammenfassung.md>
 //
-// - Pflicht: ANTHROPIC_API_KEY (aus GitHub oder schon im Worker). Fehlt er → Exit 1 mit Anleitung.
+// - KI-Schlüssel: GEMINI_API_KEY (Stufe standard) und ANTHROPIC_API_KEY (Stufe pro), je aus GitHub oder schon im Worker.
+//   Mindestens einer ist Pflicht, sonst Exit 1 mit Anleitung. Fehlt einer, ist die Stufe aus /v1/config nicht verfügbar.
 // - SPOT_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
 //   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
 // - ADMIN_SECRET (nur Testbetrieb): wird bei jedem Lauf neu erzeugt, außer ein GitHub-Secret ist gesetzt; der Workflow nutzt ihn sofort.
@@ -33,9 +34,15 @@ export function plan(mode, env, existing) {
   const generated = [];
   const given = (n) => (env[n] ?? '').trim();
 
-  if (given('ANTHROPIC_API_KEY')) secrets.ANTHROPIC_API_KEY = given('ANTHROPIC_API_KEY');
-  else if (have.has('ANTHROPIC_API_KEY')) notes.push('`ANTHROPIC_API_KEY`: bleibt wie im Worker gesetzt.');
-  else errors.push('ANTHROPIC_API_KEY');
+  const aiKeys = { GEMINI_API_KEY: 'standard (Gemini)', ANTHROPIC_API_KEY: 'pro (Claude)' };
+  const missingAi = [];
+  for (const [n, tier] of Object.entries(aiKeys)) {
+    if (given(n)) secrets[n] = given(n);
+    else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
+    else missingAi.push([n, tier]);
+  }
+  if (missingAi.length === 2) errors.push('AI_KEY');
+  else for (const [n, tier] of missingAi) notes.push(`\`${n}\` fehlt: Stufe ${tier} ist nicht verfügbar (die App blendet sie aus).`);
 
   for (const n of ['SPOT_SIGNING_KEY', 'SYNC_ENCRYPTION_KEY']) {
     if (given(n)) secrets[n] = given(n);
@@ -67,8 +74,9 @@ export function plan(mode, env, existing) {
 }
 
 const MISSING_HELP = {
-  ANTHROPIC_API_KEY: 'Der KI-Schlüssel für Fuel (Anthropic-API-Key, beginnt mit `sk-ant-`). Erstellen unter console.anthropic.com → API Keys. ' +
-    'Am besten in einem eigenen Workspace mit Ausgabenlimit.',
+  AI_KEY: 'Mindestens ein KI-Schlüssel für Fuel: **`GEMINI_API_KEY`** (Stufe Standard, Google AI Studio: aistudio.google.com/apikey, ' +
+    'beginnt mit `AIza`, Projekt mit Abrechnung) und/oder **`ANTHROPIC_API_KEY`** (Stufe Pro, console.anthropic.com → API Keys, beginnt mit `sk-ant-`). ' +
+    'Am besten je mit Ausgabenlimit.',
 };
 
 if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {
@@ -83,7 +91,7 @@ if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {
   const r = plan(mode, process.env, existing);
   if (r.errors.length) {
     const msg = ['### ❌ Es fehlt ein Pflicht-Secret', '',
-      ...r.errors.map((n) => `- **\`${n}\`** – ${MISSING_HELP[n]}`), '',
+      ...r.errors.map((n) => `- ${MISSING_HELP[n]}`), '',
       'So trägst du es ein: GitHub → dieses Repo → **Settings → Secrets and variables → Actions → New repository secret** ' +
       '(Name exakt wie oben, Wert einfügen) → danach den Workflow erneut starten (Actions → „Backend deployen“ → Run workflow).', ''].join('\n');
     appendFileSync(summaryFile, msg);

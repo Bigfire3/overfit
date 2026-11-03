@@ -2,7 +2,7 @@ name: Backend deployen
 
 # Deploy-Knopf für das Cloudflare-Backend (Fuel, Spot, KI-Chat): Actions → „Backend deployen“ → Run workflow.
 # Anleitung im Browser: backend/README.md → „Deployment ohne Terminal“.
-# Alles ist idempotent: D1-Datenbank und R2-Bucket werden nur angelegt, wenn sie fehlen; Migrationen laufen nur, wenn neu.
+# Alles ist idempotent: D1-Datenbank, R2-Bucket und AI Gateway werden nur angelegt, wenn sie fehlen; Migrationen laufen nur, wenn neu.
 
 on:
   workflow_dispatch:
@@ -42,7 +42,8 @@ jobs:
       MODE: ${{ inputs.mode || vars.BACKEND_DEPLOY_MODE }}
       EVENT: ${{ github.event_name }}
       CURRENT_URL: ${{ vars.OVERFIT_BACKEND_URL }}
-      # Worker-Secrets (alle optional bis auf ANTHROPIC_API_KEY; Details in backend/README.md)
+      # Worker-Secrets (mindestens GEMINI_API_KEY oder ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       SPOT_SIGNING_KEY: ${{ secrets.SPOT_SIGNING_KEY }}
       SYNC_ENCRYPTION_KEY: ${{ secrets.SYNC_ENCRYPTION_KEY }}
@@ -89,7 +90,8 @@ jobs:
               echo
               echo "1. **CLOUDFLARE_ACCOUNT_ID**: dash.cloudflare.com → in der linken Leiste „Workers & Pages“ → rechts steht „Account ID“ (Kopieren-Symbol)."
               echo "2. **CLOUDFLARE_API_TOKEN**: dash.cloudflare.com → Profil (oben rechts) → My Profile → API Tokens → Create Token → „Create Custom Token“ mit den Rechten"
-              echo "   *Account · Workers Scripts · Edit*, *Account · D1 · Edit*, *Account · Workers R2 Storage · Edit*, *Account · Account Settings · Read*"
+              echo "   *Account · Workers Scripts · Edit*, *Account · D1 · Edit*, *Account · Workers R2 Storage · Edit*, *Account · Account Settings · Read*,"
+              echo "   *Account · Workers AI · Read*, *Account · AI Gateway · Edit*"
               echo "   (Account Resources: dein Konto) → Continue → Create Token → Wert kopieren."
               echo "3. GitHub → Settings → Secrets and variables → Actions → New repository secret (Name exakt wie oben)."
               echo
@@ -124,6 +126,53 @@ jobs:
           echo "worker=$(echo "$N" | jq -r .worker)" >> "$GITHUB_OUTPUT"
           echo "db=$(echo "$N" | jq -r .db)" >> "$GITHUB_OUTPUT"
           echo "bucket=$(echo "$N" | jq -r .bucket)" >> "$GITHUB_OUTPUT"
+          echo "gateway=$(echo "$N" | jq -r .gateway)" >> "$GITHUB_OUTPUT"
+
+      - name: KI-Rechte prüfen, AI Gateway anlegen, falls es fehlt
+        if: steps.pre.outputs.run == 'true'
+        env:
+          GW: ${{ steps.names.outputs.gateway }}
+        run: |
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          OUT="$RUNNER_TEMP/cf.json"
+          cf() { curl -sS -o "$OUT" -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'content-type: application/json' "$@"; }
+          rights() {
+            {
+              echo "### ❌ API-Token: Rechte für die KI fehlen"
+              echo
+              echo "$1"
+              echo
+              echo "So ergänzt du sie: dash.cloudflare.com → Profil (oben rechts) → My Profile → API Tokens → beim Token (z. B. „overfit-deploy“) **Edit** →"
+              echo "unter Permissions zwei Zeilen hinzufügen: *Account · Workers AI · Read* und *Account · AI Gateway · Edit* → Continue to summary → Update Token."
+              echo "Der Token-Wert bleibt gleich, das GitHub-Secret musst du nicht ändern. Danach den Workflow erneut starten."
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
+          # Workers AI (Stufe lite, Binding beim Deploy)
+          CODE=$(cf "$API/ai/models/search?per_page=1") || CODE=000
+          case "$CODE" in
+            200) echo "Workers AI: Zugriff in Ordnung." ;;
+            401|403) rights "Workers AI ist mit diesem Token nicht erreichbar (HTTP $CODE): Es fehlt *Account · Workers AI · Read*." ;;
+            *) echo "::error::Workers-AI-Prüfung fehlgeschlagen (HTTP $CODE): $(cat "$OUT")"; exit 1 ;;
+          esac
+          # AI Gateway: Protokolle, Kosten, Rate-Limit (600/min gleitend als Notbremse), Cache aus (optional im Dashboard)
+          CODE=$(cf "$API/ai-gateway/gateways/$GW") || CODE=000
+          case "$CODE" in
+            200) echo "AI Gateway $GW gibt es schon." ;;
+            401|403) rights "Das AI Gateway lässt sich mit diesem Token nicht lesen (HTTP $CODE): Es fehlt *Account · AI Gateway · Edit*." ;;
+            *)
+              BODY=$(jq -nc --arg id "$GW" '{id: $id, cache_ttl: 0, cache_invalidate_on_update: true, collect_logs: true,
+                rate_limiting_interval: 60, rate_limiting_limit: 600, rate_limiting_technique: "sliding"}')
+              CODE=$(cf -X POST "$API/ai-gateway/gateways" -d "$BODY") || CODE=000
+              case "$CODE" in
+                200|201) echo "AI Gateway $GW angelegt." ;;
+                401|403) rights "Das AI Gateway lässt sich mit diesem Token nicht anlegen (HTTP $CODE): Es fehlt *Account · AI Gateway · Edit*." ;;
+                *) if grep -qi "already exists" "$OUT"; then echo "AI Gateway $GW gibt es schon."; else
+                     echo "::error::AI Gateway $GW konnte nicht angelegt werden (HTTP $CODE): $(cat "$OUT")"; exit 1; fi ;;
+              esac
+              ;;
+          esac
+          echo "- AI Gateway: \`$GW\` (Protokolle und Kosten: dash.cloudflare.com → AI → AI Gateway)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: D1-Datenbank anlegen, falls sie fehlt
         if: steps.pre.outputs.run == 'true'
@@ -202,7 +251,10 @@ jobs:
           [ "${OK:-0}" = 1 ] || { echo "::error::$URL/v1/health antwortet nicht"; exit 1; }
           CFG=$(curl -fsS "$URL/v1/config")
           echo "$CFG" | jq -e --arg m "$MODE" '.mode == $m and (.packages | length) > 0' >/dev/null || { echo "::error::/v1/config passt nicht zum Modus $MODE: $CFG"; exit 1; }
-          echo "Health und Config in Ordnung (mode=$MODE)."
+          TIERS=$(echo "$CFG" | jq -r '[.tiers | to_entries[] | select(.value.available) | .key] | join(", ")')
+          [ -n "$TIERS" ] || { echo "::error::Keine KI-Stufe verfügbar: $CFG"; exit 1; }
+          echo "Health und Config in Ordnung (mode=$MODE, Stufen: $TIERS)."
+          echo "- Verfügbare KI-Stufen: $TIERS" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Test-Guthaben gutschreiben
         if: steps.pre.outputs.run == 'true' && inputs.mode == 'test' && inputs.credit_eur != '' && inputs.credit_eur != '0'
@@ -268,7 +320,7 @@ jobs:
             echo
             echo "### Hilfe bei Fehlern"
             echo
-            echo "- \`Authentication error\` / \`10000\`: Der API-Token hat nicht alle Rechte (Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit, Account Settings Read) oder gehört zu einem anderen Konto."
+            echo "- \`Authentication error\` / \`10000\`: Der API-Token hat nicht alle Rechte (Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit, Account Settings Read, Workers AI Read, AI Gateway Edit) oder gehört zu einem anderen Konto."
             echo "- \`workers.dev subdomain\`: Subdomain im Dashboard wählen (Workers & Pages)."
             echo "- R2: einmalig im Dashboard unter „R2 Object Storage“ aktivieren (Free-Tarif)."
             echo "- Der Lauf ist wiederholbar: bereits Angelegtes wird übersprungen."

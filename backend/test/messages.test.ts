@@ -7,6 +7,7 @@ const reply = (usage: object = { input_tokens: 1000, output_tokens: 500 }) =>
     headers: { 'content-type': 'application/json' },
   });
 
+// Alte App-Versionen schicken die Modell-ID; sie entspricht der Stufe `pro`.
 const body = (extra: object = {}) => ({
   model: 'claude-sonnet-5-5',
   max_tokens: 1000,
@@ -18,9 +19,13 @@ let upstream: any;
 beforeEach(() => {
   upstream = vi.fn(async () => reply());
   const real = globalThis.fetch;
-  vi.stubGlobal('fetch', (input: any, init?: any) =>
-    String(input instanceof Request ? input.url : input).startsWith('https://api.anthropic.com') ? upstream(input, init) : real(input, init),
-  );
+  vi.stubGlobal('fetch', (input: any, init?: any) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith('https://api.anthropic.com')) return upstream(input, init);
+    // Ausweich-Stufe (Gemini) ist in diesen Tests ebenfalls ausgefallen; Stufen-Tests: tiers.test.ts
+    if (url.startsWith('https://generativelanguage.googleapis.com')) return Promise.resolve(new Response('down', { status: 503 }));
+    return real(input, init);
+  });
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -65,8 +70,9 @@ describe('POST /v1/messages', () => {
     expect(r.status).toBe(502);
     expect(r.body.error.code).toBe('upstream_unavailable');
     expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(f.balanceMicro);
+    // Netzwerkfehler bei pro → Ausweichen auf standard, das hier ebenfalls ausfällt (503) → 502
     upstream.mockRejectedValue(new Error('network'));
-    expect((await c.call('POST', '/v1/messages', body())).status).toBe(504);
+    expect((await c.call('POST', '/v1/messages', body())).status).toBe(502);
     expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(f.balanceMicro);
     upstream.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'bad' } }), { status: 400 }));
     const r3 = await c.call('POST', '/v1/messages', body());

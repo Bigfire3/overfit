@@ -2,8 +2,12 @@ export interface Env {
   DB: D1Database;
   /** R2-Bucket für freigegebene Körperfotos (KI-Chat-Verbindung), verschlüsselt abgelegt. */
   PHOTOS: R2Bucket;
-  // Secrets
+  /** Workers AI (Stufe `lite`) und AI-Gateway-URLs. Fehlt im lokalen Dev und in Tests ohne Mock. */
+  AI?: AiBinding;
+  // Secrets (mindestens einer der beiden KI-Schlüssel)
   ANTHROPIC_API_KEY?: string;
+  /** Google-AI-Studio-Key (Gemini, Stufe `standard`). */
+  GEMINI_API_KEY?: string;
   SPOT_SIGNING_KEY?: string;
   /** Hauptschlüssel für die Verschlüsselung der KI-Chat-Daten (≥ 32 zufällige Bytes, Base64url). */
   SYNC_ENCRYPTION_KEY?: string;
@@ -17,6 +21,12 @@ export interface Env {
   APPLE_APP_ATTEST_TEAM_ID?: string;
   // Konfiguration (alle optional, Defaults in config.ts)
   ANTHROPIC_BASE_URL?: string;
+  GEMINI_BASE_URL?: string;
+  /** Name des Cloudflare AI Gateways; leer = Anbieter direkt (lokal). Setzt der Deploy-Workflow. */
+  AI_GATEWAY_ID?: string;
+  /** Zeitlimit je Anbieter-Versuch (ms) und für die ganze Anfrage inklusive Ausweichen. */
+  UPSTREAM_TIMEOUT_MS?: string;
+  UPSTREAM_BUDGET_MS?: string;
   /** Öffentliche Basis-URL des Workers (Issuer/Resource für OAuth), Standard: Origin der Anfrage. */
   PUBLIC_BASE_URL?: string;
   /** Basis für Import-Links, Standard https://bigfire3.github.io/overfit/t */
@@ -56,6 +66,12 @@ export interface Env {
   RL_SENSITIVE_PER_HOUR?: string;
 }
 
+/** Ausschnitt des Workers-AI-Bindings, den das Backend nutzt. */
+export interface AiBinding {
+  run(model: string, inputs: unknown, options?: unknown): Promise<unknown>;
+  gateway(id: string): { getUrl(provider?: string): Promise<string> };
+}
+
 export interface Price {
   /** Mikro-Euro pro 1 Mio. Token */
   in: number;
@@ -74,7 +90,9 @@ export interface Config {
   testCreditCapMicro: number;
   attestationMode: 'required' | 'mock';
   purchaseMode: 'required' | 'mock';
-  anthropicBaseUrl: string;
+  aiGatewayId: string | null;
+  upstreamTimeoutMs: number;
+  upstreamBudgetMs: number;
   markupBp: number;
   storeFeeBp: number;
   spotStarterMicro: number;

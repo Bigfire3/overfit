@@ -13,6 +13,7 @@ import {
   setProfile,
 } from './account';
 import { handleMessages } from './messages';
+import { DEFAULT_TIER, TIER_NAMES, TIERS, tierAvailable } from './providers';
 import { handleAdminCredit } from './admin';
 import { handleVerifyPurchase } from './purchases';
 import { createChallenge, createSpotToken, redeemSpot } from './spot';
@@ -62,7 +63,7 @@ const CHAT_ROUTES = ['/v1/chat', '/v1/chat/enable', '/v1/chat/disable', '/v1/cha
   '/v1/chat/inbox/ack', '/v1/chat/connections/revoke'];
 const PHOTO_ROUTE = /^\/v1\/chat\/photos\/([A-Za-z0-9_.:-]{1,80})$/;
 
-function publicConfig(cfg: Config) {
+function publicConfig(env: Env, cfg: Config) {
   return {
     /** `test` = Testbetrieb (keine Geräteprüfung, Test-Guthaben); die App zeigt dann einen Hinweis. */
     mode: cfg.testMode ? 'test' : 'production',
@@ -72,6 +73,14 @@ function publicConfig(cfg: Config) {
     storeFeeBp: cfg.storeFeeBp,
     models: Object.fromEntries(Object.entries(cfg.prices).map(([m, p]) => [m, p])),
     maxTokensCap: cfg.maxTokensCap,
+    /** KI-Stufen: die App schickt den Namen als `model`; Preise in µ€/MTok ohne Aufschlag. */
+    defaultTier: DEFAULT_TIER,
+    tiers: Object.fromEntries(
+      TIER_NAMES.map((t) => [
+        t,
+        { available: tierAvailable(env, t), model: TIERS[t].model, images: TIERS[t].images, fallback: TIERS[t].fallback, price: cfg.prices[TIERS[t].model] },
+      ]),
+    ),
     packages: Object.entries(cfg.packages).map(([productId, p]) => ({
       productId,
       priceMicro: p.priceMicro,
@@ -94,7 +103,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   const method = req.method;
 
   if (path === '/v1/health' && method === 'GET') return Response.json({ ok: true });
-  if (path === '/v1/config' && method === 'GET') return Response.json(publicConfig(cfg));
+  if (path === '/v1/config' && method === 'GET') return Response.json(publicConfig(env, cfg));
 
   if (Math.random() < 0.02) ctx.waitUntil(cleanup(env).catch(() => {}));
 

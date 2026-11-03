@@ -87,9 +87,11 @@ class ExerciseAutofillTest {
 
     private class Fake(private val answers: MutableList<Any>) : AiGateway {
         val sent = mutableListOf<Pair<CoachPrompt, Boolean>>()
+        val light = mutableListOf<Boolean>()
         override fun available() = true
-        override suspend fun send(prompt: CoachPrompt, structured: Boolean): CoachReply {
+        override suspend fun send(prompt: CoachPrompt, structured: Boolean, light: Boolean): CoachReply {
             sent += prompt to structured
+            this.light += light
             val next = answers.removeAt(0)
             if (next is CoachException) throw next
             return CoachReply(next as String, next)
@@ -105,6 +107,7 @@ class ExerciseAutofillTest {
         assertEquals(ExerciseAutofillSchema.schema, prompt.schema)
         assertTrue(prompt.user.contains("Plank"))
         assertEquals(ExerciseAutofillSchema.MAX_TOKENS, prompt.maxTokens)
+        assertEquals(listOf(true), fake.light)
     }
 
     @Test fun badRequestWithStructuredRetriesOnceWithoutIt() = runTest {

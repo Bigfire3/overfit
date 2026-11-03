@@ -60,8 +60,8 @@ object CoachModels {
     const val OPENROUTER = "anthropic/claude-sonnet-5.5"
     /** Newest Gemini Flash marked "Stable" in Google's model list (3.8 Flash is still "New"). */
     const val GEMINI = "gemini-3.6-flash"
-    /** The Fuel backend only accepts this model (see backend/src/config.ts). */
-    const val FUEL = "claude-sonnet-5-5"
+    /** Fuel sends a tier instead of a model (backend/src/providers.ts); Standard = Gemini Flash, Pro = Claude Sonnet. */
+    const val FUEL = app.overfit.ai.TIER_STANDARD
     const val MAX_TOKENS = 8_000
     /** Gemini counts its thinking tokens into the output limit, so it gets more room. */
     const val GEMINI_MAX_TOKENS = 16_000
@@ -288,13 +288,16 @@ class OpenRouterCoach(http: HttpClient, apiKey: () -> String?) :
 class GeminiCoach(http: HttpClient, apiKey: () -> String?) :
     ChatCompletionsCoach(http, apiKey, ProviderId.GEMINI, "${app.overfit.ai.GEMINI_OPENAI_BASE}/chat/completions")
 
-/** Fuel: the Anthropic body through our backend, which reports cost and the new balance. */
+/**
+ * Fuel: the Anthropic body through our backend, which maps it onto the provider of the tier and reports cost and the
+ * new balance. [model] is the tier (standard | pro | lite); a tier the backend does not offer falls back to the next.
+ */
 class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
     override val providerId = ProviderId.FUEL
     override suspend fun send(prompt: CoachPrompt, model: String, structured: Boolean): CoachReply {
         if (!fuel.available) throw CoachException(CoachErrorKind.NO_ACCESS)
         val result = try {
-            fuel.messages(anthropicBody(prompt, CoachModels.FUEL, structured).toString())
+            fuel.messages(anthropicBody(prompt, fuel.resolveTier(model), structured).toString())
         } catch (e: CancellationException) {
             throw e
         } catch (e: FuelException) {
@@ -302,7 +305,7 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
                 when {
                     e.code == "network" -> CoachErrorKind.NETWORK
                     e.code == "insufficient_funds" -> CoachErrorKind.NO_FUEL
-                    e.code == "not_configured" -> CoachErrorKind.NO_ACCESS
+                    e.code == "not_configured" || e.code == "tier_unavailable" -> CoachErrorKind.NO_ACCESS
                     e.code == "rate_limited" || e.status == 429 -> CoachErrorKind.RATE_LIMIT
                     e.status >= 500 || e.code == "upstream_unavailable" -> CoachErrorKind.SERVER
                     e.status == 401 || e.status == 403 -> CoachErrorKind.AUTH

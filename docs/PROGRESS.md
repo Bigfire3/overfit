@@ -10,10 +10,35 @@
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
 | 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); Feinschliff laufend |
 | 6 | Store-Release (App Store, Play Store) | offen |
-| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Store-Kauf offen (braucht Konten) |
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Fuel, Demo) fertig; Stufen Standard/Pro/Lite mit Gemini, Claude, Workers AI über AI Gateway (Session X); Store-Kauf offen (braucht Konten) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Fuel mit mehreren KI-Anbietern und AI Gateway (Session X, 3.11.)
+**Erledigt:**
+- **Stufen statt fester Anbieter:** `standard` = Gemini 3.6 Flash (Voreinstellung: Coach-Auswertung, Chat, Vorschläge), `pro` = Claude Sonnet 5.5, `lite` = Llama 3.1 8B bei Workers AI („Mit KI ausfüllen“). Die App schickt weiter das Anthropic-Format mit `model` = Stufe, das Backend übersetzt (Gemini native API mit JSON-Schema und Bildern, Workers AI über das `AI`-Binding, nur Text) und antwortet im Anthropic-Format. `lite` weist Bilder mit `400 images_not_supported` ab.
+- **Abrechnung:** Preistabelle in µ€ je MTok in `backend/src/providers.ts` (Workers AI aus Neurons umgerechnet, Gemini-Preiserhöhung zum 1.1.2027 hinterlegt). Reservieren/Abrechnen, Marge und Store-Gebühr unverändert. Jede Verbrauchsbuchung hat Modell und Stufe (Migration `0003_ledger_tier.sql`).
+- **Ausweichen:** Ausfall (5xx, 429, Zeitüberschreitung, Netzwerk) → `standard` ↔ `pro`, `lite` → `standard`. Der Nutzer zahlt nie mehr als die gewählte Stufe.
+- **AI Gateway:** alle Anbieter-Aufrufe laufen über `overfit` bzw. `overfit-test` (Protokolle, Kosten, Rate-Limit 600/min). Fotos-Anfragen werden nicht protokolliert. Der Deploy-Workflow prüft die Token-Rechte und legt das Gateway idempotent an; fehlen Rechte, bricht er mit Anleitung ab.
+- **Secrets:** neu `GEMINI_API_KEY`; `ANTHROPIC_API_KEY` ist optional (fehlt er, gibt es kein Pro). Mindestens einer ist Pflicht.
+- **App:** Coach-Tab → Coach-Einstellungen → „Coach-Qualität: Standard / Pro“ mit Preishinweis (nur mit Fuel; Pro nur, wenn der Server es anbietet). „Mit KI ausfüllen“ nutzt mit Fuel `lite`. Eigener Key: unverändert, null Backend-Anfragen (OwnKeyPrivacyTest grün).
+- Tests: `backend/test/tiers.test.ts` (jede Stufe, Fehler, Ausweichen, Rückerstattung, Gateway, Config, Preistabelle), App: `CoachTransportTest` (Stufenauflösung, Cache), `ExerciseAutofillTest`.
+**Offen:** Echte Läufe gegen Gemini, Workers AI und das Gateway sind nur gemockt geprüft; der erste Deploy-Lauf zeigt, ob alles passt.
+
+### Von Fabian zu tun (Session X)
+1. **Cloudflare-Token erweitern:** dash.cloudflare.com → Profil → My Profile → API Tokens → beim bestehenden Deploy-Token **Edit** → unter Permissions zwei Zeilen ergänzen: **Account · Workers AI · Read** und **Account · AI Gateway · Edit** → Continue to summary → Update Token. Der Wert bleibt gleich, kein GitHub-Secret ändern. (Neuer Token: alle sechs Rechte, siehe `backend/README.md`.)
+2. **Gemini-Key:** aistudio.google.com/apikey → Create API key (Projekt mit Abrechnung, Ausgabenlimit im Google-Cloud-Projekt setzen) → GitHub → Settings → Secrets and variables → Actions → New repository secret `GEMINI_API_KEY`.
+3. `ANTHROPIC_API_KEY` kann bleiben (dann gibt es Pro) oder fehlen (nur Standard und Lite).
+4. Actions → **Backend deployen** → Run workflow → `mode` = test. Die Zusammenfassung nennt Gateway und verfügbare Stufen.
+5. Kosten und Protokolle: dash.cloudflare.com → AI → AI Gateway → `overfit-test`.
+
+### Bitte auf dem Handy testen (Session X, nach dem Deploy)
+1. Fuel als KI-Zugang, Coach-Tab → Coach-Einstellungen: „Coach-Qualität“ mit Standard (vorgewählt) und Pro, darunter der Preishinweis („Pro kostet … etwa das 3-Fache“). Ohne Anthropic-Key steht dort nur „Mit Fuel antwortet Gemini Flash (Standard).“
+2. Workout auswerten lassen (Standard): Auswertung kommt, Kosten ≈ 1–2 ct. Dann Pro wählen, nochmal: Kosten höher (≈ 4 ct). Fuel → Buchungen zeigt beide Abbuchungen.
+3. Coach-Chat mit Standard: Antwort kommt, Kosten darunter. Mit Körperfoto (Foto-Freigabe an): Antwort bezieht sich aufs Foto.
+4. Eigene Übung → „Mit KI ausfüllen“: Felder werden gefüllt, Kosten im Bruchteil-Cent-Bereich.
+5. Eigener Key statt Fuel: alles wie vorher, Coach-Einstellungen zeigen das Modellfeld statt „Coach-Qualität“.
 
 ## Deploy-Knopf und Datenschutz-Garantie (Session V, 3.11.)
 **Erledigt:**
@@ -25,8 +50,8 @@
 
 ### Von Fabian zu tun: Backend im Browser deployen (Details: `backend/README.md`)
 1. cloudflare.com → Konto anlegen (Free). Dashboard → **Workers & Pages** → workers.dev-Subdomain wählen. **R2 Object Storage** aktivieren (Free).
-2. **Account ID** kopieren (Workers & Pages, rechts). **API-Token**: Profil → API Tokens → Create Custom Token mit *Workers Scripts: Edit*, *D1: Edit*, *Workers R2 Storage: Edit*, *Account Settings: Read* → kopieren.
-3. GitHub → Settings → Secrets and variables → Actions → Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ANTHROPIC_API_KEY`.
+2. **Account ID** kopieren (Workers & Pages, rechts). **API-Token**: Profil → API Tokens → Create Custom Token mit *Workers Scripts: Edit*, *D1: Edit*, *Workers R2 Storage: Edit*, *Account Settings: Read*, *Workers AI: Read*, *AI Gateway: Edit* → kopieren.
+3. GitHub → Settings → Secrets and variables → Actions → Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `GEMINI_API_KEY` und/oder `ANTHROPIC_API_KEY` (Session X).
 4. Actions → **Backend deployen** → Run workflow → `mode` = test → in der Zusammenfassung die Worker-URL kopieren.
 5. Settings → Secrets and variables → Actions → **Variables** → `OVERFIT_BACKEND_URL` = diese URL.
 6. Nächsten App-Build abwarten (Merge nach main oder Actions → Android → Run workflow), APK aus „Overfit latest“ installieren.

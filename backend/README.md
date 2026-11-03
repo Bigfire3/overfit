@@ -20,18 +20,22 @@ npm run dev         # wrangler dev, lokaler D1, DEV_MODE=true
 Für `npm run dev` Secrets lokal in `backend/.dev.vars` (nicht committen):
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...        # oder ANTHROPIC_BASE_URL=http://localhost:9999 mit eigenem Fake
+GEMINI_API_KEY=AIza...              # Stufe standard; oder GEMINI_BASE_URL=http://localhost:9999 mit eigenem Fake
+ANTHROPIC_API_KEY=sk-ant-...        # Stufe pro; oder ANTHROPIC_BASE_URL=…
 SPOT_SIGNING_KEY=irgendein-langer-zufallswert
 ATTESTATION_MODE=mock               # nur mit DEV_MODE=true wirksam
 PURCHASE_MODE=mock
 ```
+
+Lokal gibt es kein Workers-AI-Binding und kein AI Gateway: die Stufe `lite` ist dort nicht verfügbar, Gemini und Anthropic werden
+direkt angesprochen. Die Tests ersetzen beides durch Mocks (`test/tiers.test.ts`).
 
 Im Dev-Modus akzeptieren Kauf und Spot Token der Form `mock:<id>` statt echter Store-/Attestierungs-Belege. In Produktion
 (`DEV_MODE` nicht `true`) werden die Mock-Modi ignoriert: ohne echte Prüfer sind Käufe und Spot abgeschaltet (503).
 
 ## Deployment ohne Terminal (empfohlen): der Deploy-Knopf
 
-Alles im Browser, nichts installieren. Der Workflow `.github/workflows/backend-deploy.yml` legt Datenbank und Bucket an, spielt die
+Alles im Browser, nichts installieren. Der Workflow `.github/workflows/backend-deploy.yml` legt Datenbank, Bucket und AI Gateway an, spielt die
 Migrationen ein, deployt, überträgt die Secrets und prüft `/v1/health` und `/v1/config`. Er ist idempotent: beliebig oft startbar.
 
 **Kosten:** Cloudflare Free reicht (Workers, D1, R2 haben ein kostenloses Kontingent, keine Kreditkarte nötig für den Free-Tarif).
@@ -51,6 +55,11 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    - **D1 – Edit**
    - **Workers R2 Storage – Edit**
    - **Account Settings – Read**
+   - **Workers AI – Read** (Workers-AI-Binding für die Stufe `lite`; der Workflow prüft das Recht vorab)
+   - **AI Gateway – Edit** (AI Gateway anlegen und lesen; „Edit“ schließt „Read“ ein)
+
+   Hast du schon einen Token mit den ersten vier Rechten: beim Token auf **Edit** → die zwei Zeilen ergänzen → Update Token. Der Wert
+   bleibt gleich, das GitHub-Secret muss nicht geändert werden.
 
    Account Resources: „Include → dein Konto“ → Continue to summary → Create Token → den Wert **sofort kopieren** (wird nur einmal gezeigt).
 6. **GitHub-Secrets eintragen:** GitHub → Repo → Settings → Secrets and variables → Actions → **New repository secret**:
@@ -59,7 +68,8 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    |---|---|---|
    | `CLOUDFLARE_API_TOKEN` | ja | der Token aus Schritt 5 |
    | `CLOUDFLARE_ACCOUNT_ID` | ja | Account-ID aus Schritt 4 |
-   | `ANTHROPIC_API_KEY` | ja (nur beim ersten Mal, danach merkt sich der Worker ihn) | Anthropic-API-Key für Fuel (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit) |
+   | `GEMINI_API_KEY` | mindestens einer der beiden KI-Keys (nur beim ersten Mal, danach merkt sich der Worker ihn) | Google-AI-Studio-Key für die Stufe **Standard** (aistudio.google.com/apikey → Create API key, Projekt mit Abrechnung; Ausgabenlimit im Google-Cloud-Projekt setzen) |
+   | `ANTHROPIC_API_KEY` | optional, siehe oben | Anthropic-Key für die Stufe **Pro** (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit). Fehlt er, ist Pro nicht verfügbar und die App blendet es aus |
    | `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY` | nein | werden, wenn nicht gesetzt, einmalig zufällig erzeugt und im Worker gespeichert. `SYNC_ENCRYPTION_KEY` nie ändern |
    | `ADMIN_SECRET` | nein | nur Testbetrieb; sonst bei jedem Lauf neu erzeugt |
    | `GOOGLE_PLAY_*`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_*` | nein | Store-Prüfer (siehe Tabelle unten); fehlen sie, überspringt der Workflow sie mit Hinweis |
@@ -103,7 +113,8 @@ Secrets (im Workflow oder von Hand):
 
    | Secret | Zweck | Nötig für |
    |---|---|---|
-   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | `/v1/messages` (Fuel) |
+   | `GEMINI_API_KEY` | Google-AI-Studio-Key des Betreibers | Fuel-Stufe `standard` |
+   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | Fuel-Stufe `pro` |
    | `SPOT_SIGNING_KEY` | Zufälliger String ≥ 32 Zeichen (`openssl rand -base64 48`); signiert Spot-Tokens und Challenges | Spot |
    | `SYNC_ENCRYPTION_KEY` | Zufällige 32 Byte als Base64url; verschlüsselt alle KI-Chat-Daten (die OAuth-Anmeldung des MCP-Servers braucht kein eigenes Geheimnis). **Nie ändern** (sonst sind gespeicherte Daten unlesbar; die App lädt dann beim nächsten Sync neu hoch) | KI-Chat |
    | `ADMIN_SECRET` | ≥ 16 Zeichen, nur Testbetrieb (`POST /v1/admin/credit`) | Test-Guthaben |
@@ -116,7 +127,10 @@ Secrets (im Workflow oder von Hand):
    Schnittstellen, die Mock-Varianten (Dev) und der Test-Prüfer (Testbetrieb). Käufe und Spot antworten in Produktion daher mit
    `purchases_unavailable` bzw. `attestation_unavailable`, bis die Prüfer mit echten Zugangsdaten nachgezogen werden
    (eigene Aufgabe, setzt die Store-Konten aus Phase 6 voraus). `/v1/messages`, Konten und Wiederherstellung laufen schon
-   mit `ANTHROPIC_API_KEY` allein.
+   mit einem KI-Key allein.
+
+Von Hand zusätzlich: in `wrangler.jsonc` `"ai": { "binding": "AI" }` und `vars.AI_GATEWAY_ID` ergänzen und das Gateway im Dashboard
+anlegen (AI → AI Gateway → Create). Der Workflow erledigt das selbst (`scripts/deploy-config.mjs`).
 
 ## KI-Chat als Connector eintragen (nach dem Deployment)
 
@@ -170,7 +184,9 @@ den gleichen OAuth-Ablauf.
 | `MAX_TOKENS_CAP` | 8192 | Obergrenze für `max_tokens` (begrenzt die Reservierung) |
 | `MAX_BODY_BYTES` | 8 388 608 | Größtes Request-Body (Fotos) |
 | `IMAGE_TOKENS_RESERVE` | 3000 | Pauschale Eingabe-Token je Bild bei der Reservierung |
-| `PRICE_TABLE` | Sonnet 5.5 | JSON: `{"<modell>":{"in":…,"cacheRead":…,"cacheWrite":…,"out":…}}` in **µ€ je 1 Mio. Token** (USD-Listenpreis × Wechselkurs). Nur Modelle hier sind erlaubt. |
+| `PRICE_TABLE` | Tabelle in `src/providers.ts` | JSON: `{"<modell>":{"in":…,"cacheRead":…,"cacheWrite":…,"out":…}}` in **µ€ je 1 Mio. Token**; überschreibt einzelne Modelle der Tabelle |
+| `AI_GATEWAY_ID` | leer (direkt) | Name des Cloudflare AI Gateways; setzt der Deploy-Workflow (`overfit` bzw. `overfit-test`) |
+| `UPSTREAM_TIMEOUT_MS` / `UPSTREAM_BUDGET_MS` | 100 000 / 140 000 | Zeitlimit je Anbieter-Versuch / für Anfrage samt Ausweichen |
 | `PACKAGES` | 5 € / 10 € | JSON: `{"<store-produkt-id>":{"priceMicro":…}}` |
 | `CHAT_MAX_DOCS` / `CHAT_MAX_BYTES` | 5000 / 25 MB | Grenzen der KI-Chat-Daten je Konto (ohne Fotos) |
 | `CHAT_MAX_PHOTOS` / `CHAT_MAX_PHOTO_BYTES` | 300 / 3 MB | Fotos je Konto / Größe je Foto |
@@ -181,7 +197,23 @@ den gleichen OAuth-Ablauf.
 | `TEST_STARTER_MICRO` / `TEST_CREDIT_CAP_MICRO` | 1 000 000 / 20 000 000 | Test-Startguthaben je Konto / Obergrenze für alles Test-Guthaben |
 | `RL_*` | siehe API-Doku | Rate-Limits (`RL_MCP_PER_MIN` 120 je Verbindung) |
 
-Preise ändern oder Modelle ergänzen: `PRICE_TABLE` setzen (Wechselkurs und Listenpreise selbst pflegen) und neu deployen.
+## KI-Stufen, Preise und AI Gateway
+
+| Stufe | Anbieter, Modell | Bilder | Ausweichen bei Ausfall | Listenpreis je MTok (ein / aus) |
+|---|---|---|---|---|
+| `standard` (Voreinstellung) | Google Gemini `gemini-3.6-flash` (native API, `responseJsonSchema`) | ja | → `pro` | 0,75 $ / 3,75 $ (ab 2027-01-01: 1,50 $ / 7,50 $) |
+| `pro` | Anthropic `claude-sonnet-5-5` | ja | → `standard` | 2 $ / 10 $ |
+| `lite` | Workers AI `@cf/meta/llama-3.1-8b-instruct` (JSON-Modus) | nein (400 `images_not_supported`) | → `standard` | 25 608 / 75 147 Neurons (0,282 $ / 0,827 $) |
+
+- Die App schickt das Anthropic-Format mit `model` = Stufe; das Backend bildet es auf den Anbieter ab und antwortet im Anthropic-Format.
+- Preise stehen in `src/providers.ts` (`MODEL_PRICES`, mit Gültig-ab-Datum, Wechselkurs `EUR_PER_USD`). Ändern: Tabelle anpassen
+  und deployen, oder kurzfristig `PRICE_TABLE` setzen.
+- Ausweichen (5xx, 429, Zeitüberschreitung, Netzwerk): berechnet wird höchstens der Preis der angefragten Stufe für die tatsächlich
+  verbrauchten Token; die Differenz trägt die Marge. Ablehnungen (4xx) weichen nicht aus.
+- AI Gateway: alle Aufrufe (Gemini, Anthropic über `getUrl`, Workers AI über die `gateway`-Option) laufen über `AI_GATEWAY_ID`.
+  Protokolle und Kosten: dash.cloudflare.com → AI → AI Gateway → `overfit` bzw. `overfit-test`. Der Workflow legt es mit
+  Protokollen an, Rate-Limit 600 Anfragen/Minute (gleitend, Notbremse) und Cache aus. Anfragen mit Körperfotos werden nicht
+  protokolliert (`cf-aig-collect-log: false`). Caching kann im Dashboard eingeschaltet werden; Coach-Anfragen sind aber fast nie gleich.
 
 ## Aufbau
 
@@ -189,7 +221,7 @@ Preise ändern oder Modelle ergänzen: `PRICE_TABLE` setzen (Wechselkurs und Lis
   Refresh-Rotation) · `pages.ts` Anmeldeseite · `sync.ts` Geräte-Endpunkte · `data.ts` Lesen + Kennzahlen · `vault.ts`
   AES-GCM · `catalog.ts` Übungskatalog (`catalog.gen.json` aus dem App-Katalog, neu erzeugen mit `node scripts/build-catalog.mjs`)
 - `src/index.ts` Router · `auth.ts` Signaturprüfung/Replay-Schutz · `ledger.ts` Saldo, Reservierung, Abrechnung ·
-  `messages.ts` KI-Proxy · `purchases.ts` · `spot.ts` · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-/Attestierungs-Schnittstellen)
+  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `providers.ts` Stufen, Preise, Anbieter-Adapter · `purchases.ts` · `spot.ts` · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-/Attestierungs-Schnittstellen)
 - Guthaben als „Posten“ (`lots`): Käufe verfallen nie, Boni nach 180 Tagen; Verbrauch zuerst verfallende Posten. Reservierung =
   ein atomares `INSERT … SELECT … WHERE saldo ≥ betrag` (D1 serialisiert Schreibzugriffe) – parallele Anfragen können nicht überziehen.
   Reservierungen älter als 15 min gelten als verwaist und zählen nicht mehr.

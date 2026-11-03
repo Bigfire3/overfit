@@ -62,6 +62,8 @@ class CoachService(
     private val scope: CoroutineScope,
     private val photos: CoachPhotoLoader = CoachPhotoLoader { null },
     private val clock: () -> Long,
+    /** Fuel tiers of the backend (coach quality setting); null = unknown. Only asked while Fuel is the provider. */
+    private val fuelTiers: suspend () -> Map<String, app.overfit.fuel.FuelTierInfo>? = { null },
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
 ) {
     private val mutex = Mutex()
@@ -78,6 +80,8 @@ class CoachService(
 
     fun access(): CoachAccess = access.invoke()
 
+    suspend fun fuelTiers(): Map<String, app.overfit.fuel.FuelTierInfo>? = fuelTiers.invoke()
+
     /** The transport for [id] (shared with the coach chat). */
     fun transportFor(id: ProviderId): CoachTransport = transport(id)
 
@@ -87,9 +91,10 @@ class CoachService(
      */
     val ai: AiGateway = object : AiGateway {
         override fun available(): Boolean = access() is CoachAccess.Ready
-        override suspend fun send(prompt: CoachPrompt, structured: Boolean): CoachReply {
+        override suspend fun send(prompt: CoachPrompt, structured: Boolean, light: Boolean): CoachReply {
             val ready = access() as? CoachAccess.Ready ?: throw CoachException(CoachErrorKind.NO_ACCESS)
-            return transport(ready.providerId).send(prompt, settings.state.value.model(ready.providerId), structured)
+            val model = if (light && ready.providerId == ProviderId.FUEL) app.overfit.ai.TIER_LITE else settings.state.value.model(ready.providerId)
+            return transport(ready.providerId).send(prompt, model, structured)
         }
     }
 

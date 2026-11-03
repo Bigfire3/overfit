@@ -98,8 +98,11 @@ Jeder Fehler: passender HTTP-Status und
 | 429 | `spot_inviter_limit` | Einladender hat diesen Monat alle Spots vergeben |
 | 429 | `spot_budget_exhausted` | Globales Monatsbudget für Spots aufgebraucht |
 | 500 | `internal_error` | |
-| 502 | `upstream_unavailable` | Anthropic nicht verfügbar/überlastet, **nichts abgebucht** |
-| 503 | `not_configured` | Server-Secret fehlt (Betreiberfehler) |
+| 400 | `upstream_rejected` | KI-Anbieter lehnt die Anfrage ab (z. B. Schema), **nichts abgebucht**, kein Ausweichen |
+| 400 | `images_not_supported` | Bilder an eine Stufe ohne Bildverarbeitung (`lite`) |
+| 502 | `upstream_unavailable` | KI-Anbieter (auch die Ausweich-Stufe) nicht verfügbar/überlastet, **nichts abgebucht** |
+| 503 | `not_configured` | Server-Secret fehlt (Betreiberfehler, keine KI-Stufe verfügbar) |
+| 503 | `tier_unavailable` | Angefragte Stufe nicht konfiguriert (`details.available`) |
 | 503 | `purchases_unavailable` | Käufe sind (noch) nicht freigeschaltet → Kauf-UI ausblenden |
 | 503 | `attestation_unavailable` | Spot ist (noch) nicht freigeschaltet |
 | 504 | `upstream_unavailable` | Zeitüberschreitung, **nichts abgebucht** |
@@ -113,7 +116,13 @@ Jeder Fehler: passender HTTP-Status und
 {
   "mode": "production",
   "currency": "EUR", "unit": "micro-euro", "markupBp": 800, "storeFeeBp": 1500, "maxTokensCap": 8192,
-  "models": { "claude-sonnet-5-5": { "in": 1840000, "cacheRead": 184000, "cacheWrite": 2300000, "out": 9200000 } },
+  "models": { "gemini-3.6-flash": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 }, "claude-sonnet-5-5": { … }, "@cf/meta/llama-3.1-8b-instruct": { … } },
+  "defaultTier": "standard",
+  "tiers": {
+    "standard": { "available": true, "model": "gemini-3.6-flash", "images": true, "fallback": "pro", "price": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 } },
+    "pro": { "available": false, "model": "claude-sonnet-5-5", "images": true, "fallback": "standard", "price": { … } },
+    "lite": { "available": true, "model": "@cf/meta/llama-3.1-8b-instruct", "images": false, "fallback": "standard", "price": { … } }
+  },
   "packages": [ { "productId": "overfit.fuel.10", "priceMicro": 10000000, "creditMicro": 7870370 } ],
   "spot": { "starterMicro": 1000000, "rewardMicro": 1000000, "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
 }
@@ -121,7 +130,9 @@ Jeder Fehler: passender HTTP-Status und
 `mode`: `production` oder `test`. **`test` = Testserver** (`DEPLOY_MODE=test`): keine Geräteprüfung beim Spot-Einlösen (Token `test:<geräte-id>`,
 ein Spot je Gerät), neues Konto bekommt Test-Startguthaben (Buchungstyp `test_credit`), niedrige Limits; die App zeigt unter Fuel „Testserver“.
 Produktion kennt kein `test:`-Token. Nur der exakte Wert `test` schaltet den Testbetrieb frei.
-Modellpreise in µ€ je 1 Mio. Token (für Kostenschätzung in der App). `productId` entspricht der Produkt-ID im Play-/App-Store.
+Modellpreise in µ€ je 1 Mio. Token ohne Aufschlag (für Kostenschätzung in der App), jeweils der heute gültige Preis.
+`tiers.<stufe>.available`: Stufe ist konfiguriert (`standard` braucht `GEMINI_API_KEY`, `pro` `ANTHROPIC_API_KEY`, `lite` das
+Workers-AI-Binding). Die App bietet nur verfügbare Stufen an. `productId` entspricht der Produkt-ID im Play-/App-Store.
 
 ### `POST /v1/admin/credit` (nur Testserver)
 `Authorization: Bearer <ADMIN_SECRET>`, Body `{ "amountMicro": 5000000, "all": true }` oder `{ "amountMicro": …, "accountId": "…" }`
@@ -154,7 +165,7 @@ Body: `{ "publicKey": "<base64url>" }`. → `201` (neu) oder `200` (schon regist
 Body `{ "displayName": "Fabian" }` (≤ 24 Zeichen, `null` oder `""` löscht). → `{ "displayName": "Fabian" }`. Der Name wird nur beim Einlösen eines Spots an den Eingeladenen ausgeliefert (freiwillig).
 
 ### `GET /v1/account/ledger?limit=50&before=<id>`
-`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|spot_bonus|spot_reward", "amountMicro": -6956, "model": "...", "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv.
+`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|spot_bonus|spot_reward", "amountMicro": -6956, "model": "gemini-3.6-flash", "tier": "standard", "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv. Bei `usage`: `model` = tatsächlich genutztes Modell, `tier` = angefragte und abgerechnete Stufe (alte Buchungen: `null`).
 
 ## Wiederherstellungscode (Umzug aufs neue Handy)
 
@@ -167,15 +178,37 @@ Das **neue** Gerät registriert sich normal (`POST /v1/devices`, leeres Konto) u
 ## KI-Proxy
 
 ### `POST /v1/messages`
-Body: Anthropic-Messages-Request, unverändert (`model`, `max_tokens`, `system`, `messages`, `tools` … auch Bilder als Base64). Einschränkungen: `model` in der Whitelist (`/v1/config`), `max_tokens` ≤ `maxTokensCap`, **kein** `stream`. Limit: 10 Anfragen/Minute je Gerät.
+Body: Anthropic-Messages-Request (`model`, `max_tokens`, `system`, `messages`, Bilder als Base64, `output_config.format` für Structured
+Output, `output_config.effort`). **`model` ist eine Stufe:** `standard` (Gemini Flash), `pro` (Claude Sonnet) oder `lite` (kleines Modell
+bei Workers AI, nur Text). Alte App-Versionen schicken `claude-sonnet-5-5` → wird als `pro` behandelt. Einschränkungen: `max_tokens` ≤
+`maxTokensCap`, **kein** `stream`. Limit: 10 Anfragen/Minute je Gerät.
 
-Ablauf: Höchstkosten (geschätzte Eingabe + `max_tokens` × Ausgabepreis, mit Aufschlag) werden atomar reserviert (sonst `402 insufficient_funds`), die Anfrage geht an Anthropic, danach wird nach `usage` abgerechnet: `ceil((input×in + cache_read×cacheRead + cache_creation×cacheWrite + output×out) / 1e6 × (1 + markup))`, der Rest der Reservierung wird freigegeben. Bei jedem Fehler (Netz, 5xx, 4xx) wird vollständig freigegeben. Verbrauch → zuerst verfallende Posten (Startguthaben), dann Kauf-Guthaben.
+Abbildung: `pro` geht unverändert an Anthropic (Modell der Stufe, `effort: medium`, wenn nicht gesetzt). `standard` wird auf die native
+Gemini-API übersetzt (`systemInstruction`, `inlineData` für Bilder, `responseJsonSchema` + `responseMimeType: application/json`,
+`thinkingLevel` aus `effort`, sonst `medium`, `maxOutputTokens` = 2 × `max_tokens`, mindestens 4096, weil Gemini Thinking-Token
+mitzählt). `lite` geht über das Workers-AI-Binding (Text-Nachrichten, `response_format: json_schema`); Bilder →
+`400 images_not_supported` ohne Reservierung. Andere Anthropic-Felder (z. B. `tools`) gibt es nur bei `pro`.
 
-Antwort `200`: die Anthropic-Antwort unverändert, **plus** Feld `overfit`:
+Ablauf: Höchstkosten der angefragten Stufe (geschätzte Eingabe + Ausgabe-Höchstmenge × Ausgabepreis, mit Aufschlag) werden atomar
+reserviert (sonst `402 insufficient_funds`), die Anfrage geht über das Cloudflare AI Gateway an den Anbieter, danach wird nach `usage`
+abgerechnet: `ceil((input×in + cache_read×cacheRead + cache_creation×cacheWrite + output×out) / 1e6 × (1 + markup))`, der Rest der
+Reservierung wird freigegeben. Ohne Nutzungsangabe wird die Reservierung berechnet.
+
+**Ausweichen:** Fällt der Anbieter aus (5xx, 429, Zeitüberschreitung, Netzwerk), geht die Anfrage einmal an die Ausweich-Stufe
+(`standard` → `pro`, `pro` → `standard`, `lite` → `standard`), sofern sie konfiguriert ist und Bilder kann. Berechnet wird
+`min(Kosten zum Preis des genutzten Modells, Kosten zum Preis der angefragten Stufe)` für die tatsächlich verbrauchten Token: nie mehr
+als die angefragte Stufe. Ablehnungen (4xx außer 408/429) weichen nicht aus (`400 upstream_rejected`). Bei jedem endgültigen Fehler
+wird die Reservierung vollständig freigegeben. Verbrauch → zuerst verfallende Posten (Startguthaben), dann Kauf-Guthaben.
+
+Antwort `200`: Anthropic-Format (`content`, `stop_reason` mit `end_turn` | `max_tokens` | `refusal`, `usage`, `model` = genutztes Modell),
+**plus** Feld `overfit`:
 ```json
-{ "id": "msg_…", "content": [ … ], "usage": { … }, "overfit": { "costMicro": 6956, "balanceMicro": 7863414, "currency": "EUR" } }
+{ "id": "msg_…", "model": "gemini-3.6-flash", "content": [ … ], "stop_reason": "end_turn", "usage": { … },
+  "overfit": { "costMicro": 2609, "balanceMicro": 7863414, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "gemini-3.6-flash", "fallback": false } }
 ```
-und Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Fuel · 7,86 €“ und die Kosten der Auswertung daraus. Bilder werden bei der Reservierung pauschal (3000 Token je Bild) gezählt, nicht nach Base64-Länge. Timeout zum Anbieter 120 s.
+und Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Fuel · 7,86 €“ und die Kosten der Auswertung daraus. Bilder
+werden bei der Reservierung pauschal (3000 Token je Bild) gezählt, nicht nach Base64-Länge. Zeitlimit je Anbieter 100 s, für die ganze
+Anfrage samt Ausweichen 140 s. Anfragen mit Bildern werden im AI Gateway nicht protokolliert.
 
 ## Kauf
 

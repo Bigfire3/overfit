@@ -33,7 +33,10 @@ export async function release(env: Env, holdId: string): Promise<void> {
 }
 
 export interface UsageEntry {
+  /** Tatsächlich genutztes Modell (bei Ausweichen das der Ausweich-Stufe). */
   model: string;
+  /** Angefragte und abgerechnete Stufe. */
+  tier: string;
   input: number;
   cacheRead: number;
   cacheWrite: number;
@@ -69,9 +72,9 @@ export async function settle(
   const charged = charge - left;
   stmts.push(
     env.DB.prepare(
-      `INSERT INTO ledger (account_id, ts, type, amount_micro, model, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, ref)
-       VALUES (?, ?, 'usage', ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(accountId, now(), -charged, usage.model, usage.input, usage.cacheRead, usage.cacheWrite, usage.output, holdId),
+      `INSERT INTO ledger (account_id, ts, type, amount_micro, model, tier, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, ref)
+       VALUES (?, ?, 'usage', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(accountId, now(), -charged, usage.model, usage.tier, usage.input, usage.cacheRead, usage.cacheWrite, usage.output, holdId),
   );
   await env.DB.batch(stmts);
   return charged;
