@@ -97,10 +97,11 @@ fun ExercisesScreen(
     language: Language,
     onOpenExercise: (Exercise) -> Unit,
     onNewCustomExercise: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val t = LocalStrings.current
-    // Only exercises here; the saved workouts live on the Training tab.
-    Screen(footer = { PrimaryButton(t.newCustomExercise, onNewCustomExercise) }) {
+    // Only exercises here; the saved workouts live on the Training tab. Not a tab of its own: opened from Training.
+    Screen(header = { BackHeader(t.back, onBack) }, footer = { PrimaryButton(t.newCustomExercise, onNewCustomExercise) }) {
         Title(t.exercisesTitle)
         Spacer(Modifier.height(Space.m))
         CatalogList(catalog, language, onClick = onOpenExercise)

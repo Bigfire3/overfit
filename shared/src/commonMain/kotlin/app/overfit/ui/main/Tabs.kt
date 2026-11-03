@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +61,7 @@ fun StartScreen(
     onOpenRunning: () -> Unit,
     onEndRunning: () -> Unit,
     onNew: () -> Unit,
+    onExercises: () -> Unit,
     onOpenWorkout: (Long) -> Unit,
     share: ShareDependencies,
     onDuo: () -> Unit,
@@ -80,6 +82,9 @@ fun StartScreen(
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { Title(t.navStart) }
+            // The exercise catalogue is not a tab: it sits here (and in every exercise picker).
+            IconButton(Icon.Exercises, t.navExercises, onExercises)
+            Spacer(Modifier.width(Space.s))
             IconButton(Icon.Plus, t.newWorkout, onNew)
         }
         Spacer(Modifier.height(Space.l))

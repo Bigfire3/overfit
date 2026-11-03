@@ -106,8 +106,12 @@ class AppSmokeTest {
         // Other tabs
         compose.onNodeWithText("Verlauf").performClick()
         compose.onNodeWithText("Noch keine Trainings", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("Übungen").performClick()
+        // Exercises are no tab anymore: four tabs, the catalogue opens from the Training tab
+        compose.onAllNodes(hasText("Übungen") and hasClickAction()).assertCountEquals(0)
+        compose.onNode(hasText("Training") and hasClickAction()).performClick()
+        compose.onNodeWithContentDescription("Übungen").performClick()
         compose.onNodeWithText("Eigene Übung").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Zurück").performClick()
         compose.onNodeWithText("Fotos").performClick()
         compose.onNodeWithText("Foto-Tagebuch").assertIsDisplayed()
 
@@ -162,7 +166,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Später einrichten").performClick()
 
         // Catalogue: German search term finds the English exercise
-        compose.onNodeWithText("Übungen").performClick()
+        compose.onNodeWithContentDescription("Übungen").performClick()
         waitFor("Suchen, z. B. Klimmzug")
         compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("Klimmzug")
         waitFor("Pull-up")
@@ -188,8 +192,8 @@ class AppSmokeTest {
                 kotlinx.coroutines.runBlocking { data.exercises.exercises.first() }.any { it.isCustom && it.name == "Klimmzug" }
         }
 
-        // Workout: Training tab → "+" → create; name, one exercise from the picker, an extra set, save
-        compose.onNode(hasText("Training") and hasClickAction()).performClick()
+        // Workout: back from the catalogue to the Training tab → "+" → create; name, one exercise from the picker, an extra set, save
+        compose.onNodeWithContentDescription("Zurück").performClick()
         waitFor("Letzte Coach-Tipps")
         compose.onNodeWithContentDescription("Neues Workout").performClick()
         waitFor("Workout erstellen")

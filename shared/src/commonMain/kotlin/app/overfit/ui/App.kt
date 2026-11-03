@@ -323,7 +323,6 @@ class PickedExercises {
 enum class Tab(val route: Any, val icon: Icon, val label: (Strings) -> String) {
     START(StartRoute, Icon.Training, { it.navStart }),
     HISTORY(HistoryRoute, Icon.History, { it.navHistory }),
-    EXERCISES(ExercisesRoute, Icon.Exercises, { it.navExercises }),
     PHOTOS(PhotosRoute, Icon.Photos, { it.navPhotos }),
     PROFILE(SettingsRoute, Icon.Settings, { it.navProfile });
 
@@ -463,6 +462,7 @@ fun OverfitApp(deps: AppDependencies) {
                                 nav.openWorkout()
                             },
                             onNew = { nav.navigate(StartWorkoutRoute) },
+                            onExercises = { nav.navigate(ExercisesRoute) },
                             onOpenWorkout = { nav.navigate(WorkoutPlanRoute(it)) },
                             share = share,
                             onDuo = { nav.navigate(DuoRoute) },
@@ -603,6 +603,7 @@ fun OverfitApp(deps: AppDependencies) {
                             language = state.language,
                             onOpenExercise = { nav.navigate(ExerciseDetailRoute(it.id)) },
                             onNewCustomExercise = { nav.navigate(CustomExerciseRoute(name = catalog.filter.value.query.trim())) },
+                            onBack = nav::popBackStack,
                         )
                     }
                     composable<ExerciseDetailRoute> { entry ->
@@ -871,7 +872,7 @@ internal fun NavHostController.openWorkout() {
     if (!popBackStack(WorkoutRoute, inclusive = false)) navigate(WorkoutRoute) { launchSingleTop = true }
 }
 
-/** Shows the bottom tab bar only on the five top-level screens. */
+/** Shows the bottom tab bar only on the four top-level screens. */
 @Composable
 private fun AppScaffold(
     nav: NavHostController,

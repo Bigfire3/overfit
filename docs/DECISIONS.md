@@ -521,6 +521,7 @@ Fabians Feedback: „Der erste Tab soll Training heißen … das mit den Templat
 - **Name:** Leer gestartet heißt das Training „Workout vom 3. Nov.“; im Beenden-Flow steht der Name als Eingabefeld oben, eine Änderung benennt Training und Workout um.
 - **Schutzregeln:** Ein Training ohne Übungen leert nie ein Workout und legt keins an. Ein Workout, das während des Trainings gelöscht wurde, wird nicht wiederhergestellt. Gelöschte Workouts bleiben im Verlauf (Sitzungen speichern ihre Werte selbst, `templateId` ohne Fremdschlüssel). „Alle Daten löschen“ verwirft ohne Übernahme. Schlägt die Übernahme fehl, wird trotzdem beendet.
 - **Sicherung:** Das laufende Training wird schon nach jeder Änderung gespeichert (Phase 2); Verwerfen geht nur über das Bestätigungsmuster.
+- **Übungen ohne eigenen Tab** (Fabian: „Der Übungskatalog soll auch nicht mit in der Tableiste sein.“): Tab-Leiste = Training, Verlauf, Fotos, Profil. Der Katalog (eigene Übungen, Suche, Fortschritt je Übung) öffnet über das Hantel-Icon oben im Training-Tab neben „+“ – dort, wo man trainiert, statt versteckt im Profil – und weiterhin über jeden Übungs-Picker.
 
 ### Zur Prüfung durch Fabian
 - Auch **Verwerfen** übernimmt die Struktur (ein leer gestartetes, verworfenes Training mit Übungen erscheint als Workout). Begründung: „nichts darf verloren gehen“. Wer das nicht will, löscht das Workout. Alternative: beim Verwerfen nichts übernehmen.
