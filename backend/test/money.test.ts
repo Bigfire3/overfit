@@ -17,9 +17,8 @@ describe('Geld', () => {
   it('überläuft bei großen Mengen nicht', () => {
     expect(costMicro({ input_tokens: 5_000_000_000, output_tokens: 5_000_000_000 }, sonnet, 800)).toBeGreaterThan(0);
   });
-  it('Paket-Gutschrift = Preis × (1 − Store) / (1 + Aufschlag)', () => {
-    // 10 € × 0,85 / 1,08 = 7,87037… €
-    expect(packageCreditMicro(10_000_000, 1500, 800)).toBe(7_870_370);
-    expect(packageCreditMicro(5_000_000, 0, 0)).toBe(5_000_000);
+  it('Paket-Gutschrift ist 1:1 zum Preis', () => {
+    expect(packageCreditMicro(10_000_000)).toBe(10_000_000);
+    expect(packageCreditMicro(5_000_000)).toBe(5_000_000);
   });
 });

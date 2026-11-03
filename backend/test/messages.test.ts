@@ -36,21 +36,21 @@ describe('POST /v1/messages', () => {
     const r = await c.call('POST', '/v1/messages', body());
     expect(r.status).toBe(200);
     expect(r.body.content[0].text).toBe('ok');
-    expect(r.body.overfit.costMicro).toBe(6956);
-    expect(r.headers.get('x-overfit-cost-micro')).toBe('6956');
-    expect(r.body.overfit.balanceMicro).toBe(funded.balanceMicro - 6956);
-    expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(funded.balanceMicro - 6956);
+    expect(r.body.overfit.costMicro).toBe(10884);
+    expect(r.headers.get('x-overfit-cost-micro')).toBe('10884');
+    expect(r.body.overfit.balanceMicro).toBe(funded.balanceMicro - 10884);
+    expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(funded.balanceMicro - 10884);
     const [, init] = upstream.mock.calls[0];
     expect(init.headers['x-api-key']).toBe('test-key');
     const led = await c.call('GET', '/v1/account/ledger');
-    expect(led.body.entries[0]).toMatchObject({ type: 'usage', amountMicro: -6956, inputTokens: 1000, outputTokens: 500 });
+    expect(led.body.entries[0]).toMatchObject({ type: 'usage', amountMicro: -10884, inputTokens: 1000, outputTokens: 500 });
   });
 
   it('Cache-Tokens werden separat abgerechnet', async () => {
     upstream.mockResolvedValue(reply({ input_tokens: 0, cache_read_input_tokens: 20_000, cache_creation_input_tokens: 0, output_tokens: 0 }));
     const c = await Client.create();
     await fund(c);
-    expect((await c.call('POST', '/v1/messages', body())).body.overfit.costMicro).toBe(Math.ceil((20_000 * 184_000 * 10800) / 1e10));
+    expect((await c.call('POST', '/v1/messages', body())).body.overfit.costMicro).toBe(Math.ceil((20_000 * 184_000 * 16900) / 1e10));
   });
 
   it('ohne Guthaben: 402 und kein Upstream-Aufruf', async () => {
@@ -94,7 +94,7 @@ describe('POST /v1/messages', () => {
     const c = await Client.create(baseEnv({ PACKAGES: JSON.stringify({ small: { priceMicro: 100_000 } }) }));
     await c.call('POST', '/v1/purchases/verify', { platform: 'google', productId: 'small', purchaseToken: 'mock:o1' });
     const bal = (await c.call('GET', '/v1/account')).body.balanceMicro;
-    // Jede Anfrage reserviert ~ (1000 × 9,2 + Eingabe) × 1,08 ≈ 10 000 µ€ → bei ~79 000 µ€ passen höchstens 7
+    // Jede Anfrage reserviert ~ (1000 × 9,2 + Eingabe) × 1,69 ≈ 10 000 µ€ → bei ~79 000 µ€ passen höchstens 7
     const res = await Promise.all(Array.from({ length: 20 }, () => c.call('POST', '/v1/messages', body())));
     const ok = res.filter((r) => r.status === 200).length;
     const denied = res.filter((r) => r.status === 402).length;
@@ -102,7 +102,7 @@ describe('POST /v1/messages', () => {
     expect(denied).toBeGreaterThan(0);
     const after = (await c.call('GET', '/v1/account')).body.balanceMicro;
     expect(after).toBeGreaterThanOrEqual(0);
-    expect(bal - after).toBe(ok * 6956);
+    expect(bal - after).toBe(ok * 10884);
   });
 
   it('Bilder werden pauschal statt nach Base64-Länge reserviert', async () => {
@@ -133,7 +133,7 @@ describe('POST /v1/messages', () => {
     await c.call('POST', '/v1/messages', body());
     const rows = await e.DB.prepare("SELECT id, remaining_micro AS r FROM lots ORDER BY id").all<{ id: string; r: number }>();
     const m = Object.fromEntries(rows.results.map((x) => [x.id, x.r]));
-    expect(m.bonus).toBe(1_000_000 - 6956);
+    expect(m.bonus).toBe(1_000_000 - 10884);
     expect(m.paid).toBe(1_000_000);
     expect(m.old).toBe(1_000_000);
   });

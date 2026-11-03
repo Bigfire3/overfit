@@ -24,7 +24,10 @@ export function costMicro(usage: Usage, price: Price, markupBp: number): number 
   return Number(ceilDiv(sum * (BP + BigInt(markupBp)), MTOK * BP));
 }
 
-/** Gutschrift eines Pakets: Preis × (1 − Store-Gebühr) / (1 + Aufschlag), abgerundet. */
-export function packageCreditMicro(priceMicro: number, storeFeeBp: number, markupBp: number): number {
-  return Number((BigInt(priceMicro) * (BP - BigInt(storeFeeBp)) * BP) / (BP * (BP + BigInt(markupBp))));
+/**
+ * Gutschrift eines Pakets: **1:1 zum Preis**, in jedem Kanal (Store, Web, Code). USt, Zahlungs- und Store-Gebühr trägt der
+ * Aufschlag `MARKUP_BP` auf die Modellpreise, nicht die Gutschrift (docs/monetization.md „Rechnung“).
+ */
+export function packageCreditMicro(priceMicro: number): number {
+  return priceMicro;
 }

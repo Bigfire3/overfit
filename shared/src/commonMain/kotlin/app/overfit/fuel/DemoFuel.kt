@@ -22,15 +22,15 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
     )
 
     override suspend fun config() = FuelConfig(
-        markupBp = 800, storeFeeBp = 1_500,
+        markupBp = 6_900,
         tiers = mapOf(
             "standard" to FuelTierInfo(true, "gemini-3.6-flash", true, TierPrice(690_000, 3_450_000), "Gemini 3.6 Flash", "Google", 1_000),
             "pro" to FuelTierInfo(true, "claude-sonnet-5-5", true, TierPrice(1_840_000, 9_200_000), "Claude Sonnet 5.5", "Anthropic"),
             "lite" to FuelTierInfo(true, "@cf/meta/llama-3.1-8b-instruct", false, TierPrice(259_153, 760_488), "Llama 3.1 8B", "Cloudflare"),
         ),
         packages = listOf(
-            FuelPackage("overfit.fuel.5", 5_000_000, 3_935_185),
-            FuelPackage("overfit.fuel.10", 10_000_000, 7_870_370),
+            FuelPackage("overfit.fuel.5", 5_000_000, 5_000_000),
+            FuelPackage("overfit.fuel.10", 10_000_000, 10_000_000),
         ),
     )
 

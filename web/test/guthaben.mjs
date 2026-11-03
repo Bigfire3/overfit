@@ -33,7 +33,7 @@ const base = `http://localhost:${server.address().port}`;
 let failed = 0;
 const check = (ok, msg) => { if (!ok) { failed++; console.error('FAIL', msg); } else console.log('ok  ', msg); };
 
-const PACKAGES = [5, 10, 20].map((e) => ({ id: `web.${e}`, priceMicro: e * 1e6, creditMicro: e * 1e6 }));
+const PACKAGES = [10, 20, 50].map((e) => ({ id: `web.${e}`, priceMicro: e * 1e6, creditMicro: e * 1e6 }));
 const FAKE_PADDLE = `window.Paddle = {
   Environment: { set: (e) => { window.__paddleEnv = e; } },
   Initialize: (o) => { window.__paddleInit = o; },
@@ -78,7 +78,7 @@ const browser = await chromium.launch();
   const text = (await page.innerText('main')).replace(/\u00a0/g, ' ');
   check(text.includes('Guthaben aufladen'), 'App-Link: Titel „Guthaben aufladen“ (lang=de schlägt Browsersprache)');
   check(text.includes('Testmodus – keine echte Zahlung'), 'Testmodus-Hinweis sichtbar');
-  check(text.includes('5 €') && text.includes('10 €') && text.includes('20 €'), 'Pakete 5/10/20 €');
+  check(text.includes('10 €') && text.includes('20 €') && text.includes('50 €'), 'Pakete 10/20/50 €');
   check(text.includes('10 € Guthaben'), 'Guthaben = Preis');
   check(text.includes('Impressum (folgt vor dem Start)') && text.includes('Datenschutz (folgt vor dem Start)') && text.includes('AGB'), 'Rechtstexte als Platzhalter markiert');
   check((await page.locator('.pack[aria-checked="true"]').innerText()).replace(/\u00a0/g, ' ').includes('10 €'), '10 € vorgewählt');

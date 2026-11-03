@@ -15,6 +15,18 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Marge bei 1:1-Guthaben (Session AA, 3.11.)
+**Erledigt:**
+- Rechnung in docs/monetization.md („Rechnung“, mit Tabellen): USt 19 %, Paddle 5 % + 0,50 € (an paddle.com/pricing geprüft), Store 15 % auf Netto nach USt, Spot-/Startguthaben als 10 % vom Netto, Zielgewinn 7 %. Ergebnis **`MARKUP_BP = 6900` (69 %)**, ein Wert für alle Modelle; Store ist der Engpass.
+- **Web-Pakete 10/20/50 €** (5 € hätte den Aufschlag auf 74,5 % gehoben); Store-Pakete `overfit.fuel.5`/`.10` bleiben. **Gutschrift überall = Preis**, Store-Formel (doppelter Aufschlag, ohne USt) entfernt, `STORE_FEE_BP` entfällt.
+- App: Kostenschätzungen kommen weiter aus `/v1/config` (jetzt mit 69 %); unter Guthaben ein ehrlicher Satz plus Link „Wie setzen sich die Preise zusammen?“ → `web/preise/` (DE+EN).
+- Tests: `backend/test/pricing.test.ts` (Break-even je Kanal/Paket, Schätzung), Config-, Kauf- und Abrechnungstests angepasst.
+
+**Bitte auf dem Handy testen (nach Merge, neue APK):**
+1. Profil → Guthaben: Pakete zeigen „Paket 5 € → 5 € Guthaben“, darunter der Satz zum 69-%-Aufschlag und der Link „Wie setzen sich die Preise zusammen?“ → öffnet die Seite (erst nach dem Pages-Deploy erreichbar).
+2. Coach-Einstellungen → Modell: Schätzung „≈ 2,4 ct“ je Auswertung (Gemini 3.6 Flash), Hinweistext nennt 69 %.
+3. „Im Web aufladen“ (nur Testmodus/Sideload): Kaufseite zeigt 10/20/50 €.
+
 ## Guthaben im Web kaufen, Testmodus (Session Z, 3.11.)
 **Erledigt:**
 - **Backend:** `POST /v1/purchase/web-link` (signiert, Token 15 min, einmalig), öffentliche Endpunkte der Kaufseite

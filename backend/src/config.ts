@@ -1,15 +1,22 @@
 import type { Config, Env, Price } from './types';
 import { currentPrices } from './providers';
 
+/**
+ * Einziger Aufschlag auf alle Modellpreise (Basispunkte). Herleitung und Tabelle: docs/monetization.md „Rechnung“.
+ * 6900 = 69 %: deckt im ungünstigsten Kanal (Store, 15 % Gebühr auf Netto nach USt) USt, Gebühr, Spot-Gutschriften
+ * (10 % vom Netto) und lässt 7 % vom Netto als Gewinn.
+ */
+export const DEFAULT_MARKUP_BP = 6900;
+
 const DEFAULT_PACKAGES = {
   'overfit.fuel.5': { priceMicro: 5_000_000 },
   'overfit.fuel.10': { priceMicro: 10_000_000 },
 };
 
 const DEFAULT_WEB_PACKAGES = {
-  'web.5': { priceMicro: 5_000_000 },
   'web.10': { priceMicro: 10_000_000 },
   'web.20': { priceMicro: 20_000_000 },
+  'web.50': { priceMicro: 50_000_000 },
 };
 
 function int(v: string | undefined, def: number, min = 0): number {
@@ -43,8 +50,7 @@ export function getConfig(env: Env): Config {
     aiGatewayId: env.AI_GATEWAY_ID?.trim() || null,
     upstreamTimeoutMs: int(env.UPSTREAM_TIMEOUT_MS, 100_000, 1000),
     upstreamBudgetMs: int(env.UPSTREAM_BUDGET_MS, 140_000, 1000),
-    markupBp: int(env.MARKUP_BP, 800),
-    storeFeeBp: int(env.STORE_FEE_BP, 1500),
+    markupBp: int(env.MARKUP_BP, DEFAULT_MARKUP_BP),
     spotStarterMicro: int(env.SPOT_STARTER_MICRO, 1_000_000),
     spotRewardMicro: int(env.SPOT_REWARD_MICRO, 1_000_000),
     spotTokenTtlSec: int(env.SPOT_TOKEN_TTL_SEC, 45, 5),

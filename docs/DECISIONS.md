@@ -848,13 +848,8 @@ Schätzung = ⌈(Eingabe-Token × Eingabepreis + (Ausgabe-Token + Thinking) × A
 - **Checkout per API-Transaktion + Paddle.js auf der eigenen Seite** (`/v1/web/checkout` legt die Transaktion mit Preis ohne
   Katalog, `tax_mode: internal` an). So braucht Fabian im Paddle-Dashboard keine Produkte/Preise anzulegen; Pakete und Preise
   stehen im Backend (`WEB_PACKAGES`). Paddle hat keine eigene gehostete Seite; der Default Payment Link zeigt auf `/guthaben/`.
-- **Pakete 5/10/20 € statt 2/5/10 €:** Die Fixgebühr von 0,50 € frisst bei 2 € ein Viertel des Preises. 5 € bleibt der kleinste
-  Einstieg, 20 € für Vielnutzer.
-- **1:1-Guthaben (5 € = 5 €), Endpreise inkl. USt.** Fabians Vorgabe, so im Testmodus umgesetzt. Nachgerechnet mit der Marge aus
-  Session Y (8 % Aufschlag ≈ 6,3 % vom Kaufpreis): USt und Paddle-Gebühr (23–31 % des Preises) liegen weit darüber, jedes Paket
-  verlöre im Live-Betrieb Geld (5 €: −1,18 €, 10 €: −1,86 €, 20 €: −3,21 €). Vorschlag in docs/monetization.md („Rechnung Web-Kauf“):
-  Aufteilung offen zeigen (Guthaben = Preis − USt − Paddle-Gebühr), Mindestpaket 10 €, keine versteckten Aufschläge. Nicht umgesetzt,
-  weil es Fabians 1:1-Vorgabe ändert und im Testmodus kein Geld fließt; vor dem Live-Start zu entscheiden.
+- **Pakete 5/10/20 € statt 2/5/10 €:** Die Fixgebühr von 0,50 € frisst bei 2 € ein Viertel des Preises. (Session AA: weiter auf 10/20/50 €, siehe unten.)
+- **1:1-Guthaben, Endpreise inkl. USt.** Fabians Vorgabe; die Margenfrage ist in Session AA entschieden (nächster Abschnitt).
 - **Kauflink = Zufallstoken mit Hash in D1 statt HMAC-signiertem Token.** Einmaligkeit und Ablauf muss der Server ohnehin
   speichern; ein signierter Token brächte nichts dazu, würde aber die Konto-ID in die URL tragen. Token im Fragment (`#t=`), damit er
   weder in Logs noch im Referer landet. 15 Minuten, bis zu 5 Checkouts (Paket wechseln, Abbruch), nach der ersten Zahlung verbraucht.
@@ -877,3 +872,12 @@ Schätzung = ⌈(Eingabe-Token × Eingabepreis + (Ausgabe-Token + Thinking) × A
   damit es mit der parallelen Umbenennung keine Konflikte gibt. Neue Ledger-Typen: `code_redeem`, `refund`, `chargeback`; neues Feld
   `source` (`web`, `code`).
 - Impressum, Datenschutz, AGB auf der Kaufseite sind sichtbar als „folgt vor dem Start“ markiert, keine erfundenen Rechtstexte.
+
+## Marge bei 1:1-Guthaben (Session AA, 3.11.)
+Fabians Entscheidung (Geld): „1:1 mit höherer Marge“. Guthaben = Kaufpreis in jedem Kanal; der Aufschlag auf die Modellpreise wird so hoch gesetzt, dass jeder Kauf auch bei ganz verbrauchtem Guthaben kostendeckend ist. Rechnung mit Tabelle: docs/monetization.md „Rechnung (Session AA)“.
+- **Ein einziger Aufschlag `MARKUP_BP = 6900` (69 %)**, weil das Guthaben kanalübergreifend dasselbe ist. Dimensioniert für den ungünstigsten Kanal (Store: 15 % Gebühr auf den Preis ohne USt, nötig 68,7 %) mit 10 % Spot-/Startguthaben-Rücklage und 7 % Zielgewinn vom Netto (Spanne 5–10 %; bescheiden, aber genug für Betrieb, Rückbuchungen und Kursschwankungen). Zentral in `backend/src/config.ts` (`DEFAULT_MARKUP_BP`) und `wrangler.jsonc`; `/v1/config` liefert Preise und `usageProfiles`, die App rechnet die Schätzung (Coach-Auswertung Gemini 3.6 Flash ≈ 2,4 ct) daraus, ohne eigene Konstante.
+- **Web-Pakete 10/20/50 € statt 5/10/20 €:** Die feste Paddle-Gebühr von 0,50 € macht 5 € zum teuersten Paket (nötig wären 74,5 % statt 68,7 %, also 5,8 Punkte mehr für alle). Ab 10 € ist der Store der Engpass. Das 5-€-Store-Paket (`overfit.fuel.5`) bleibt: proportionale Gebühr, kein Einfluss auf den Aufschlag. IDs stabil, nichts läuft aus.
+- **Store-Gutschrift korrigiert:** vorher Preis × (1 − Gebühr) ÷ (1 + Aufschlag) (zog den Aufschlag doppelt ab und ließ die USt weg). Jetzt Gutschrift = Preis, die Store-Gebühr (15 % auf Netto nach USt) steckt im Aufschlag. `STORE_FEE_BP` entfällt, `storeFeeBp` ist nicht mehr in `/v1/config`.
+- **Transparenz:** Aufschlag und Wofür in monetization.md; App unter „Guthaben“: ein Satz plus Link „Wie setzen sich die Preise zusammen?“ auf `/preise/` (DE+EN, Beispielrechnung).
+- **Verworfen:** Abzug beim Kauf (widerspricht 1:1); eigener Aufschlag je Kanal (das Guthaben ist kanalübergreifend dasselbe und wird beim Verbrauch nicht nach Herkunft getrennt; ein Wert ist einfacher und ehrlicher).
+- **Offen für später:** Bei Paddle für kleine Pakete bessere Konditionen anfragen; bei Wechselkurs- oder Preisänderungen der Modelle `backend/test/pricing.test.ts` anpassen und Aufschlag neu rechnen.

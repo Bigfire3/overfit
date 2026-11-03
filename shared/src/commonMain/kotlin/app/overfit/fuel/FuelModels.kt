@@ -109,7 +109,6 @@ data class FuelConfig(
     /** `test` = test server (no device check, test credit); anything else = production. */
     val mode: String = "production",
     val markupBp: Int = 0,
-    val storeFeeBp: Int = 0,
     val maxTokensCap: Int = 8192,
     val defaultTier: String = "standard",
     /** standard | pro | lite → availability and price. Empty = old backend (only the model `claude-sonnet-5-5`). */

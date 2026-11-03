@@ -18,8 +18,7 @@
   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "overfit-chat-photos" }],
   // Alle Beträge in Mikro-Euro (1 € = 1_000_000). Aufschläge in Basispunkten (100 = 1 %).
   "vars": {
-    "MARKUP_BP": "800",
-    "STORE_FEE_BP": "1500",
+    "MARKUP_BP": "6900",
     "SPOT_STARTER_MICRO": "1000000",
     "SPOT_REWARD_MICRO": "1000000",
     "SPOT_TOKEN_TTL_SEC": "45",

@@ -25,7 +25,7 @@
     linkInvalid: 'Dieser Kauflink ist ungültig. Öffne in der App „Im Web aufladen“ – oder kauf hier einen Code.',
     toCode: 'Stattdessen Code kaufen (Geschenk)', toCredit: 'Zurück: auf mein Konto laden',
     gives: function (e) { return e + ' Guthaben'; },
-    honest: 'Endpreise inkl. USt. Du zahlst 5\u00a0€ und bekommst 5\u00a0€ Guthaben, ohne Abzug. Die Marge steckt in den Modellpreisen, die die App nennt.',
+    honest: 'Endpreise inkl. USt. Du zahlst 10\u00a0€ und bekommst 10\u00a0€ Guthaben, ohne Abzug. USt, Zahlungsgebühr und unsere Marge stecken im Aufschlag auf die Modellpreise (69\u00a0%), den die App nennt. Details unter „Wie setzen sich die Preise zusammen?“ (Link unten).',
     pay: 'Weiter zur Zahlung', payBusy: 'Einen Moment …', payFailed: 'Die Zahlung konnte nicht gestartet werden. Bitte noch einmal versuchen.',
     mor: 'Die Zahlung wickelt Paddle als Verkäufer (Merchant of Record) ab, inklusive Umsatzsteuer und Beleg per E-Mail. overfit sieht keine Zahlungsdaten.',
     waitTitle: 'Zahlung wird bestätigt …', waitText: 'Das dauert meist nur ein paar Sekunden.',
@@ -46,7 +46,7 @@
     linkInvalid: 'This purchase link is not valid. Open “Top up on the web” in the app – or buy a code here.',
     toCode: 'Buy a code instead (gift)', toCredit: 'Back: top up my account',
     gives: function (e) { return e + ' credit'; },
-    honest: 'Final prices incl. VAT. You pay €5 and get €5 of credit, no deductions. The margin is in the model prices shown in the app.',
+    honest: 'Final prices incl. VAT. You pay €10 and get €10 of credit, no deductions. VAT, payment fee and our margin are in the markup on model prices (69 %) that the app shows. Details under “How are the prices made up?” (link below).',
     pay: 'Continue to payment', payBusy: 'One moment …', payFailed: 'The payment could not be started. Please try again.',
     mor: 'Paddle handles the payment as the seller (merchant of record), including VAT and an email receipt. overfit never sees payment details.',
     waitTitle: 'Confirming payment …', waitText: 'This usually takes a few seconds.',
@@ -102,7 +102,7 @@
       $('linkNote').textContent = status === 'expired' ? T.linkExpired : status === 'used' ? T.linkUsed : T.linkInvalid;
       $('linkNote').hidden = false;
     }
-    selected = (s.packages[1] || s.packages[0] || {}).id || null;
+    selected = (s.packages[0] || {}).id || null;
     renderShop();
     show('shop');
   }).catch(function () { fail(T.errNet); });

@@ -29,7 +29,7 @@ class WebCreditStrings(
 
 val GermanWebCredit = WebCreditStrings(
     webTopUp = "Im Web aufladen",
-    webTopUpNote = "Öffnet die Kaufseite im Browser. 5 € zahlen = 5 € Guthaben, ohne Store-Gebühr. Kein Konto nötig.",
+    webTopUpNote = "Öffnet die Kaufseite im Browser. 10 € zahlen = 10 € Guthaben, ohne Store-Gebühr. Kein Konto nötig.",
     webTopUpTestNote = "Testmodus – keine echte Zahlung, nur Testkarten.",
     webTopUpOpening = "Kaufseite wird geöffnet …",
     webTopUpFailed = "Die Kaufseite ließ sich nicht öffnen. Bitte später noch einmal versuchen.",
@@ -50,7 +50,7 @@ val GermanWebCredit = WebCreditStrings(
 
 val EnglishWebCredit = WebCreditStrings(
     webTopUp = "Top up on the web",
-    webTopUpNote = "Opens the purchase page in your browser. Pay €5 = €5 of credit, no store fee. No account needed.",
+    webTopUpNote = "Opens the purchase page in your browser. Pay €10 = €10 of credit, no store fee. No account needed.",
     webTopUpTestNote = "Test mode – no real payment, test cards only.",
     webTopUpOpening = "Opening the purchase page …",
     webTopUpFailed = "The purchase page could not be opened. Please try again later.",

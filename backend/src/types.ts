@@ -65,7 +65,6 @@ export interface Env {
   TEST_STARTER_MICRO?: string;
   TEST_CREDIT_CAP_MICRO?: string;
   MARKUP_BP?: string;
-  STORE_FEE_BP?: string;
   SPOT_STARTER_MICRO?: string;
   SPOT_REWARD_MICRO?: string;
   SPOT_TOKEN_TTL_SEC?: string;
@@ -112,7 +111,6 @@ export interface Config {
   upstreamTimeoutMs: number;
   upstreamBudgetMs: number;
   markupBp: number;
-  storeFeeBp: number;
   spotStarterMicro: number;
   spotRewardMicro: number;
   spotTokenTtlSec: number;

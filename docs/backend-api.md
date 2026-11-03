@@ -7,7 +7,7 @@ Das Backend speichert **keine Trainingsinhalte und keine Fotos** (Anfragen werde
 
 - Alle Beträge sind **Integer in Mikro-Euro (µ€)**: `1 € = 1_000_000`. Nie Float. Anzeige in der App: `4_200_000` → „4,20 €“ (kaufmännisch runden, nur zur Anzeige).
 - Felder heißen `…Micro`. Das Backend rechnet immer in Euro; Preise pro Modell in µ€ je 1 Mio. Token stehen in `GET /v1/config`.
-- Aufschlag (`markupBp`) und Store-Gebühr (`storeFeeBp`) in Basispunkten (800 = 8 %). Alles ist serverseitig konfigurierbar; die App liest Werte aus `/v1/config` und rechnet nichts selbst nach.
+- Aufschlag (`markupBp`) in Basispunkten (6900 = 69 %), ein Wert für alle Modelle; die Paket-Gutschrift ist immer 1:1 zum Preis. Alles ist serverseitig konfigurierbar; die App liest Werte aus `/v1/config` und rechnet nichts selbst nach.
 
 ## Signatur-Schema (alle Endpunkte außer `/v1/health` und `/v1/config`)
 
@@ -115,7 +115,7 @@ Jeder Fehler: passender HTTP-Status und
 ```json
 {
   "mode": "production",
-  "currency": "EUR", "unit": "micro-euro", "markupBp": 800, "storeFeeBp": 1500, "maxTokensCap": 8192,
+  "currency": "EUR", "unit": "micro-euro", "markupBp": 6900, "maxTokensCap": 8192,
   "models": { "gemini-3.6-flash": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 }, "claude-sonnet-5-5": { … }, "@cf/meta/llama-3.1-8b-instruct": { … } },
   "defaultTier": "standard",
   "tiers": {
@@ -225,7 +225,7 @@ Anfrage samt Ausweichen 140 s. Anfragen mit Bildern bekommen `cf-aig-collect-log
 ### `POST /v1/purchases/verify`
 Body `{ "platform": "google"|"apple", "productId": "overfit.fuel.10", "purchaseToken": "<Play purchaseToken | Apple signierte Transaktion (JWS)>" }`.
 → `{ "productId": "…", "creditedMicro": 7870370, "alreadyCredited": false, "balanceMicro": 7870370 }`.
-Gutschrift = `Preis × (1 − storeFeeBp) / (1 + markupBp)` (abgerundet), **idempotent pro Kauf** (`alreadyCredited: true` bei Wiederholung, auch von anderen Konten – ein Kauf zählt nur einmal). Die App ruft das nach jedem erfolgreichen Store-Kauf auf (und beim Start für noch nicht bestätigte Käufe) und schließt die Transaktion erst danach ab. Ohne Store-Zugangsdaten im Backend: `503 purchases_unavailable`.
+Gutschrift = Preis (1:1, `creditMicro` = `priceMicro`), **idempotent pro Kauf** (`alreadyCredited: true` bei Wiederholung, auch von anderen Konten – ein Kauf zählt nur einmal). Die App ruft das nach jedem erfolgreichen Store-Kauf auf (und beim Start für noch nicht bestätigte Käufe) und schließt die Transaktion erst danach ab. Ohne Store-Zugangsdaten im Backend: `503 purchases_unavailable`.
 
 ## Web-Kauf und Guthaben-Codes (Session Z, Testmodus)
 Siehe docs/monetization.md. Anbieter: Paddle (Merchant of Record), hinter der Schnittstelle `PaymentProvider`
@@ -234,7 +234,7 @@ Siehe docs/monetization.md. Anbieter: Paddle (Merchant of Record), hinter der Sc
 
 `/v1/config` → `webPurchase`: `{ enabled, testMode, provider, channels: ["sideload"], pageUrl, packages: [{ id, priceMicro, creditMicro }] }`.
 `enabled` = Paddle eingerichtet; `testMode` = Sandbox; `channels` = wo die App „Im Web aufladen“ zeigt (`sideload` = APK von GitHub,
-`store` = Play Store / App Store; Standard nur `sideload`, Repo-Variable `WEB_PURCHASE_CHANNELS`). Pakete: `web.5`, `web.10`, `web.20`.
+`store` = Play Store / App Store; Standard nur `sideload`, Repo-Variable `WEB_PURCHASE_CHANNELS`). Pakete: `web.10`, `web.20`, `web.50`.
 
 ### `POST /v1/purchase/web-link` (signiert; Alias `/v1/purchases/web-link`)
 Body `{ "locale": "de" }` → `{ "url": "https://bigfire3.github.io/overfit/guthaben/#t=<token>&lang=de", "expiresAt": …, "ttlSec": 900 }`.

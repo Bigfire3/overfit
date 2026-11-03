@@ -24,7 +24,7 @@ export async function handleVerifyPurchase(env: Env, cfg: Config, device: Device
   const existing = await env.DB.prepare('SELECT account_id, credited_micro FROM purchases WHERE platform = ? AND order_id = ?')
     .bind(platform, verified.orderId)
     .first<{ account_id: string; credited_micro: number }>();
-  const credited = packageCreditMicro(pkg.priceMicro, cfg.storeFeeBp, cfg.markupBp);
+  const credited = packageCreditMicro(pkg.priceMicro);
   if (existing) {
     // Idempotent: derselbe Kauf wird nie zweimal gutgeschrieben (auch nicht für ein anderes Konto).
     return {

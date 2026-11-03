@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>overfit – Preise</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="stylesheet" href="../style.css">
+<style>
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 15px; }
+td { padding: 8px 0; border-top: 1px solid var(--line); }
+td:last-child { text-align: right; }
+.en { display: none; }
+html[lang="en"] .de { display: none; }
+html[lang="en"] .en { display: block; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">overfit</div>
+
+  <div class="de">
+    <h1>Wie setzen sich die Preise zusammen?</h1>
+    <p class="sub">Ohne Werbetext: wofür dein Geld draufgeht.</p>
+    <p><b>Guthaben bleibt 1:1.</b> 10&nbsp;€ bezahlt sind 10&nbsp;€ Guthaben, im Web wie im App Store oder Play Store. Verbraucht wird es zum Listenpreis des KI-Anbieters für das gewählte Modell <b>plus 69&nbsp;% Aufschlag</b>. Unter jeder Antwort steht der echte Preis.</p>
+    <p>Der Aufschlag deckt, was zwischen deinem Kaufpreis und der KI-Rechnung liegt. Beispiel, 10&nbsp;€ im Web (Paddle), wenn das Guthaben ganz verbraucht wird:</p>
+    <table>
+      <tr><td>Du zahlst</td><td>10,00 €</td></tr>
+      <tr><td>Umsatzsteuer (19 % in Deutschland, andere EU-Länder weichen ab)</td><td>− 1,60 €</td></tr>
+      <tr><td>Zahlungsgebühr Paddle (5 % + 0,50 €)</td><td>− 1,00 €</td></tr>
+      <tr><td>Bleibt bei uns</td><td>7,40 €</td></tr>
+      <tr><td>Rechnung der KI-Anbieter für 10 € Guthaben (10 € ÷ 1,69)</td><td>− 5,92 €</td></tr>
+      <tr><td>Startguthaben und Einladungs-Gutschriften (angesetzt mit 10 % von 7,40 €)</td><td>− 0,74 €</td></tr>
+      <tr><td>Gewinn, auch für den Betrieb (Server, Entwicklung)</td><td>0,75 € (≈ 10 %)</td></tr>
+    </table>
+    <p class="dim small">Im Store ist es ähnlich: Apple und Google nehmen 15&nbsp;% vom Preis ohne Umsatzsteuer, bei 10&nbsp;€ bleiben 7,14&nbsp;€, am Ende rund 7&nbsp;% Gewinn. Der Aufschlag ist für den ungünstigsten Fall gerechnet, damit kein Kauf draufzahlt. Die vollständige Rechnung steht im Repository unter docs/monetization.md.</p>
+    <p class="dim small"><a href="?lang=en">English</a></p>
+  </div>
+
+  <div class="en">
+    <h1>How are the prices made up?</h1>
+    <p class="sub">No marketing: where your money goes.</p>
+    <p><b>Credit stays 1:1.</b> Pay €10, get €10 of credit, on the web as well as in the App Store or Play Store. It is used up at the AI provider's list price for the model you choose <b>plus a 69 % markup</b>. The real price is shown under every answer.</p>
+    <p>The markup covers what sits between your payment and the AI bill. Example, €10 on the web (Paddle), if the credit is used up completely:</p>
+    <table>
+      <tr><td>You pay</td><td>€10.00</td></tr>
+      <tr><td>VAT (19 % in Germany, other EU countries differ)</td><td>− €1.60</td></tr>
+      <tr><td>Paddle payment fee (5 % + €0.50)</td><td>− €1.00</td></tr>
+      <tr><td>Left with us</td><td>€7.40</td></tr>
+      <tr><td>AI providers' bill for €10 of credit (€10 ÷ 1.69)</td><td>− €5.92</td></tr>
+      <tr><td>Starter credit and invitation rewards (assumed at 10 % of €7.40)</td><td>− €0.74</td></tr>
+      <tr><td>Profit, also for running costs (servers, development)</td><td>€0.75 (≈ 10 %)</td></tr>
+    </table>
+    <p class="dim small">In the stores it is similar: Apple and Google take 15 % of the price without VAT, so €7.14 is left of €10 and about 7 % ends up as profit. The markup is sized for the worst case so that no purchase loses money. The full calculation is in the repository at docs/monetization.md.</p>
+    <p class="dim small"><a href="?lang=de">Deutsch</a></p>
+  </div>
+</main>
+<script>
+(function () {
+  var p = new URLSearchParams(location.search).get('lang');
+  var de = p ? p === 'de' : (navigator.language || '').toLowerCase().indexOf('de') === 0;
+  document.documentElement.lang = de ? 'de' : 'en';
+})();
+</script>
+</body>
+</html>
