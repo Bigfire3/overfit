@@ -4,6 +4,7 @@ import app.overfit.domain.Language
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FuelBasicsTest {
     @Test
@@ -73,7 +74,7 @@ class FuelBasicsTest {
         var last = 0L
         for (t in 0..plan.totalMs step 16) {
             val v = plan.valueAt(t)
-            assert(v >= last && v <= 1_000_000) { "not monotonic at $t" }
+            assertTrue(v >= last && v <= 1_000_000, "not monotonic at $t")
             last = v
         }
     }
