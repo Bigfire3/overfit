@@ -143,7 +143,7 @@ object ShareFormat {
             if (ref == null && id == null && ename == null) return@mapNotNull null
             val sets = (o["sets"] as? JsonArray).orEmpty().take(MAX_SETS).mapNotNull { s ->
                 val so = s as? JsonObject ?: return@mapNotNull null
-                SharedSet(so.num("kg"), so.num("reps")?.roundToInt()?.coerceIn(0, 10_000), so.num("sec")?.roundToInt()?.coerceIn(0, 86_400))
+                SharedSet(so.num("kg")?.coerceAtLeast(0.0), so.num("reps")?.roundToInt()?.coerceIn(0, 10_000), so.num("sec")?.roundToInt()?.coerceIn(0, 86_400))
             }
             SharedExercise(id, ename, ref, sets, o.num("restSec")?.roundToInt()?.coerceIn(0, 3600), o.str("note")?.takeIf { it.isNotBlank() })
         }

@@ -108,14 +108,14 @@ class CoachParserTest {
     }
 
     @Test
-    fun weightAsCommaStringAndNegative() {
+    fun weightAsCommaString_negativeIsClampedToZero() {
         val r = ok(
             """{"summary":"s","next_session":{"exercises":[{"exercise_id":"a","sets":[
             {"weight_kg":"82,5","reps":8},{"weight_kg":-20,"reps":10}]}]}}""",
         )
         val sets = assertNotNull(r.nextSession).exercises.single().sets
         assertEquals(82.5, sets[0].weightKg)
-        assertEquals(-20.0, sets[1].weightKg)
+        assertEquals(0.0, sets[1].weightKg)
     }
 
     @Test
