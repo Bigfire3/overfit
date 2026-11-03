@@ -77,6 +77,20 @@ class CoachPromptBuilderTest {
     }
 
     @Test
+    fun saunaIsExplainedInStaticSystemAndMarkedPerWorkout() {
+        val sauna = current.copy(sauna = true)
+        val p = CoachPromptBuilder.build(ctx().copy(current = sauna, sameTemplate = listOf(earlier.copy(sauna = true))))
+        // The explanation is always there (static prefix stays byte-identical for caching).
+        assertTrue(p.staticSystem.contains(CoachPromptBuilder.SAUNA_NOTE))
+        assertEquals(CoachPromptBuilder.build(ctx()).staticSystem, p.staticSystem)
+        val header = p.user.lines().first { it.startsWith("\"Push\" 2026-10-15") }
+        assertTrue(header.endsWith("feeling 3/5, sauna: yes"), header)
+        assertTrue(p.user.lines().first { it.startsWith("\"Push\" 2026-10-08") }.endsWith("sauna: yes"))
+        // Without sauna nothing is added.
+        assertFalse(CoachPromptBuilder.build(ctx()).user.contains("sauna"))
+    }
+
+    @Test
     fun staticSystemIsStableAcrossProfileChanges() {
         val a = CoachPromptBuilder.build(ctx(profile = "Name: Max\nDate: 2026-11-03"))
         val b = CoachPromptBuilder.build(ctx(profile = "Name: Eva\nDate: 2026-12-24"))

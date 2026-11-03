@@ -159,6 +159,8 @@ data class WorkoutSessionEntity(
     val restEndsAt: Long?,
     val restAfterSetId: String?,
     val updatedAt: Long,
+    /** "Sauna" checked after the workout (v8). Shown in the calendar and given to the AI. */
+    @ColumnInfo(defaultValue = "0") val sauna: Boolean = false,
 )
 
 @Entity(
@@ -276,6 +278,7 @@ data class HistoryRow(
     /** Sum of kg × reps over completed sets with positive weight. */
     val volumeKg: Double,
     val photoCount: Int,
+    val sauna: Boolean = false,
 )
 
 /** Photo with the workout it belongs to (photo diary). */

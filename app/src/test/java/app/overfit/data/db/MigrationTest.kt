@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import java.io.File
 
 /**
@@ -244,6 +245,46 @@ class MigrationTest {
             val fresh = dao.messages("c1").first { it.id == "m2" }
             assertEquals("claude-sonnet-5-5", fresh.servedModel)
             assertEquals("gemini-3.6-flash", fresh.fallbackFrom)
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
+     * v7 → v8: `workout_session.sauna` (NOT NULL, default 0). Existing workouts keep everything and read as
+     * "no sauna"; the flag can then be set and shows up in history and records.
+     */
+    @Test
+    fun migration7to8KeepsWorkoutsAndAddsSaunaDefaultFalse() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v7 = helper.createDatabase(7)
+        v7.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1000, 5000, 'gut', 4, NULL, 'NONE', NULL, NULL, NULL, 5000)",
+        )
+        v7.close()
+        helper.runMigrationsAndValidate(8, OverfitDatabase.MIGRATIONS.toList()).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val dao = db.workoutDao()
+            val old = dao.get("w1")!!.session
+            assertEquals("gut", old.note)
+            assertEquals(4, old.feeling)
+            assertEquals(false, old.sauna)
+            assertEquals(false, dao.observeHistory().first().single().sauna)
+            dao.updateSauna("w1", true, 6000)
+            assertEquals(true, dao.get("w1")!!.session.sauna)
+            assertEquals(true, dao.observeHistory().first().single().sauna)
         } finally {
             db.close()
         }

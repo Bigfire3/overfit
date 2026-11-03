@@ -44,6 +44,12 @@ class ChatDocsTest {
     }
 
     @Test
+    fun saunaIsSentOnlyWhenChecked() {
+        assertEquals(true, ChatDocs.workout(record("w3", 5).copy(sauna = true)).data["sauna"]!!.jsonPrimitive.content.toBoolean())
+        assertEquals(null, ChatDocs.workout(record("w4", 5)).data["sauna"]) // missing = no sauna (backend reads false)
+    }
+
+    @Test
     fun runningWorkoutHasEndedAtNull() {
         val doc = ChatDocs.workout(record("w2", 5, ended = false))
         assertEquals(JsonNull, doc.data["endedAt"])

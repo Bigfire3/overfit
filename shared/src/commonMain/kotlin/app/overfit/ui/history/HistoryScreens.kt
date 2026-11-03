@@ -40,6 +40,7 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.HeaderDeleteButton
 import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.CheckRow
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
@@ -145,6 +146,12 @@ fun HistoryDetailScreen(
         Spacer(Modifier.height(Space.l))
         SummaryRows(d.summary, unit, language, t)
         d.finished.feeling?.let { ListRow(h.feeling, "$it / 5") }
+        // Can be changed afterwards (forgotten in the finish flow).
+        var sauna by remember(workoutId) { mutableStateOf(d.finished.sauna) }
+        CheckRow(h.sauna, sauna) {
+            sauna = it
+            appScope.launch { workouts.setSauna(workoutId, it) }
+        }
         d.finished.note?.let {
             SectionTitle(h.note)
             Text(it)

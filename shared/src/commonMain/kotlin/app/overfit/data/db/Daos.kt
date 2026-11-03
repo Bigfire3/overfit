@@ -183,7 +183,8 @@ interface WorkoutDao {
                 WHERE se.sessionId = ws.id AND s.completed = 1) AS completedSets,
              (SELECT COALESCE(SUM(s.weightKg * s.reps), 0.0) FROM set_entry s JOIN session_exercise se ON se.id = s.sessionExerciseId
                 WHERE se.sessionId = ws.id AND s.completed = 1 AND s.weightKg > 0 AND s.reps > 0) AS volumeKg,
-             (SELECT COUNT(*) FROM workout_photo p WHERE p.sessionId = ws.id) AS photoCount
+             (SELECT COUNT(*) FROM workout_photo p WHERE p.sessionId = ws.id) AS photoCount,
+             ws.sauna AS sauna
            FROM workout_session ws WHERE ws.status = 'FINISHED' ORDER BY ws.startedAt DESC""",
     )
     fun observeHistory(): Flow<List<HistoryRow>>
@@ -201,6 +202,9 @@ interface WorkoutDao {
 
     @Query("UPDATE workout_session SET note = :note, feeling = :feeling, updatedAt = :now WHERE id = :id")
     suspend fun updateDetails(id: String, note: String?, feeling: Int?, now: Long)
+
+    @Query("UPDATE workout_session SET sauna = :sauna, updatedAt = :now WHERE id = :id")
+    suspend fun updateSauna(id: String, sauna: Boolean, now: Long)
 
     @Query("UPDATE workout_session SET name = :name, updatedAt = :now WHERE id = :id")
     suspend fun rename(id: String, name: String, now: Long)

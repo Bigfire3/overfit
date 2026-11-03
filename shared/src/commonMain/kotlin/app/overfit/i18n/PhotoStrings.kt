@@ -21,7 +21,10 @@ data class PhotoStrings(
     val statWorkouts: (Int) -> String,
     val statPhotos: (Int) -> String,
     val statStreak: (weeks: Int) -> String,
-    val dayDescription: (day: Int, photos: Int, workout: Boolean) -> String,
+    val dayDescription: (day: Int, photos: Int, workout: Boolean, sauna: Boolean) -> String,
+    /** Legend under the stats, only shown once a sauna day exists. */
+    val legendWorkout: String,
+    val legendSauna: String,
     val photoCount: (Int) -> String,
     val sharePhoto: String,
     val viewerDuration: String,
@@ -78,7 +81,11 @@ val PhotoGerman = PhotoStrings(
     statWorkouts = { if (it == 1) "1 Training" else "$it Trainings" },
     statPhotos = { if (it == 1) "1 Foto" else "$it Fotos" },
     statStreak = { if (it == 1) "1 Woche in Folge" else "$it Wochen in Folge" },
-    dayDescription = { day, photos, workout -> "Tag $day${if (photos > 0) ", $photos Foto${if (photos == 1) "" else "s"}" else if (workout) ", Training" else ""}" },
+    dayDescription = { day, photos, workout, sauna ->
+        "Tag $day${if (photos > 0) ", $photos Foto${if (photos == 1) "" else "s"}" else if (workout) ", Training" else ""}${if (sauna) ", Sauna" else ""}"
+    },
+    legendWorkout = "Training",
+    legendSauna = "Sauna",
     photoCount = { it.toString() },
     sharePhoto = "Foto teilen",
     viewerDuration = "Dauer",
@@ -130,7 +137,11 @@ val PhotoEnglish = PhotoStrings(
     statWorkouts = { if (it == 1) "1 workout" else "$it workouts" },
     statPhotos = { if (it == 1) "1 photo" else "$it photos" },
     statStreak = { if (it == 1) "1 week in a row" else "$it weeks in a row" },
-    dayDescription = { day, photos, workout -> "$day${if (photos > 0) ", $photos photo${if (photos == 1) "" else "s"}" else if (workout) ", workout" else ""}" },
+    dayDescription = { day, photos, workout, sauna ->
+        "$day${if (photos > 0) ", $photos photo${if (photos == 1) "" else "s"}" else if (workout) ", workout" else ""}${if (sauna) ", sauna" else ""}"
+    },
+    legendWorkout = "Workout",
+    legendSauna = "Sauna",
     photoCount = { it.toString() },
     sharePhoto = "Share photo",
     viewerDuration = "Duration",

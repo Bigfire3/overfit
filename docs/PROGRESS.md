@@ -927,3 +927,15 @@ Offen / Hinweise:
 3. „Einladung einlösen“ → Einlösen: schwarz, zwei Pulse, Zahl zählt 0,00 → 1,00 €, darunter „Einladung von Fabian“, kräftiger Puls
 4. Guthaben → Buchungen: Eintrag „Einladungsbonus“; beim Einladenden „Einladungsbonus (Freund eingeladen)“ nach der ersten Auswertung des Freundes
 5. Ein alter Link `overfit://spot#…` (aus der Zwischenablage eingefügt) funktioniert weiter; nirgends steht mehr „Spot“
+
+## Session AK – Sauna-Häkchen nach dem Training (3.11.)
+- Erledigt: Häkchen „Sauna“ im Abschluss-Screen (Standard aus) und nachträglich in der Trainingsdetail-Ansicht; DB v8 mit Migration und Test; Kalender zeigt Sauna-Tage mit hohlem Ring (Legende, sobald es einen gibt); Coach-Auswertung, KI-Chat-Kontext und KI-Chat-Sync (Backend `list_workouts`) bekommen die Sauna; Backup führt das Feld mit (alte Backups = keine Sauna). Details in docs/DECISIONS.md.
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Sauna)
+1. Training beenden → im Abschluss-Screen unter „Gefühl“ steht „Sauna“ mit leerem Kästchen; antippen → schwarz gefülltes Kästchen mit Haken → „Speichern“
+2. Tab „Fotos“: Am Tag des Trainings unter dem Punkt ein hohler Ring, oben „● Training ○ Sauna“ als Legende; an einem Tag mit Foto sitzt der Ring neben dem kleinen Punkt oben links
+3. Verlauf → das Training öffnen → „Sauna“ ist angehakt; abhaken → zurück zum Kalender: der Ring ist weg (und die Legende, falls es der einzige Sauna-Tag war)
+4. Coach-Auswertung für ein Training mit Sauna starten (oder KI-Chat fragen „Wann war ich zuletzt in der Sauna?“) → der Coach kennt die Sauna
+5. „Kontext kopieren“ (Coach-Tab bzw. KI-Chat-Einstellungen) → in einen Editor einfügen: Zeile des Trainings endet mit „· danach Sauna“
+6. Backup exportieren und wieder einspielen → Sauna-Häkchen bleiben erhalten

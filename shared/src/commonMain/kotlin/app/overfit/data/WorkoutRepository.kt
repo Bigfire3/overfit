@@ -53,6 +53,7 @@ class WorkoutRepository(
             note = row.session.note,
             feeling = row.session.feeling,
             photos = photosOf(id),
+            sauna = row.session.sauna,
         )
     }
 
@@ -68,6 +69,12 @@ class WorkoutRepository(
     /** Note (blank = none) and feeling 1–5 (null = none) after finishing. */
     suspend fun updateDetails(id: String, note: String?, feeling: Int?) {
         dao.updateDetails(id, note?.trim()?.ifEmpty { null }, feeling?.coerceIn(1, 5), clock())
+        onChanged?.invoke(id, true)
+    }
+
+    /** "Sauna after the workout" (finish flow and history detail). */
+    suspend fun setSauna(id: String, sauna: Boolean) {
+        dao.updateSauna(id, sauna, clock())
         onChanged?.invoke(id, true)
     }
 
@@ -168,6 +175,7 @@ class WorkoutRepository(
                 endedAt = null,
                 note = workout.note,
                 feeling = existing?.feeling,
+                sauna = existing?.sauna ?: false,
                 photoPath = existing?.photoPath,
                 restStartedAt = workout.rest?.startedAt,
                 restEndsAt = workout.rest?.endsAt,
@@ -236,6 +244,7 @@ data class FinishedWorkout(
     val note: String?,
     val feeling: Int?,
     val photos: List<WorkoutPhoto>,
+    val sauna: Boolean = false,
 )
 
 /** Photo of a workout; [path] is the absolute file path for the image loader. */
@@ -252,13 +261,14 @@ data class DiaryPhoto(val photo: WorkoutPhoto, val workoutName: String)
 internal fun ExerciseSetRow.toLogged() = LoggedSet(exerciseId, SetValues(weightKg, reps, durationSec))
 
 /** A workout plus what the sync needs: [endedAt] is null while it runs. */
-data class WorkoutRecord(val workout: Workout, val endedAt: Long?, val feeling: Int?, val updatedAt: Long)
+data class WorkoutRecord(val workout: Workout, val endedAt: Long?, val feeling: Int?, val updatedAt: Long, val sauna: Boolean = false)
 
 private fun SessionWithExercises.toRecord() = WorkoutRecord(
     workout = toDomain(),
     endedAt = if (session.status == SessionStatus.FINISHED) session.endedAt else null,
     feeling = session.feeling,
     updatedAt = session.updatedAt,
+    sauna = session.sauna,
 )
 
 internal fun SessionWithExercises.toDomain(): Workout {
