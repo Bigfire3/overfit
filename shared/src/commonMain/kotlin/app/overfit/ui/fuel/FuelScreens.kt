@@ -14,6 +14,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.domain.Language
@@ -144,6 +145,12 @@ fun FuelScreen(
             }
         }
         Text(t.topUpNote, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.s))
+        val markupBp = (config as? Loaded.Ready<FuelConfig>)?.value?.markupBp ?: 0
+        if (markupBp > 0) {
+            val uriHandler = LocalUriHandler.current
+            Text(t.pricesNote(formatPercent(markupBp)), style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.xs))
+            ListRow(t.pricesHow, onClick = { uriHandler.openUri(PRICES_URL + if (language == Language.EN) "?lang=en" else "?lang=de") })
+        }
         WebCreditSection(service, (config as? Loaded.Ready<FuelConfig>)?.value, distribution, language, isDemo, onRedeemCode)
 
         SectionTitle(t.spot)
@@ -302,3 +309,9 @@ fun RecoveryScreen(session: FuelSession, onBack: () -> Unit, onRestored: () -> U
         }, tone = Tone.Default)
     }
 }
+
+/** Explains how the prices are made up (static page, same text as docs/monetization.md). */
+private const val PRICES_URL = "https://bigfire3.github.io/overfit/preise/"
+
+/** 6900 → "69", 750 → "7,5" in a locale-neutral way (the string is built per language by the caller's text). */
+private fun formatPercent(bp: Int): String = if (bp % 100 == 0) (bp / 100).toString() else (bp / 100.0).toString()

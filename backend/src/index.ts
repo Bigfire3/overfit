@@ -97,7 +97,6 @@ function publicConfig(env: Env, cfg: Config) {
     currency: 'EUR',
     unit: 'micro-euro',
     markupBp: cfg.markupBp,
-    storeFeeBp: cfg.storeFeeBp,
     models: Object.fromEntries(Object.entries(cfg.prices).map(([m, p]) => [m, p])),
     maxTokensCap: cfg.maxTokensCap,
     /** KI-Stufen: die App schickt den Namen als `model`; Preise in µ€/MTok ohne Aufschlag. */
@@ -123,7 +122,7 @@ function publicConfig(env: Env, cfg: Config) {
     packages: Object.entries(cfg.packages).map(([productId, p]) => ({
       productId,
       priceMicro: p.priceMicro,
-      creditMicro: packageCreditMicro(p.priceMicro, cfg.storeFeeBp, cfg.markupBp),
+      creditMicro: packageCreditMicro(p.priceMicro),
     })),
     /** Guthaben im Web kaufen (Merchant of Record); `testMode` = Sandbox, keine echte Zahlung. */
     webPurchase: webPurchaseConfig(env, cfg),

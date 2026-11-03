@@ -32,7 +32,7 @@ jobs:
           BACKEND_URL: ${{ vars.OVERFIT_BACKEND_URL }}
         run: |
           mkdir -p _site/fonts
-          cp -r web/index.html web/style.css web/t web/guthaben web/favicon.svg web/favicon.ico web/apple-touch-icon.png web/icon-192.png web/icon-512.png web/.nojekyll _site/
+          cp -r web/index.html web/style.css web/t web/guthaben web/preise web/favicon.svg web/favicon.ico web/apple-touch-icon.png web/icon-192.png web/icon-512.png web/.nojekyll _site/
           URL=$(printf '%s' "$BACKEND_URL" | tr -d '[:space:]' | sed 's#/*$##')
           if ! printf '%s' "$URL" | grep -Eq '^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$'; then URL=""; fi
           printf "window.OVERFIT_API = '%s';\n" "$URL" > _site/guthaben/config.js

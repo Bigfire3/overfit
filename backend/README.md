@@ -174,8 +174,7 @@ den gleichen OAuth-Ablauf.
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
-| `MARKUP_BP` | 800 | Aufschlag auf API-Preise (Basispunkte, 800 = 8 %) |
-| `STORE_FEE_BP` | 1500 | Store-Gebühr für die Paket-Gutschrift |
+| `MARKUP_BP` | 6900 | Einziger Aufschlag auf alle Modellpreise (Basispunkte, 6900 = 69 %); Herleitung in docs/monetization.md. Die Paket-Gutschrift ist immer 1:1 zum Preis |
 | `SPOT_STARTER_MICRO` / `SPOT_REWARD_MICRO` | 1 000 000 | Startguthaben (Eingeladener) / Belohnung (Einladender) |
 | `SPOT_TOKEN_TTL_SEC` | 45 | Gültigkeit des QR-Tokens |
 | `SPOT_MONTHLY_LIMIT_PER_INVITER` | 10 | Spots pro Einladendem und Monat |
@@ -188,7 +187,7 @@ den gleichen OAuth-Ablauf.
 | `AI_GATEWAY_ID` | leer (direkt) | Name des Cloudflare AI Gateways; setzt der Deploy-Workflow (`overfit` bzw. `overfit-test`) |
 | `UPSTREAM_TIMEOUT_MS` / `UPSTREAM_BUDGET_MS` | 100 000 / 140 000 | Zeitlimit je Anbieter-Versuch / für Anfrage samt Ausweichen |
 | `PACKAGES` | 5 € / 10 € | JSON: `{"<store-produkt-id>":{"priceMicro":…}}` |
-| `WEB_PACKAGES` | 5 € / 10 € / 20 € | Pakete der Kaufseite, JSON `{"web.5":{"priceMicro":5000000}}`; Guthaben = Preis (1:1) |
+| `WEB_PACKAGES` | 10 € / 20 € / 50 € | Pakete der Kaufseite, JSON `{"web.10":{"priceMicro":10000000}}`; Guthaben = Preis (1:1) |
 | `PADDLE_ENV` | Sandbox | `live` = echte Zahlungen, nur im Produktionsbetrieb (Repo-Variable `PADDLE_ENV`); Testbetrieb ist immer Sandbox |
 | `WEB_PURCHASE_CHANNELS` | `sideload` | Wo die App „Im Web aufladen“ zeigt: `sideload` (APK), `store` (Play/App Store); Repo-Variable |
 | `WEB_PURCHASE` | an | `off` schaltet den Web-Kauf ab, auch mit Paddle-Secrets |

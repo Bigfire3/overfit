@@ -21,6 +21,12 @@ class CostEstimateTest {
     }
 
     @Test
+    fun currentMarkupOf69PercentIsIncluded() {
+        // Session AA: MARKUP_BP 6900. Gemini: 13 938 µ€ × 1.69 = 23 555.22 → 23 556 (≈ 2.4 ct per review)
+        assertEquals(23_556, CostEstimate.micro(gemini, 6_900, FuelTask.COACH))
+    }
+
+    @Test
     fun chatAndAutofillUseTheirOwnProfiles() {
         // chat Gemini: (6700 × 690 000 + 1500 × 3 450 000) / 1e6 = 9 798 → +8 % = 10 581.84 → 10 582
         assertEquals(10_582, CostEstimate.micro(gemini, 800, FuelTask.CHAT))

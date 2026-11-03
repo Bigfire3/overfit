@@ -39,7 +39,13 @@ describe('GET /v1/config: echte Modellnamen', () => {
     expect(r.body.tiers.standard.price.in).toBe(currentPrices()['gemini-3.6-flash'].in);
     expect(r.body.usageProfiles.coach.inputTokens).toBeGreaterThan(0);
     expect(r.body.usageProfiles.autofill.outputTokens).toBeGreaterThan(0);
-    expect(r.body.markupBp).toBe(800);
+    expect(r.body.markupBp).toBe(6900);
+    expect(r.body.storeFeeBp).toBeUndefined();
+    // Store-Pakete: Guthaben = Preis, in /v1/config sichtbar.
+    expect(r.body.packages.map((p: any) => [p.productId, p.priceMicro, p.creditMicro])).toEqual([
+      ['overfit.fuel.5', 5_000_000, 5_000_000],
+      ['overfit.fuel.10', 10_000_000, 10_000_000],
+    ]);
   });
 });
 
@@ -58,7 +64,7 @@ describe('Antwort nennt das tatsächlich antwortende Modell', () => {
       requestedModel: 'gemini-3.6-flash',
       requestedModelName: 'Gemini 3.6 Flash',
       requestedVendor: 'Google',
-      costMicro: costMicro({ input_tokens: 1000, output_tokens: 500 }, price, 800),
+      costMicro: costMicro({ input_tokens: 1000, output_tokens: 500 }, price, 6900),
     });
   });
 });
@@ -94,7 +100,7 @@ describe('GET /v1/admin/usage', () => {
     const fb = g('claude-sonnet-5-5', false, true);
     expect(fb).toMatchObject({ requests: 1, tier: 'standard' });
     // Ausweichung auf das teurere Modell: berechnet wird der Gemini-Preis, die Marge schrumpft (hier negativ)
-    expect(fb.chargedMicro).toBe(costMicro({ input_tokens: 1000, output_tokens: 500 }, prices['gemini-3.6-flash'], 800));
+    expect(fb.chargedMicro).toBe(costMicro({ input_tokens: 1000, output_tokens: 500 }, prices['gemini-3.6-flash'], 6900));
     expect(fb.marginMicro).toBe(fb.chargedMicro - costMicro({ input_tokens: 1000, output_tokens: 500 }, prices['claude-sonnet-5-5'], 0));
     expect(g('claude-sonnet-5-5', false, false).marginMicro).toBeGreaterThan(0);
     expect(r.body.totals.marginMicro).toBe(r.body.groups.reduce((a: number, x: any) => a + x.marginMicro, 0));

@@ -7,7 +7,9 @@ import type { Env } from '../src/types';
 
 const SECRET = 'pdl_ntfset_test_secret_0123456789';
 const PADDLE = { PADDLE_API_KEY: 'pdl_sdbx_apikey_test', PADDLE_WEBHOOK_SECRET: SECRET, PADDLE_CLIENT_TOKEN: 'test_client_token' };
-const env = (extra: Partial<Env> = {}) => baseEnv({ ...PADDLE, ...extra });
+// Die Tests rechnen mit 5/10/20 €; die Standardpakete (10/20/50 €) prüft „/v1/config“ unten.
+const TEST_PACKAGES = JSON.stringify({ 'web.5': { priceMicro: 5_000_000 }, 'web.10': { priceMicro: 10_000_000 }, 'web.20': { priceMicro: 20_000_000 } });
+const env = (extra: Partial<Env> = {}) => baseEnv({ ...PADDLE, WEB_PACKAGES: TEST_PACKAGES, ...extra });
 const DB = (workerEnv as unknown as Env).DB;
 
 let paddle: ReturnType<typeof vi.fn<(url: string, init: RequestInit) => Promise<Response>>>;
@@ -230,7 +232,7 @@ describe('Webhook: Zahlung', () => {
     const cfg = (await rawFetch('/v1/config', prod)).body.webPurchase;
     expect(cfg.enabled).toBe(false);
     expect((await webhook(prod, completed('txn_1', null))).status).toBe(503);
-    const live = baseEnv({ ...PADDLE, DEV_MODE: 'false', PADDLE_ENV: 'live' });
+    const live = baseEnv({ ...PADDLE, WEB_PACKAGES: TEST_PACKAGES, DEV_MODE: 'false', PADDLE_ENV: 'live' });
     expect((await rawFetch('/v1/config', live)).body.webPurchase).toMatchObject({ enabled: true, testMode: false });
     await post(live, '/v1/web/checkout', { packageId: 'web.5', kind: 'code' });
     expect(paddle.mock.calls[0][0]).toBe('https://api.paddle.com/transactions');
@@ -294,8 +296,9 @@ describe('Webhook: Rückerstattung und Chargeback', () => {
     const c = await Client.create(e);
     const r = await paid(e, c);
     await c.call('POST', '/v1/purchases/verify', { platform: 'google', productId: 'overfit.fuel.5', purchaseToken: 'mock:s1' });
-    // Web-Guthaben schon verbraucht, Store-Guthaben (3,94 €) noch da → Erstattung über 5 € nimmt es mit, endet bei 0.
+    // Web-Guthaben schon verbraucht, Store-Guthaben (Rest 3,94 €) noch da → Erstattung über 5 € nimmt es mit, endet bei 0.
     await DB.prepare("UPDATE lots SET remaining_micro = 0 WHERE ref LIKE 'paddle:%'").run();
+    await DB.prepare("UPDATE lots SET remaining_micro = 3935185 WHERE ref NOT LIKE 'paddle:%' AND remaining_micro = 5000000").run();
     expect(await balance(c)).toBe(3_935_185);
     expect((await webhook(e, adjustment('adj_x', r.transactionId, '500'))).body).toMatchObject({ reversed: 3_935_185, incident: 'refund:shortfall' });
     expect(await balance(c)).toBe(0);
@@ -387,6 +390,13 @@ describe('/v1/config', () => {
     const cfg = (await rawFetch('/v1/config', env())).body.webPurchase;
     expect(cfg).toMatchObject({ enabled: true, testMode: true, provider: 'paddle', channels: ['sideload'], pageUrl: 'https://bigfire3.github.io/overfit/guthaben/' });
     expect(cfg.packages.map((p: any) => p.id)).toEqual(['web.5', 'web.10', 'web.20']);
+    // Standardpakete ohne Überschreibung: 10/20/50 €, Guthaben = Preis (docs/monetization.md „Rechnung“).
+    const std = (await rawFetch('/v1/config', baseEnv({ ...PADDLE }))).body.webPurchase.packages;
+    expect(std).toEqual([
+      { id: 'web.10', priceMicro: 10_000_000, creditMicro: 10_000_000 },
+      { id: 'web.20', priceMicro: 20_000_000, creditMicro: 20_000_000 },
+      { id: 'web.50', priceMicro: 50_000_000, creditMicro: 50_000_000 },
+    ]);
     expect((await rawFetch('/v1/config', env({ WEB_PURCHASE_CHANNELS: 'sideload,store' }))).body.webPurchase.channels).toEqual(['sideload', 'store']);
     expect((await rawFetch('/v1/config', env({ WEB_PURCHASE: 'off' }))).body.webPurchase.enabled).toBe(false);
     expect((await rawFetch('/v1/config', baseEnv())).body.webPurchase).toMatchObject({ enabled: false, provider: null });
