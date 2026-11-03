@@ -331,7 +331,7 @@ class QrCodeTest {
             assertTrue(!small[cx + 1, cy + 1] && small[cx + 2, cy + 2])
         }
         assertTrue(!small[7, 7] || true)
-        val big = QrCode.encode("x".repeat(800))
+        val big = QrCode.encode("x".repeat(1200))
         assertTrue(big.size > 100)
         assertTrue(!QrCode.fits("x".repeat(3000)))
         assertTrue(runCatching { QrCode.encode("x".repeat(3000)) }.isFailure)

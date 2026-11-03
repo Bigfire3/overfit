@@ -15,6 +15,23 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Teilen und Import verbessern, Beispiel-Workouts standardmäßig (Session Q, 3.11.)
+**Erledigt:**
+- Import: „Datei auswählen“ (System-Dateiauswähler); Android öffnet `.overfit`-Dateien aus Dateien/Downloads/WhatsApp (VIEW) und nimmt sie über „Teilen mit …“ an (SEND), danach dieselbe Vorschau. Backup-ZIP im Import → Hinweis.
+- Schalter heißt „Gewichte und Wiederholungen mitsenden“, mit Erklärung und Vorschau „Das wird geteilt“.
+- QR deutlich kleiner: Push 93→57, Pull 89→53, Legs 85→49 Module (ECC L, Base45/Alphanumeric, Binärform, Hash-IDs), runde Module, 200 dp. Generisches `QrView(text)`. Scanner liest alten Link und neues `OF1:`. Kurz-Code (`OFS:`) vorbereitet, Backend-Vertrag in docs/backend-api.md.
+- Push/Pull/Legs sind beim ersten Start da (und einmalig bei bestehenden Installationen), löschbar, ohne Wiederkehr.
+- QR-Generator-Fix: Maskenwahl wie ISO/ZXing (manche Symbole waren nicht lesbar).
+- Tests: Base45/Payload (commonTest), `QrSizeTest`, `QrCompareTest`, `QrZxingTest`, `IncomingShareTest` (Intent), `SamplesSeedTest`, `ShareFlowTest` (Erststart + Löschen), `ShareImportTest`.
+**Offen:** Kurz-Code braucht das deployte Backend; iOS ohne In-App-QR-Scanner (siehe DECISIONS „Zur Prüfung durch Fabian“).
+
+### Bitte auf dem Handy testen: Teilen und Import
+1. Frisch installiert (oder App-Daten löschen): Training-Tab zeigt Push, Pull, Legs. Pull öffnen → Bearbeiten → löschen (zweimal tippen); App komplett schließen und neu öffnen: Pull kommt nicht wieder. „+“ → Beispiel-Workouts hinzufügen bringt Pull zurück.
+2. Workout öffnen → Teilen: oben „Das wird geteilt“, QR ist kleiner und rund; mit dem Scanner in Overfit (zweites Handy: Training → „+“ → Importieren → QR-Code scannen) lesen und importieren.
+3. Verlauf → Training → Teilen: Schalter „Gewichte und Wiederholungen mitsenden“ an/aus, Erklärung und Vorschau wechseln mit.
+4. „Als Datei teilen“ → an dich per WhatsApp senden → Datei in WhatsApp antippen → „Öffnen mit Overfit“ (oder Teilen → Overfit) → Vorschau erscheint. Genauso aus Downloads.
+5. Importieren → „Datei auswählen“ → die .overfit-Datei wählen → Vorschau. Backup-ZIP wählen → Hinweis „Das ist ein Backup“.
+
 ## Foto-Tagebuch im Stil von BeReal „Memories“ (Session M, 3.11.)
 **Erledigt:** `ui/photos` umgebaut, keine Schemaänderung.
 - Monatsweises Kalender-Raster (7 Spalten, Wochenstart DE Montag / EN Sonntag), neuester Monat zuerst, Monatsname groß.

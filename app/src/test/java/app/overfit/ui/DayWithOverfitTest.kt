@@ -156,8 +156,7 @@ class DayWithOverfitTest {
         waitFor("Duo · bald") // Training tab
         assertTrue(store.state.value.onboardingDone)
 
-        // --- Samples: Push, Pull, Legs ------------------------------------------------------
-        click("Beispiel-Workouts hinzufügen")
+        // --- Samples: Push, Pull, Legs are there from the first start on --------------------
         waitFor("Legs"); waitFor("Pull"); waitFor("Push")
         compose.waitUntil(10_000) { templates().size == 3 }
         val push = templates().first { it.name == "Push" }
@@ -168,7 +167,9 @@ class DayWithOverfitTest {
             waitFor(name)
             compose.onAllNodes(hasText(name))[0].performScrollTo().performClick()
             waitFor("Starten") // the workout plan screen
+            waitFor("Teilen")
             click("Teilen")
+            waitFor("Das wird geteilt") // preview of what the recipient gets, above the compact QR code
             waitFor("Link kopieren")
             click("Link kopieren")
             waitFor("Link kopiert")

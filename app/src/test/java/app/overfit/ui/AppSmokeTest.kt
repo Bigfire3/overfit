@@ -50,7 +50,8 @@ class AppSmokeTest {
 
     private var keyIsValid = false
     private val secrets = InMemorySecretStore()
-    private val kv = InMemoryKeyValueStore()
+    // Tests that look at an empty app opt out of the first-start sample workouts (Push/Pull/Legs), as an existing install would.
+    private val kv = InMemoryKeyValueStore().apply { put(AppData.KEY_SAMPLES_SEEDED, "1") }
     private val store = AppStore(kv, secrets, DeviceDefaults(Language.DE, WeightUnit.KG))
     private val database = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext()).build()
     // Catalogue straight from the source tree (the working directory of :app tests is app/).

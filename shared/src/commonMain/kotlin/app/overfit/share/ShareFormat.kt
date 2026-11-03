@@ -170,6 +170,10 @@ object ShareFormat {
     fun parseInput(text: String): ShareParse {
         if (text.isBlank()) return ShareParse.Fail(ShareFailure.EMPTY)
         val candidates = buildList<() -> ShareParse> {
+            // App-internal QR content (and short codes, which need the backend and are resolved by the caller).
+            QR_REGEX.find(text)?.let { m ->
+                add { QrPayload.decode(m.value)?.let { ShareParse.Ok(it) } ?: ShareParse.Fail(ShareFailure.NOT_OVERFIT) }
+            }
             LINK_REGEX.find(text)?.let { m -> add { fromPayload(m.groupValues[1]) } }
             FENCE_REGEX.findAll(text).forEach { m -> add { fromJson(m.groupValues[1]) } }
             val first = text.indexOf('{')
@@ -188,6 +192,7 @@ object ShareFormat {
         return firstFail ?: ShareParse.Fail(ShareFailure.NOT_OVERFIT)
     }
 
+    private val QR_REGEX = Regex("""OF1:[0-9A-Z \$%*+\-./:]+""")
     private val LINK_REGEX = Regex("""(?:https?://[^\s#]*/t|overfit://t/?)#([A-Za-z0-9_\-+/=]+)""")
     private val FENCE_REGEX = Regex("""```[A-Za-z]*\s*\n?(.*?)```""", RegexOption.DOT_MATCHES_ALL)
 

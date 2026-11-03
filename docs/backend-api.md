@@ -303,3 +303,29 @@ Body `{ "grantId": "g_…" }` oder `{ "all": true }` → `{ "revoked": 1 }`. Der
 `list_exercises`, `get_exercise_progress`, `search_exercise_catalog`, `list_photos`, `get_photo` (Bildinhalt),
 `create_template` (→ Eingang + Import-Link), `add_note` (→ Eingang). Dazu drei Prompts (`evaluate_last_workout`,
 `assess_progress`, `plan_next_workout`). Limit 120 MCP-Aufrufe/min je Verbindung.
+
+## Kurz-Codes für Workouts und Duo (geplant, Session Q, noch nicht deployt)
+
+Ziel: der QR-Code trägt nur eine ID (`OFS:<ID>`, 8 Zeichen Base36-Großbuchstaben+Ziffern → Version 1, 21×21 Module) statt des
+ganzen Workouts (Push/Pull/Legs: 49–57 Module mit `OF1:`). Dasselbe Prinzip gilt später für die Duo-Session (ID einer Session)
+und wie bei Spotify Codes: das Muster enthält nur eine ID, der Inhalt liegt auf dem Server.
+
+App-Seite ist vorbereitet (`share/QrPayload.kt`): Schnittstelle `ShortCodeService { upload(training): String?; fetch(id): SharedTraining? }`,
+Standard `NoShortCodes`. `qrTextFor(training, service)` nutzt `OFS:<ID>`, wenn `upload` eine ID liefert, sonst den vollständigen
+`OF1:`-Inhalt (offline und ohne Backend funktioniert alles wie bisher). Der Scanner/Import erkennt beide Formate;
+`OFS:` ohne erreichbares Backend ergibt die Meldung „kein Overfit-Training“.
+
+### `POST /v1/share/short` (signiert)
+Body: das Teilen-Format v1 (`docs/share-format.md`, wie im Link, JSON). Antwort `{ "id": "7K3QX9M2", "expiresAt": 1765000000 }`.
+- ID: 8 Zeichen aus `0-9A-Z`, zufällig, nicht ratebar (kein Zähler). Nur Inhalt, keine Gerätekennung gespeichert.
+- Aufbewahrung 30 Tage (kurzlebig, Duo-Sessions 24 h), danach `404`. Maximal 200 KB (wie `MAX_JSON_BYTES`).
+- Rate-Limit: 30 pro Stunde und Gerät.
+
+### `GET /v1/share/short/<id>` (öffentlich, ohne Signatur)
+Antwort: das Teilen-Format v1 (JSON), `404` bei unbekannter/abgelaufener ID. Kein Konto nötig, damit auch ein neues Handy
+direkt importieren kann. Antwort mit `Cache-Control: no-store`.
+
+### Datenschutz
+Der Inhalt eines Kurz-Codes liegt (anders als der Link, dessen Fragment nie einen Server erreicht) kurz auf dem Server.
+Deshalb ist der Kurz-Code opt-in pro Teilen-Vorgang vorgesehen, sobald das Backend läuft; ohne Zustimmung bleibt es beim
+vollständigen `OF1:`-Code. Fotos, Notizen und Gefühl gehören wie beim Link nie dazu.
