@@ -19,9 +19,23 @@ import platform.darwin.NSObject
  */
 object IosNotificationTaps {
     private var delegate: Delegate? = null
+    private var handler: (() -> Unit)? = null
+    private var pending = false
 
-    fun install(onRestNotification: () -> Unit) {
-        delegate = Delegate(onRestNotification).also { UNUserNotificationCenter.currentNotificationCenter().delegate = it }
+    /** Called from Swift at app launch, so a tap that launched the app is not lost. */
+    fun install() {
+        if (delegate == null) delegate = Delegate { tapped() }.also { UNUserNotificationCenter.currentNotificationCenter().delegate = it }
+    }
+
+    fun onRestNotification(open: () -> Unit) {
+        install()
+        handler = open
+        if (pending) { pending = false; open() }
+    }
+
+    private fun tapped() {
+        val open = handler
+        if (open != null) open() else pending = true
     }
 
     private class Delegate(val onTap: () -> Unit) : NSObject(), UNUserNotificationCenterDelegateProtocol {

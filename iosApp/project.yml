@@ -49,6 +49,8 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension: [overfit]
               public.mime-type: [application/x-overfit]
+        # Files from Files/WhatsApp/Mail are copied into the app (no in-place editing needed).
+        LSSupportsOpeningDocumentsInPlace: false
         CFBundleDocumentTypes:
           - CFBundleTypeName: Overfit Training
             CFBundleTypeRole: Viewer

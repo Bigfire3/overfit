@@ -68,7 +68,7 @@ fun MainViewController(): UIViewController {
             deps.store.completeOnboarding()
         }
     }
-    IosNotificationTaps.install { deps.requestOpenWorkout() }
+    IosNotificationTaps.onRestNotification { deps.requestOpenWorkout() }
     IosAppearance.follow(deps.store.state.map { it.settings.theme })
     return ComposeUIViewController {
         // The window exists once Compose is shown; apply the theme's interface style to it.

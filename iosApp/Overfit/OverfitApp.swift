@@ -3,6 +3,11 @@ import Shared
 
 @main
 struct OverfitApp: App {
+    init() {
+        // Before launch finishes: a tap on the rest notification opens the running workout.
+        IosNotificationTaps.shared.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             // Compose draws edge to edge and handles safe areas and the keyboard itself.
