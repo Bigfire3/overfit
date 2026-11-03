@@ -1109,3 +1109,9 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - **„Animationen reduzieren“:** Nicht umgesetzt, weil es in Compose Multiplatform keinen einfachen gemeinsamen Zugriff auf die Systemeinstellung gibt (bräuchte `expect/actual`). Die Animation ist ruhig (harter Wechsel, 1,4 Hz) und nur in der Detailansicht; als Folgeaufgabe vermerkt.
 - **Netz:** Frames 2/3 werden einmalig vom Import-Skript (gepinnter Commit `aac5992`) geholt und eingecheckt; zur Laufzeit kein Netz, `OwnKeyPrivacyTest` unberührt.
 - **Dateigröße:** Alle SVGs (auch Frame 1) laufen im Import durch `shrink()`: Dezimalzahlen im Attribut `d` auf 1 Nachkommastelle gerundet (Grafik 512×512, Abweichung < 0,05 px, nicht sichtbar). Das ist eine Änderung im Sinne von CC BY-SA 4.0; der Hinweis in „Über Overfit“ (`aboutWorkoutGuide`) nennt sie. Vorher/nachher siehe PR.
+
+## Coach-Story statt Erklärtexte (3.11.)
+- Die Story zeigt vier Wege/Inhalte: Auswertung allgemein, eigener Schlüssel, Guthaben (inkl. Einladungsbonus), eigenes Abo (Prompts/Chat-Verbindungen). Das sind die real vorhandenen Wege im Code. Seite 4 führt zur Claude-Verbindung (Prompts bleiben auf der Seite).
+- Die Story ist eine eigene Route ohne Tab-Leiste (Vollbild). Das Erstes-Mal-Flag liegt im `AppStore` (KeyValueStore), nicht im Profil-State, damit Backup/Restore es nicht beeinflusst.
+- Auto-Weiter nur bis zur letzten Seite; die letzte Seite schließt nie von selbst. Tests schalten das Auto-Weiter per `coachStoryAutoAdvance = false` ab (virtuelle Testuhr würde sonst bei jedem Warten Seiten überspringen).
+- Die Zeile „Deine Daten gehen direkt an …“ ist von der Coach-Seite in Story Seite 2 gewandert; der KI-Zugang-Screen bleibt unverändert.

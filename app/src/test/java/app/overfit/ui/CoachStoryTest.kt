@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import kotlinx.coroutines.cancel
 import kotlinx.datetime.LocalDate
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -54,7 +55,11 @@ class CoachStoryTest {
     private val s = GermanCoachStory
 
     @After
-    fun tearDown() = database.close()
+    fun tearDown() {
+        // Stop the app's background work first, so no query hits the closed database.
+        data.scope.cancel()
+        database.close()
+    }
 
     private fun launch() {
         val deps = AppDependencies(
@@ -134,7 +139,7 @@ class CoachStoryTest {
         await(s.ownKey.title)
         compose.onNodeWithTag("story:action").performClick()
         awaitStoryGone()
-        await("API-Key einfügen")
+        await("Wie bekomme ich einen Key?")
     }
 
     @Test

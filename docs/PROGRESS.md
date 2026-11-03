@@ -927,3 +927,15 @@ Offen / Hinweise:
 3. „Einladung einlösen“ → Einlösen: schwarz, zwei Pulse, Zahl zählt 0,00 → 1,00 €, darunter „Einladung von Fabian“, kräftiger Puls
 4. Guthaben → Buchungen: Eintrag „Einladungsbonus“; beim Einladenden „Einladungsbonus (Freund eingeladen)“ nach der ersten Auswertung des Freundes
 5. Ein alter Link `overfit://spot#…` (aus der Zwischenablage eingefügt) funktioniert weiter; nirgends steht mehr „Spot“
+
+## Session Coach-Story (3.11.)
+- Erledigt: Tipp auf den Titel „Coach“ (mit Info-Icon) öffnet eine Vollbild-Story mit 4 Seiten (Fortschrittsbalken als Haarlinien, Tipp rechts/links = weiter/zurück, Wischen nach unten oder X = schließen, Auto-Weiter nach 6 s). Seite 1: was die KI auswertet; Seiten 2–4: eigener Schlüssel, Guthaben (mit Einladungsbonus), eigenes Abo (Claude/ChatGPT/Gemini) mit Knopf zur passenden Stelle. Beim ersten Öffnen des Coach-Tabs geht sie einmal von selbst auf (Flag `overfit.coachStorySeen`).
+- Coach-Seite entschlackt: Erklär- und Hinweistexte (KI-Zugang ohne Zugang, Datenschutz-Zeile, Prompts-Intro, Verbindungs-Hinweis, Chat-Intro, Hinweiszeilen unter „Letzte Einheit auswerten“/„Fortschritt bewerten“) sind raus; der Inhalt steht in der Story bzw. im KI-Zugang (Profil/Einstellungen).
+- Tests: neue `CoachStoryTest`; bestehende Coach-Tests setzen das Erstes-Mal-Flag vorab.
+
+### Bitte auf dem Handy testen (Coach-Story)
+1. Neue APK, Tab „Coach“ zum ersten Mal öffnen → Story geht von selbst auf; X oder nach unten wischen schließt
+2. Tab wechseln und zurück → keine Story mehr; Tipp auf „Coach ⓘ“ öffnet sie wieder
+3. Rechts tippen = weiter, links = zurück, nach ca. 6 s geht sie von selbst weiter; auf Seite 4 rechts tippen schließt
+4. Knöpfe auf Seite 2–4: „Schlüssel einrichten“, „Zum Guthaben“, „Claude verbinden“ führen zur passenden Stelle
+5. Coach-Seite wirkt ruhiger; Auswerten, Chat, Prompts und Verbindungen funktionieren wie vorher
