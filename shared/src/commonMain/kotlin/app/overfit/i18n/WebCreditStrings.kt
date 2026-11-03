@@ -34,7 +34,7 @@ class WebCreditStrings(
 val GermanWebCredit = WebCreditStrings(
     webTopUp = "Im Web aufladen",
     webChannel = "Im Web",
-    webPackage = { credit, price -> "$credit Guthaben · $price" },
+    webPackage = { credit, price -> "$credit Guthaben · Preis: $price" },
     webTopUpNote = "Öffnet die Kaufseite im Browser. 10 € zahlen = 10 € Guthaben, ohne Store-Aufpreis. Kein Konto nötig.",
     webTopUpTestNote = "Testmodus – keine echte Zahlung, nur Testkarten.",
     webTopUpOpening = "Kaufseite wird geöffnet …",
@@ -57,7 +57,7 @@ val GermanWebCredit = WebCreditStrings(
 val EnglishWebCredit = WebCreditStrings(
     webTopUp = "Top up on the web",
     webChannel = "On the web",
-    webPackage = { credit, price -> "$credit credit · $price" },
+    webPackage = { credit, price -> "$credit credit · price: $price" },
     webTopUpNote = "Opens the purchase page in your browser. Pay €10 = €10 of credit, no store surcharge. No account needed.",
     webTopUpTestNote = "Test mode – no real payment, test cards only.",
     webTopUpOpening = "Opening the purchase page …",

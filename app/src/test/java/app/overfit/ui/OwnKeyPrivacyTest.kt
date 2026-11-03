@@ -85,7 +85,7 @@ class OwnKeyPrivacyTest {
         requests += "${req.url.host} ${req.method.value} ${req.url.encodedPath}"
         val body = if (req.url.host == backendHost) {
             when (req.url.encodedPath) {
-                "/v1/config" -> """{"currency":"EUR","unit":"micro-euro","markupBp":800,"storeFeeBp":1500,"models":{},"maxTokensCap":8192,"packages":[],"spot":{"starterMicro":1000000,"rewardMicro":1000000,"tokenTtlSec":45,"monthlyLimitPerInviter":10,"expiryDays":180}}"""
+                "/v1/config" -> """{"currency":"EUR","unit":"micro-euro","markupBp":800,"storeFeeBp":1500,"models":{},"maxTokensCap":8192,"packages":[],"invite":{"starterReviews":5,"rewardReviews":5,"tokenTtlSec":45,"monthlyLimitPerInviter":10,"expiryDays":180}}"""
                 "/v1/chat/inbox" -> """{"items":[]}"""
                 "/v1/chat" -> """{"enabled":false,"photos":false,"connections":[]}"""
                 else -> """{"deviceId":"d","balanceMicro":0,"expiring":[]}"""

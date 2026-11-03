@@ -127,7 +127,7 @@ class CoachTabTest {
         compose.onNodeWithText("Senden").performScrollTo().performClick()
         waitFor("Probier das hier.")
         waitFor("Workout-Vorschlag: Coach Oberkörper")
-        waitFor("Gemini 3.6 Flash (Google) · 0,0042 €")
+        waitFor("Gemini 3.6 Flash (Google) · 0,0042 € Guthaben")
 
         // The system prompt has the profile and the workouts; a second question carries the history.
         val first = fake.prompts.last()

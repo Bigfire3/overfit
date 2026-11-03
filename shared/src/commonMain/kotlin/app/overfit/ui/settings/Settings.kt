@@ -212,7 +212,7 @@ private fun FuelRow(session: FuelSession, fuelActive: Boolean, onClick: () -> Un
     val value = when {
         service == null -> f.fuelRowSoon
         !load -> ""
-        else -> ((account as? Loaded.Ready)?.value?.balanceMicro?.let { formatEuro(it, f.language) } ?: "") +
+        else -> ((account as? Loaded.Ready)?.value?.let { app.overfit.ui.fuel.creditSummary(it, f) } ?: "") +
             if (demo) " · ${f.fuelRowDemo}" else ""
     }
     ListRow(f.fuel, value.trim(), onClick = onClick)

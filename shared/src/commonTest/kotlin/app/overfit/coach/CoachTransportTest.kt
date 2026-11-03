@@ -9,8 +9,8 @@ import app.overfit.fuel.FuelMessageResult
 import app.overfit.fuel.FuelService
 import app.overfit.fuel.FuelTierInfo
 import app.overfit.fuel.LedgerPage
-import app.overfit.fuel.SpotRedeemResult
-import app.overfit.fuel.SpotToken
+import app.overfit.fuel.InviteRedeemResult
+import app.overfit.fuel.InviteToken
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -251,8 +251,8 @@ class CoachTransportTest {
         override suspend fun ledger(before: Long?, limit: Int): LedgerPage = error("unused")
         override suspend fun createRecoveryCode(): String = error("unused")
         override suspend fun restore(code: String): FuelAccount = error("unused")
-        override suspend fun spotToken(): SpotToken = error("unused")
-        override suspend fun redeemSpot(token: String): SpotRedeemResult = error("unused")
+        override suspend fun inviteToken(): InviteToken = error("unused")
+        override suspend fun redeemInvite(token: String): InviteRedeemResult = error("unused")
         override suspend fun messages(bodyJson: String): FuelMessageResult {
             lastBody = bodyJson
             return onMessages(bodyJson)
@@ -283,6 +283,20 @@ class CoachTransportTest {
         assertEquals(4_170_000L, reply.balanceMicro)
         val sent = Json.parseToJsonElement(fake.lastBody!!).jsonObject
         assertEquals("pro", sent["model"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun fuelMarksCoachReviewsSoGiftedReviewsCanApply() = runTest {
+        val fake = FakeFuel(tiers("standard")) { FuelMessageResult(fuelAnswer, 0, 0, giftReview = true) }
+        val reply = FuelCoach(FuelProvider { fake }).send(prompt.copy(review = true), "standard")
+        assertTrue(reply.giftReview)
+        assertEquals("review", Json.parseToJsonElement(fake.lastBody!!).jsonObject["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)
+        FuelCoach(FuelProvider { fake }).send(prompt.copy(review = false), "standard")
+        assertEquals("chat", Json.parseToJsonElement(fake.lastBody!!).jsonObject["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)
+        // Never in the body sent directly to Anthropic (own key).
+        assertTrue("overfit" !in anthropicBody(prompt.copy(review = true), "claude-sonnet-5-5", true))
+        // Real coach reviews are marked.
+        assertTrue(CoachPromptBuilder.build(CoachContext(ReviewKind.entries.first(), app.overfit.domain.Language.DE, "", "", null, emptyList())).review)
     }
 
     @Test

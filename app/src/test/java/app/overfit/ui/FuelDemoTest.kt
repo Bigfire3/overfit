@@ -67,8 +67,13 @@ class FuelDemoTest {
         compose.onNodeWithText("Demo ansehen").performClick()
 
         // Demo balance and packages
-        try { compose.waitUntil(5_000) { shown("Guthaben · 4,20 €") } } catch (e: Throwable) { throw AssertionError(compose.onRoot().printToString(), e) }
+        try { compose.waitUntil(5_000) { shown("4,20 € Guthaben") } } catch (e: Throwable) { throw AssertionError(compose.onRoot().printToString(), e) }
         compose.onNodeWithText("Demo – lokale Beispieldaten, nichts davon ist echt.").assertExists()
+        // Credit is "X € Guthaben"; gifted reviews are their own counter; bought vs. gifted, gifted first.
+        compose.onNodeWithText("5 geschenkte Auswertungen").assertExists()
+        compose.onNodeWithText("Gekauft: 3,20 € Guthaben · geschenkt: 1,00 € Guthaben").assertExists()
+        compose.onNodeWithText("Geschenktes wird zuerst verbraucht.").assertExists()
+        compose.onNodeWithText("Geschenkte Auswertungen gelten für Coach-Auswertungen mit Gemini 3.6 Flash", substring = true).assertExists()
         // Store packages show both values: credit and the higher store price.
         compose.onNodeWithText("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)").performScrollTo().assertExists()
         compose.onNodeWithText("28 % Aufschlag", substring = true).assertExists()
@@ -81,16 +86,23 @@ class FuelDemoTest {
         assertTrue(shown("Gemini 3.6 Flash (Google)", substring = true))
         compose.onNodeWithText("Ersatzmodell, berechnet wurde der Preis von Gemini 3.6 Flash").performScrollTo().assertExists()
         assertTrue(!shown("Standard", substring = true) && !shown("Lite", substring = true))
+        // Every booking says whether it was paid, gifted or used; gifted reviews show as a count.
+        compose.onNodeWithText("+5 Auswertungen").performScrollTo().assertExists()
+        assertTrue(shown("bezahlt ·", substring = true))
+        assertTrue(shown("geschenkt ·", substring = true))
+        assertTrue(shown("verbraucht ·", substring = true))
+        assertTrue(shown("+3,20 € Guthaben"))
         compose.onNodeWithContentDescription("Zurück").performClick()
 
         // invite screen shows a rotating code
         compose.onNodeWithText("Freunde einladen").performScrollTo().performClick()
         compose.waitUntil(5_000) { shown("Neuer Code in", substring = true) }
+        assertTrue(shown("Ihr bekommt beide 5 Coach-Auswertungen geschenkt", substring = true))
         compose.onNodeWithContentDescription("Zurück").performClick()
 
         // Redeem (paste) → reveal
         compose.onNodeWithText("Einladung einlösen").performScrollTo().performClick()
-        compose.onNodeWithText("Link oder Code").performTextInput("overfit://invite#demo-spot-token-1")
+        compose.onNodeWithText("Link oder Code").performTextInput("overfit://invite#demo-invite-token-1")
         compose.onNodeWithText("Einlösen").performClick()
         compose.waitUntil(10_000) { shown("Einladung von Fabian") }
         assertTrue(HapticPattern.Reveal in haptics.played)
