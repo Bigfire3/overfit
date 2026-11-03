@@ -1,6 +1,14 @@
 package app.overfit.data
 
+import app.overfit.data.db.ExerciseSetRow
+import app.overfit.data.db.HistoryRow
 import app.overfit.data.db.OverfitDatabase
+import app.overfit.data.db.WorkoutPhotoEntity
+import app.overfit.domain.LoggedSet
+import app.overfit.domain.WorkoutStats
+import app.overfit.domain.WorkoutSummary
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import app.overfit.data.db.SessionExerciseEntity
 import app.overfit.data.db.SessionStatus
 import app.overfit.data.db.SessionWithExercises
@@ -19,8 +27,99 @@ import kotlin.time.Clock
 class WorkoutRepository(
     private val db: OverfitDatabase,
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    val photoFiles: PhotoFiles = InMemoryPhotoFiles(),
 ) : WorkoutStore {
     private val dao = db.workoutDao()
+
+    /**
+     * Emits whenever workouts, sets or photos change (also once right away). Other features
+     * (AI chat sync, coach) listen to this instead of polling.
+     */
+    val changes: Flow<Unit> =
+        db.invalidationTracker.createFlow("workout_session", "session_exercise", "set_entry", "workout_photo").map { }
+
+    // --- History (finished workouts) ---------------------------------------------------------
+
+    /** Finished workouts, newest first. */
+    val history: Flow<List<HistoryRow>> = dao.observeHistory()
+
+    /** A finished workout with note, feeling and photos; null if missing or still running. */
+    suspend fun getFinished(id: String): FinishedWorkout? {
+        val row = dao.get(id) ?: return null
+        if (row.session.status != SessionStatus.FINISHED) return null
+        return FinishedWorkout(
+            workout = row.toDomain(),
+            endedAt = row.session.endedAt ?: row.session.updatedAt,
+            note = row.session.note,
+            feeling = row.session.feeling,
+            photos = photosOf(id),
+        )
+    }
+
+    /** Summary with records against all earlier finished workouts. */
+    suspend fun summary(id: String): WorkoutSummary? {
+        val finished = getFinished(id) ?: return null
+        val w = finished.workout
+        val ids = w.exercises.map { it.exercise.id }.distinct()
+        val previous = if (ids.isEmpty()) emptyList() else dao.setsBefore(ids, w.startedAt, w.id).map { it.toLogged() }
+        return WorkoutStats.summarize(w, finished.endedAt, previous)
+    }
+
+    /** Note (blank = none) and feeling 1–5 (null = none) after finishing. */
+    suspend fun updateDetails(id: String, note: String?, feeling: Int?) =
+        dao.updateDetails(id, note?.trim()?.ifEmpty { null }, feeling?.coerceIn(1, 5), clock())
+
+    suspend fun rename(id: String, name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isNotEmpty()) dao.rename(id, trimmed.take(80), clock())
+    }
+
+    /** Deletes a finished workout with its sets and photo files. */
+    suspend fun deleteWorkout(id: String) {
+        val photos = dao.photosOf(id)
+        dao.delete(id)
+        photos.forEach { photoFiles.delete(it.fileName) }
+    }
+
+    /** Completed sets of an exercise in finished workouts, newest workout first. */
+    fun exerciseSets(exerciseId: String): Flow<List<ExerciseSetRow>> = dao.observeExerciseSets(exerciseId)
+
+    // --- Photos ------------------------------------------------------------------------------
+
+    /** Photos of one workout in order (AI chat sync, coach). */
+    suspend fun photosOf(sessionId: String): List<WorkoutPhoto> = dao.photosOf(sessionId).map { it.toPhoto() }
+
+    fun observePhotosOf(sessionId: String): Flow<List<WorkoutPhoto>> = dao.observePhotosOf(sessionId).map { l -> l.map { it.toPhoto() } }
+
+    /** All photos for the diary, newest first. */
+    val photos: Flow<List<DiaryPhoto>> = dao.observePhotos().map { rows ->
+        rows.map { DiaryPhoto(WorkoutPhoto(it.id, it.sessionId, it.fileName, it.takenAt, photoFiles.path(it.fileName)), it.sessionName) }
+    }
+
+    /** Stores an already prepared JPEG for [sessionId] in the private photo folder. */
+    suspend fun addPhoto(sessionId: String, jpeg: ByteArray, takenAt: Long = clock()): WorkoutPhoto {
+        val id = Workout.newId()
+        val name = "$id.jpg"
+        photoFiles.write(name, jpeg)
+        val entity = WorkoutPhotoEntity(id, sessionId, name, takenAt, dao.nextPhotoPosition(sessionId))
+        try {
+            dao.insertPhoto(entity)
+        } catch (e: Exception) {
+            photoFiles.delete(name)
+            throw e
+        }
+        return entity.toPhoto()
+    }
+
+    suspend fun deletePhoto(id: String) {
+        val photo = dao.getPhoto(id) ?: return
+        dao.deletePhoto(id)
+        photoFiles.delete(photo.fileName)
+    }
+
+    fun readPhoto(photo: WorkoutPhoto): ByteArray? = photoFiles.read(photo.fileName)
+
+    private fun WorkoutPhotoEntity.toPhoto() = WorkoutPhoto(id, sessionId, fileName, takenAt, photoFiles.path(fileName))
 
     override suspend fun loadActive(): Workout? = dao.getActive()?.toDomain()
 
@@ -104,7 +203,29 @@ class WorkoutRepository(
         dao.lastCompletedSets(exerciseId).map { SetValues(it.weightKg, it.reps, it.durationSec) }
 }
 
-private fun SessionWithExercises.toDomain(): Workout {
+/** A finished workout as shown in the history detail. */
+data class FinishedWorkout(
+    val workout: Workout,
+    val endedAt: Long,
+    val note: String?,
+    val feeling: Int?,
+    val photos: List<WorkoutPhoto>,
+)
+
+/** Photo of a workout; [path] is the absolute file path for the image loader. */
+data class WorkoutPhoto(
+    val id: String,
+    val sessionId: String,
+    val fileName: String,
+    val takenAt: Long,
+    val path: String,
+)
+
+data class DiaryPhoto(val photo: WorkoutPhoto, val workoutName: String)
+
+internal fun ExerciseSetRow.toLogged() = LoggedSet(exerciseId, SetValues(weightKg, reps, durationSec))
+
+internal fun SessionWithExercises.toDomain(): Workout {
     val restStart = session.restStartedAt
     val restEnd = session.restEndsAt
     return Workout(

@@ -14,6 +14,7 @@ import app.overfit.fuel.RequestSigner
 import app.overfit.platform.AndroidAttestor
 import app.overfit.platform.AndroidDeviceKey
 import app.overfit.platform.AndroidHaptics
+import app.overfit.platform.AndroidPhotoFiles
 import app.overfit.platform.AndroidKeyValueStore
 import app.overfit.platform.AndroidRestAlerts
 import app.overfit.platform.AndroidSecretStore
@@ -40,7 +41,7 @@ fun androidDependencies(
     return AppDependencies(
     store = AppStore(kv, secrets, deviceDefaults()),
     providers = Providers(createHttpClient()) { fuel.service() },
-    data = AppData(database, kv),
+    data = AppData(database, kv, photoFiles = AndroidPhotoFiles(context)),
     versionName = versionName,
     haptics = AndroidHaptics(context),
     restAlerts = AndroidRestAlerts(context, restIcon),

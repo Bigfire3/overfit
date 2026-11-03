@@ -39,6 +39,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.overfit.ai.Providers
+import app.overfit.data.backup.BackupContributor
+import app.overfit.data.backup.BackupService
 import app.overfit.data.AppData
 import app.overfit.data.AppStore
 import app.overfit.data.InMemoryKeyValueStore
@@ -138,6 +140,28 @@ class AppDependencies(
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
 ) {
     val fuelSession = FuelSession(fuel)
+
+    /**
+     * Other features add their data to the backup here (coach memory, AI chat settings), see
+     * [BackupContributor]. Register before the UI starts.
+     */
+    val backupContributors = mutableListOf<BackupContributor>()
+
+    /** Backup file picked in the settings, waiting for the import preview ([BackupImportRoute]). */
+    val pendingBackup = MutableStateFlow<ByteArray?>(null)
+
+    /**
+     * Phase 4 (coach): content at the end of the finish flow, below note/feeling/photos and
+     * above "Save" – e.g. "Send to coach" / "Later". Empty until the coach is wired in.
+     */
+    var finishCoachSection: @Composable (workoutId: String) -> Unit = {}
+
+    /**
+     * Called (on the main thread) when the finish flow is saved: note, feeling and photos are
+     * stored. Phase 4 queues the coach review here, the AI chat sync can push the workout.
+     */
+    val workoutSavedListeners = mutableListOf<(workoutId: String) -> Unit>()
+    val backup = BackupService(data, store, versionName, clock) { backupContributors.toList() }
     /** The running workout; created once per process, loads the stored workout right away. */
     val workout: WorkoutController = WorkoutController(
         store = data.workouts,
@@ -177,6 +201,15 @@ class AppDependencies(
 @Serializable data object DuoRoute
 @Serializable data class ShareRoute(val templateId: Long)
 @Serializable data class ExerciseDetailRoute(val id: String)
+/** Finish flow right after "Finish": summary, feeling, note, photos, coach slot. */
+@Serializable data class FinishRoute(val workoutId: String)
+@Serializable data class HistoryDetailRoute(val workoutId: String)
+/** Share a finished workout (`kind: "workout"`); [withActual] = logged values instead of targets. */
+@Serializable data class WorkoutShareRoute(val workoutId: String, val withActual: Boolean = true)
+@Serializable data class PhotoViewerRoute(val photoId: String)
+@Serializable data class PhotoCompareRoute(val firstId: String, val secondId: String)
+/** Preview and confirm a backup import; the file waits in [AppDependencies.pendingBackup]. */
+@Serializable data object BackupImportRoute
 /** Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). */
 @Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "")
 /** Template editor; [templateId] 0 = new template. */

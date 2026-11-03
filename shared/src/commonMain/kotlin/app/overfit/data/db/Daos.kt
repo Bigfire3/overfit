@@ -59,6 +59,13 @@ interface ExerciseDao {
 
     @Query("DELETE FROM exercise")
     suspend fun deleteAll()
+
+    /** Exercises a backup must carry: custom ones, changed settings and everything referenced. */
+    @Query(
+        """SELECT * FROM exercise WHERE source = 'CUSTOM' OR defaultRestSec IS NOT NULL OR isArchived = 1
+             OR id IN (SELECT exerciseId FROM template_exercise) OR id IN (SELECT exerciseId FROM session_exercise)""",
+    )
+    suspend fun forBackup(): List<ExerciseEntity>
 }
 
 data class ExerciseImageRef(val id: String, val imageRef: String)
@@ -80,6 +87,10 @@ interface TemplateDao {
     @Transaction
     @Query("SELECT * FROM workout_template WHERE id = :id")
     suspend fun getWithExercises(id: Long): TemplateWithExercises?
+
+    @Transaction
+    @Query("SELECT * FROM workout_template ORDER BY position")
+    suspend fun allWithExercises(): List<TemplateWithExercises>
 
     @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM workout_template")
     suspend fun nextPosition(): Int
@@ -159,4 +170,84 @@ interface WorkoutDao {
            ORDER BY s.position""",
     )
     suspend fun lastCompletedSets(exerciseId: String): List<SetEntryEntity>
+
+    // --- History (phase 3) ---------------------------------------------------------------------
+
+    @Query(
+        """SELECT ws.id AS id, ws.name AS name, ws.startedAt AS startedAt, ws.endedAt AS endedAt, ws.feeling AS feeling,
+             (SELECT COUNT(*) FROM session_exercise se WHERE se.sessionId = ws.id) AS exerciseCount,
+             (SELECT COUNT(*) FROM set_entry s JOIN session_exercise se ON se.id = s.sessionExerciseId
+                WHERE se.sessionId = ws.id AND s.completed = 1) AS completedSets,
+             (SELECT COALESCE(SUM(s.weightKg * s.reps), 0.0) FROM set_entry s JOIN session_exercise se ON se.id = s.sessionExerciseId
+                WHERE se.sessionId = ws.id AND s.completed = 1 AND s.weightKg > 0 AND s.reps > 0) AS volumeKg,
+             (SELECT COUNT(*) FROM workout_photo p WHERE p.sessionId = ws.id) AS photoCount
+           FROM workout_session ws WHERE ws.status = 'FINISHED' ORDER BY ws.startedAt DESC""",
+    )
+    fun observeHistory(): Flow<List<HistoryRow>>
+
+    @Transaction
+    @Query("SELECT * FROM workout_session WHERE status = 'FINISHED' ORDER BY startedAt")
+    suspend fun allFinished(): List<SessionWithExercises>
+
+    @Query("UPDATE workout_session SET note = :note, feeling = :feeling, updatedAt = :now WHERE id = :id")
+    suspend fun updateDetails(id: String, note: String?, feeling: Int?, now: Long)
+
+    @Query("UPDATE workout_session SET name = :name, updatedAt = :now WHERE id = :id")
+    suspend fun rename(id: String, name: String, now: Long)
+
+    /** Completed sets of [exerciseId] in finished workouts, newest workout first. */
+    @Query(
+        """SELECT ws.id AS sessionId, ws.startedAt AS startedAt, ws.name AS sessionName, se.exerciseId AS exerciseId,
+             s.weightKg AS weightKg, s.reps AS reps, s.durationSec AS durationSec, s.position AS position
+           FROM set_entry s JOIN session_exercise se ON se.id = s.sessionExerciseId
+           JOIN workout_session ws ON ws.id = se.sessionId
+           WHERE se.exerciseId = :exerciseId AND ws.status = 'FINISHED' AND s.completed = 1
+           ORDER BY ws.startedAt DESC, se.position, s.position""",
+    )
+    fun observeExerciseSets(exerciseId: String): Flow<List<ExerciseSetRow>>
+
+    /** Completed sets of [exerciseIds] in finished workouts other than [excludeId] that started before [before]. */
+    @Query(
+        """SELECT ws.id AS sessionId, ws.startedAt AS startedAt, ws.name AS sessionName, se.exerciseId AS exerciseId,
+             s.weightKg AS weightKg, s.reps AS reps, s.durationSec AS durationSec, s.position AS position
+           FROM set_entry s JOIN session_exercise se ON se.id = s.sessionExerciseId
+           JOIN workout_session ws ON ws.id = se.sessionId
+           WHERE se.exerciseId IN (:exerciseIds) AND ws.status = 'FINISHED' AND s.completed = 1
+             AND ws.id != :excludeId AND ws.startedAt < :before""",
+    )
+    suspend fun setsBefore(exerciseIds: List<String>, before: Long, excludeId: String): List<ExerciseSetRow>
+
+    // --- Photos --------------------------------------------------------------------------------
+
+    @Insert
+    suspend fun insertPhoto(photo: WorkoutPhotoEntity)
+
+    @Insert
+    suspend fun insertPhotos(photos: List<WorkoutPhotoEntity>)
+
+    @Query("SELECT * FROM workout_photo WHERE id = :id")
+    suspend fun getPhoto(id: String): WorkoutPhotoEntity?
+
+    @Query("DELETE FROM workout_photo WHERE id = :id")
+    suspend fun deletePhoto(id: String)
+
+    @Query("SELECT * FROM workout_photo WHERE sessionId = :sessionId ORDER BY position, takenAt")
+    suspend fun photosOf(sessionId: String): List<WorkoutPhotoEntity>
+
+    @Query("SELECT * FROM workout_photo WHERE sessionId = :sessionId ORDER BY position, takenAt")
+    fun observePhotosOf(sessionId: String): Flow<List<WorkoutPhotoEntity>>
+
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM workout_photo WHERE sessionId = :sessionId")
+    suspend fun nextPhotoPosition(sessionId: String): Int
+
+    @Query(
+        """SELECT p.id AS id, p.sessionId AS sessionId, p.fileName AS fileName, p.takenAt AS takenAt, p.position AS position,
+             ws.name AS sessionName
+           FROM workout_photo p JOIN workout_session ws ON ws.id = p.sessionId
+           ORDER BY p.takenAt DESC, p.position DESC""",
+    )
+    fun observePhotos(): Flow<List<PhotoRow>>
+
+    @Query("SELECT * FROM workout_photo ORDER BY takenAt")
+    suspend fun allPhotos(): List<WorkoutPhotoEntity>
 }

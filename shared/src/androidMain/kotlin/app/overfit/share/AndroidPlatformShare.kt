@@ -30,6 +30,19 @@ class AndroidPlatformShare(private val context: Context) : PlatformShare {
         launchChooser(send)
     }
 
+    override fun shareBytes(fileName: String, bytes: ByteArray, mimeType: String) {
+        val dir = File(context.cacheDir, "share").apply { mkdirs() }
+        dir.listFiles()?.filter { it.name.startsWith("overfit-backup-") }?.forEach { it.delete() }
+        val file = File(dir, fileName).apply { writeBytes(bytes) }
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = mimeType
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        launchChooser(send)
+    }
+
     private fun launchChooser(send: Intent) {
         val chooser = Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
