@@ -69,7 +69,10 @@ class OverfitUITestCase: XCTestCase {
     /** Confirm buttons change their label and reset after 4 s: tap twice on the same spot, screenshot in between. */
     func confirm(_ label: String, shotName: String) {
         guard let button = find(label) else { waitFor(label); return }
-        let spot = button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        // Absolute screen point: after the first tap the button has a new label, an element-relative
+        // coordinate would be resolved again and not find it.
+        let frame = button.frame
+        let spot = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX, dy: frame.midY))
         spot.tap()
         usleep(400_000)
         let screenshot = XCUIScreen.main.screenshot()
