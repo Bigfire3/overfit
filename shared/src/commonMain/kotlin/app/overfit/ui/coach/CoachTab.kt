@@ -310,7 +310,8 @@ fun CoachChatScreen(
     LaunchedEffect(confirmDelete) { if (confirmDelete) { delay(4000); confirmDelete = false } }
     val messages by remember(id) { if (id.isEmpty()) flowOf(emptyList()) else chat.messages(id) }.collectAsState(initial = emptyList())
     val list = rememberLazyListState()
-    LaunchedEffect(messages.size) { if (messages.isNotEmpty()) list.animateScrollToItem(messages.size - 1) }
+    // New message or an answer that arrived: show the end of the chat.
+    LaunchedEffect(messages.size, messages.lastOrNull()?.status) { if (messages.isNotEmpty()) list.animateScrollToItem(messages.size - 1) }
 
     Screen(
         header = { BackHeader(t.back, onBack) },
