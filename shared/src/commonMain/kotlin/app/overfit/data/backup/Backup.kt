@@ -253,7 +253,7 @@ class BackupService(
         if (db.workoutDao().getActive() != null) throw BackupError.WorkoutRunning()
         val json = preview.json
         // Clean slate: same as "delete all data" (catalogue is loaded again), then insert.
-        data.resetAll()
+        data.resetAll(reseedSamples = false)
         val now = clock()
         val exerciseDao = db.exerciseDao()
         db.transaction {

@@ -425,7 +425,8 @@ class DayWithOverfitTest {
         click("Alle Daten löschen")
         click("Wirklich alles löschen?")
         waitFor("Dein Name")
-        compose.waitUntilState(10_000) { templates().isEmpty() }
+        // Fresh start: only the Push/Pull/Legs examples are left (no restart needed).
+        compose.waitUntilState(10_000) { templates().map { it.name } == listOf("Push", "Pull", "Legs") }
         assertEquals("", store.state.value.profile.name)
         assertTrue(runBlocking { data.workouts.history.first() }.isEmpty())
         runBlocking { deps.backup.restore(deps.backup.preview(backupBytes).getOrThrow()) }

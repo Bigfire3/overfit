@@ -65,9 +65,13 @@ fun WorkoutPlanScreen(
     var deleteArmed by remember { mutableStateOf(false) }
     var template by remember(templateId) { mutableStateOf<Template?>(null) }
     LaunchedEffect(templateId) {
+        // The list flow emits more than once after a delete (names and workouts are separate queries). Closing once only:
+        // a second pop would take the training tab down with it and leave a black screen.
+        var closed = false
         templates.templates.collect {
+            if (closed) return@collect
             val loaded = templates.get(templateId)
-            if (loaded == null) onBack() else template = loaded
+            if (loaded == null) { closed = true; onBack() } else template = loaded
         }
     }
     val w = template

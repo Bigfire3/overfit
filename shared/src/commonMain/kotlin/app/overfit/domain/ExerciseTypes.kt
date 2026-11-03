@@ -8,7 +8,7 @@ enum class ExerciseSource { WORKOUT_GUIDE, FREE_DB, CUSTOM }
 
 /**
  * What is logged per set.
- * With [WEIGHT_REPS] the weight may be negative (= assistance, e.g. a band); for bodyweight
+ * Weights are entered as 0 or more (old data may still hold negative assistance values); for bodyweight
  * exercises a positive weight means added load.
  */
 enum class TrackingType {
