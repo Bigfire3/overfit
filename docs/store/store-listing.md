@@ -1,91 +1,98 @@
-# Store-Texte (Entwurf)
+# Store-Texte
 
-Gilt für App Store und Google Play. Limits: Play Kurzbeschreibung 80 Zeichen, Langbeschreibung 4000; App Store Untertitel 30, Beschreibung 4000.
+Gilt für App Store und Google Play. Stand: aktueller Funktionsumfang (siehe docs/PROGRESS.md). Limits: Play Titel 30, Kurzbeschreibung 80, Langbeschreibung 4000; App Store Untertitel 30, Beschreibung 4000.
+Marke: Wortmarke „overfit“ immer klein, Claim „personal training for everyone“ (30 Zeichen) in beiden Sprachen auf Englisch (siehe docs/DECISIONS.md). Keine Funktion bewerben, die es nicht gibt (Duo nur „bald“).
 
 ## Deutsch
 
-**Name:** Overfit: Krafttraining Log
+**Titel (Play, ≤ 30):** overfit: Workout & KI-Coach (27)
 
-**Untertitel (App Store, ≤ 30):** Training loggen mit KI-Coach
+**Untertitel (App Store, ≤ 30):** personal training for everyone (30)
 
 **Kurzbeschreibung (Play, ≤ 80):**
-Minimalistisches Trainingslog mit Pausentimer und KI-Coach. Ohne Werbung.
+Dein Trainer in der Tasche: kennt dein Training, wertet aus, plant. Werbefrei. (78)
 
 **Langbeschreibung:**
-Overfit ist das Trainingslog für Krafttraining und Calisthenics: schwarz-weiß, schnell und ohne Ablenkung.
+overfit – personal training for everyone.
+
+Ein persönlicher Trainer in der Tasche, der dein Training kennt, auswertet und plant. Für alle, nicht nur für Leute, die sich einen Personal Trainer leisten können. Schwarz-weiß, schnell, ohne Werbung und Ablenkung.
 
 TRAINIEREN
-• Über 1000 Übungen mit Bildern, deutsche Suche und Filter
-• Eigene Übungen und Vorlagen, Beispielvorlagen Push, Pull und Legs
-• Sätze mit einem Tipp abhaken, Gewichte und Wiederholungen live anpassen
-• Satz oder Übung hinzufügen, ersetzen, umsortieren
-• „Letztes Mal“ zeigt dir, was du zuletzt gemacht hast
-• Dein Training läuft weiter, auch wenn die App geschlossen wird
+• 302 Übungen mit Grafiken und Fotos, deutsche Suche und Filter
+• KI-Übungen: Lass dir eine fehlende Übung von der KI anlegen, dazu eigene Übungen
+• Workouts: Beispiel-Workouts Push, Pull und Legs oder eigene, jederzeit anpassbar
+• Sätze mit einem Tipp abhaken, Gewicht und Wiederholungen live ändern
+• Workout minimieren und in der App weiterarbeiten – dein Training läuft auch nach App-Neustart weiter
+• „Letztes Mal“ zeigt, was du zuletzt gemacht hast
 
 PAUSENTIMER
 • Startet beim Abhaken, ±15 Sekunden, Überspringen
 • Benachrichtigung und Vibration am Pausenende, auch bei gesperrtem Bildschirm
 
-FORTSCHRITT
+AUSWERTUNG
 • Zusammenfassung nach dem Training mit neuen Bestwerten
-• Verlauf, Notizen, Gefühl und Fortschritt je Übung
-• Foto-Tagebuch: Körperfotos bleiben privat auf deinem Gerät, Vergleich nebeneinander
+• Verlauf und Auswertung je Übung: Top-Satz, Volumen, Fortschritt
+• Diary im BeReal-Stil: Körperfotos bleiben privat auf deinem Gerät, Vergleich nebeneinander
 
 KI-COACH
-• Nutze deinen eigenen API-Key oder Fuel, das Coach-Guthaben in der App
-• Lass dir Trainings auswerten und Vorlagen anpassen
-• Verbinde deinen Chat (Claude, ChatGPT, Gemini) oder kopiere deinen Kontext mit einem Tipp
-• Lass dir eine Vorlage von der KI erstellen und füge sie direkt ein
+• Der Coach kennt dein Training und hat ein Gedächtnis für Ziele, Verletzungen und Vorlieben
+• Coach-Tab mit Chat: frag, lass auswerten, plane dein nächstes Training
+• Eigener API-Key (Gemini, Claude, OpenAI, OpenRouter) oder Fuel, das Coach-Guthaben in der App
+• KI-Chat-Verbindung: nutze Claude, ChatGPT oder Gemini mit deinen echten Trainingsdaten
 
 TEILEN
-• Vorlagen und Trainings per Link, QR-Code oder Datei teilen
-• Freunde „spotten“: Einladen per QR, ihr bekommt beide 1 € Fuel
+• Workouts und Trainings per Link, QR-Code oder Datei teilen
+• „Spot“: Freunde einladen, ihr bekommt beide 1 € Fuel
+• Duo – gemeinsam trainieren: bald
 
 DEINE DATEN
 • Alles liegt lokal auf deinem Gerät, ohne Konto, ohne Werbung, ohne Tracking
 • Backup als eine Datei, jederzeit „Alle Daten löschen“
-• Deutsch und Englisch, Hell und Dunkel
+• Open Source (MIT), Deutsch und Englisch, Hell und Dunkel
 
 ## English
 
-**Name:** Overfit: Strength Training Log
+**Title (Play, ≤ 30):** overfit: Workout & AI Coach (27)
 
-**Subtitle (App Store, ≤ 30):** Workout log with AI coach
+**Subtitle (App Store, ≤ 30):** personal training for everyone (30)
 
 **Short description (Play, ≤ 80):**
-Minimal workout log with rest timer and AI coach. No ads.
+Your trainer in your pocket: knows your training, reviews it, plans it. No ads. (78)
 
 **Long description:**
-Overfit is the workout log for strength training and calisthenics: black and white, fast and distraction-free.
+overfit – personal training for everyone.
+
+A personal trainer in your pocket that knows your training, reviews it and plans it. For everyone, not only for people who can afford a personal trainer. Black and white, fast, no ads and no distractions.
 
 TRAIN
-• 1000+ exercises with images, search and filters
-• Your own exercises and templates, sample templates Push, Pull and Legs
+• 302 exercises with graphics and photos, search and filters
+• AI exercises: have AI create a missing exercise, plus your own exercises
+• Workouts: sample workouts Push, Pull and Legs or your own, adjustable any time
 • Check off sets with one tap, adjust weight and reps live
-• Add, replace and reorder sets and exercises
+• Minimize your workout and keep using the app – it keeps running even after an app restart
 • "Last time" shows what you did before
-• Your workout keeps running even if the app is closed
 
 REST TIMER
 • Starts when you check off a set, ±15 seconds, skip
 • Notification and vibration when the rest is over, even with the screen locked
 
-PROGRESS
+REVIEW
 • Summary after each workout with new personal bests
-• History, notes, feeling and progress per exercise
-• Photo diary: body photos stay private on your device, compare side by side
+• History and per-exercise review: top set, volume, progress
+• BeReal-style diary: body photos stay private on your device, compare side by side
 
 AI COACH
-• Use your own API key or Fuel, the coach credit inside the app
-• Get your workouts reviewed and templates adjusted
-• Connect your chat (Claude, ChatGPT, Gemini) or copy your context with one tap
-• Have AI build a template and paste it straight in
+• The coach knows your training and has a memory for goals, injuries and preferences
+• Coach tab with chat: ask, get reviews, plan your next workout
+• Your own API key (Gemini, Claude, OpenAI, OpenRouter) or Fuel, the coach credit inside the app
+• AI chat connection: use Claude, ChatGPT or Gemini with your real training data
 
 SHARING
-• Share templates and workouts as link, QR code or file
-• Spot a friend: invite by QR, you both get €1 Fuel
+• Share workouts and trainings as link, QR code or file
+• "Spot": invite friends, you both get €1 Fuel
+• Duo – train together: coming soon
 
 YOUR DATA
 • Everything stays on your device, no account, no ads, no tracking
 • One-file backup, "Delete all data" any time
-• German and English, light and dark
+• Open source (MIT), German and English, light and dark

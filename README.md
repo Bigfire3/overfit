@@ -1,18 +1,18 @@
-# Overfit
+# overfit
 
-Minimalistische App für Android und iOS zum Loggen von Krafttraining und Calisthenics – mit Pausentimer und KI-Coach.
-Schwarz-weiß, Deutsch und Englisch, ohne Werbung, mit deinem eigenen API-Key. Gebaut mit Kotlin Multiplatform und Compose Multiplatform.
-Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRESS.md) · Entscheidungen: [docs/DECISIONS.md](docs/DECISIONS.md)
+**personal training for everyone** – Dein persönlicher Trainer in der Tasche: kennt dein Training, wertet aus und plant.
+Für Android und iOS, schwarz-weiß, Deutsch und Englisch, ohne Werbung, Open Source (MIT). Gebaut mit Kotlin Multiplatform und Compose Multiplatform.
+Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRESS.md) · Entscheidungen: [docs/DECISIONS.md](docs/DECISIONS.md) · Monetarisierung: [docs/monetization.md](docs/monetization.md)
 
 ## Funktionen
 
-- **Training loggen**: Übungskatalog (über 1000 Übungen, deutsche Suche, Filter), eigene Übungen, Vorlagen; Workout-Modus mit
+- **Training loggen**: Übungskatalog (302 Übungen mit Grafiken, deutsche Suche, Filter), eigene und KI-Übungen, Workouts; Workout-Modus mit
   Sätzen abhaken, Werten, Notizen je Übung, Satz/Übung hinzufügen, ersetzen, umsortieren; läuft nach App-Neustart weiter
 - **Pausentimer** mit ±15 s und Überspringen, auch im Hintergrund (Benachrichtigung, Alarm, Haptik; Schalter „Vibration“)
 - **Beenden-Flow**: Zusammenfassung, neue Bestwerte, Gefühl, Notiz, Körperfotos (nur app-privat); **Verlauf** mit Details, Fortschritt je Übung
 - **Foto-Tagebuch**: Zeitachse, Vollbild, zwei Fotos vergleichen
-- **Teilen und Importieren**: Vorlagen und Trainings als Link, QR-Code oder Datei; Beispielvorlagen Push/Pull/Legs;
-  **KI-Vorlage** per Chat (ChatGPT, Claude, Gemini) erstellen und aus der Zwischenablage einfügen
+- **Teilen und Importieren**: Workouts und Trainings als Link, QR-Code oder Datei; Beispiel-Workouts Push/Pull/Legs;
+  **KI-Workout** per Chat (ChatGPT, Claude, Gemini) erstellen und aus der Zwischenablage einfügen
 - **KI-Coach**: mit eigenem API-Key oder „Fuel“ (Coach-Guthaben); **KI-Chat-Verbindung** (Claude, ChatGPT, Gemini) oder „Kontext kopieren“
 - **Fuel und Spot**: Guthaben in Euro; Freunde per QR „spotten“, beide bekommen 1 € Fuel
 - **Backup** als eine ZIP-Datei (Export/Import), **Alle Daten löschen**

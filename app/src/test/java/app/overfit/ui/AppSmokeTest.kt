@@ -122,7 +122,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Coach-Gedächtnis").performScrollTo().performClick()
         compose.onNodeWithText("Was der Coach über dich weiß", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Zurück").performClick()
-        compose.onNodeWithText("Über Overfit").performScrollTo().performClick()
+        compose.onNodeWithText("Über overfit").performScrollTo().performClick()
         compose.onNodeWithText("CC BY-SA 4.0", substring = true).assertExists()
         compose.onNodeWithText("Version 0.1.test").assertExists()
         compose.onNodeWithContentDescription("Zurück").performClick()
