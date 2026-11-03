@@ -72,7 +72,7 @@ class TrainingTabTest {
     @Test
     fun startEmpty_addExercise_finish_isSavedWorkout_startsAgain() {
         val deps = launch()
-        compose.onNodeWithText("Noch keine Workouts", substring = true).assertExists()
+        waitFor("Noch keine Workouts", substring = true)
 
         // "+" → start empty → the workout runs without exercises
         compose.onNodeWithContentDescription("Neues Workout").performClick()
@@ -127,7 +127,7 @@ class TrainingTabTest {
             data.templates.save(Template(0, "Push", null, listOf(TemplateExercise(bench, 60, null, List(2) { PlannedSet(60.0, 8) }))))
         }
         val deps = launch()
-        compose.onNodeWithText("noch nie trainiert").assertExists()
+        waitFor("noch nie trainiert")
         compose.onNodeWithText("Push").performClick()
         waitFor("Starten")
         compose.onNodeWithText("Starten").performClick()
