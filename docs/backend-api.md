@@ -257,7 +257,7 @@ IDs: `[A-Za-z0-9_.:-]{1,80}`. Unbekannte Felder in `data` sind erlaubt und werde
 | `template` | Vorlagen-UUID | `{ "name", "note"?, "exercises": [ { "exerciseId", "name", "trackingType", "restSec"?, "note"?, "sets": [ { "kg"?, "reps"?, "sec"? } ] } ] }` |
 | `workout` | Session-UUID | `{ "name", "templateId"?, "startedAt", "endedAt": <ms> \| null (läuft), "note"?, "feeling"? (1–5), "photoIds"?: [], "review"?: { "rating", "summary", "positives", "improvements", "tips" }, "exercises": [ { "exerciseId", "name", "trackingType", "origin"?: "planned"\|"added"\|"replaced", "replacedExerciseId"?, "note"?, "restSec"?, "sets": [ { "kg"?, "reps"?, "sec"?, "rpe"?, "completed": true, "completedAt"?, "planned"?: { "kg"?, "reps"?, "sec"? } } ] } ] }` |
 
-`exerciseId` = stabile Übungs-ID (`wg:…`, `fedb:…` oder UUID eigener Übungen), `name` = Anzeigename (für den Chat lesbar).
+`exerciseId` = stabile Übungs-ID (`wg:…`, `custom:<uuid>` eigener Übungen; ehemalige `fedb:…`-Übungen, die Nutzer verwendet haben, behalten ihre ID als eigene Übung), `name` = Anzeigename (für den Chat lesbar).
 Kennzahlen (Volumen, Top-Satz, e1RM nach Epley, längster Halt) berechnet der Server beim Upload selbst. Fotos,
 Notizen und Gefühl gehen nur in diese Verbindung, nie in Teilen-Links.
 

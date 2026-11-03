@@ -8,6 +8,7 @@ import app.overfit.domain.WorkoutExercise
 import app.overfit.domain.formatNumber
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.json.JsonObject
 import kotlin.math.roundToInt
 import kotlin.time.Instant
 
@@ -23,7 +24,18 @@ data class CoachPrompt(
     val dynamicSystem: String,
     val user: String,
     val images: List<CoachImage> = emptyList(),
-)
+    /**
+     * Output schema for structured outputs; null = the coach schema. Other AI features (exercise autofill) send their
+     * own. Every transport reads it through [outputSchema] / [outputSchemaName] / [outputMaxTokens].
+     */
+    val schema: JsonObject? = null,
+    val schemaName: String? = null,
+    val maxTokens: Int? = null,
+) {
+    val outputSchema: JsonObject get() = schema ?: CoachSchema.schema
+    val outputSchemaName: String get() = schemaName ?: CoachSchema.NAME
+    val outputMaxTokens: Int get() = maxTokens ?: CoachModels.MAX_TOKENS
+}
 
 /** Everything the request is built from. Collected by [CoachService] from database, store and files. */
 data class CoachContext(

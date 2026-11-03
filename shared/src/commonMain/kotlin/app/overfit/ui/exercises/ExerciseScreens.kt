@@ -59,13 +59,25 @@ import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import app.overfit.ai.ExerciseAutofill
+import app.overfit.ai.ExerciseSuggestion
+import app.overfit.coach.CoachErrorKind
+import app.overfit.coach.CoachException
+import app.overfit.domain.ExerciseSearch
+import app.overfit.i18n.LocalExerciseFormStrings
+import app.overfit.ui.components.MultilineInput
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** Loads one exercise and applies changes (settings, custom edits, delete). */
-class ExerciseViewModel(private val id: String?, private val repository: ExerciseRepository) : ViewModel() {
+/** Loads one exercise and applies changes (settings, custom edits, delete); for the form also AI autofill and "Did you mean …?". */
+class ExerciseViewModel(
+    private val id: String?,
+    private val repository: ExerciseRepository,
+    private val autofill: ExerciseAutofill? = null,
+) : ViewModel() {
     /** null while loading (or for a new custom exercise). */
     private val _exercise = MutableStateFlow<Exercise?>(null)
     val exercise: StateFlow<Exercise?> = _exercise.asStateFlow()
@@ -78,6 +90,62 @@ class ExerciseViewModel(private val id: String?, private val repository: Exercis
             _loaded.value = true
         }
     }
+
+    /** Active catalogue as search index ("Did you mean …?"); loaded on first use. */
+    private val _index = MutableStateFlow<List<ExerciseSearch.Indexed>>(emptyList())
+    private var indexLoaded = false
+
+    fun loadIndex() {
+        if (indexLoaded) return
+        indexLoaded = true
+        viewModelScope.launch { _index.value = ExerciseSearch.index(repository.getActive()) }
+    }
+
+    /** Up to three existing exercises that look like [name] (empty for short names and when editing). */
+    fun similar(name: String): List<Exercise> {
+        val q = name.trim()
+        if (id != null || q.length < 3) return emptyList()
+        val index = _index.value
+        if (index.isEmpty()) return emptyList()
+        return ExerciseSearch.search(index, ExerciseSearch.Filter(query = q)).take(3)
+    }
+    val indexVersion: StateFlow<List<ExerciseSearch.Indexed>> = _index.asStateFlow()
+
+    val aiAvailable: Boolean get() = autofill?.available == true
+
+    sealed interface AutofillState {
+        data object Idle : AutofillState
+        data object Loading : AutofillState
+        data object Done : AutofillState
+        data class Failed(val kind: CoachErrorKind) : AutofillState
+    }
+
+    private val _autofillState = MutableStateFlow<AutofillState>(AutofillState.Idle)
+    val autofillState: StateFlow<AutofillState> = _autofillState.asStateFlow()
+
+    /** Latest AI answer, taken over by the form once ([consumeSuggestion]). */
+    private val _suggestion = MutableStateFlow<ExerciseSuggestion?>(null)
+    val suggestion: StateFlow<ExerciseSuggestion?> = _suggestion.asStateFlow()
+
+    fun autofill(name: String, language: Language) {
+        val ai = autofill ?: return
+        if (name.isBlank() || _autofillState.value == AutofillState.Loading) return
+        _autofillState.value = AutofillState.Loading
+        viewModelScope.launch {
+            _autofillState.value = try {
+                _suggestion.value = ai.fill(name, language)
+                AutofillState.Done
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: CoachException) {
+                AutofillState.Failed(e.kind)
+            } catch (_: Exception) {
+                AutofillState.Failed(CoachErrorKind.SERVER)
+            }
+        }
+    }
+
+    fun consumeSuggestion() { _suggestion.value = null }
 
     fun saveSettings(trackingType: TrackingType, restSec: Int?, done: () -> Unit) {
         val current = _exercise.value ?: return
@@ -138,6 +206,10 @@ fun ExerciseDetailScreen(
             Text(t.alsoTrains(e.secondaryMuscles.joinToString { t.muscle(it) }), tone = Tone.Faint)
         }
         e.equipment?.let { Text(t.equipmentName(it), tone = Tone.Faint) }
+        e.note?.let {
+            Spacer(Modifier.height(Space.m))
+            Text(it)
+        }
 
         SectionTitle(t.tracking)
         if (e.isCustom) {
@@ -222,15 +294,22 @@ private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepositor
     }
 }
 
-/** Create ([id] = null) or edit a custom exercise. */
+/**
+ * Create ([id] = null) or edit a custom exercise. Only the name is needed; "Fill in with AI" suggests tracking type,
+ * muscles, equipment, rest and a short note, all editable before saving. For new exercises similar catalogue entries
+ * are offered first ("Did you mean …?", [onPickExisting]) so no duplicates are created.
+ */
 @Composable
 fun CustomExerciseScreen(
     viewModel: ExerciseViewModel,
     initialName: String,
+    language: Language,
     onBack: () -> Unit,
     onSaved: (String) -> Unit,
+    onPickExisting: ((Exercise) -> Unit)? = null,
 ) {
     val t = LocalStrings.current
+    val f = LocalExerciseFormStrings.current
     val existing by viewModel.exercise.collectAsStateWithLifecycle()
     val loaded by viewModel.loaded.collectAsStateWithLifecycle()
     if (!loaded) return
@@ -238,16 +317,43 @@ fun CustomExerciseScreen(
     val e = existing
     var name by rememberSaveable(e?.id) { mutableStateOf(e?.name ?: initialName) }
     var tracking by rememberSaveable(e?.id) { mutableStateOf(e?.trackingType ?: TrackingType.WEIGHT_REPS) }
-    var muscle by rememberSaveable(e?.id) { mutableStateOf(e?.primaryMuscles?.firstOrNull()) }
+    var primary by rememberSaveable(e?.id) { mutableStateOf(MuscleKeys.of(e?.primaryMuscles.orEmpty())) }
+    var secondary by rememberSaveable(e?.id) { mutableStateOf(MuscleKeys.of(e?.secondaryMuscles.orEmpty())) }
     var equipment by rememberSaveable(e?.id) { mutableStateOf(e?.equipment) }
     var rest by rememberSaveable(e?.id) { mutableStateOf(e?.defaultRestSec?.toString().orEmpty()) }
+    var note by rememberSaveable(e?.id) { mutableStateOf(e?.note.orEmpty()) }
+
+    val autofillState by viewModel.autofillState.collectAsStateWithLifecycle()
+    val suggestion by viewModel.suggestion.collectAsStateWithLifecycle()
+    LaunchedEffect(suggestion) {
+        val s = suggestion ?: return@LaunchedEffect
+        tracking = s.trackingType
+        primary = MuscleKeys.of(s.primary)
+        secondary = MuscleKeys.of(s.secondary)
+        equipment = s.equipment
+        s.restSec?.let { rest = it.toString() }
+        s.note?.let { note = it }
+        viewModel.consumeSuggestion()
+    }
+    val index by viewModel.indexVersion.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { if (e == null) viewModel.loadIndex() }
+    val similar = remember(name, index) { viewModel.similar(name) }
 
     Screen(
         scroll = true,
         header = { BackHeader(t.back, onBack) },
         footer = {
             PrimaryButton(t.save, {
-                viewModel.saveCustom(CustomExerciseInput(name, tracking, rest.toIntOrNull(), muscle, equipment), onSaved)
+                val input = CustomExerciseInput(
+                    name = name,
+                    trackingType = tracking,
+                    restSec = rest.toIntOrNull(),
+                    primary = MuscleKeys.parse(primary),
+                    equipment = equipment,
+                    secondary = MuscleKeys.parse(secondary),
+                    note = note,
+                )
+                viewModel.saveCustom(input, onSaved)
             }, enabled = name.isNotBlank())
         },
     ) {
@@ -255,11 +361,45 @@ fun CustomExerciseScreen(
         Spacer(Modifier.height(Space.s))
         BigInput(name, { name = it.take(60) }, t.exerciseNamePlaceholder, Modifier.fillMaxWidth())
 
+        Spacer(Modifier.height(Space.m))
+        if (viewModel.aiAvailable) {
+            val loading = autofillState == ExerciseViewModel.AutofillState.Loading
+            ListRow(
+                if (loading) f.aiFilling else f.aiFill,
+                tone = if (name.isBlank() || loading) Tone.Muted else Tone.Default,
+                onClick = { if (!loading && name.isNotBlank()) viewModel.autofill(name, language) },
+            )
+            val hint = when (val st = autofillState) {
+                ExerciseViewModel.AutofillState.Done -> f.aiFilled
+                is ExerciseViewModel.AutofillState.Failed -> f.aiError(st.kind)
+                else -> if (name.isBlank()) f.aiNeedName else f.aiFillHint
+            }
+            Text(hint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        } else {
+            Text(f.aiNoAccess, style = Theme.type.caption, tone = Tone.Muted)
+        }
+
+        if (similar.isNotEmpty() && onPickExisting != null) {
+            SectionTitle(f.didYouMean)
+            Text(f.didYouMeanHint, style = Theme.type.caption, tone = Tone.Muted)
+            similar.forEach { candidate -> ExerciseRow(candidate, language, selected = null) { onPickExisting(candidate) } }
+        }
+
         SectionTitle(t.tracking)
         TrackingChooser(tracking) { tracking = it }
 
-        SectionTitle(t.muscleGroup)
-        ChoiceChips(Muscle.entries, muscle, { t.muscle(it) }) { muscle = it }
+        SectionTitle(f.primaryMuscles)
+        MultiChoiceChips(Muscle.entries, MuscleKeys.parse(primary), { t.muscle(it) }) { m ->
+            val list = MuscleKeys.parse(primary)
+            primary = MuscleKeys.of(if (m in list) list - m else list + m)
+            if (m !in list) secondary = MuscleKeys.of(MuscleKeys.parse(secondary) - m)
+        }
+
+        SectionTitle(f.secondaryMuscles)
+        MultiChoiceChips(Muscle.entries.filter { it !in MuscleKeys.parse(primary) }, MuscleKeys.parse(secondary), { t.muscle(it) }) { m ->
+            val list = MuscleKeys.parse(secondary)
+            secondary = MuscleKeys.of(if (m in list) list - m else list + m)
+        }
 
         SectionTitle(t.equipment)
         ChoiceChips(Equipment.entries, equipment, { t.equipmentName(it) }) { equipment = it }
@@ -268,6 +408,24 @@ fun CustomExerciseScreen(
         ListRow(t.restTime) {
             RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
         }
+
+        SectionTitle(f.note)
+        MultilineInput(note, { note = it.take(500) }, f.notePlaceholder, minHeight = 64.dp)
+    }
+}
+
+/** Muscle lists as comma-separated keys, so they survive in rememberSaveable on every platform. */
+internal object MuscleKeys {
+    fun of(list: List<Muscle>): String = list.distinct().joinToString(",") { it.key }
+    fun parse(keys: String): List<Muscle> = keys.split(',').mapNotNull { Muscle.fromKey(it) }
+}
+
+/** Multiple choice: tapping toggles. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> MultiChoiceChips(options: List<T>, selected: List<T>, label: (T) -> String, onToggle: (T) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+        options.forEach { option -> Chip(label(option), option in selected, { onToggle(option) }) }
     }
 }
 

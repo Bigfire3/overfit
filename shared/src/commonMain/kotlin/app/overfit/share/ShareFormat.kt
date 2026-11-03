@@ -32,6 +32,8 @@ object ShareFormat {
     const val MAX_SETS = 30
     const val MAX_JSON_BYTES = 200 * 1024
     const val MAX_NAME = 80
+    const val MAX_NOTE = 500
+    const val MAX_REST_SEC = 3600
 
     private val json = Json { prettyPrint = false }
 
@@ -69,8 +71,13 @@ object ShareFormat {
                         put("ref", c.ref)
                         put("name", c.name)
                         put("trackingType", c.trackingType)
-                        c.muscle?.let { put("muscle", it) }
+                        // "muscle" (first primary muscle) stays for app versions before "primary" existed.
+                        (c.primary.firstOrNull() ?: c.muscle)?.let { put("muscle", it) }
+                        if (c.primary.isNotEmpty()) put("primary", buildJsonArray { c.primary.forEach { add(JsonPrimitive(it)) } })
+                        if (c.secondary.isNotEmpty()) put("secondary", buildJsonArray { c.secondary.forEach { add(JsonPrimitive(it)) } })
                         c.equipment?.let { put("equipment", it) }
+                        c.restSec?.let { put("restSec", it) }
+                        c.note?.let { put("note", it) }
                     })
                 }
             })
@@ -114,7 +121,19 @@ object ShareFormat {
             val o = el as? JsonObject ?: return@mapNotNull null
             val ref = o.str("ref") ?: return@mapNotNull null
             val cname = o.str("name")?.trim()?.take(MAX_NAME)?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-            SharedCustom(ref, cname, o.str("trackingType") ?: "WEIGHT_REPS", o.str("muscle"), o.str("equipment"))
+            val muscle = o.str("muscle")
+            val primary = o.strings("primary").ifEmpty { listOfNotNull(muscle) }
+            SharedCustom(
+                ref = ref,
+                name = cname,
+                trackingType = o.str("trackingType") ?: "WEIGHT_REPS",
+                muscle = muscle ?: primary.firstOrNull(),
+                equipment = o.str("equipment"),
+                primary = primary,
+                secondary = o.strings("secondary"),
+                restSec = o.num("restSec")?.toInt()?.takeIf { it in 0..MAX_REST_SEC },
+                note = o.str("note")?.trim()?.take(MAX_NOTE)?.takeIf { it.isNotEmpty() },
+            )
         }
         val parsed = exercises.mapNotNull { el ->
             val o = el as? JsonObject ?: return@mapNotNull null
@@ -172,6 +191,11 @@ object ShareFormat {
     private val LINK_REGEX = Regex("""(?:https?://[^\s#]*/t|overfit://t/?)#([A-Za-z0-9_\-+/=]+)""")
     private val FENCE_REGEX = Regex("""```[A-Za-z]*\s*\n?(.*?)```""", RegexOption.DOT_MATCHES_ALL)
 
+    /** String array (unknown entries are skipped), at most 10. */
+    private fun JsonObject.strings(key: String): List<String> =
+        (this[key] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content?.trim()?.takeIf { s -> s.isNotEmpty() } }
+            .distinct().take(10)
+
     private fun JsonObject.str(key: String): String? =
         (this[key] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull
 
@@ -198,12 +222,20 @@ data class SharedExercise(
     val note: String? = null,
 )
 
+/**
+ * Own exercise of the sender. [muscle] is the old single-muscle field (still written as the first primary muscle so
+ * older app versions keep reading it); [primary], [secondary], [restSec] and [note] were added in November 2026.
+ */
 data class SharedCustom(
     val ref: String,
     val name: String,
     val trackingType: String = "WEIGHT_REPS",
     val muscle: String? = null,
     val equipment: String? = null,
+    val primary: List<String> = listOfNotNull(muscle),
+    val secondary: List<String> = emptyList(),
+    val restSec: Int? = null,
+    val note: String? = null,
 )
 
 data class SharedTraining(

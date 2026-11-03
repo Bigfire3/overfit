@@ -37,7 +37,7 @@ class RepositoryTest {
     @After
     fun tearDown() = db.close()
 
-    private fun input(name: String) = CustomExerciseInput(name, TrackingType.WEIGHT_REPS, 60, null, null)
+    private fun input(name: String) = CustomExerciseInput(name, TrackingType.WEIGHT_REPS, 60)
 
     private suspend fun custom(name: String) = exercises.get(exercises.createCustom(input(name)))!!
 

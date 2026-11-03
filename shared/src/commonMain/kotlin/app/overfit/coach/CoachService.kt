@@ -1,5 +1,6 @@
 package app.overfit.coach
 
+import app.overfit.ai.AiGateway
 import app.overfit.ai.ProviderId
 import app.overfit.data.ExerciseRepository
 import app.overfit.data.TemplateRepository
@@ -76,6 +77,18 @@ class CoachService(
     val latestFinished = dao.observeLatestFinished()
 
     fun access(): CoachAccess = access.invoke()
+
+    /**
+     * The coach's AI access for other features (exercise autofill): same provider, key or Fuel, and model. New
+     * providers wired into [transport] are picked up automatically.
+     */
+    val ai: AiGateway = object : AiGateway {
+        override fun available(): Boolean = access() is CoachAccess.Ready
+        override suspend fun send(prompt: CoachPrompt, structured: Boolean): CoachReply {
+            val ready = access() as? CoachAccess.Ready ?: throw CoachException(CoachErrorKind.NO_ACCESS)
+            return transport(ready.providerId).send(prompt, settings.state.value.model(ready.providerId), structured)
+        }
+    }
 
     /** Provider the next request goes to (for the settings screen). */
     fun providerId(): ProviderId = (access() as? CoachAccess.Ready)?.providerId ?: currentProvider()

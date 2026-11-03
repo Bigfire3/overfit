@@ -45,7 +45,7 @@ Nicht im Onboarding: Sprache (Gerät/Einstellungen), Ziel, Größe, Erfahrung, E
 
 ## Datenmodell (Vorschlag, darfst du verbessern)
 - Übungs-IDs müssen geräteübergreifend stabil sein (z. B. `wg:<slug>`, `fdb:<id>`, eigene Übungen: UUID), damit geteilte Trainings auf anderen Geräten auflösbar sind. Vorlagen und Sessions bekommen ebenfalls eine UUID.
-- Exercise: id, name, source (WORKOUT_GUIDE | FREE_DB | CUSTOM), sourceId?, imageRef, primaryMuscles, equipment, trackingType, defaultRestSec
+- Exercise: id, name, source (WORKOUT_GUIDE | CUSTOM; FREE_DB nur noch in alten Backups), sourceId?, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType, defaultRestSec, note
 - trackingType: WEIGHT_REPS (Gewicht darf negativ sein = Unterstützung, z. B. Band; positiv bei Körpergewichtsübungen = Zusatzgewicht), REPS, TIME (Sekunden, z. B. Handstand-Hold), WEIGHT_TIME
 - WorkoutTemplate + TemplateExercise (Reihenfolge, geplante Sätze, Pausenzeit)
 - WorkoutSession: Start, Ende, templateId?, Notiz, Gefühl 1–5 (optional), photoPath?, aiStatus (NONE, QUEUED, SENT, DONE, FAILED)
@@ -57,8 +57,8 @@ Nicht im Onboarding: Sprache (Gerät/Einstellungen), Ziel, Größe, Erfahrung, E
 
 ## Übungsbilder & Katalog
 - Hauptquelle: Workout Guide (github.com/bryllim/workout-guide, npm @bryllim/workout-guide): 302 Übungen, je 3 schematische SVG-Frames. Nur Frame 1 als Standbild zeigen, keine Animation. SVG beim Rendern in der Theme-Farbe einfärben.
-- Ergänzung für fehlende Übungen: free-exercise-db (github.com/yuhonas/free-exercise-db, Unlicense), erstes Bild.
-- Import-Skript im Repo: beide Kataloge an feste Versionen bzw. Commit-SHAs gepinnt laden, per Namen abgleichen, Dubletten zusammenführen (Workout Guide hat Vorrang), Ergebnis als exercises.json ins App-Asset. Workout-Guide-SVGs offline mitbündeln. free-exercise-db-Bilder lazy laden mit Coil-Disk-Cache, Einstellung „Alle Bilder offline laden".
+- ~~Ergänzung durch free-exercise-db~~ – am 3.11.2026 entfernt (Fotos passten nicht ins Design). Fehlende Übungen legt man als eigene Übung an; „Mit KI ausfüllen“ ergänzt aus dem Namen Erfassungsart, Muskeln, Equipment, Pause und eine Ausführungsnotiz (alles bearbeitbar), vorher „Meintest du …?“ gegen Dubletten. Auch im Workout-Modus über den Übungs-Picker.
+- Import-Skript im Repo: Workout Guide an festen Commit gepinnt laden, Ergebnis als exercises.json ins App-Asset. Workout-Guide-SVGs offline mitbündeln. Keine Bilder aus dem Netz.
 - Lizenz: Workout-Guide-Grafiken sind CC BY-SA 4.0 → Namensnennung (Bryl Lim, Everkinetic) im „Über"-Screen, Dateien unverändert lassen (Einfärben beim Rendern ist erlaubt).
 - Keine Anleitungstexte: nur Name, Bild, Muskelgruppe. Fuzzy-Suche + Filter Muskelgruppe/Equipment.
 - Eigene Übungen: Name, trackingType, Pausenzeit; ohne Bild → Initialen-Kachel (z. B. „HA").

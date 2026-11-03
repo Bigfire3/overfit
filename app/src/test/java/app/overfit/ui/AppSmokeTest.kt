@@ -184,7 +184,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Zeit").performClick()
         compose.onNodeWithText("Speichern").performClick()
         compose.waitUntil(5_000) {
-            kotlinx.coroutines.runBlocking { database.exerciseDao().count() } > 1000 &&
+            kotlinx.coroutines.runBlocking { database.exerciseDao().count() } > 300 &&
                 kotlinx.coroutines.runBlocking { data.exercises.exercises.first() }.any { it.isCustom && it.name == "Klimmzug" }
         }
 

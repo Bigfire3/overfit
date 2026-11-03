@@ -61,6 +61,8 @@ data class BExercise(
     val isArchived: Boolean = false,
     val createdAt: Long = 0,
     val updatedAt: Long = 0,
+    /** Execution note (since database v5; older backups have none). */
+    val note: String? = null,
 )
 
 @Serializable
@@ -255,7 +257,11 @@ class BackupService(
         val now = clock()
         val exerciseDao = db.exerciseDao()
         db.transaction {
+            val referencedIds = (json.templates.flatMap { t -> t.exercises.map { it.exerciseId } } +
+                json.workouts.flatMap { w -> w.exercises.flatMap { listOfNotNull(it.exerciseId, it.replacedExerciseId) } }).toSet()
             json.exercises.forEach { e ->
+                // free-exercise-db is gone (database v5): only exercises the backup uses come back, as custom ones.
+                if (e.source == ExerciseSource.FREE_DB.name && e.id !in referencedIds) return@forEach
                 val existing = exerciseDao.get(e.id)
                 val type = enumOr(e.trackingType, TrackingType.WEIGHT_REPS)
                 if (existing != null && existing.source != ExerciseSource.CUSTOM) {
@@ -345,11 +351,15 @@ private inline fun <reified E : Enum<E>> enumOr(name: String, fallback: E): E =
 
 private fun ExerciseEntity.toBackup() = BExercise(
     id, name, source.name, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType.name,
-    defaultRestSec, isArchived, createdAt, updatedAt,
+    defaultRestSec, isArchived, createdAt, updatedAt, note,
 )
 
-private fun BExercise.toEntity(type: TrackingType) = ExerciseEntity(
-    id = id, name = name, source = enumOr(source, ExerciseSource.CUSTOM), imageRef = imageRef,
-    primaryMuscles = primaryMuscles, secondaryMuscles = secondaryMuscles, equipment = equipment, trackingType = type,
-    defaultRestSec = defaultRestSec, isArchived = isArchived, createdAt = createdAt, updatedAt = updatedAt,
-)
+private fun BExercise.toEntity(type: TrackingType): ExerciseEntity {
+    val legacy = source == ExerciseSource.FREE_DB.name
+    return ExerciseEntity(
+        id = id, name = name, source = if (legacy) ExerciseSource.CUSTOM else enumOr(source, ExerciseSource.CUSTOM),
+        imageRef = if (legacy) null else imageRef,
+        primaryMuscles = primaryMuscles, secondaryMuscles = secondaryMuscles, equipment = equipment, trackingType = type,
+        defaultRestSec = defaultRestSec, isArchived = isArchived, createdAt = createdAt, updatedAt = updatedAt, note = note,
+    )
+}

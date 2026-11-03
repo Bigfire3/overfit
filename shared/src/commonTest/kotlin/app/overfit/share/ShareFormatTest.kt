@@ -1,5 +1,6 @@
 package app.overfit.share
 
+import app.overfit.domain.Equipment
 import app.overfit.domain.Exercise
 import app.overfit.domain.ExerciseSource
 import app.overfit.domain.Muscle
@@ -14,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DeflateTest {
@@ -173,7 +175,7 @@ class ShareMapperTest {
         assertEquals(listOf("Handstand"), preview.newExerciseNames)
         val line = preview.exercises.last()
         assertEquals(TrackingType.TIME, line.newExercise!!.trackingType)
-        assertEquals(Muscle.SHOULDERS, line.newExercise!!.muscle)
+        assertEquals(Muscle.SHOULDERS, line.newExercise!!.primary.single())
     }
 
     @Test fun resolvesNamesGermanAndEnglishAndCreatesUnknown() {
@@ -202,6 +204,106 @@ class ShareMapperTest {
             exercises = listOf(SharedExercise(name = "Zauberkugel"), SharedExercise(name = "zauberkugel")),
         )
         assertEquals(1, ShareMapper.resolve(t, catalog).newExerciseNames.size)
+    }
+}
+
+class ShareCustomExerciseTest {
+    private fun ex(id: String, name: String, custom: Boolean) = Exercise(
+        id, name, if (custom) ExerciseSource.CUSTOM else ExerciseSource.WORKOUT_GUIDE, null, emptyList(), emptyList(), null, TrackingType.WEIGHT_REPS, null,
+    )
+
+    private val fly = Exercise(
+        "custom:fly", "Fliegende eng", ExerciseSource.CUSTOM, null,
+        listOf(Muscle.CHEST, Muscle.TRICEPS), listOf(Muscle.SHOULDERS), Equipment.DUMBBELL, TrackingType.WEIGHT_REPS, 75, "Ellbogen eng",
+    )
+
+    private fun training(custom: List<SharedCustom>, exercise: SharedExercise = SharedExercise(ref = "c1", sets = listOf(SharedSet(kg = 10.0, reps = 10)))) =
+        SharedTraining(name = "T", exercises = listOf(exercise), custom = custom)
+
+    @Test fun customExerciseRoundTripsWithAllFields() {
+        val template = Template(0, "T", null, listOf(TemplateExercise(fly, null, null, listOf(PlannedSet(10.0, 10)))))
+        val shared = ShareMapper.fromTemplate(template)
+        val json = ShareFormat.toJson(shared)
+        assertTrue(json.contains("\"muscle\":\"chest\""), json)
+        assertEquals(ShareParse.Ok(shared), ShareFormat.fromJson(json))
+        val viaPayload = assertIs<ShareParse.Ok>(ShareFormat.fromPayload(ShareFormat.toPayload(shared))).training
+        val viaJson = assertIs<ShareParse.Ok>(ShareFormat.fromJson(json)).training
+        assertEquals(viaJson, viaPayload)
+
+        val preview = ShareMapper.resolve(viaJson, listOf(ex("wg:squat", "Squat", false)))
+        val line = preview.exercises.single()
+        assertNull(line.exercise)
+        val n = assertNotNull(line.newExercise)
+        assertEquals("Fliegende eng", n.name)
+        assertEquals(listOf(Muscle.CHEST, Muscle.TRICEPS), n.primary)
+        assertEquals(listOf(Muscle.SHOULDERS), n.secondary)
+        assertEquals(Equipment.DUMBBELL, n.equipment)
+        assertEquals(75, n.restSec)
+        assertEquals("Ellbogen eng", n.note)
+        assertEquals(TrackingType.WEIGHT_REPS, n.trackingType)
+    }
+
+    @Test fun oldFormatWithOnlyMuscleResolvesToPrimary() {
+        val parsed = assertIs<ShareParse.Ok>(
+            ShareFormat.fromJson("""{"v":1,"name":"T","exercises":[{"ref":"c1","sets":[{"sec":30}]}],"custom":[{"ref":"c1","name":"Handstand","trackingType":"TIME","muscle":"shoulders"}]}"""),
+        ).training
+        val n = assertNotNull(ShareMapper.resolve(parsed, emptyList()).exercises.single().newExercise)
+        assertEquals(listOf(Muscle.SHOULDERS), n.primary)
+        assertTrue(n.secondary.isEmpty())
+        assertNull(n.note)
+    }
+
+    @Test fun existingCustomWithSameNameIsReused() {
+        val own = ex("custom:mine", "Fliegende eng", true)
+        val shared = training(listOf(SharedCustom("c1", "  fliegende   ENG ", "WEIGHT_REPS")))
+        val line = ShareMapper.resolve(shared, listOf(own)).exercises.single()
+        assertEquals("custom:mine", line.exercise?.id)
+        assertNull(line.newExercise)
+
+        val caseOnly = training(listOf(SharedCustom("c1", "FLIEGENDE ENG", "WEIGHT_REPS")))
+        val line2 = ShareMapper.resolve(caseOnly, listOf(own)).exercises.single()
+        assertEquals("custom:mine", line2.exercise?.id)
+        assertNull(line2.newExercise)
+    }
+
+    @Test fun existingCatalogueExerciseWithExactNameIsReused() {
+        val shared = training(listOf(SharedCustom("c1", "Squat", "WEIGHT_REPS")))
+        val line = ShareMapper.resolve(shared, listOf(ex("wg:squat", "Squat", false))).exercises.single()
+        assertEquals("wg:squat", line.exercise?.id)
+        assertNull(line.newExercise)
+    }
+
+    @Test fun legacyFedbIdWithKnownNameFallsBackToName() {
+        val t = SharedTraining(name = "T", exercises = listOf(SharedExercise(id = "fedb:Barbell_Curl", name = "Bizepscurl Langhantel")))
+        val catalog = listOf(ex("wg:biceps-curl", "Bizepscurl Langhantel", false))
+        val line = ShareMapper.resolve(t, catalog).exercises.single()
+        assertEquals("wg:biceps-curl", line.exercise?.id)
+    }
+
+    @Test fun legacyFedbIdOnlyResolvesByExactNameOrBecomesNew() {
+        val t = SharedTraining(name = "T", exercises = listOf(SharedExercise(id = "fedb:Barbell_Curl", sets = listOf(SharedSet(kg = 20.0, reps = 8)))))
+        val known = ShareMapper.resolve(t, listOf(ex("wg:barbell-curl", "Barbell Curl", false), ex("wg:squat", "Squat", false))).exercises.single()
+        assertEquals("wg:barbell-curl", known.exercise?.id)
+        assertNull(known.newExercise)
+
+        val unknown = ShareMapper.resolve(t, listOf(ex("wg:squat", "Squat", false))).exercises.single()
+        assertNull(unknown.exercise)
+        assertEquals("Barbell Curl", unknown.newExercise?.name)
+    }
+
+    @Test fun toTemplateBuildsExerciseWithAllFields() {
+        val template = Template(0, "T", null, listOf(TemplateExercise(fly, null, null, listOf(PlannedSet(10.0, 10)))))
+        val shared = assertIs<ShareParse.Ok>(ShareFormat.fromJson(ShareFormat.toJson(ShareMapper.fromTemplate(template)))).training
+        val preview = ShareMapper.resolve(shared, emptyList())
+        val back = ShareMapper.toTemplate(preview, mapOf("fliegende eng" to "custom:new1"))
+        val e = back.exercises.single().exercise
+        assertEquals("custom:new1", e.id)
+        assertEquals(ExerciseSource.CUSTOM, e.source)
+        assertEquals(listOf(Muscle.CHEST, Muscle.TRICEPS), e.primaryMuscles)
+        assertEquals(listOf(Muscle.SHOULDERS), e.secondaryMuscles)
+        assertEquals(Equipment.DUMBBELL, e.equipment)
+        assertEquals(75, e.defaultRestSec)
+        assertEquals("Ellbogen eng", e.note)
     }
 }
 

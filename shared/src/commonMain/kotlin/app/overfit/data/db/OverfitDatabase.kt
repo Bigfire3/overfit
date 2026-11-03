@@ -9,6 +9,8 @@ import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.immediateTransaction
 import androidx.room.migration.Migration
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 import androidx.room.useWriterConnection
 
 @Database(
@@ -24,9 +26,10 @@ import androidx.room.useWriterConnection
         CoachReviewEntity::class,
         CoachMemoryEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     // v1 → v2 adds the workout tables, v2 → v3 the photo table, v3 → v4 the coach tables (nothing is dropped or rewritten).
+    // v4 → v5 is manual ([MIGRATION_4_5]): free-exercise-db removed, exercise.note added.
     autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 @TypeConverters(Converters::class)
@@ -44,7 +47,29 @@ abstract class OverfitDatabase : RoomDatabase() {
          * Manual migrations. Rule (SPEC): never migrate destructively – every schema change gets a
          * migration (here or as an [AutoMigration] for pure additions) and a migration test.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf()
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_4_5)
+    }
+}
+
+/**
+ * v4 → v5: the free-exercise-db catalogue was removed (photos did not fit the design).
+ * - `exercise.note` is added (execution note of custom exercises).
+ * - free-exercise-db exercises that templates or workouts use (also as the replaced exercise) become custom exercises:
+ *   same ID (no foreign key has to change, backups and coach texts keep matching), no image (→ initials tile).
+ * - Unused free-exercise-db exercises are deleted. The new catalogue no longer contains them, so seeding cannot bring
+ *   them back.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE exercise ADD COLUMN note TEXT")
+        connection.execSQL(
+            """UPDATE exercise SET source = 'CUSTOM', imageRef = NULL
+               WHERE source = 'FREE_DB' AND (
+                   id IN (SELECT exerciseId FROM template_exercise)
+                   OR id IN (SELECT exerciseId FROM session_exercise)
+                   OR id IN (SELECT replacedExerciseId FROM session_exercise WHERE replacedExerciseId IS NOT NULL))""",
+        )
+        connection.execSQL("DELETE FROM exercise WHERE source = 'FREE_DB'")
     }
 }
 

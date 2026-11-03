@@ -28,6 +28,35 @@ Offen: Abstimmung mit Session L (Mini-Leiste, „Training beenden“ auf dem Tab
 6. Workout öffnen → „Bearbeiten“ → „Workout löschen“ (zweimal tippen) → Verlauf zeigt die alten Trainings weiterhin
 7. Übungen-Tab: nur noch Katalog; nirgends steht mehr „Vorlage“ (auch Teilen, Import, Coach, KI-Chat), in Englisch nirgends „template“
 
+## Feedback-Runde 3.11. – Session K: Katalog ohne free-exercise-db, Übungen per KI, eigene Übungen im Workout
+
+Erledigt:
+- free-exercise-db komplett entfernt: Katalog nur noch Workout Guide (302 Übungen mit SVG), Backend-Katalog neu,
+  „Alle Bilder offline laden“ und Bilder aus dem Netz weg, Lizenzhinweise aktualisiert (Workout Guide/Everkinetic, CC BY-SA 4.0).
+- Datenbank v5: benutzte `fedb:`-Übungen bleiben (gleiche ID) als eigene Übung ohne Bild, unbenutzte sind gelöscht.
+  Migrationstest `migration4to5ConvertsUsedFreeDbExercisesAndDeletesUnusedOnes`.
+- Eigene Übung: Haupt- und Hilfsmuskeln, Equipment, Erfassungsart, Pause, Ausführungsnotiz; „Mit KI ausfüllen“ (eigener
+  Key oder Fuel, Structured Output), „Meintest du …?“ gegen Dubletten.
+- Übungs-Picker (Vorlage und Workout-Modus): „Neue Übung anlegen“ mit demselben Formular; die Übung landet im Katalog
+  und direkt im Training bzw. in der Vorlage.
+- Teilen: eigene Übungen übertragen alle Felder (abwärtskompatibel), beim Import keine Dublette bei gleichem Namen.
+  Alte Links mit `fedb:`-IDs: Fallback über den Namen (docs/share-format.md).
+
+### Bitte auf dem Handy testen (Session K)
+1. Update installieren, App öffnen: Übungen → Katalog zeigt nur noch Grafik-Übungen (302). Hattest du eine
+   free-exercise-db-Übung in einer Vorlage oder einem Training: sie ist noch da, als „Eigene Übung“ mit Buchstaben-Kachel.
+2. Profil → „Alle Bilder offline laden“ gibt es nicht mehr; Profil → Über: nur noch Workout Guide als Bildquelle.
+3. Übungen → „Eigene Übung“ → Name „Bizepscurl am Kabel“ eingeben → unter „Meintest du …?“ erscheinen ähnliche Übungen
+   (antippen öffnet sie). Zurück, Name wieder eingeben → „Mit KI ausfüllen“ (mit Key oder Fuel) → nach ein paar Sekunden
+   sind Erfassungsart, Haupt-/Hilfsmuskeln, Equipment, Pause und Ausführung gefüllt → etwas ändern → Speichern →
+   Übung öffnen: Notiz steht unter den Muskeln.
+4. Ohne KI-Zugang (KI trennen): im Formular steht statt des Knopfs ein Hinweis, alles lässt sich von Hand ausfüllen.
+5. Training starten → „Übung hinzufügen“ → suchen („Turkish Get-up“) → letzte Zeile „„Turkish Get-up“ als neue Übung
+   anlegen“ → ausfüllen (gern mit KI) → Speichern → die Übung steht sofort im laufenden Training; Pausentimer und
+   Benachrichtigung laufen dabei weiter. Dasselbe im Vorlagen-Editor.
+6. Vorlage mit dieser eigenen Übung teilen → auf zweitem Gerät (oder nach Löschen der Übung) importieren → die Übung
+   kommt mit Muskeln, Equipment, Erfassungsart, Pause und Notiz an; nochmal importieren → keine zweite gleichnamige Übung.
+
 ## 3.11. – KI-Kontext, Auswertung je Übung, Gemini (Session N)
 Erledigt:
 - **Profil überall:** Name, Alter und aktuelles Körpergewicht (Profil-Einheit) gehen über jeden KI-Weg mit: Coach (eigener Key und Fuel), „Kontext kopieren“, „KI-Vorlage kopieren“, Gem-/GPT-Anleitung (Zeile „Über mich“) und KI-Chat (jede MCP-Tool-Antwort beginnt mit `user`). Alle Wege nutzen eine gemeinsame Funktion (`aiProfileFacts`), fehlende Werte fallen weg.

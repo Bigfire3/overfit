@@ -129,7 +129,10 @@ class DayWithOverfitTest {
         // Sub-screens hide the tab bar: step back until it is there (screens settle asynchronously).
         repeat(4) {
             if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
-            if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) back()
+            // The back button can vanish between the check and the click while a screen settles: then just retry.
+            if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) {
+                try { back() } catch (_: AssertionError) {}
+            }
             compose.waitForIdle()
         }
         compose.waitUntil(10_000) { compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty() }
@@ -222,11 +225,11 @@ class DayWithOverfitTest {
         val countBefore = deps.workout.state.value.workout!!.exercises.size
         compose.onAllNodesWithText("Ersetzen")[0].performScrollTo().performClick()
         waitFor("Suchen, z. B. Klimmzug")
-        compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("Dips")
-        compose.waitUntil(20_000) { compose.onAllNodes(hasText("Dips", substring = true)).fetchSemanticsNodes().size >= 2 }
-        // [0] is the search field itself (it contains the typed text); the results follow it.
-        compose.onAllNodes(hasText("Dips", substring = true))[1].performClick()
-        try { compose.waitUntil(10_000) { deps.workout.state.value.workout!!.exercises.any { it.exercise.name.startsWith("Dips") } } }
+        compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("Dip")
+        compose.waitUntil(20_000) { compose.onAllNodes(hasText("Dip")).fetchSemanticsNodes().size >= 2 }
+        // [0] is the search field itself (it contains the typed text); the exact result "Dip" follows it.
+        compose.onAllNodes(hasText("Dip"))[1].performClick()
+        try { compose.waitUntil(10_000) { deps.workout.state.value.workout!!.exercises.any { it.exercise.name == "Dip" } } }
         catch (e: Throwable) { throw AssertionError(deps.workout.state.value.workout!!.exercises.map { it.exercise.name }.toString() + compose.onRoot().printToString().take(3000), e) }
         assertEquals(countBefore, deps.workout.state.value.workout!!.exercises.size)
         // reorder (the drag gesture itself is not scriptable here; the same edit the drag handle calls)

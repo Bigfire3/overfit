@@ -24,9 +24,6 @@ interface ExerciseDao {
     @Query("SELECT * FROM exercise WHERE id IN (:ids)")
     suspend fun getAll(ids: List<String>): List<ExerciseEntity>
 
-    @Query("SELECT id, imageRef FROM exercise WHERE isArchived = 0 AND imageRef LIKE 'http%'")
-    suspend fun remoteImages(): List<ExerciseImageRef>
-
     @Query("SELECT COUNT(*) FROM exercise")
     suspend fun count(): Int
 
@@ -67,8 +64,6 @@ interface ExerciseDao {
     )
     suspend fun forBackup(): List<ExerciseEntity>
 }
-
-data class ExerciseImageRef(val id: String, val imageRef: String)
 
 @Dao
 interface TemplateDao {

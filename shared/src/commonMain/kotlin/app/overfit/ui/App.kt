@@ -69,11 +69,13 @@ import app.overfit.ui.chat.ChatProviderScreen
 import app.overfit.ui.chat.ChatViewModel
 import app.overfit.i18n.LocalChatStrings
 import app.overfit.i18n.chatStringsFor
+import app.overfit.i18n.LocalExerciseFormStrings
+import app.overfit.i18n.exerciseFormStringsFor
+import app.overfit.ai.ExerciseAutofill
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.toRoute
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
-import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -191,6 +193,8 @@ class AppDependencies(
     val fuelSession = FuelSession(fuel)
     /** The AI coach: requests, queue, reviews, memory. Runs in the app scope. */
     val coach: CoachService = createCoach(store, providers, data, today, clock, coachPhotos, coachTransport)
+    /** "Fill in with AI" for custom exercises: same access, provider and model as the coach. */
+    val exerciseAutofill = ExerciseAutofill(coach.ai)
     /** KI-Chat-Verbindung (Claude, ChatGPT, Gemini): sync, inbox, notes. The coach memory goes along as memory/coach. */
     val chat: ChatFeature = ChatFeature(fuel, data, store, kv, data.scope, clock, memory = { coach.memoryText })
 
@@ -297,8 +301,11 @@ class AppDependencies(
 @Serializable data class PhotoCompareRoute(val firstId: String, val secondId: String)
 /** Preview and confirm a backup import; the file waits in [AppDependencies.pendingBackup]. */
 @Serializable data object BackupImportRoute
-/** Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). */
-@Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "")
+/**
+ * Custom exercise; [id] empty = new one (prefilled with [name], e.g. the search text). [pick]: opened from the
+ * exercise picker, the saved exercise goes straight back into the picker's caller (template or running workout).
+ */
+@Serializable data class CustomExerciseRoute(val id: String = "", val name: String = "", val pick: Boolean = false)
 /** A saved workout with "Start", edit and share. */
 @Serializable data class WorkoutPlanRoute(val templateId: Long)
 /** Template editor; [templateId] 0 = new template. */
@@ -309,6 +316,8 @@ class AppDependencies(
 /** Hands the picker's result back to the editor below it on the back stack. */
 class PickedExercises {
     val result = MutableStateFlow<List<String>?>(null)
+    /** Exercise created (or chosen under "Did you mean …?") in the form opened from the picker. */
+    val created = MutableStateFlow<String?>(null)
 }
 
 enum class Tab(val route: Any, val icon: Icon, val label: (Strings) -> String) {
@@ -336,7 +345,6 @@ fun OverfitApp(deps: AppDependencies) {
         ImageLoader.Builder(context)
             .components {
                 add(SvgDecoder.Factory())
-                add(KtorNetworkFetcherFactory())
             }
             .crossfade(true)
             .build()
@@ -356,6 +364,7 @@ fun OverfitApp(deps: AppDependencies) {
             LocalFuelStrings provides fuelStringsFor(state.language),
             LocalChatStrings provides chatStringsFor(state.language),
             LocalCoachStrings provides coachStringsFor(state.language),
+            LocalExerciseFormStrings provides exerciseFormStringsFor(state.language),
         ) {
             val nav = rememberNavController()
             val coachNav = remember(nav) {
@@ -610,10 +619,22 @@ fun OverfitApp(deps: AppDependencies) {
                     composable<CustomExerciseRoute> { entry ->
                         val route = entry.toRoute<CustomExerciseRoute>()
                         CustomExerciseScreen(
-                            viewModel = viewModel { ExerciseViewModel(route.id.ifEmpty { null }, deps.data.exercises) },
+                            viewModel = viewModel { ExerciseViewModel(route.id.ifEmpty { null }, deps.data.exercises, deps.exerciseAutofill) },
                             initialName = route.name,
+                            language = state.language,
                             onBack = nav::popBackStack,
-                            onSaved = { nav.popBackStack() },
+                            onSaved = { id ->
+                                if (route.pick) picked.created.value = id
+                                nav.popBackStack()
+                            },
+                            onPickExisting = { existing ->
+                                if (route.pick) {
+                                    picked.created.value = existing.id
+                                    nav.popBackStack()
+                                } else {
+                                    nav.navigate(ExerciseDetailRoute(existing.id)) { popUpTo<CustomExerciseRoute> { inclusive = true } }
+                                }
+                            },
                         )
                     }
                     composable<TemplateEditorRoute> { entry ->
@@ -636,12 +657,16 @@ fun OverfitApp(deps: AppDependencies) {
                     }
                     composable<ExercisePickerRoute> { entry ->
                         val single = entry.toRoute<ExercisePickerRoute>().single
+                        val pickedCreated by picked.created.collectAsStateWithLifecycle()
                         ExercisePickerScreen(
                             catalog = viewModel { CatalogViewModel(deps.data.exercises) },
                             language = state.language,
                             single = single,
                             onBack = nav::popBackStack,
                             onPicked = { ids -> picked.result.value = ids; nav.popBackStack() },
+                            onCreate = { query -> nav.navigate(CustomExerciseRoute(name = query, pick = true)) },
+                            created = pickedCreated,
+                            onCreatedConsumed = { picked.created.value = null },
                         )
                     }
                     composable<PhotosRoute> {
@@ -702,7 +727,6 @@ fun OverfitApp(deps: AppDependencies) {
                             onFuel = { nav.navigate(FuelRoute) },
                             onAiCoach = { nav.navigate(AiCoachRoute) },
                             onChatNotes = { nav.navigate(ChatNotesRoute) },
-                            offlineImages = deps.data.offlineImages,
                             restAlerts = deps.restAlerts,
                             share = share,
                             exportingBackup = exportingBackup,

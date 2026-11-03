@@ -41,7 +41,6 @@ kotlin {
             api(libs.room.runtime)
             implementation(libs.coil.compose.mp)
             implementation(libs.coil.svg.mp)
-            implementation(libs.coil.network.ktor3)
         }
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
