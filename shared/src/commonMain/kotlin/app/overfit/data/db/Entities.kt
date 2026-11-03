@@ -260,6 +260,9 @@ data class WorkoutPhotoEntity(
 )
 
 /** Row of the history list: a finished workout with its key numbers. */
+/** Query result: when a saved workout was last trained (epoch ms of the start). */
+data class TemplateLastDone(val templateId: Long, val lastStartedAt: Long)
+
 data class HistoryRow(
     val id: String,
     val name: String,

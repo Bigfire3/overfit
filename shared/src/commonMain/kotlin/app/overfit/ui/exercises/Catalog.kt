@@ -89,79 +89,20 @@ class CatalogViewModel(repository: ExerciseRepository) : ViewModel() {
     fun toggleOnlyCustom() = _filter.update { it.copy(onlyCustom = !it.onlyCustom) }
 }
 
-enum class ExercisesSegment { CATALOG, TEMPLATES }
-
-/** Tab "Exercises": catalogue (search, filters, custom exercises) and templates. */
+/** Tab "Exercises": catalogue (search, filters, custom exercises). */
 @Composable
 fun ExercisesScreen(
     catalog: CatalogViewModel,
-    templates: List<TemplateSummary>?,
     language: Language,
     onOpenExercise: (Exercise) -> Unit,
     onNewCustomExercise: () -> Unit,
-    onOpenTemplate: (Long) -> Unit,
-    onNewTemplate: () -> Unit,
-    share: ShareDependencies,
-    onImport: () -> Unit,
 ) {
     val t = LocalStrings.current
-    var segment by rememberSaveable { mutableStateOf(ExercisesSegment.CATALOG) }
-    Screen(
-        footer = {
-            if (segment == ExercisesSegment.CATALOG) PrimaryButton(t.newCustomExercise, onNewCustomExercise)
-            else PrimaryButton(t.newTemplate, onNewTemplate)
-        },
-    ) {
+    // Only exercises here; the saved workouts live on the Training tab.
+    Screen(footer = { PrimaryButton(t.newCustomExercise, onNewCustomExercise) }) {
         Title(t.exercisesTitle)
         Spacer(Modifier.height(Space.m))
-        Segmented(
-            segment,
-            listOf(ExercisesSegment.CATALOG to t.catalog, ExercisesSegment.TEMPLATES to t.templates),
-        ) { segment = it }
-        Spacer(Modifier.height(Space.s))
-        if (segment == ExercisesSegment.CATALOG) {
-            CatalogList(catalog, language, onClick = onOpenExercise)
-        } else {
-            TemplateList(templates, onOpenTemplate, share, onImport)
-        }
-    }
-}
-
-@Composable
-fun ColumnScope.TemplateList(
-    templates: List<TemplateSummary>?,
-    onOpen: (Long) -> Unit,
-    share: ShareDependencies,
-    onImport: () -> Unit,
-) {
-    val t = LocalStrings.current
-    if (templates == null) return
-    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-        if (templates.isEmpty()) {
-            item(key = "empty") { Text(t.templatesTabEmpty, Modifier.padding(vertical = Space.l), tone = Tone.Muted) }
-        }
-        items(templates, key = { it.id }) { template -> TemplateRow(template) { onOpen(template.id) } }
-        item(key = "import") {
-            TemplateImportRows(share, onImport, showSamples = true)
-        }
-    }
-}
-
-@Composable
-fun TemplateRow(template: TemplateSummary, onClick: () -> Unit) {
-    val t = LocalStrings.current
-    Column(Modifier.fillMaxWidth().pressableRow(onClick)) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.m)) {
-            Text(template.name, style = Theme.type.label)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                t.templateSummary(template.exerciseNames.size, template.exerciseNames),
-                style = Theme.type.caption,
-                tone = Tone.Muted,
-                maxLines = 2,
-            )
-        }
-        Hairline()
+        CatalogList(catalog, language, onClick = onOpenExercise)
     }
 }
 

@@ -92,7 +92,7 @@ val HistoryGerman = HistoryStrings(
     notDone = "offen",
     markerAdded = "hinzugefügt",
     markerReplaced = "ersetzt",
-    useAsTemplate = "Als Vorlage übernehmen",
+    useAsTemplate = "Als Workout speichern",
     shareWorkout = "Teilen",
     workoutMissing = "Dieses Training gibt es nicht mehr.",
 
@@ -148,7 +148,7 @@ val HistoryEnglish = HistoryStrings(
     notDone = "open",
     markerAdded = "added",
     markerReplaced = "replaced",
-    useAsTemplate = "Use as template",
+    useAsTemplate = "Save as workout",
     shareWorkout = "Share",
     workoutMissing = "This workout no longer exists.",
 
