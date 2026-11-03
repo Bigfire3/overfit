@@ -82,7 +82,12 @@ fun FinishScreen(
     var seeded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(data) {
         val d = data ?: return@LaunchedEffect
-        if (!seeded) { seeded = true; feeling = d.finished.feeling; note = d.finished.note.orEmpty() }
+        // Prefill once, but never overwrite what the user already entered while the data was loading.
+        if (!seeded) {
+            seeded = true
+            if (feeling == null) feeling = d.finished.feeling
+            if (note.isEmpty()) note = d.finished.note.orEmpty()
+        }
     }
     var saving by remember { mutableStateOf(false) }
 
