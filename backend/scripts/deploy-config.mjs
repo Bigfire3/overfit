@@ -43,12 +43,13 @@ export function readJsonc(path) {
 }
 
 /**
- * Web-Kauf aus Repo-Variablen: echte Zahlungen (`PADDLE_ENV=live`) nur im Produktionsbetrieb, der Testbetrieb ist immer
- * Sandbox. `WEB_PURCHASE_CHANNELS` (sideload,store) steuert, wo die App den Knopf zeigt.
+ * Web-Kauf aus Repo-Variablen: `WEB_PURCHASE_CHANNELS` (sideload,store) steuert, wo die App den Knopf zeigt;
+ * `STRIPE_INVOICES=on` erzeugt zu jedem Kauf eine Stripe-Rechnung (kostet extra). Test- oder Live-Zahlungen ergeben sich
+ * aus dem Stripe-Schlüssel (der Worker nimmt im Testbetrieb nur sk_test_…, in Produktion nur sk_live_…).
  */
 export function webVars(mode, env) {
   const v = {};
-  if (mode === 'production' && (env.PADDLE_ENV ?? '').trim() === 'live') v.PADDLE_ENV = 'live';
+  if ((env.STRIPE_INVOICES ?? '').trim() === 'on') v.STRIPE_INVOICES = 'on';
   const ch = (env.WEB_PURCHASE_CHANNELS ?? '').trim();
   if (/^(sideload|store)(,(sideload|store))*$/.test(ch)) v.WEB_PURCHASE_CHANNELS = ch;
   return v;

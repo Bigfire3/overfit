@@ -2,7 +2,7 @@ import { ApiError } from './errors';
 import type { Config, Device, Env } from './types';
 import { hex, randomId, sha256 } from './crypto';
 import { availableMicro, clawbackStatements, grantStatements, now } from './ledger';
-import { PaddleProvider, PADDLE_API } from './payments/paddle';
+import { StripeProvider, stripeKeyEnvironment } from './payments/stripe';
 import type { PaymentEnvironment, PaymentProvider } from './payments/provider';
 
 /** Wie viele Checkouts ein Kauflink höchstens starten darf (Paket wechseln, abbrechen, neu versuchen). */
@@ -12,16 +12,19 @@ const MAX_WEBHOOK_BYTES = 64 * 1024;
 // ---- Anbieter ------------------------------------------------------------------------------------------------
 
 /**
- * Sandbox im Testbetrieb, live nur mit `PADDLE_ENV=live` im Produktionsbetrieb. Ein Produktions-Worker mit
- * Sandbox-Keys bietet keinen Web-Kauf an: Testkarten würden sonst echtes Guthaben (= echte KI-Kosten) erzeugen.
+ * Umgebung aus dem Stripe-Schlüssel, passend zum Betrieb: Test-/Dev-Worker nur mit Testschlüssel (`sk_test_…`),
+ * Produktions-Worker nur mit Live-Schlüssel (`sk_live_…`). Sonst kein Web-Kauf: Testkarten würden in Produktion echtes
+ * Guthaben (= echte KI-Kosten) erzeugen, echte Zahlungen im Testbetrieb nur Test-Guthaben.
  */
-export function paymentEnvironment(env: Env, cfg: Config): PaymentEnvironment | null {
-  if (cfg.testMode || cfg.devMode) return 'sandbox';
-  return env.PADDLE_ENV === 'live' ? 'live' : null;
+export function paymentEnvironment(cfg: Config, key: string): PaymentEnvironment | null {
+  const e = stripeKeyEnvironment(key);
+  if (!e) return null;
+  if (cfg.testMode || cfg.devMode) return e === 'sandbox' ? e : null;
+  return e === 'live' ? e : null;
 }
 
 let override: ((env: Env, cfg: Config) => PaymentProvider | null) | null = null;
-/** Nur Tests: anderen Anbieter einsetzen (null = zurück zu Paddle). */
+/** Nur Tests: anderen Anbieter einsetzen (null = zurück zu Stripe). */
 export function setPaymentProviderForTests(f: typeof override) {
   override = f;
 }
@@ -29,12 +32,15 @@ export function setPaymentProviderForTests(f: typeof override) {
 export function getPaymentProvider(env: Env, cfg: Config): PaymentProvider | null {
   if (cfg.webPurchaseOff) return null;
   if (override) return override(env, cfg);
-  const key = env.PADDLE_API_KEY?.trim();
-  const secret = env.PADDLE_WEBHOOK_SECRET?.trim();
-  const clientToken = env.PADDLE_CLIENT_TOKEN?.trim();
-  const environment = paymentEnvironment(env, cfg);
-  if (!key || !secret || !clientToken || !environment) return null;
-  return new PaddleProvider(key, secret, clientToken, environment, env.PADDLE_API_BASE?.trim() || PADDLE_API[environment]);
+  const key = env.STRIPE_SECRET_KEY?.trim();
+  const secret = env.STRIPE_WEBHOOK_SECRET?.trim();
+  if (!key || !secret) return null;
+  const environment = paymentEnvironment(cfg, key);
+  if (!environment) return null;
+  return new StripeProvider(key, secret, environment, {
+    apiBase: env.STRIPE_API_BASE?.trim() || undefined,
+    invoices: env.STRIPE_INVOICES === 'on',
+  });
 }
 
 function requireProvider(env: Env, cfg: Config): PaymentProvider {
@@ -95,7 +101,7 @@ async function linkStatus(env: Env, token: string): Promise<{ status: LinkStatus
 
 // ---- Öffentliche Endpunkte der Kaufseite ---------------------------------------------------------------------
 
-/** `POST /v1/web/session`: Pakete, Testmodus, Paddle.js-Einstellungen und (mit Token) der Zustand des Kauflinks. */
+/** `POST /v1/web/session`: Pakete, Testmodus, Anbieter und (mit Token) der Zustand des Kauflinks. */
 export async function webSession(env: Env, cfg: Config, body: Record<string, unknown>) {
   const p = getPaymentProvider(env, cfg);
   const token = typeof body.token === 'string' ? body.token : '';
@@ -103,6 +109,8 @@ export async function webSession(env: Env, cfg: Config, body: Record<string, unk
     enabled: !!p,
     testMode: p ? p.environment === 'sandbox' : true,
     client: p?.client ?? null,
+    /** Aufschlag auf die Modellpreise (Basispunkte), damit die Kaufseite ihn nennen kann. */
+    markupBp: cfg.markupBp,
     packages: webPackages(cfg),
     link: token ? await linkStatus(env, token) : null,
   };
@@ -142,7 +150,14 @@ export async function webCheckout(env: Env, cfg: Config, body: Record<string, un
   )
     .bind(orderId, provider.name, provider.environment, kind, accountId, hash, packageId, pkg.priceMicro, pkg.priceMicro, now())
     .run();
-  const session = await provider.createCheckout({ orderId, kind, packageId, priceMicro: pkg.priceMicro, creditMicro: pkg.priceMicro, locale });
+  const page = cfg.webPurchaseUrl;
+  const sep = page.includes('?') ? '&' : '?';
+  const session = await provider.createCheckout({
+    orderId, kind, packageId, priceMicro: pkg.priceMicro, creditMicro: pkg.priceMicro, locale,
+    successUrl: `${page}${sep}order=${encodeURIComponent(orderId)}&lang=${locale}`,
+    // Ohne Token: die Kaufseite merkt ihn sich selbst (sessionStorage), er landet nicht beim Anbieter.
+    cancelUrl: `${page}${sep}canceled=1&lang=${locale}`,
+  });
   await env.DB.prepare('UPDATE web_orders SET provider_txn_id = ? WHERE id = ?').bind(session.providerTxnId, orderId).run();
   return {
     orderId,
@@ -182,6 +197,7 @@ interface OrderRow {
   id: string;
   provider: string;
   provider_txn_id: string | null;
+  provider_payment_id: string | null;
   kind: 'credit' | 'code';
   account_id: string | null;
   link_hash: string | null;
@@ -214,7 +230,7 @@ export async function handlePaymentWebhook(env: Env, cfg: Config, req: Request):
       .bind(P, evt.providerTxnId)
       .first<OrderRow>()
       ?? (evt.orderId ? await env.DB.prepare('SELECT * FROM web_orders WHERE id = ? AND provider = ?').bind(evt.orderId, P).first<OrderRow>() : null);
-    // Fremde Transaktion (z. B. aus dem Paddle-Dashboard angelegt): nicht unser Kauf, nichts buchen.
+    // Fremde Zahlung (z. B. im Stripe-Dashboard angelegt): nicht unser Kauf, nichts buchen.
     if (!order) return { ok: true, ignored: 'unknown_order' };
     if (order.provider_txn_id && order.provider_txn_id !== evt.providerTxnId) return { ok: true, ignored: 'txn_mismatch' };
     if (evt.currency !== 'EUR' || evt.totalMinor * 10_000 < order.price_micro) {
@@ -230,8 +246,9 @@ export async function handlePaymentWebhook(env: Env, cfg: Config, req: Request):
       // Wächter: zweite Zustellung desselben Ereignisses scheitert hier, die ganze Batch-Transaktion rollt zurück.
       env.DB.prepare('INSERT INTO web_events (provider, event_key, created_at) VALUES (?, ?, ?)').bind(P, key, t),
       env.DB.prepare(
-        "UPDATE web_orders SET status = CASE WHEN status = 'open' THEN 'paid' ELSE status END, paid_at = ?, provider_txn_id = ? WHERE id = ?",
-      ).bind(t, evt.providerTxnId, order.id),
+        `UPDATE web_orders SET status = CASE WHEN status = 'open' THEN 'paid' ELSE status END, paid_at = ?, provider_txn_id = ?,
+           provider_payment_id = COALESCE(?, provider_payment_id), country = ?, paid_micro = ? WHERE id = ?`,
+      ).bind(t, evt.providerTxnId, evt.paymentId, evt.country, evt.totalMinor * 10_000, order.id),
     ];
     if (order.link_hash) {
       stmts.push(env.DB.prepare('UPDATE web_links SET used_at = ? WHERE token_hash = ? AND used_at IS NULL').bind(t, order.link_hash));
@@ -258,12 +275,15 @@ export async function handlePaymentWebhook(env: Env, cfg: Config, req: Request):
   // Rückerstattung / Chargeback
   const key = `adj:${evt.adjustmentId}`;
   if (await eventSeen(env, P, key)) return { ok: true, duplicate: true };
-  const order = await env.DB.prepare('SELECT * FROM web_orders WHERE provider = ? AND provider_txn_id = ?')
-    .bind(P, evt.providerTxnId)
-    .first<OrderRow>();
+  const order =
+    (await env.DB.prepare('SELECT * FROM web_orders WHERE provider = ? AND provider_payment_id = ?').bind(P, evt.paymentId).first<OrderRow>()) ??
+    (evt.orderId ? await env.DB.prepare('SELECT * FROM web_orders WHERE id = ? AND provider = ?').bind(evt.orderId, P).first<OrderRow>() : null);
   if (!order) return { ok: true, ignored: 'unknown_order' };
+  if (order.provider_payment_id && order.provider_payment_id !== evt.paymentId) return { ok: true, ignored: 'payment_mismatch' };
   const t = now();
-  const refundMicro = Math.min(evt.amountMinor * 10_000, order.price_micro - order.reversed_micro);
+  // Stripe meldet bei Erstattungen die Summe aller bisherigen; gebucht wird nur der neue Teil.
+  const newMicro = evt.cumulative ? evt.amountMinor * 10_000 - order.reversed_micro : evt.amountMinor * 10_000;
+  const refundMicro = Math.max(Math.min(newMicro, order.price_micro - order.reversed_micro), 0);
   // Anteil des Guthabens, der zur erstatteten Summe gehört (heute 1:1).
   const creditBack = Math.max(Math.floor((refundMicro * order.credit_micro) / order.price_micro), 0);
   const ref = `${P}:${evt.adjustmentId}`;
@@ -300,9 +320,9 @@ export async function handlePaymentWebhook(env: Env, cfg: Config, req: Request):
   // Vorfall markieren; reicht das Guthaben nicht (schon verbraucht), steht das dabei.
   const incident = taken < creditBack && order.status !== 'open' ? `${evt.action}:shortfall` : evt.action;
   stmts.push(
-    env.DB.prepare('UPDATE web_orders SET status = ?, reversed_micro = reversed_micro + ?, incident = ? WHERE id = ?').bind(
-      evt.action === 'chargeback' ? 'chargeback' : 'refunded', refundMicro, incident, order.id,
-    ),
+    env.DB.prepare(
+      'UPDATE web_orders SET status = ?, reversed_micro = reversed_micro + ?, incident = ?, provider_payment_id = COALESCE(provider_payment_id, ?) WHERE id = ?',
+    ).bind(evt.action === 'chargeback' ? 'chargeback' : 'refunded', refundMicro, incident, evt.paymentId, order.id),
   );
   try {
     await env.DB.batch(stmts);

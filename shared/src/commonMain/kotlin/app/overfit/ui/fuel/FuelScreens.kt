@@ -136,12 +136,11 @@ fun FuelScreen(
 
         SectionTitle(t.topUp)
         val packages = (config as? Loaded.Ready<FuelConfig>)?.value?.packages.orEmpty()
+        if (packages.isNotEmpty()) Text(t.storeChannel, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         packages.forEach { p ->
-            ListRow(t.topUpPackage(formatEuro(p.priceMicro, language)), Tone.Muted) {
-                Column {
-                    Text(t.topUpGives(formatEuro(p.creditMicro, language)))
-                    Text(t.storeSoon, style = Theme.type.caption, tone = Tone.Muted)
-                }
+            // Both values openly: what you get and what the store charges (VAT and store fee on top).
+            ListRow(t.storePackage(formatEuro(p.creditMicro, language), formatEuro(p.priceMicro, language)), Tone.Muted) {
+                Text(t.storeSoon, style = Theme.type.caption, tone = Tone.Muted)
             }
         }
         Text(t.topUpNote, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.s))
@@ -313,5 +312,5 @@ fun RecoveryScreen(session: FuelSession, onBack: () -> Unit, onRestored: () -> U
 /** Explains how the prices are made up (static page, same text as docs/monetization.md). */
 private const val PRICES_URL = "https://bigfire3.github.io/overfit/preise/"
 
-/** 6900 → "69", 750 → "7,5" in a locale-neutral way (the string is built per language by the caller's text). */
+/** 2800 → "28", 750 → "7,5" in a locale-neutral way (the string is built per language by the caller's text). */
 private fun formatPercent(bp: Int): String = if (bp % 100 == 0) (bp / 100).toString() else (bp / 100.0).toString()

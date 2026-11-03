@@ -881,3 +881,46 @@ Fabians Entscheidung (Geld): „1:1 mit höherer Marge“. Guthaben = Kaufpreis 
 - **Transparenz:** Aufschlag und Wofür in monetization.md; App unter „Guthaben“: ein Satz plus Link „Wie setzen sich die Preise zusammen?“ auf `/preise/` (DE+EN, Beispielrechnung).
 - **Verworfen:** Abzug beim Kauf (widerspricht 1:1); eigener Aufschlag je Kanal (das Guthaben ist kanalübergreifend dasselbe und wird beim Verbrauch nicht nach Herkunft getrennt; ein Wert ist einfacher und ehrlicher).
 - **Offen für später:** Bei Paddle für kleine Pakete bessere Konditionen anfragen; bei Wechselkurs- oder Preisänderungen der Modelle `backend/test/pricing.test.ts` anpassen und Aufschlag neu rechnen.
+
+## Web-Kauf über Stripe, Store-Aufpreis offen, Aufschlag 28 % (Session AB, 3.11.)
+Fabians Entscheidung (Geld): „Ja, mit Stripe umbauen und Store-Aufpreis ausweisen. Ich bin schon Kleinunternehmer.“ Rechnung mit Tabellen:
+docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer und Schwellen“.
+- **Stripe statt Paddle, Paddle entfernt.** Paddle ist Merchant of Record und schlägt USt auf bzw. zieht sie ab; das passt nicht zum
+  Direktverkauf als Kleinunternehmer (ohne USt), und die Gebühr (5 % + 0,50 €) war der Grund für den hohen Aufschlag. Paddle als zweite
+  Implementierung zu behalten hätte Secrets, Doku, Tests und eine Auswahl-Logik am Leben gehalten, ohne dass sie je genutzt wird; die
+  Schnittstelle `PaymentProvider` bleibt, ein Wechsel ist weiterhin eine neue Datei in `backend/src/payments/`. Migrationen bleiben
+  abwärtskompatibel: `0006_stripe.sql` fügt nur Spalten hinzu (`provider_payment_id`, `country`, `paid_micro`); alte Sandbox-Bestellungen
+  (`provider = paddle`) bleiben lesbar.
+- **Gehosteter Stripe Checkout, kein Stripe.js, kein Node-SDK.** Formular-POST an `/v1/checkout/sessions` per fetch, Weiterleitung auf
+  `session.url`. Kein Publishable Key nötig, keine Kartendaten auf unserer Seite. Zahlarten nicht im Code fest: „dynamische
+  Zahlungsmethoden“ aus dem Dashboard (Karte, Wallets, Link, SEPA, Klarna …). Verzögerte Zahlarten buchen erst bei
+  `checkout.session.async_payment_succeeded`. Idempotency-Key je Bestellung.
+- **Webhook-Signatur selbst geprüft** (WebCrypto, HMAC-SHA256 über `t.body`, 300 s Toleranz wie Stripes SDK, mehrere `v1`). Zusätzlich
+  `livemode`-Abgleich: Test-Ereignisse buchen nie auf einem Live-Worker. Erstattungen kommen als `charge.refunded` mit kumulierter Summe;
+  gebucht wird nur die Differenz zum schon Erstatteten, idempotent über `refund:<charge>:<Summe>`. Chargeback: `charge.dispute.created`.
+  Erstattung vor Zahlungsbestätigung findet die Bestellung über `metadata.overfit_order` am PaymentIntent.
+- **Modus aus dem Schlüssel statt Repo-Variable** (`PADDLE_ENV` entfällt): Testbetrieb nimmt nur `sk_test_…`, Produktion nur `sk_live_…`.
+  Für Produktion eigene GitHub-Secrets `STRIPE_LIVE_SECRET_KEY`/`STRIPE_LIVE_WEBHOOK_SECRET`, damit Test- und Live-Werte nebeneinander liegen.
+- **Abbruch-Rücksprung ohne Token:** `cancel_url` enthält den Kauflink-Token nicht (er soll nicht bei Stripe landen); die Kaufseite merkt
+  ihn sich vor der Weiterleitung in `sessionStorage`.
+- **Kleinunternehmer:** Endpreise ohne USt, kein Stripe Tax. „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ steht auf Kaufseite,
+  Stripe-Checkout (`custom_text`) und Bestätigung. Stripe-Belege haben kein freies Fußzeilenfeld; für eine Rechnung mit Hinweis gibt es
+  `STRIPE_INVOICES=on` (Stripe-Rechnung mit Fußzeile, kostet extra), standardmäßig aus, weil bei B2C keine Rechnungspflicht besteht und die
+  Gebühr den Gewinn kleiner Pakete auffrisst.
+- **Schwellen-Werkzeug statt Beratung:** `webRevenue` im Admin-Usage-Report (Jahr, Land, Summe, Warnung ab 80 % von 10.000 € EU-Lieferschwelle,
+  25.000 €/100.000 € Kleinunternehmergrenze). Gespeichert wird nur das Rechnungsland. Unbekanntes Land zählt bei der Lieferschwelle
+  vorsichtshalber mit. Store-Erlöse fehlen darin (stehen in den Store-Konsolen); der Hinweis sagt das.
+- **Preise je Kanal:** Web 1:1. Store-Pakete bekommen festes Guthaben und einen offen ausgewiesenen Store-Preis (`PACKAGES` mit
+  `priceMicro` = Store-Preis, `creditMicro` = Guthaben): 5 € für 6,99 €, 10 € für 13,99 €. Die Stores sind Verkäufer, führen USt ab und
+  nehmen 15 % vom Netto; Fabians Kleinunternehmerstatus ändert das nicht. Preisstufen: die niedrigste x,99-Stufe, die bei 27 % USt noch
+  ≥ 5 % Gewinn lässt (6,49 bzw. 13,49 € reichen nicht). Produkt-IDs bleiben; Store-Kauf ist noch nicht live, also bricht nichts.
+- **Aufschlag 28 % (`MARKUP_BP = 2800`).** Stripe-Gebühr konservativ gemischt mit 2,5 % + 0,25 € (Preisseite: EWR 1,5 %, Premium 2,8 %,
+  UK 2,5 %, Nicht-EWR 3,15 %, Umrechnung + 2 %, jeweils + 0,25 €); jede einzelne Zahlart muss ohne Verlust bleiben. Sonst dieselben
+  Annahmen wie AA (10 % Spot-Rücklage, Ziel 7 %, Untergrenze 5 % vom Netto). 28 % ist der kleinste ganze Wert, mit dem jedes Web-Paket
+  ≥ 5 % behält; ab 10 € > 7 %. Coach-Auswertung Gemini 3.6 Flash damit ≈ 1,8 ct statt 2,4 ct.
+- **5 € im Web wieder drin:** kostet alle nur einen Punkt (27 % → 28 %) statt 5,8 Punkte wie bei Paddle; ein niedriger Einstieg ist für
+  eine App ohne Abo den Punkt wert. Vorgewählt bleibt 10 €.
+- **Verworfen:** eigener Aufschlag je Kanal beim Verbrauch (Guthaben wird nicht nach Herkunft getrennt, siehe AA); 6,49/12,99 € im Store
+  (bräuchten ~35 % Aufschlag für alle); Stripe Tax/OSS jetzt schon (erst nötig über der Lieferschwelle).
+- **Offen:** echter Lauf gegen Stripe im Testmodus (alles gemockt geprüft); Live-Betrieb braucht Kontoaktivierung, Rechtstexte,
+  juristische Prüfung. Bei Preisänderungen `backend/test/pricing.test.ts` anpassen und neu rechnen.

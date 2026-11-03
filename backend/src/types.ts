@@ -19,23 +19,25 @@ export interface Env {
   APPLE_IAP_ISSUER_ID?: string;
   APPLE_BUNDLE_ID?: string;
   APPLE_APP_ATTEST_TEAM_ID?: string;
-  /** Web-Kauf über Paddle (Merchant of Record). Fehlt einer der drei Werte, ist der Web-Kauf aus. */
-  PADDLE_API_KEY?: string;
-  PADDLE_WEBHOOK_SECRET?: string;
-  /** Client-seitiges Token für Paddle.js (öffentlich, beginnt mit `test_` in der Sandbox bzw. `live_`). */
-  PADDLE_CLIENT_TOKEN?: string;
+  /**
+   * Web-Kauf über Stripe Checkout. Fehlt einer der beiden Werte, ist der Web-Kauf aus. `sk_test_…`/`rk_test_…` = Testmodus
+   * (nur im Test-/Dev-Betrieb), `sk_live_…`/`rk_live_…` = echte Zahlungen (nur im Produktionsbetrieb).
+   */
+  STRIPE_SECRET_KEY?: string;
+  /** Signing secret des Webhook-Endpunkts (`whsec_…`). */
+  STRIPE_WEBHOOK_SECRET?: string;
   // Konfiguration (alle optional, Defaults in config.ts)
-  /** `live` = echte Zahlungen (nur im Produktionsbetrieb); sonst Sandbox (Testmodus). */
-  PADDLE_ENV?: string;
-  /** Nur Tests/lokal: andere API-Basis für Paddle. */
-  PADDLE_API_BASE?: string;
-  /** `off` schaltet den Web-Kauf ab, auch wenn die Paddle-Secrets gesetzt sind. */
+  /** Nur Tests/lokal: andere API-Basis für Stripe. */
+  STRIPE_API_BASE?: string;
+  /** `on` = zu jedem Kauf eine Stripe-Rechnung (PDF) mit §-19-Fußzeile; kostet bei Stripe extra. Standard: nur Beleg. */
+  STRIPE_INVOICES?: string;
+  /** `off` schaltet den Web-Kauf ab, auch wenn die Stripe-Secrets gesetzt sind. */
   WEB_PURCHASE?: string;
   /** Adresse der Kaufseite, Standard https://bigfire3.github.io/overfit/guthaben/ */
   WEB_PURCHASE_URL?: string;
   /** Kanäle, in denen die App „Im Web aufladen“ zeigt (Komma-Liste aus sideload, store). Standard: sideload. */
   WEB_PURCHASE_CHANNELS?: string;
-  /** JSON {"web.5": {"priceMicro": 5000000}, …}; Guthaben = Preis. */
+  /** JSON {"web.5": {"priceMicro": 5000000}, …}; Guthaben = Preis (1:1). */
   WEB_PACKAGES?: string;
   WEB_LINK_TTL_SEC?: string;
   ANTHROPIC_BASE_URL?: string;
@@ -122,8 +124,9 @@ export interface Config {
   maxBodyBytes: number;
   imageTokensReserve: number;
   prices: Record<string, Price>;
-  packages: Record<string, { priceMicro: number }>;
-  /** Pakete der Kaufseite: Endpreis inkl. USt; Guthaben = Preis (1:1, keine Gebühr abgezogen). */
+  /** Store-Pakete: Preis im Store (inkl. USt und Store-Gebühr, offen ausgewiesen) und Guthaben. */
+  packages: Record<string, { priceMicro: number; creditMicro: number }>;
+  /** Pakete der Kaufseite: Endpreis (Kleinunternehmer, keine USt); Guthaben = Preis (1:1). */
   webPackages: Record<string, { priceMicro: number }>;
   webPurchaseOff: boolean;
   webPurchaseUrl: string;

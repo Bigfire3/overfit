@@ -2,6 +2,7 @@ import { ApiError } from './errors';
 import type { Config, Env } from './types';
 import { json, grantTestCredit } from './account';
 import { sha256 } from './crypto';
+import { webRevenueReport } from './revenue';
 
 /** Größte Einzel-Gutschrift (Mikro-Euro) und größte Kontenzahl für „an alle“. */
 export const ADMIN_MAX_CREDIT_MICRO = 10_000_000;
@@ -55,8 +56,9 @@ export async function handleAdminCredit(req: Request, env: Env, cfg: Config, bod
  * Inhaltsfreie Nutzungsauswertung: `GET /v1/admin/usage?from=&to=` (ISO-Datum, `to` exklusiv, Standard: letzte 30 Tage)
  * mit `Authorization: Bearer <ADMIN_SECRET>`. Liest nur Zahlen aus dem Ledger (Modell, Tokens, Kosten, Marge,
  * Stufe, Ausweichung, Foto), nie Prompts, Antworten oder Fotos. Gibt es auch in Produktion, aber nur mit ADMIN_SECRET.
+ * Dazu `webRevenue`: Web-Umsatz je Jahr und Rechnungsland mit Schwellen-Warnungen (revenue.ts), unabhängig von from/to.
  */
-export async function handleAdminUsage(req: Request, env: Env, url: URL): Promise<Response> {
+export async function handleAdminUsage(req: Request, env: Env, cfg: Config, url: URL): Promise<Response> {
   if (!env.ADMIN_SECRET || env.ADMIN_SECRET.length < 16) throw new ApiError(404, 'not_found', 'Unbekannter Endpunkt');
   if (req.method !== 'GET') throw new ApiError(405, 'method_not_allowed', 'Methode nicht erlaubt');
   const auth = req.headers.get('authorization') ?? '';
@@ -116,5 +118,6 @@ export async function handleAdminUsage(req: Request, env: Env, url: URL): Promis
       marginMicro: sum((g) => Number(g.marginMicro ?? 0)),
     },
     groups,
+    webRevenue: await webRevenueReport(env, cfg),
   });
 }

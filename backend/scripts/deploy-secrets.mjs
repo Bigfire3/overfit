@@ -9,13 +9,15 @@
 // - SPOT_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
 //   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
 // - ADMIN_SECRET (nur Testbetrieb): wird bei jedem Lauf neu erzeugt, außer ein GitHub-Secret ist gesetzt; der Workflow nutzt ihn sofort.
-// - Web-Kauf (Paddle): PADDLE_API_KEY, PADDLE_WEBHOOK_SECRET, PADDLE_CLIENT_TOKEN. Optional; fehlt einer (weder in GitHub
-//   noch im Worker), bleibt der Web-Kauf aus, mit Hinweis in der Zusammenfassung (kein Abbruch).
+// - Web-Kauf (Stripe): STRIPE_SECRET_KEY (sk_test_… im Testbetrieb, sk_live_… in Produktion), STRIPE_WEBHOOK_SECRET (whsec_…).
+//   In Produktion haben STRIPE_LIVE_SECRET_KEY / STRIPE_LIVE_WEBHOOK_SECRET Vorrang (Test- und Live-Werte parallel in GitHub).
+//   Optional; fehlt einer (weder in GitHub noch im Worker) oder passt der Schlüssel nicht zum Modus, bleibt der Web-Kauf aus,
+//   mit Hinweis in der Zusammenfassung (kein Abbruch).
 // - Optional (Play/Apple-Prüfer): nur gesetzt, wenn vorhanden; sonst Hinweis in der Zusammenfassung.
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 
-export const PADDLE = ['PADDLE_API_KEY', 'PADDLE_WEBHOOK_SECRET', 'PADDLE_CLIENT_TOKEN'];
+export const STRIPE = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
 
 export const OPTIONAL = [
   'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME', 'PLAY_INTEGRITY_SERVICE_ACCOUNT',
@@ -65,17 +67,25 @@ export function plan(mode, env, existing) {
       notes.push('`ADMIN_SECRET`: für diesen Lauf neu erzeugt (nur Testbetrieb, für Test-Guthaben).');
     }
   }
-  const paddleMissing = [];
-  for (const n of PADDLE) {
-    if (given(n)) secrets[n] = given(n);
-    else if (!have.has(n)) paddleMissing.push(n);
+  const stripeMissing = [];
+  for (const n of STRIPE) {
+    // Produktion nimmt bevorzugt eigene Live-Secrets (STRIPE_LIVE_…), damit Test- und Live-Schlüssel nebeneinander in GitHub liegen können.
+    const live = mode === 'production' ? given(n.replace('STRIPE_', 'STRIPE_LIVE_')) : '';
+    if (live) secrets[n] = live;
+    else if (given(n)) secrets[n] = given(n);
+    else if (!have.has(n)) stripeMissing.push(n);
   }
-  const webPurchase = paddleMissing.length === 0;
-  if (webPurchase) notes.push('Web-Kauf (Paddle): alle drei Secrets vorhanden.');
-  else {
-    notes.push(`Web-Kauf bleibt **aus**: es fehlt ${paddleMissing.map((n) => `\`${n}\``).join(', ')} ` +
-      '(Paddle → Developer Tools → Authentication bzw. Notifications; Anleitung in backend/README.md → „Web-Kauf“).');
-  }
+  let webPurchase = stripeMissing.length === 0;
+  const key = secrets.STRIPE_SECRET_KEY ?? '';
+  const wantLive = mode === 'production';
+  if (!webPurchase) {
+    notes.push(`Web-Kauf bleibt **aus**: es fehlt ${stripeMissing.map((n) => `\`${n}\``).join(', ')} ` +
+      '(Stripe → Entwickler → API-Schlüssel bzw. Webhooks; Anleitung in backend/README.md → „Web-Kauf“).');
+  } else if (key && !(wantLive ? /^(sk|rk)_live_/ : /^(sk|rk)_test_/).test(key)) {
+    webPurchase = false;
+    notes.push(`Web-Kauf bleibt **aus**: \`STRIPE_SECRET_KEY\` muss im Modus ${mode} mit \`${wantLive ? 'sk_live_' : 'sk_test_'}\` beginnen ` +
+      '(Testbetrieb nur Testmodus-Schlüssel, Produktion nur Live-Schlüssel).');
+  } else notes.push(`Web-Kauf (Stripe${wantLive ? '' : ', Testmodus'}): beide Secrets vorhanden.`);
   const skipped = [];
   for (const n of OPTIONAL) {
     if (given(n)) secrets[n] = given(n);

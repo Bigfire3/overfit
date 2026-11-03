@@ -10,10 +10,66 @@
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
 | 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); Feinschliff laufend |
 | 6 | Store-Release (App Store, Play Store) | offen |
-| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Paddle-Sandbox, Session Z); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte, Margenentscheidung) |
+| 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Session Z, seit Session AB über Stripe, Web 1:1, Store-Aufpreis offen, Aufschlag 28 %); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Stripe statt Paddle, Store-Aufpreis offen, Aufschlag 28 % (Session AB, 3.11.)
+**Erledigt:**
+- **Stripe Checkout** (Testmodus) hinter `PaymentProvider` (`backend/src/payments/stripe.ts`), Paddle entfernt. Gehostete Checkout-Seite,
+  Zahlarten aus dem Stripe-Dashboard, kein Stripe Tax. Webhook mit eigener Signaturprüfung (WebCrypto, 300 s, mehrere `v1`, `livemode`-Abgleich):
+  `checkout.session.completed`/`async_payment_succeeded`, `charge.refunded` (kumulierte Teil-Erstattungen), `charge.dispute.created`,
+  idempotent. Codes laufen ebenfalls über Stripe. Migration `0006_stripe.sql` (nur neue Spalten: PaymentIntent, Land, bezahlter Betrag).
+- **Kleinunternehmer:** „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ (EN sinngemäß) auf Kaufseite, im Stripe-Checkout und in der
+  Bestätigung; optional Stripe-Rechnung mit Fußzeile (`STRIPE_INVOICES=on`). Schwellen-Hinweis in docs/monetization.md; `webRevenue` im
+  Admin-Usage-Report und in `scripts/usage-report.mjs` (Web-Umsatz je Jahr, Land, gesamt, Warnung ab 80 %).
+- **Preise je Kanal:** Web 1:1, Pakete **5/10/20/50 €** (10 € vorgewählt). Store mit offenem Aufpreis: **5 € Guthaben für 6,99 €, 10 € für 13,99 €**.
+  **`MARKUP_BP = 2800` (28 %)** statt 69 %. Rechnung mit Tabellen: docs/monetization.md „Rechnung (Session AB)“; `pricing.test.ts` prüft jedes
+  Paket ≥ 5 % vom Netto (Store bei 19 % und 27 % USt), keine Zahlart im Verlust, Preisstufen und den Aufschlag.
+- **App:** Guthaben zeigt je Kanal beide Werte: „5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)“ (App Store und Google Play) und unter „Im Web“
+  „10,00 € Guthaben · 10,00 €“ (nur wo „Im Web aufladen“ per Flag sichtbar ist). Texte ohne „69 %“, der Prozentwert kommt aus `/v1/config`.
+- **Webseite:** Kaufseite leitet auf Stripe weiter (Abbruch kehrt mit gemerktem Kauflink zurück), `web/preise/` mit Beispiel Web und Store.
+- **Deploy:** Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (Produktion: `STRIPE_LIVE_…`), Zusammenfassung nennt Webhook-URL und
+  Ereignisse; fehlen sie oder passt der Schlüssel nicht zum Modus, bleibt der Web-Kauf aus, mit Hinweis.
+- Tests: Backend 126 (web, pricing, revenue, money, transparency u. a.), `web/test/guthaben.mjs` (26 Prüfungen), `WebCreditTest`,
+  `FuelDemoTest`, `WebPurchaseTest`, `CostEstimateTest`; `OwnKeyPrivacyTest` unverändert.
+**Offen:** echter Lauf gegen Stripe im Testmodus (gemockt geprüft); Live: Kontoaktivierung, Rechtstexte, juristische Prüfung.
+
+### Von Fabian zu tun (Session AB, alles im Browser)
+Ausführlich mit Pfaden: backend/README.md → „Web-Kauf (Stripe, Testmodus)“.
+1. **dashboard.stripe.com/register** → Konto anlegen, E-Mail bestätigen. Oben **Testmodus** einschalten.
+2. **Einstellungen → Unternehmen → Öffentliche Unternehmensangaben:** Name `overfit`, Support-E-Mail, Website `https://bigfire3.github.io/overfit/`,
+   Statement descriptor `OVERFIT`.
+3. **Einstellungen → Billing → Rechnungsvorlage → Standard-Fußzeile:** `Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.` → Speichern.
+   **Einstellungen → Unternehmen → Kunden-E-Mails:** „Erfolgreiche Zahlungen“ an.
+4. **Einstellungen → Zahlungen → Zahlungsmethoden:** Karten an; optional Apple Pay, Google Pay, Link, Klarna, SEPA, EPS, iDEAL, Bancontact.
+5. **Entwickler → API-Schlüssel:** Geheimschlüssel `sk_test_…` kopieren.
+6. **Entwickler → Webhooks → Endpunkt/Ziel hinzufügen:** URL = Repo-Variable `OVERFIT_BACKEND_URL` + `/v1/webhooks/payment`; Ereignisse
+   `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, `charge.dispute.created` → Speichern →
+   Signaturgeheimnis `whsec_…` kopieren.
+7. **GitHub → Settings → Secrets and variables → Actions → New repository secret:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+   Die alten `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_CLIENT_TOKEN` und die Variable `PADDLE_ENV` löschen.
+8. **Actions → Backend deployen → Run workflow**, `mode` = test. Zusammenfassung: „Web-Kauf: An, Testmodus (Stripe)“, Webhook-URL = Schritt 6.
+9. **Actions → Web veröffentlichen (GitHub Pages) → Run workflow.**
+10. Neues APK aus „Overfit latest“ installieren, dann testen (unten).
+
+**Für echte Zahlungen später:** Stripe-Konto aktivieren (Einzelunternehmen, Identität, Bankkonto, Steuernummer, Kleinunternehmer), im
+Live-Modus Schritte 2–6 wiederholen, GitHub-Secrets `STRIPE_LIVE_SECRET_KEY` und `STRIPE_LIVE_WEBHOOK_SECRET`, Backend deployen mit
+`mode` = production; Impressum, Datenschutz, AGB/Widerruf (Platzhalter auf der Kaufseite), juristische Prüfung; Schwellen mit dem
+Steuerberater klären (`scripts/usage-report.mjs` warnt ab 80 %).
+
+### Bitte auf dem Handy testen (Session AB, nach den Schritten oben)
+1. Profil → Guthaben: unter „App Store und Google Play“ „5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)“ und „10,00 € Guthaben · 13,99 €
+   (inkl. Store-Gebühr)“; unter „Im Web“ 5/10/20/50 € je „… Guthaben · …“ 1:1. Darunter der Satz mit „28 % Aufschlag“.
+2. „Wie setzen sich die Preise zusammen?“ → Seite zeigt Web-Beispiel (10 € → 0,74 € Gewinn) und Store-Beispiel (6,99 €).
+3. Coach-Einstellungen → Modell: Schätzung ≈ 1,8 ct je Auswertung (Gemini 3.6 Flash), Hinweis nennt 28 %.
+4. „Im Web aufladen“ → Kaufseite: 5/10/20/50 €, 10 € vorgewählt, „Gemäß § 19 UStG …“, „Testmodus“. 5 € wählen → „Weiter zur Zahlung“ →
+   Stripe-Seite (Testmodus-Banner, §-19-Satz unter dem Bezahlknopf) → Karte `4242 4242 4242 4242`, Datum in der Zukunft, CVC beliebig →
+   „Danke! 5 € Guthaben …“ mit §-19-Satz → „Zurück zur App“ → Saldo +5,00 €, Buchung „Aufladung im Web“.
+5. Abbruch: auf der Stripe-Seite „Zurück“ → Kaufseite „Zahlung abgebrochen, es wurde nichts berechnet.“, weiter „Guthaben aufladen“.
+6. Erstattung: Stripe → Zahlungen → Kauf → Erstatten (z. B. 2 €) → Saldo −2 €, Buchung „Erstattung“; Rest erstatten → nochmal −3 € (nie unter 0).
+7. Am Rechner Kaufseite ohne App → Code kaufen → Code in der App einlösen (wie Session Z).
 
 ## Marge bei 1:1-Guthaben (Session AA, 3.11.)
 **Erledigt:**

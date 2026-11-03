@@ -69,7 +69,9 @@ class FuelDemoTest {
         // Demo balance and packages
         try { compose.waitUntil(5_000) { shown("Guthaben · 4,20 €") } } catch (e: Throwable) { throw AssertionError(compose.onRoot().printToString(), e) }
         compose.onNodeWithText("Demo – lokale Beispieldaten, nichts davon ist echt.").assertExists()
-        compose.onNodeWithText("Paket 5,00 €").performScrollTo().assertExists()
+        // Store packages show both values: credit and the higher store price.
+        compose.onNodeWithText("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)").performScrollTo().assertExists()
+        compose.onNodeWithText("28 % Aufschlag", substring = true).assertExists()
         assertTrue(shown("Bald im Store"))
 
         // Ledger

@@ -4,7 +4,7 @@ import { costMicro } from '../src/money';
 import { currentPrices, TIERS } from '../src/providers';
 import type { Env } from '../src/types';
 
-const MARKUP = 6900;
+const MARKUP = 2800;
 const price = (tier: keyof typeof TIERS) => currentPrices()[TIERS[tier].model];
 
 const geminiReply = (meta: object = { promptTokenCount: 1000, candidatesTokenCount: 300, thoughtsTokenCount: 200 }, finishReason = 'STOP', text = '{"ok":true}') =>
@@ -98,7 +98,7 @@ describe('Stufe pro (Anthropic)', () => {
     const r = await c.call('POST', '/v1/messages', body('pro'));
     expect(r.status).toBe(200);
     expect(r.body.content[0].text).toBe('pro');
-    expect(r.body.overfit).toMatchObject({ tier: 'pro', model: 'claude-sonnet-5-5', costMicro: 10884 });
+    expect(r.body.overfit).toMatchObject({ tier: 'pro', model: 'claude-sonnet-5-5', costMicro: 8244 });
     const sent = JSON.parse(anthropic.mock.calls[0][1].body);
     expect(sent.model).toBe('claude-sonnet-5-5');
     expect(sent.output_config).toMatchObject({ effort: 'medium', format: { type: 'json_schema' } });
@@ -163,7 +163,7 @@ describe('Ausweichen bei Ausfall', () => {
     expect(r.body.content[0].text).toBe('pro');
     const usage = { input_tokens: 1000, output_tokens: 500 };
     const atStandard = costMicro(usage, price('standard'), MARKUP);
-    expect(atStandard).toBeLessThan(10884);
+    expect(atStandard).toBeLessThan(8244);
     expect(r.body.overfit).toMatchObject({ tier: 'standard', servedTier: 'pro', model: 'claude-sonnet-5-5', fallback: true, costMicro: atStandard });
     expect(await balance(c)).toBe(f.balanceMicro - atStandard);
     expect(await lastUsage(c)).toMatchObject({ tier: 'standard', model: 'claude-sonnet-5-5', amountMicro: -atStandard });

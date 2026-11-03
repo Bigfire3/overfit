@@ -1,30 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env as workerEnv } from 'cloudflare:workers';
 import { Client, baseEnv, rawFetch } from './helpers';
-import { paddleSignature, verifyPaddleSignature } from '../src/payments/paddle';
+import { stripeSignature, verifyStripeSignature } from '../src/payments/stripe';
 import { formatCode, newCreditCode, normalizeCreditCode } from '../src/web';
 import type { Env } from '../src/types';
 
-const SECRET = 'pdl_ntfset_test_secret_0123456789';
-const PADDLE = { PADDLE_API_KEY: 'pdl_sdbx_apikey_test', PADDLE_WEBHOOK_SECRET: SECRET, PADDLE_CLIENT_TOKEN: 'test_client_token' };
-// Die Tests rechnen mit 5/10/20 €; die Standardpakete (10/20/50 €) prüft „/v1/config“ unten.
+const SECRET = 'whsec_test_secret_0123456789';
+const STRIPE = { STRIPE_SECRET_KEY: 'sk_test_51abc', STRIPE_WEBHOOK_SECRET: SECRET };
+// Die Tests rechnen mit 5/10/20 €; die Standardpakete (5/10/20/50 €) prüft „/v1/config“ unten.
 const TEST_PACKAGES = JSON.stringify({ 'web.5': { priceMicro: 5_000_000 }, 'web.10': { priceMicro: 10_000_000 }, 'web.20': { priceMicro: 20_000_000 } });
-const env = (extra: Partial<Env> = {}) => baseEnv({ ...PADDLE, WEB_PACKAGES: TEST_PACKAGES, ...extra });
+const env = (extra: Partial<Env> = {}) => baseEnv({ ...STRIPE, WEB_PACKAGES: TEST_PACKAGES, ...extra });
 const DB = (workerEnv as unknown as Env).DB;
 
-let paddle: ReturnType<typeof vi.fn<(url: string, init: RequestInit) => Promise<Response>>>;
-let txnCounter = 0;
+let stripe: ReturnType<typeof vi.fn<(url: string, init: RequestInit) => Promise<Response>>>;
+let sessionCounter = 0;
 beforeEach(() => {
-  txnCounter = 0;
-  paddle = vi.fn(async (_url: string, init: RequestInit) => {
-    const id = `txn_${++txnCounter}`;
-    const body = JSON.parse(String(init.body));
-    return Response.json({ data: { id, status: 'ready', custom_data: body.custom_data, checkout: { url: `https://pay.test/?_ptxn=${id}` } } }, { status: 201 });
+  sessionCounter = 0;
+  stripe = vi.fn(async (_url: string, _init: RequestInit) => {
+    const id = `cs_test_${++sessionCounter}`;
+    return Response.json({ id, object: 'checkout.session', url: `https://checkout.stripe.com/c/pay/${id}` });
   });
   const real = globalThis.fetch;
   vi.stubGlobal('fetch', (input: any, init?: any) => {
     const url = String(input instanceof Request ? input.url : input);
-    if (url.startsWith('https://sandbox-api.paddle.com') || url.startsWith('https://api.paddle.com')) return paddle(url, init);
+    if (url.startsWith('https://api.stripe.com')) return stripe(url, init);
     return real(input, init);
   });
 });
@@ -35,23 +34,31 @@ const post = (e: Env, path: string, body: unknown, headers: Record<string, strin
 
 async function webhook(e: Env, payload: unknown, opts: { secret?: string; ts?: number; header?: string | null } = {}) {
   const raw = JSON.stringify(payload);
-  const sig = opts.header === undefined ? await paddleSignature(opts.secret ?? SECRET, raw, opts.ts) : opts.header;
+  const sig = opts.header === undefined ? await stripeSignature(opts.secret ?? SECRET, raw, opts.ts) : opts.header;
   return rawFetch('/v1/webhooks/payment', e, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...(sig ? { 'paddle-signature': sig } : {}) },
+    headers: { 'content-type': 'application/json', ...(sig ? { 'stripe-signature': sig } : {}) },
     body: raw,
   });
 }
 
-const completed = (txn: string, order: string | null, grandTotal = '500', currency = 'EUR') => ({
-  event_id: `evt_${txn}`,
-  event_type: 'transaction.completed',
-  data: { id: txn, status: 'completed', currency_code: currency, custom_data: order ? { overfit_order: order } : null, details: { totals: { grand_total: grandTotal, total: grandTotal } } },
-});
-const adjustment = (id: string, txn: string, total: string, action = 'refund', status = 'approved', evtType = 'adjustment.updated') => ({
-  event_type: evtType,
-  data: { id, action, status, transaction_id: txn, totals: { total, currency_code: 'EUR' } },
-});
+/** PaymentIntent zur Checkout Session (im Test fest abgeleitet). */
+const pi = (cs: string) => cs.replace(/^cs_/, 'pi_');
+const event = (type: string, object: Record<string, unknown>, livemode = false) => ({ id: `evt_${Math.random()}`, object: 'event', type, livemode, data: { object } });
+const completed = (
+  cs: string, order: string | null, amount = 500,
+  o: { currency?: string; status?: string; type?: string; country?: string | null; livemode?: boolean } = {},
+) =>
+  event(o.type ?? 'checkout.session.completed', {
+    id: cs, object: 'checkout.session', payment_status: o.status ?? 'paid', payment_intent: pi(cs), amount_total: amount,
+    currency: o.currency ?? 'eur', client_reference_id: order, metadata: order ? { overfit_order: order } : {},
+    customer_details: { address: { country: o.country === undefined ? 'DE' : o.country } },
+  }, o.livemode);
+/** Stripe meldet bei `charge.refunded` die Summe aller bisherigen Erstattungen. */
+const refunded = (cs: string, amountRefunded: number, order: string | null = null) =>
+  event('charge.refunded', { id: `ch_${cs}`, object: 'charge', payment_intent: pi(cs), amount_refunded: amountRefunded, currency: 'eur', metadata: order ? { overfit_order: order } : {} });
+const dispute = (id: string, cs: string, amount: number) =>
+  event('charge.dispute.created', { id, object: 'dispute', charge: `ch_${cs}`, payment_intent: pi(cs), amount, currency: 'eur' });
 
 const tokenOf = (url: string) => /#t=([A-Za-z0-9_-]+)/.exec(url)![1];
 const balance = async (c: Client) => (await c.call('GET', '/v1/account')).body.balanceMicro as number;
@@ -81,7 +88,7 @@ describe('Kauflink aus der App', () => {
     expect((await c.call('POST', '/v1/purchases/web-link', {})).status).toBe(200);
   });
 
-  it('ohne Signatur abgelehnt, ohne Paddle-Secrets 503', async () => {
+  it('ohne Signatur abgelehnt, ohne Stripe-Secrets 503', async () => {
     expect((await post(env(), '/v1/purchase/web-link', {})).status).toBe(401);
     const c = await Client.create(baseEnv());
     const r = await c.call('POST', '/v1/purchase/web-link', {});
@@ -95,7 +102,7 @@ describe('Kauflink aus der App', () => {
     const token = tokenOf((await c.call('POST', '/v1/purchase/web-link', {})).body.url);
     const s = await post(e, '/v1/web/session', { token });
     expect(s.status).toBe(200);
-    expect(s.body).toMatchObject({ enabled: true, testMode: true, link: { status: 'valid' }, client: { provider: 'paddle', environment: 'sandbox', clientToken: 'test_client_token' } });
+    expect(s.body).toMatchObject({ enabled: true, testMode: true, link: { status: 'valid' }, client: { provider: 'stripe', environment: 'sandbox' } });
     expect(s.body.packages).toEqual([
       { id: 'web.5', priceMicro: 5_000_000, creditMicro: 5_000_000 },
       { id: 'web.10', priceMicro: 10_000_000, creditMicro: 10_000_000 },
@@ -118,21 +125,44 @@ describe('Kauflink aus der App', () => {
 });
 
 describe('Checkout beim Anbieter', () => {
-  it('erstellt eine Paddle-Transaktion mit Endpreis inkl. USt und unserer Bestell-ID', async () => {
+  it('erstellt eine Stripe Checkout Session: Endpreis ohne USt, §-19-Hinweis, Bestell-ID, Rücksprung ohne Token', async () => {
     const e = env();
     const c = await Client.create(e);
     const r = await startCredit(c, e, 'web.10');
-    expect(r.transactionId).toBe('txn_1');
-    const [url, init] = paddle.mock.calls[0];
-    expect(url).toBe('https://sandbox-api.paddle.com/transactions');
-    expect((init.headers as Record<string, string>).authorization).toBe('Bearer pdl_sdbx_apikey_test');
-    const body = JSON.parse(String(init.body));
-    expect(body.items[0].price.unit_price).toEqual({ amount: '1000', currency_code: 'EUR' });
-    expect(body.items[0].price.tax_mode).toBe('internal');
-    expect(body.items[0].price.name).toBe('overfit Guthaben 10 €');
-    expect(body.custom_data).toEqual({ overfit_order: r.orderId, kind: 'credit', package: 'web.10' });
+    expect(r.transactionId).toBe('cs_test_1');
+    expect((r as any).checkoutUrl).toBe('https://checkout.stripe.com/c/pay/cs_test_1');
+    const [url, init] = stripe.mock.calls[0];
+    expect(url).toBe('https://api.stripe.com/v1/checkout/sessions');
+    const h = init.headers as Record<string, string>;
+    expect(h.authorization).toBe('Bearer sk_test_51abc');
+    expect(h['content-type']).toBe('application/x-www-form-urlencoded');
+    expect(h['idempotency-key']).toBe(`overfit-${r.orderId}`);
+    const f = new URLSearchParams(String(init.body));
+    expect(f.get('mode')).toBe('payment');
+    expect(f.get('line_items[0][price_data][unit_amount]')).toBe('1000');
+    expect(f.get('line_items[0][price_data][currency]')).toBe('eur');
+    expect(f.get('line_items[0][price_data][product_data][name]')).toBe('overfit Guthaben 10 €');
+    expect(f.get('metadata[overfit_order]')).toBe(r.orderId);
+    expect(f.get('payment_intent_data[metadata][overfit_order]')).toBe(r.orderId);
+    expect(f.get('client_reference_id')).toBe(r.orderId);
+    expect(f.get('custom_text[submit][message]')).toBe('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.');
+    expect(f.get('success_url')).toBe(`https://bigfire3.github.io/overfit/guthaben/?order=${r.orderId}&lang=de`);
+    expect(f.get('cancel_url')).toBe('https://bigfire3.github.io/overfit/guthaben/?canceled=1&lang=de');
+    // Kein Stripe Tax, keine fest verdrahteten Zahlarten (kommen aus dem Dashboard), Token nie beim Anbieter
+    expect([...f.keys()].some((k) => k.startsWith('automatic_tax') || k.startsWith('payment_method_types'))).toBe(false);
+    expect(String(init.body)).not.toContain(r.token);
+    expect(f.get('invoice_creation[enabled]')).toBeNull();
     const order = await DB.prepare('SELECT * FROM web_orders WHERE id = ?').bind(r.orderId).first<any>();
-    expect(order).toMatchObject({ status: 'open', provider_txn_id: 'txn_1', credit_micro: 10_000_000, price_micro: 10_000_000, kind: 'credit', environment: 'sandbox' });
+    expect(order).toMatchObject({ status: 'open', provider: 'stripe', provider_txn_id: 'cs_test_1', credit_micro: 10_000_000, price_micro: 10_000_000, kind: 'credit', environment: 'sandbox' });
+  });
+
+  it('mit STRIPE_INVOICES=on: Rechnung mit §-19-Fußzeile (EN)', async () => {
+    const e = env({ STRIPE_INVOICES: 'on' });
+    await post(e, '/v1/web/checkout', { packageId: 'web.5', kind: 'code', locale: 'en' });
+    const f = new URLSearchParams(String(stripe.mock.calls[0][1].body));
+    expect(f.get('invoice_creation[enabled]')).toBe('true');
+    expect(f.get('invoice_creation[invoice_data][footer]')).toContain('§ 19 UStG');
+    expect(f.get('locale')).toBe('en');
   });
 
   it('unbekanntes Paket, Credit ohne Token, höchstens 5 Checkouts je Link', async () => {
@@ -146,7 +176,7 @@ describe('Checkout beim Anbieter', () => {
   });
 
   it('Anbieter-Fehler wird zu 502 payment_unavailable', async () => {
-    paddle.mockImplementationOnce(async () => Response.json({ error: { code: 'transaction_default_checkout_url_not_set' } }, { status: 400 }));
+    stripe.mockImplementationOnce(async () => Response.json({ error: { type: 'invalid_request_error' } }, { status: 400 }));
     const e = env();
     const r = await post(e, '/v1/web/checkout', { packageId: 'web.5', kind: 'code' });
     expect(r.status).toBe(502);
@@ -155,17 +185,20 @@ describe('Checkout beim Anbieter', () => {
 });
 
 describe('Webhook: Signatur', () => {
-  it('prüft HMAC-SHA256 über "ts:body", Zeitfenster und mehrere h1 (Schlüsselwechsel)', async () => {
+  it('prüft HMAC-SHA256 über "t.body", Zeitfenster und mehrere v1 (Secret-Wechsel)', async () => {
     const body = '{"a":1}';
     const t = 1_800_000_000;
-    const h = await paddleSignature(SECRET, body, t);
-    expect(await verifyPaddleSignature(SECRET, h, body, t)).toBe(true);
-    expect(await verifyPaddleSignature(SECRET, h, body + ' ', t)).toBe(false);
-    expect(await verifyPaddleSignature('other', h, body, t)).toBe(false);
-    expect(await verifyPaddleSignature(SECRET, h, body, t + 301)).toBe(false);
-    expect(await verifyPaddleSignature(SECRET, `ts=${t};h1=deadbeef;${h.split(';')[1]}`, body, t)).toBe(true);
-    expect(await verifyPaddleSignature(SECRET, null, body, t)).toBe(false);
-    expect(await verifyPaddleSignature(SECRET, 'garbage', body, t)).toBe(false);
+    const h = await stripeSignature(SECRET, body, t);
+    expect(h).toMatch(/^t=1800000000,v1=[0-9a-f]{64}$/);
+    expect(await verifyStripeSignature(SECRET, h, body, t)).toBe(true);
+    expect(await verifyStripeSignature(SECRET, h, body + ' ', t)).toBe(false);
+    expect(await verifyStripeSignature('other', h, body, t)).toBe(false);
+    expect(await verifyStripeSignature(SECRET, h, body, t + 301)).toBe(false);
+    expect(await verifyStripeSignature(SECRET, h, body, t - 301)).toBe(false);
+    expect(await verifyStripeSignature(SECRET, `t=${t},v1=deadbeef,${h.split(',')[1]},v0=abc`, body, t)).toBe(true);
+    expect(await verifyStripeSignature(SECRET, `t=${t},v0=${h.split('v1=')[1]}`, body, t)).toBe(false);
+    expect(await verifyStripeSignature(SECRET, null, body, t)).toBe(false);
+    expect(await verifyStripeSignature(SECRET, 'garbage', body, t)).toBe(false);
   });
 
   it('falsche, fehlende oder alte Signatur → 401, nichts gebucht', async () => {
@@ -181,20 +214,34 @@ describe('Webhook: Signatur', () => {
 });
 
 describe('Webhook: Zahlung', () => {
-  it('bucht 5 € = 5 € Guthaben mit Quelle web und Transaktions-ID, Link ist danach verbraucht', async () => {
+  it('bucht 5 € = 5 € Guthaben mit Quelle web, merkt PaymentIntent und Land, Link ist danach verbraucht', async () => {
     const e = env();
     const c = await Client.create(e);
     const r = await startCredit(c, e);
-    const res = await webhook(e, completed(r.transactionId, r.orderId));
+    const res = await webhook(e, completed(r.transactionId, r.orderId, 500, { country: 'at' }));
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ ok: true, credited: 5_000_000 });
     expect(await balance(c)).toBe(5_000_000);
     const entry = (await c.call('GET', '/v1/account/ledger')).body.entries[0];
     expect(entry).toMatchObject({ type: 'purchase', amountMicro: 5_000_000, source: 'web' });
     const ref = await DB.prepare("SELECT ref FROM ledger WHERE source = 'web'").first<{ ref: string }>();
-    expect(ref!.ref).toBe('paddle:txn_1');
+    expect(ref!.ref).toBe('stripe:cs_test_1');
+    const o = await DB.prepare('SELECT provider_payment_id, country, paid_micro FROM web_orders WHERE id = ?').bind(r.orderId).first<any>();
+    expect(o).toEqual({ provider_payment_id: 'pi_test_1', country: 'AT', paid_micro: 5_000_000 });
     expect((await rawFetch(`/v1/web/orders/${r.orderId}`, e)).body).toMatchObject({ status: 'paid', kind: 'credit', creditMicro: 5_000_000, testMode: true, code: null });
     expect((await post(e, '/v1/web/session', { token: r.token })).body.link.status).toBe('used');
+  });
+
+  it('verzögerte Zahlart: erst async_payment_succeeded bucht', async () => {
+    const e = env();
+    const c = await Client.create(e);
+    const r = await startCredit(c, e);
+    expect((await webhook(e, completed(r.transactionId, r.orderId, 500, { status: 'unpaid' }))).body.ignored).toBe('payment_status unpaid');
+    expect(await balance(c)).toBe(0);
+    expect((await rawFetch(`/v1/web/orders/${r.orderId}`, e)).body.status).toBe('open');
+    const ok = await webhook(e, completed(r.transactionId, r.orderId, 500, { type: 'checkout.session.async_payment_succeeded' }));
+    expect(ok.body.credited).toBe(5_000_000);
+    expect(await balance(c)).toBe(5_000_000);
   });
 
   it('ist idempotent: Wiederholung und parallele Zustellung buchen genau einmal', async () => {
@@ -204,8 +251,10 @@ describe('Webhook: Zahlung', () => {
     const evt = completed(r.transactionId, r.orderId);
     expect((await webhook(e, evt)).body.credited).toBe(5_000_000);
     expect((await webhook(e, evt)).body.duplicate).toBe(true);
+    // Auch async_payment_succeeded nach completed bucht nicht doppelt
+    expect((await webhook(e, completed(r.transactionId, r.orderId, 500, { type: 'checkout.session.async_payment_succeeded' }))).body.duplicate).toBe(true);
     const r2 = await startCredit(c, e, 'web.10');
-    const evt2 = completed(r2.transactionId, r2.orderId, '1000');
+    const evt2 = completed(r2.transactionId, r2.orderId, 1000);
     const both = await Promise.all([webhook(e, evt2), webhook(e, evt2), webhook(e, evt2)]);
     expect(both.every((b) => b.status === 200)).toBe(true);
     expect(await balance(c)).toBe(15_000_000);
@@ -213,55 +262,61 @@ describe('Webhook: Zahlung', () => {
     expect(n!.n).toBe(2);
   });
 
-  it('fremde Transaktion, falscher Betrag oder Währung: nichts gebucht, Vorfall markiert', async () => {
+  it('fremde Zahlung, falscher Betrag, Währung oder Modus: nichts gebucht, Vorfall markiert', async () => {
     const e = env();
     const c = await Client.create(e);
-    expect((await webhook(e, completed('txn_other', null))).body.ignored).toBe('unknown_order');
+    expect((await webhook(e, completed('cs_other', null))).body.ignored).toBe('unknown_order');
     const r = await startCredit(c, e);
-    expect((await webhook(e, completed(r.transactionId, r.orderId, '100'))).body.ignored).toBe('amount_mismatch');
-    expect((await webhook(e, completed(r.transactionId, r.orderId, '500', 'USD'))).body.ignored).toBe('amount_mismatch');
+    expect((await webhook(e, completed(r.transactionId, r.orderId, 100))).body.ignored).toBe('amount_mismatch');
+    expect((await webhook(e, completed(r.transactionId, r.orderId, 500, { currency: 'usd' }))).body.ignored).toBe('amount_mismatch');
+    // Live-Ereignis an einen Test-Worker
+    expect((await webhook(e, completed(r.transactionId, r.orderId, 500, { livemode: true }))).body.ignored).toBe('livemode_mismatch');
     expect(await balance(c)).toBe(0);
     const o = await DB.prepare('SELECT incident, status FROM web_orders WHERE id = ?').bind(r.orderId).first<any>();
     expect(o).toEqual({ incident: 'amount_mismatch', status: 'open' });
     // Andere Ereignisse werden quittiert und ignoriert
-    expect((await webhook(e, { event_type: 'transaction.created', data: {} })).body.ignored).toBe('transaction.created');
+    expect((await webhook(e, event('payment_intent.created', {}))).body.ignored).toBe('payment_intent.created');
   });
 
-  it('Produktion: Sandbox-Keys schalten den Web-Kauf nicht frei, live nur mit PADDLE_ENV=live', async () => {
-    const prod = baseEnv({ ...PADDLE, DEV_MODE: 'false' });
-    const cfg = (await rawFetch('/v1/config', prod)).body.webPurchase;
-    expect(cfg.enabled).toBe(false);
-    expect((await webhook(prod, completed('txn_1', null))).status).toBe(503);
-    const live = baseEnv({ ...PADDLE, WEB_PACKAGES: TEST_PACKAGES, DEV_MODE: 'false', PADDLE_ENV: 'live' });
-    expect((await rawFetch('/v1/config', live)).body.webPurchase).toMatchObject({ enabled: true, testMode: false });
-    await post(live, '/v1/web/checkout', { packageId: 'web.5', kind: 'code' });
-    expect(paddle.mock.calls[0][0]).toBe('https://api.paddle.com/transactions');
-    // Testbetrieb ist immer Sandbox, auch mit PADDLE_ENV=live
-    const test = baseEnv({ ...PADDLE, DEV_MODE: 'false', DEPLOY_MODE: 'test', PADDLE_ENV: 'live' });
-    expect((await rawFetch('/v1/config', test)).body.webPurchase).toMatchObject({ enabled: true, testMode: true });
+  it('Produktion nur mit Live-Key, Testbetrieb nur mit Test-Key', async () => {
+    const prod = baseEnv({ ...STRIPE, DEV_MODE: 'false' });
+    expect((await rawFetch('/v1/config', prod)).body.webPurchase.enabled).toBe(false);
+    expect((await webhook(prod, completed('cs_1', null))).status).toBe(503);
+    const live = baseEnv({ STRIPE_SECRET_KEY: 'sk_live_51abc', STRIPE_WEBHOOK_SECRET: SECRET, WEB_PACKAGES: TEST_PACKAGES, DEV_MODE: 'false' });
+    expect((await rawFetch('/v1/config', live)).body.webPurchase).toMatchObject({ enabled: true, testMode: false, provider: 'stripe' });
+    expect((await post(live, '/v1/web/checkout', { packageId: 'web.5', kind: 'code' })).status).toBe(200);
+    // Testereignis an den Live-Worker wird nicht gebucht
+    expect((await webhook(live, completed('cs_test_1', null))).body.ignored).toBe('livemode_mismatch');
+    const test = baseEnv({ STRIPE_SECRET_KEY: 'sk_live_51abc', STRIPE_WEBHOOK_SECRET: SECRET, DEV_MODE: 'false', DEPLOY_MODE: 'test' });
+    expect((await rawFetch('/v1/config', test)).body.webPurchase.enabled).toBe(false);
+    const testOk = baseEnv({ ...STRIPE, DEV_MODE: 'false', DEPLOY_MODE: 'test' });
+    expect((await rawFetch('/v1/config', testOk)).body.webPurchase).toMatchObject({ enabled: true, testMode: true });
+    // Publishable Key oder Unsinn statt Secret Key: aus
+    expect((await rawFetch('/v1/config', env({ STRIPE_SECRET_KEY: 'pk_test_abc' }))).body.webPurchase.enabled).toBe(false);
   });
 });
 
 describe('Webhook: Rückerstattung und Chargeback', () => {
-  async function paid(e: Env, c: Client, pkg = 'web.5', total = '500') {
+  async function paid(e: Env, c: Client, pkg = 'web.5', total = 500) {
     const r = await startCredit(c, e, pkg);
     await webhook(e, completed(r.transactionId, r.orderId, total));
     return r;
   }
 
-  it('Erstattung zieht Guthaben ab, idempotent, erst nach Freigabe', async () => {
+  it('Teil-Erstattungen ziehen jeweils nur den neuen Teil ab, idempotent', async () => {
     const e = env();
     const c = await Client.create(e);
-    const r = await paid(e, c, 'web.10', '1000');
-    expect((await webhook(e, adjustment('adj_1', r.transactionId, '400', 'refund', 'pending_approval', 'adjustment.created'))).body.ignored).toBe('adjustment pending_approval');
-    expect(await balance(c)).toBe(10_000_000);
-    const res = await webhook(e, adjustment('adj_1', r.transactionId, '400'));
+    const r = await paid(e, c, 'web.10', 1000);
+    const res = await webhook(e, refunded(r.transactionId, 400));
     expect(res.body).toMatchObject({ reversed: 4_000_000, incident: 'refund' });
-    expect((await webhook(e, adjustment('adj_1', r.transactionId, '400'))).body.duplicate).toBe(true);
+    expect((await webhook(e, refunded(r.transactionId, 400))).body.duplicate).toBe(true);
     expect(await balance(c)).toBe(6_000_000);
     const entry = (await c.call('GET', '/v1/account/ledger')).body.entries[0];
     expect(entry).toMatchObject({ type: 'refund', amountMicro: -4_000_000, source: 'web' });
     expect((await rawFetch(`/v1/web/orders/${r.orderId}`, e)).body.status).toBe('refunded');
+    // Zweite Erstattung: Stripe meldet die Summe (10 €), gebucht werden die restlichen 6 €
+    expect((await webhook(e, refunded(r.transactionId, 1000))).body.reversed).toBe(6_000_000);
+    expect(await balance(c)).toBe(0);
   });
 
   it('Chargeback nach Verbrauch: höchstens bis 0, Vorfall markiert', async () => {
@@ -270,13 +325,14 @@ describe('Webhook: Rückerstattung und Chargeback', () => {
     const r = await paid(e, c);
     // Guthaben fast verbraucht
     await DB.prepare('UPDATE lots SET remaining_micro = 1000000').run();
-    const res = await webhook(e, adjustment('adj_cb', r.transactionId, '500', 'chargeback'));
+    const res = await webhook(e, dispute('dp_1', r.transactionId, 500));
     expect(res.body).toMatchObject({ reversed: 1_000_000, incident: 'chargeback:shortfall' });
+    expect((await webhook(e, dispute('dp_1', r.transactionId, 500))).body.duplicate).toBe(true);
     expect(await balance(c)).toBe(0);
     const o = await DB.prepare('SELECT status, incident, reversed_micro FROM web_orders WHERE id = ?').bind(r.orderId).first<any>();
     expect(o).toEqual({ status: 'chargeback', incident: 'chargeback:shortfall', reversed_micro: 5_000_000 });
-    // Mehrfach-Erstattung über den Preis hinaus ändert nichts mehr
-    expect((await webhook(e, adjustment('adj_more', r.transactionId, '500'))).body.reversed).toBe(0);
+    // Erstattung über den Preis hinaus ändert nichts mehr
+    expect((await webhook(e, refunded(r.transactionId, 500))).body.reversed).toBe(0);
     const lots = await DB.prepare('SELECT MIN(remaining_micro) AS m FROM lots').first<{ m: number }>();
     expect(lots!.m).toBe(0);
   });
@@ -285,10 +341,16 @@ describe('Webhook: Rückerstattung und Chargeback', () => {
     const e = env();
     const c = await Client.create(e);
     const r = await startCredit(c, e, 'web.10');
-    expect((await webhook(e, adjustment('adj_early', r.transactionId, '300'))).body.reversed).toBe(0);
-    expect((await webhook(e, completed(r.transactionId, r.orderId, '1000'))).body.credited).toBe(7_000_000);
+    // PaymentIntent noch unbekannt: Stripe trägt unsere Bestell-ID über die Metadaten mit
+    expect((await webhook(e, refunded(r.transactionId, 300, r.orderId))).body.reversed).toBe(0);
+    expect((await webhook(e, completed(r.transactionId, r.orderId, 1000))).body.credited).toBe(7_000_000);
     expect(await balance(c)).toBe(7_000_000);
     expect((await rawFetch(`/v1/web/orders/${r.orderId}`, e)).body.status).toBe('refunded');
+  });
+
+  it('Erstattung einer fremden Zahlung wird ignoriert', async () => {
+    const e = env();
+    expect((await webhook(e, refunded('cs_fremd', 500))).body.ignored).toBe('unknown_order');
   });
 
   it('nimmt anderes Guthaben (z. B. Store-Kauf) mit, aber nie unter 0', async () => {
@@ -297,10 +359,10 @@ describe('Webhook: Rückerstattung und Chargeback', () => {
     const r = await paid(e, c);
     await c.call('POST', '/v1/purchases/verify', { platform: 'google', productId: 'overfit.fuel.5', purchaseToken: 'mock:s1' });
     // Web-Guthaben schon verbraucht, Store-Guthaben (Rest 3,94 €) noch da → Erstattung über 5 € nimmt es mit, endet bei 0.
-    await DB.prepare("UPDATE lots SET remaining_micro = 0 WHERE ref LIKE 'paddle:%'").run();
-    await DB.prepare("UPDATE lots SET remaining_micro = 3935185 WHERE ref NOT LIKE 'paddle:%' AND remaining_micro = 5000000").run();
+    await DB.prepare("UPDATE lots SET remaining_micro = 0 WHERE ref LIKE 'stripe:%'").run();
+    await DB.prepare("UPDATE lots SET remaining_micro = 3935185 WHERE ref NOT LIKE 'stripe:%' AND remaining_micro = 5000000").run();
     expect(await balance(c)).toBe(3_935_185);
-    expect((await webhook(e, adjustment('adj_x', r.transactionId, '500'))).body).toMatchObject({ reversed: 3_935_185, incident: 'refund:shortfall' });
+    expect((await webhook(e, refunded(r.transactionId, 500))).body).toMatchObject({ reversed: 3_935_185, incident: 'refund:shortfall' });
     expect(await balance(c)).toBe(0);
   });
 });
@@ -315,7 +377,7 @@ describe('Guthaben-Codes', () => {
     expect(normalizeCreditCode('ABCD')).toBeNull();
   });
 
-  async function buyCode(e: Env, pkg = 'web.5', total = '500') {
+  async function buyCode(e: Env, pkg = 'web.5', total = 500) {
     const co = await post(e, '/v1/web/checkout', { packageId: pkg, kind: 'code', locale: 'en' });
     expect(co.status).toBe(200);
     const pending = await rawFetch(`/v1/web/orders/${co.body.orderId}`, e);
@@ -330,7 +392,7 @@ describe('Guthaben-Codes', () => {
   it('Kauf ohne App → Code auf der Erfolgsseite → in der App einlösen, nur einmal', async () => {
     const e = env();
     const { code, orderId } = await buyCode(e);
-    expect(JSON.parse(String(paddle.mock.calls[0][1].body)).items[0].price.name).toBe('overfit credit code €5');
+    expect(new URLSearchParams(String(stripe.mock.calls[0][1].body)).get('line_items[0][price_data][product_data][name]')).toBe('overfit credit code €5');
     const a = await Client.create(e);
     const b = await Client.create(e);
     const r = await a.call('POST', '/v1/codes/redeem', { code: code.toLowerCase() });
@@ -362,7 +424,7 @@ describe('Guthaben-Codes', () => {
   it('Erstattung vor dem Einlösen sperrt den Code; danach zieht sie beim Einlöser ab', async () => {
     const e = env();
     const first = await buyCode(e);
-    await webhook(e, adjustment('adj_c1', first.transactionId, '500'));
+    await webhook(e, refunded(first.transactionId, 500));
     const c = await Client.create(e);
     const r = await c.call('POST', '/v1/codes/redeem', { code: first.code });
     expect(r.body.error.code).toBe('code_revoked');
@@ -371,15 +433,15 @@ describe('Guthaben-Codes', () => {
     const second = await buyCode(e);
     await c.call('POST', '/v1/codes/redeem', { code: second.code });
     expect(await balance(c)).toBe(5_000_000);
-    expect((await webhook(e, adjustment('adj_c2', second.transactionId, '500', 'chargeback'))).body.reversed).toBe(5_000_000);
+    expect((await webhook(e, dispute('dp_c2', second.transactionId, 500))).body.reversed).toBe(5_000_000);
     expect(await balance(c)).toBe(0);
     expect((await c.call('GET', '/v1/account/ledger')).body.entries[0]).toMatchObject({ type: 'chargeback', source: 'code' });
   });
 
   it('Teil-Erstattung vor dem Einlösen verringert den Code-Wert', async () => {
     const e = env();
-    const { code, transactionId } = await buyCode(e, 'web.10', '1000');
-    await webhook(e, adjustment('adj_p', transactionId, '300'));
+    const { code, transactionId } = await buyCode(e, 'web.10', 1000);
+    await webhook(e, refunded(transactionId, 300));
     const c = await Client.create(e);
     expect((await c.call('POST', '/v1/codes/redeem', { code })).body.creditedMicro).toBe(7_000_000);
   });
@@ -388,11 +450,12 @@ describe('Guthaben-Codes', () => {
 describe('/v1/config', () => {
   it('meldet Web-Kauf, Testmodus, Kanäle und Pakete', async () => {
     const cfg = (await rawFetch('/v1/config', env())).body.webPurchase;
-    expect(cfg).toMatchObject({ enabled: true, testMode: true, provider: 'paddle', channels: ['sideload'], pageUrl: 'https://bigfire3.github.io/overfit/guthaben/' });
+    expect(cfg).toMatchObject({ enabled: true, testMode: true, provider: 'stripe', channels: ['sideload'], pageUrl: 'https://bigfire3.github.io/overfit/guthaben/' });
     expect(cfg.packages.map((p: any) => p.id)).toEqual(['web.5', 'web.10', 'web.20']);
-    // Standardpakete ohne Überschreibung: 10/20/50 €, Guthaben = Preis (docs/monetization.md „Rechnung“).
-    const std = (await rawFetch('/v1/config', baseEnv({ ...PADDLE }))).body.webPurchase.packages;
+    // Standardpakete ohne Überschreibung: 5/10/20/50 €, Guthaben = Preis (docs/monetization.md „Rechnung“).
+    const std = (await rawFetch('/v1/config', baseEnv({ ...STRIPE }))).body.webPurchase.packages;
     expect(std).toEqual([
+      { id: 'web.5', priceMicro: 5_000_000, creditMicro: 5_000_000 },
       { id: 'web.10', priceMicro: 10_000_000, creditMicro: 10_000_000 },
       { id: 'web.20', priceMicro: 20_000_000, creditMicro: 20_000_000 },
       { id: 'web.50', priceMicro: 50_000_000, creditMicro: 50_000_000 },
@@ -412,7 +475,7 @@ describe('Umzug per Wiederherstellungscode', () => {
     const { code } = (await old.call('POST', '/v1/recovery/code')).body;
     const neu = await Client.create(e);
     expect((await neu.call('POST', '/v1/recovery/restore', { code })).status).toBe(200);
-    await webhook(e, adjustment('adj_m', r.transactionId, '200'));
+    await webhook(e, refunded(r.transactionId, 200));
     expect(await balance(neu)).toBe(3_000_000);
   });
 });

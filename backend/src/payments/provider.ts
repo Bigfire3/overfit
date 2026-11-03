@@ -1,9 +1,10 @@
 /**
- * Schmale Schnittstelle zum Zahlungsanbieter (Merchant of Record) für den Web-Kauf von Guthaben.
- * Heute gibt es nur Paddle (paddle.ts). Ein Wechsel (z. B. Lemon Squeezy, Stripe) heißt: diese Schnittstelle neu
- * implementieren und in `getPaymentProvider` auswählen; Bestellungen, Buchung, Idempotenz und Codes (web.ts) bleiben gleich.
+ * Schmale Schnittstelle zum Zahlungsanbieter für den Web-Kauf von Guthaben. Heute: Stripe Checkout (stripe.ts).
+ * Ein Wechsel heißt: diese Schnittstelle neu implementieren und in `getPaymentProvider` (web.ts) auswählen;
+ * Bestellungen, Buchung, Idempotenz und Codes (web.ts) bleiben gleich.
  */
 
+/** `sandbox` = Testmodus des Anbieters (Testkarten, keine echte Zahlung), `live` = echte Zahlungen. */
 export type PaymentEnvironment = 'sandbox' | 'live';
 
 export interface CheckoutRequest {
@@ -11,45 +12,55 @@ export interface CheckoutRequest {
   orderId: string;
   kind: 'credit' | 'code';
   packageId: string;
-  /** Endpreis inkl. USt in µ€. */
+  /** Endpreis in µ€ (Kleinunternehmer: ohne USt). */
   priceMicro: number;
   creditMicro: number;
   locale: 'de' | 'en';
+  /** Rücksprung nach erfolgreicher Zahlung bzw. nach Abbruch (Kaufseite). */
+  successUrl: string;
+  cancelUrl: string;
 }
 
 export interface CheckoutSession {
-  /** Transaktions-ID beim Anbieter, öffnet den Checkout auf der Kaufseite. */
+  /** ID des Checkouts beim Anbieter (Stripe: Checkout Session `cs_…`). */
   providerTxnId: string;
-  /** Vom Anbieter gelieferte Checkout-URL (falls vorhanden). */
+  /** Gehostete Checkout-Seite des Anbieters; die Kaufseite leitet dorthin weiter. */
   checkoutUrl: string | null;
 }
 
-/** Was die Kaufseite braucht, um den Checkout des Anbieters zu öffnen (öffentliche Werte). */
+/** Was die Kaufseite über den Anbieter wissen darf (öffentliche Werte). */
 export interface ClientSettings {
   provider: string;
   environment: PaymentEnvironment;
-  /** Client-seitiges Token des Anbieters (Paddle.js), öffentlich. */
-  clientToken: string;
 }
 
 export type PaymentEvent =
   | {
       type: 'paid';
+      /** Checkout-ID, unter der die Bestellung angelegt wurde. */
       providerTxnId: string;
+      /** Zahlungs-ID, auf die sich Erstattung und Chargeback beziehen (Stripe: PaymentIntent `pi_…`). */
+      paymentId: string | null;
       orderId: string | null;
       currency: string;
-      /** Bezahlter Gesamtbetrag in Cent (inkl. USt). */
+      /** Bezahlter Gesamtbetrag in Cent. */
       totalMinor: number;
+      /** Rechnungsland des Käufers (ISO alpha-2), falls bekannt. */
+      country: string | null;
     }
   | {
       type: 'reversal';
       /** refund = Rückerstattung, chargeback = Rückbuchung durch die Bank. */
       action: 'refund' | 'chargeback';
+      /** Eindeutiger Schlüssel des Vorgangs (Idempotenz). */
       adjustmentId: string;
-      providerTxnId: string;
+      paymentId: string;
+      /** Unsere Bestell-ID aus den Metadaten, falls vorhanden (Erstattung vor der Zahlungsbestätigung). */
+      orderId: string | null;
       currency: string;
-      /** Erstatteter Betrag in Cent (inkl. USt). */
+      /** Betrag in Cent. Bei `cumulative` die Summe aller bisherigen Erstattungen dieser Zahlung. */
       amountMinor: number;
+      cumulative: boolean;
     }
   | { type: 'ignored'; reason: string };
 

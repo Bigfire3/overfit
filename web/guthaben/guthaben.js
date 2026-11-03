@@ -1,14 +1,15 @@
 // Kaufseite für overfit-Guthaben. Ohne Login: Aus der App kommt ein kurzlebiger Kauflink (#t=…), ohne ihn kauft man
-// einen Guthaben-Code (z. B. als Geschenk). Der Checkout läuft über Paddle.js (Merchant of Record); gebucht wird erst
-// per Webhook im Backend, die Erfolgsseite fragt nur den Stand ab.
+// einen Guthaben-Code (z. B. als Geschenk). Bezahlt wird auf der gehosteten Checkout-Seite von Stripe; gebucht wird erst
+// per Webhook im Backend, die Erfolgsseite (?order=…) fragt nur den Stand ab.
 (function () {
   'use strict';
   var API = String(window.OVERFIT_API || '').replace(/\/+$/, '');
-  var PADDLE_JS = 'https://cdn.paddle.com/paddle/v2/paddle.js';
 
   var hash = new URLSearchParams(location.hash.slice(1));
   var query = new URLSearchParams(location.search);
   var token = hash.get('t') || '';
+  // Zurück vom Stripe-Checkout (Abbruch): Der Kauflink steht nicht in der Rücksprung-Adresse, die Seite hat ihn sich gemerkt.
+  if (!token && query.get('canceled')) { try { token = sessionStorage.getItem('overfit.token') || ''; } catch (e) { /* privat */ } }
   var orderId = hash.get('order') || query.get('order') || '';
   var langParam = hash.get('lang') || query.get('lang');
   var de = langParam ? langParam === 'de' : (navigator.language || '').toLowerCase().indexOf('de') === 0;
@@ -25,9 +26,11 @@
     linkInvalid: 'Dieser Kauflink ist ungültig. Öffne in der App „Im Web aufladen“ – oder kauf hier einen Code.',
     toCode: 'Stattdessen Code kaufen (Geschenk)', toCredit: 'Zurück: auf mein Konto laden',
     gives: function (e) { return e + ' Guthaben'; },
-    honest: 'Endpreise inkl. USt. Du zahlst 10\u00a0€ und bekommst 10\u00a0€ Guthaben, ohne Abzug. USt, Zahlungsgebühr und unsere Marge stecken im Aufschlag auf die Modellpreise (69\u00a0%), den die App nennt. Details unter „Wie setzen sich die Preise zusammen?“ (Link unten).',
+    honest: function (pct) { return 'Endpreise. Du zahlst 10\u00a0€ und bekommst 10\u00a0€ Guthaben, ohne Abzug. Zahlungsgebühr und unsere Marge stecken im Aufschlag auf die Modellpreise' + (pct ? ' (' + pct + '\u00a0%)' : '') + ', den die App bei jeder Antwort einrechnet. Details unter „Wie setzen sich die Preise zusammen?“ (Link unten).'; },
+    vat: 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.',
     pay: 'Weiter zur Zahlung', payBusy: 'Einen Moment …', payFailed: 'Die Zahlung konnte nicht gestartet werden. Bitte noch einmal versuchen.',
-    mor: 'Die Zahlung wickelt Paddle als Verkäufer (Merchant of Record) ab, inklusive Umsatzsteuer und Beleg per E-Mail. overfit sieht keine Zahlungsdaten.',
+    mor: 'Bezahlt wird auf der sicheren Seite von Stripe (Karte und weitere gängige Zahlarten). overfit sieht keine Zahlungsdaten. Den Beleg schickt Stripe per E-Mail.',
+    canceled: 'Zahlung abgebrochen, es wurde nichts berechnet.',
     waitTitle: 'Zahlung wird bestätigt …', waitText: 'Das dauert meist nur ein paar Sekunden.',
     paidTitle: 'Danke!', paidCredit: function (e) { return e + ' Guthaben sind auf deinem Konto. Zurück in der App ist der neue Stand da.'; },
     paidCode: function (e) { return 'Dein Code über ' + e + ' Guthaben. Einlösen in der App: Guthaben → „Code einlösen“. Den Code siehst du nur hier, heb ihn gut auf.'; },
@@ -46,9 +49,11 @@
     linkInvalid: 'This purchase link is not valid. Open “Top up on the web” in the app – or buy a code here.',
     toCode: 'Buy a code instead (gift)', toCredit: 'Back: top up my account',
     gives: function (e) { return e + ' credit'; },
-    honest: 'Final prices incl. VAT. You pay €10 and get €10 of credit, no deductions. VAT, payment fee and our margin are in the markup on model prices (69 %) that the app shows. Details under “How are the prices made up?” (link below).',
+    honest: function (pct) { return 'Final prices. You pay €10 and get €10 of credit, no deductions. The payment fee and our margin are in the markup on model prices' + (pct ? ' (' + pct + ' %)' : '') + ' that the app includes in every answer. Details under “How are the prices made up?” (link below).'; },
+    vat: 'No VAT is charged under the German small business scheme (§ 19 UStG).',
     pay: 'Continue to payment', payBusy: 'One moment …', payFailed: 'The payment could not be started. Please try again.',
-    mor: 'Paddle handles the payment as the seller (merchant of record), including VAT and an email receipt. overfit never sees payment details.',
+    mor: 'You pay on Stripe’s secure page (card and other common payment methods). overfit never sees payment details. Stripe emails you the receipt.',
+    canceled: 'Payment cancelled, nothing was charged.',
     waitTitle: 'Confirming payment …', waitText: 'This usually takes a few seconds.',
     paidTitle: 'Thank you!', paidCredit: function (e) { return e + ' of credit is on your account. Back in the app you will see the new balance.'; },
     paidCode: function (e) { return 'Your code for ' + e + ' of credit. Redeem it in the app: Credit → “Redeem code”. The code is only shown here, keep it safe.'; },
@@ -102,7 +107,11 @@
       $('linkNote').textContent = status === 'expired' ? T.linkExpired : status === 'used' ? T.linkUsed : T.linkInvalid;
       $('linkNote').hidden = false;
     }
-    selected = (s.packages[0] || {}).id || null;
+    // Kleinstes Paket ab 10 € vorwählen (5 € bleibt wählbar).
+    selected = ((s.packages.filter(function (p) { return p.priceMicro >= 10000000; })[0]) || s.packages[0] || {}).id || null;
+    var pct = s.markupBp ? String(Math.round(s.markupBp / 100)) : '';
+    $('honest').textContent = T.honest(pct);
+    if (query.get('canceled')) { $('payError').textContent = T.canceled; $('payError').hidden = false; }
     renderShop();
     show('shop');
   }).catch(function () { fail(T.errNet); });
@@ -168,40 +177,14 @@
       });
   });
 
-  function loadPaddle() {
-    if (window.Paddle) return Promise.resolve(window.Paddle);
-    return new Promise(function (resolve, reject) {
-      var s = document.createElement('script');
-      s.src = PADDLE_JS;
-      s.onload = function () { window.Paddle ? resolve(window.Paddle) : reject(new Error('paddle')); };
-      s.onerror = function () { reject(new Error('paddle')); };
-      document.head.appendChild(s);
-    });
-  }
-
   function openCheckout(co) {
-    var successUrl = location.origin + location.pathname + '?order=' + encodeURIComponent(co.orderId) + '&lang=' + lang;
-    try { sessionStorage.setItem('overfit.order', co.orderId); } catch (e) { /* privat */ }
-    return loadPaddle().then(function (Paddle) {
-      if (co.client.environment === 'sandbox') Paddle.Environment.set('sandbox');
-      Paddle.Initialize({
-        token: co.client.clientToken,
-        eventCallback: function (ev) {
-          if (ev && ev.name === 'checkout.completed') {
-            Paddle.Checkout.close();
-            location.replace(successUrl);
-          }
-          if (ev && ev.name === 'checkout.closed') {
-            $('pay').disabled = false;
-            $('pay').textContent = T.pay;
-          }
-        }
-      });
-      Paddle.Checkout.open({
-        transactionId: co.transactionId,
-        settings: { displayMode: 'overlay', theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', locale: lang, successUrl: successUrl, allowLogout: false }
-      });
-    });
+    try {
+      sessionStorage.setItem('overfit.order', co.orderId);
+      if (kind === 'credit' && token) sessionStorage.setItem('overfit.token', token);
+    } catch (e) { /* privat */ }
+    if (!co.checkoutUrl || !/^https:\/\//.test(co.checkoutUrl)) return Promise.reject(new Error('checkout_url'));
+    location.assign(co.checkoutUrl);
+    return Promise.resolve();
   }
 
   // ---- Erfolgsseite --------------------------------------------------------------------------------------------
@@ -221,6 +204,7 @@
         }
         if (o.status !== 'paid') { $('doneTitle').textContent = T.refundedTitle; $('doneText').textContent = T.refundedText; return; }
         $('doneTitle').textContent = T.paidTitle;
+        $('doneVat').hidden = false;
         if (o.kind === 'code') {
           $('doneText').textContent = T.paidCode(euro(o.creditMicro));
           $('codeValue').textContent = o.code || '';

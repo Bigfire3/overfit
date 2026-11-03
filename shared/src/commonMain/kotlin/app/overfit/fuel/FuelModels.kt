@@ -89,7 +89,12 @@ data class WebPurchaseConfig(
     val testMode: Boolean = true,
     /** Channels in which the app shows "Top up on the web": `sideload` (APK from GitHub), `store` (Play Store, App Store). */
     val channels: List<String> = emptyList(),
+    /** Packages of the purchase page: price = credit (1:1). Empty = old backend. */
+    val packages: List<WebPackage> = emptyList(),
 )
+
+@Serializable
+data class WebPackage(val id: String, val priceMicro: Long, val creditMicro: Long)
 
 /** How this build was installed. Store builds hide the web purchase unless the server enables `store` (store rules). */
 enum class Distribution(val key: String) { Sideload("sideload"), Store("store") }

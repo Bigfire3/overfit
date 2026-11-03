@@ -13,10 +13,11 @@ class WebPurchaseTest {
     @Test
     fun configFromServerAndFlagPerChannel() {
         val cfg = json.decodeFromString<FuelConfig>(
-            """{"mode":"test","packages":[],"webPurchase":{"enabled":true,"testMode":true,"provider":"paddle","channels":["sideload"],
+            """{"mode":"test","packages":[],"webPurchase":{"enabled":true,"testMode":true,"provider":"stripe","channels":["sideload"],
                "pageUrl":"https://bigfire3.github.io/overfit/guthaben/","packages":[{"id":"web.5","priceMicro":5000000,"creditMicro":5000000}]}}""",
         )
         assertTrue(cfg.webPurchase.testMode)
+        assertEquals(listOf(WebPackage("web.5", 5_000_000, 5_000_000)), cfg.webPurchase.packages)
         assertTrue(cfg.showsWebPurchase(Distribution.Sideload))
         assertFalse(cfg.showsWebPurchase(Distribution.Store), "store builds stay off until the server allows `store`")
         val both = cfg.copy(webPurchase = cfg.webPurchase.copy(channels = listOf("sideload", "store")))

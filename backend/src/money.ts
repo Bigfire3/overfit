@@ -25,9 +25,9 @@ export function costMicro(usage: Usage, price: Price, markupBp: number): number 
 }
 
 /**
- * Gutschrift eines Pakets: **1:1 zum Preis**, in jedem Kanal (Store, Web, Code). USt, Zahlungs- und Store-Gebühr trägt der
- * Aufschlag `MARKUP_BP` auf die Modellpreise, nicht die Gutschrift (docs/monetization.md „Rechnung“).
+ * Gutschrift eines Pakets. Web und Codes: 1:1 zum Preis. Store: das im Paket festgelegte Guthaben; der Store-Preis
+ * liegt offen darüber (USt und Store-Gebühr), docs/monetization.md „Rechnung“.
  */
-export function packageCreditMicro(priceMicro: number): number {
-  return priceMicro;
+export function packageCreditMicro(pkg: { priceMicro: number; creditMicro?: number }): number {
+  return pkg.creditMicro ?? pkg.priceMicro;
 }

@@ -31,3 +31,19 @@ console.table(
 );
 const t = r.totals;
 console.log(`Gesamt: ${t.requests} Anfragen (${t.photoRequests} mit Foto, ${t.fallbackRequests} mit Ausweichung), berechnet ${eur(t.chargedMicro)}, Anbieterkosten ${eur(t.providerCostMicro)}, Marge ${eur(t.marginMicro)}`);
+
+// Web-Umsatz je Jahr und Rechnungsland (Kleinunternehmer, EU-Lieferschwelle). Werkzeug, keine Steuerberatung.
+const w = r.webRevenue;
+if (w) {
+  const e2 = (micro) => (micro / 1e6).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  console.log(`\nWeb-Umsatz (Stripe, ${w.environment === 'live' ? 'echte Zahlungen' : 'Testmodus'}), bezahlt minus erstattet:`);
+  if (!w.years.length) console.log('  noch keine Web-Verkäufe');
+  for (const y of w.years) {
+    console.log(`  ${y.year}: gesamt ${e2(y.totalMicro)} in ${y.orders} Käufen, davon andere EU-Länder ${e2(y.euCrossBorderMicro)}, Land unbekannt ${e2(y.unknownCountryMicro)}`);
+    console.table(y.byCountry.map((c) => ({ Land: c.country, Käufe: c.orders, Umsatz: e2(c.totalMicro) })));
+  }
+  console.log(`Schwellen: EU-Lieferschwelle ${e2(w.thresholds.euCrossBorderMicro)} (andere EU-Länder, Vorjahr oder laufendes Jahr), ` +
+    `Kleinunternehmer ${e2(w.thresholds.smallBusinessPrevYearMicro)} Vorjahr / ${e2(w.thresholds.smallBusinessCurrentYearMicro)} laufendes Jahr. Warnung ab 80 %.`);
+  for (const x of w.warnings) console.log(`⚠️  ${x.message}`);
+  console.log(w.note);
+}
