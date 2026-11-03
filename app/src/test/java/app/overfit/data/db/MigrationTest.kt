@@ -161,6 +161,52 @@ class MigrationTest {
         }
     }
 
+    /**
+     * v5 → v6: the coach chat tables are added (pure addition). Existing data (here a workout and a coach memory)
+     * stays, the new tables are empty and work with cascading delete.
+     */
+    @Test
+    fun migration5to6KeepsDataAndAddsEmptyCoachChatTables() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v5 = helper.createDatabase(5)
+        v5.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1000, 5000, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 5000)",
+        )
+        v5.execSQL("INSERT INTO coach_memory (text, createdAt, source, reviewId) VALUES ('Ziel: Kraft', 1, 'USER', NULL)")
+        v5.close()
+
+        val v6 = helper.runMigrationsAndValidate(6, OverfitDatabase.MIGRATIONS.toList())
+        assertEquals(1L, v6.count("workout_session"))
+        assertEquals(1L, v6.count("coach_memory"))
+        assertEquals(0L, v6.count("coach_chat"))
+        assertEquals(0L, v6.count("coach_chat_message"))
+        v6.close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            assertEquals("Ziel: Kraft", db.coachDao().currentMemory()?.text)
+            val dao = db.coachChatDao()
+            dao.upsertChat(CoachChatEntity("c1", "Frage", 10, 10))
+            dao.upsertMessage(CoachChatMessageEntity("m1", "c1", fromUser = true, text = "Frage", status = "DONE", createdAt = 10))
+            dao.upsertMessage(CoachChatMessageEntity("m2", "c1", fromUser = false, text = "Antwort", status = "DONE", createdAt = 11, costMicro = 1200))
+            assertEquals(listOf("m1", "m2"), dao.messages("c1").map { it.id })
+            dao.deleteChat("c1")
+            assertEquals(0, dao.allMessages().size)
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

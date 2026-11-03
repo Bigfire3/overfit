@@ -71,11 +71,12 @@ fun PromptView(
             TextButton(
                 if (copied) copiedLabel ?: h.promptCopied else h.promptCopy,
                 { if (text != null) { onCopy(text); copied = true } },
+                Modifier.testTag("prompt-copy:$title"),
                 tone = if (copied) Tone.Muted else Tone.Default,
             )
             if (onUseInChat != null) {
                 Spacer(Modifier.width(Space.l))
-                TextButton(h.promptUseInChat, onUseInChat)
+                TextButton(h.promptUseInChat, onUseInChat, Modifier.testTag("prompt-chat:$title"))
             }
         }
     }

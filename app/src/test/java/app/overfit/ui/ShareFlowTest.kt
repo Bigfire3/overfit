@@ -4,8 +4,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTextExactly
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -86,7 +86,8 @@ class ShareFlowTest {
         waitFor("Workout importieren")
         compose.onNodeWithText("Workout importieren").performScrollTo().performClick()
         compose.onNodeWithText("Aus Zwischenablage importieren").performClick()
-        waitFor("Oberkörper A")
+        // Wait for the preview itself: the import screen shows the AI prompt, whose example also says "Oberkörper A".
+        waitFor("Vorschau")
         compose.onNodeWithText("Vorschau").assertIsDisplayed()
         compose.onNodeWithText("Bench Press").assertIsDisplayed()
         compose.onNodeWithText("3 Übungen").assertIsDisplayed()
@@ -146,7 +147,9 @@ class ShareFlowTest {
         compose.onNodeWithContentDescription("Zurück").performClick()
         openPlus()
         waitFor("KI-Prompt kopieren")
-        compose.onNodeWithText("KI-Prompt kopieren").performScrollTo().performClick()
+        // The full prompt is visible before copying.
+        compose.onNodeWithTag("prompt:KI-Prompt kopieren").performScrollTo().assertExists()
+        compose.onNodeWithTag("prompt-copy:KI-Prompt kopieren").performScrollTo().performClick()
         assertTrue(share.clipboard!!.contains("```json"))
         assertTrue(share.clipboard!!.contains("Bench Press"))
     }
