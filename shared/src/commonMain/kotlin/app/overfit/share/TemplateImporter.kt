@@ -4,7 +4,6 @@ import app.overfit.data.ExerciseRepository
 import app.overfit.data.TemplateRepository
 import app.overfit.domain.Exercise
 import app.overfit.shared.resources.Res
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 
 /** Import of shared templates (preview, then save) and the bundled sample templates. */
@@ -40,7 +39,7 @@ class TemplateImporter(
 
     /** Adds the sample templates that are missing (matched by name). Returns how many were added. */
     suspend fun addSamples(): Int {
-        val existing = templates.templates.first().map { it.name.lowercase() }.toSet()
+        val existing = templates.names().map { it.lowercase() }.toSet()
         var added = 0
         val catalog = catalog()
         for (key in SAMPLE_KEYS) {

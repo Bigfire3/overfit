@@ -64,6 +64,9 @@ interface TemplateDao {
     @Query("SELECT * FROM workout_template ORDER BY position, name COLLATE NOCASE")
     fun observeTemplates(): Flow<List<WorkoutTemplateEntity>>
 
+    @Query("SELECT name FROM workout_template")
+    suspend fun getNames(): List<String>
+
     @Query(
         """SELECT te.templateId AS templateId, e.name AS name FROM template_exercise te
            JOIN exercise e ON e.id = te.exerciseId ORDER BY te.templateId, te.position""",
