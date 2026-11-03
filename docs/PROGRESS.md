@@ -15,6 +15,29 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); Server-Deployment und Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Tab „Coach“: Chat, sichtbare Prompts, KI-Zugang an einem Ort (Session P, 3.11.)
+Erledigt:
+- Neuer Tab **Coach** (Training, Verlauf, Coach, Fotos, Profil). Oben die Statuszeile KI-Zugang (eigener Key mit Anbieter, Fuel mit Saldo oder „Kein KI-Zugang“) → Einrichten/Ändern/Trennen.
+- Auswertungen: letzte Auswertung, „Letztes Training auswerten“, „Fortschritt einschätzen“, alle Auswertungen, Gedächtnis mit Vorschau, Coach-Einstellungen.
+- **Chat** mit dem Coach: mehrere Nachrichten hin und her, eigener Key oder Fuel; der Coach kennt Profil, Workouts, letzte Trainings, Fortschritt und Gedächtnis. Workout-Vorschläge erscheinen als Karte „Workout übernehmen“ → Import-Vorschau. Verlauf lokal (Room v6), „Neuer Chat“, „Chat löschen“ (zweimal tippen), frühere Chats, Kosten je Antwort bei Fuel, Demo ohne KI-Zugang, Fotos nur über „Foto anhängen“.
+- **Prompts & Vorlagen** mit vollständigem Text (aufklappbar), „Kopieren“ und „Im Chat verwenden“: Workout per KI erstellen, Training auswerten lassen, Fortschritt der letzten 8 Wochen, Nächste Woche planen, Plateau durchbrechen, Kontext kopieren, Gem-/GPT-Anleitung. Dieselbe Anzeige beim Import („KI-Prompt kopieren“) und bei den KI-Chat-Verbindungen.
+- KI-Chat-Verbindungen (Claude, ChatGPT, Gemini) und Notizen aus dem Chat sind im Coach-Tab; im Profil bleibt der Verweis „Coach & KI“ und Fuel.
+- Tests: `CoachChatParserTest`, `CoachChatPromptTest`, `CoachPromptLibraryTest`, Verlauf in `CoachTransportTest`, `ChatContextTest` (common); `CoachTabTest`, Migration v5→v6, `DayWithOverfitTest` mit Chat-Schritt (Robolectric); bestehende UI-Tests auf den Tab umgestellt.
+
+### Bitte auf dem Handy testen: Tab „Coach“
+1. Tab-Leiste: Training, Verlauf, **Coach** (Sprechblase), Fotos, Profil.
+2. Coach-Tab oben: „KI-Zugang“ zeigt „Eigener Key · Anthropic“ (bzw. dein Anbieter), „Fuel · x,xx €“ oder „Kein KI-Zugang“. Antippen → Einrichtung; „Trennen“ braucht zwei Tipps.
+3. Darunter: letzte Auswertung, „Letztes Training auswerten“, „Fortschritt einschätzen“, „Coach-Gedächtnis“ (zeigt den Anfang des Textes).
+4. Chat: „Was soll ich morgen trainieren?“ eingeben → „Senden“ → Chat öffnet sich, „Coach schreibt …“, dann die Antwort. Nachfrage stellen („und kürzer?“) → der Coach bezieht sich auf die erste Antwort.
+5. „Erstell mir ein Push-Workout“ → Karte „Workout-Vorschlag: …“ → „Workout übernehmen“ → Import-Vorschau → „Übernehmen“ → steht im Training-Tab.
+6. Mit Fuel: unter jeder Antwort klein „Kosten: …“. Ohne KI-Zugang (Key trennen): Hinweis und Demo-Antwort mit Beispiel-Workout.
+7. „Foto anhängen“ → letzte Fotos erscheinen → eins antippen (Rahmen) → senden → „1 Foto angehängt“ steht an der Nachricht; ohne Auswahl geht kein Foto mit.
+8. „Neuer Chat“ startet leer; zurück im Tab stehen frühere Chats. „Chat löschen“ → „Wirklich löschen?“ → weg.
+9. App während „Coach schreibt …“ beenden und neu öffnen → die Antwort zeigt „Erneut versuchen“.
+10. „Prompts & Vorlagen“: jeder Prompt zeigt seinen Text, „Mehr“ klappt ihn ganz auf; „Kopieren“ wird kurz zu „Kopiert“; in ChatGPT einfügen = genau der angezeigte Text. „Im Chat verwenden“ öffnet einen neuen Chat mit der Frage im Eingabefeld.
+11. Training → „+“ → „KI-Prompt kopieren“ zeigt den Prompt ebenfalls an. Coach → Claude/ChatGPT/Gemini → „Kontext kopieren“ und Gem-Anleitung mit Text.
+12. Profil: nur noch „Coach & KI“ und Fuel im Abschnitt KI.
+
 ## Teilen und Import verbessern, Beispiel-Workouts standardmäßig (Session Q, 3.11.)
 **Erledigt:**
 - Import: „Datei auswählen“ (System-Dateiauswähler); Android öffnet `.overfit`-Dateien aus Dateien/Downloads/WhatsApp (VIEW) und nimmt sie über „Teilen mit …“ an (SEND), danach dieselbe Vorschau. Backup-ZIP im Import → Hinweis.

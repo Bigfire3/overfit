@@ -116,8 +116,9 @@ class CustomExerciseFlowTest {
         compose.onNodeWithText("Speichern").performClick()
 
         // Back in the running workout with the new exercise; the set and the rest are untouched
+        // The name also stands in the form until it closes: wait for the workout screen's counter, then the name.
+        waitFor("1/2 erledigt", substring = true)
         waitFor("Turkish Get-up Neu")
-        compose.onNodeWithText("1/2 erledigt", substring = true).assertExists()
         val workout = requireNotNull(deps.workout.state.value.workout)
         assertEquals(listOf("Bench Press", "Turkish Get-up Neu"), workout.exercises.map { it.exercise.name })
         assertEquals(restBefore, alerts.pending)

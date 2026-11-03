@@ -174,6 +174,19 @@ Body `{ "platform": "google"|"apple", "productId": "overfit.fuel.10", "purchaseT
 → `{ "productId": "…", "creditedMicro": 7870370, "alreadyCredited": false, "balanceMicro": 7870370 }`.
 Gutschrift = `Preis × (1 − storeFeeBp) / (1 + markupBp)` (abgerundet), **idempotent pro Kauf** (`alreadyCredited: true` bei Wiederholung, auch von anderen Konten – ein Kauf zählt nur einmal). Die App ruft das nach jedem erfolgreichen Store-Kauf auf (und beim Start für noch nicht bestätigte Käufe) und schließt die Transaktion erst danach ab. Ohne Store-Zugangsdaten im Backend: `503 purchases_unavailable`.
 
+## Geplant: Web-Kauf und Fuel-Codes (noch nicht gebaut)
+Siehe docs/monetization.md. Nur Vertrag, keine Implementierung.
+
+### `POST /v1/purchases/web-link` (signiert)
+Body `{ "productId": "overfit.fuel.10", "locale": "de" }` → `{ "url": "https://…/buy?t=<token>", "expiresAt": "…" }`.
+Token: signiert (HMAC), enthält anonyme Konto-ID, Produkt, Ablauf (≤ 15 Minuten), einmalig nutzbar. Die App öffnet `url` im Browser; kein Login nötig. Nur in Ländern/Stores ausgeliefert, in denen der Link erlaubt ist (Konfiguration in `/v1/config`).
+
+### `POST /v1/webhooks/payment` (Merchant of Record, Signatur des Anbieters)
+Body: Zahlungsereignis (Paddle/Lemon Squeezy/Stripe) mit Token aus dem Kauflink oder Code-Bestellung. Prüft die Anbieter-Signatur, bucht Fuel **idempotent pro Transaktions-ID** (`Preis × (1 − Anbietergebühr) / (1 + markupBp)`), `200` auch bei Wiederholung.
+
+### `POST /v1/codes/redeem` (signiert)
+Body `{ "code": "XXXX-XXXX-XXXX" }` → `{ "creditedMicro": …, "balanceMicro": … }`. Codes entstehen per Webhook (Kauf ohne App, Geschenk), sind einmalig einlösbar; Fehler `invalid_code`, `already_redeemed`.
+
 ## Spot (Einladungen)
 
 Ablauf: Einladender holt Token → zeigt QR (Token + Installationslink, alle ~30 s neu holen) → Neuer scannt → App holt Challenge → Play Integrity / App Attest mit der Challenge → Einlösen.
