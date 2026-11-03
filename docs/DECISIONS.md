@@ -500,3 +500,10 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - **Benachrichtigung:** Die Tap-Intents (Pausentimer läuft / Pause vorbei) tragen `EXTRA_OPEN_WORKOUT`; `MainActivity` zählt `AppDependencies.openWorkoutRequests` hoch, die UI öffnet daraufhin das maximierte Training. Nach Prozess-Neustart stellt die bestehende Wiederherstellung das Training ohnehin maximiert wieder her.
 - **Zweites Training:** Läuft eins, zeigt der Start-Tab statt „Training starten“ die Wahl „Zum laufenden Training“ / „Laufendes beenden“ (Bestätigungsmuster, Button wechselt Text). „Beenden“ heißt wie sonst auch: Training abschließen und speichern (Beenden-Flow), nicht verwerfen – umkehrbar und ohne Datenverlust. Danach startet man das neue Training vom Start-Tab.
 
+
+- **Lizenz (Entscheidung Fabian, 3.11.):** Apache-2.0 ersetzt durch „Alle Rechte vorbehalten“. Der Code darf öffentlich
+  einsehbar sein (z. B. damit die CI für ein öffentliches Repo kostenlos läuft), aber ohne Erlaubnis nicht kopiert,
+  verändert oder weiterverwendet werden. Drittbestandteile behalten ihre Lizenzen (Workout-Guide-Grafiken CC BY-SA 4.0,
+  Inter OFL, Bibliotheken). Backend `package.json`: `"license": "UNLICENSED"` (npm-Konvention für „nicht lizenziert“).
+  Was vor dem Wechsel unter Apache-2.0 veröffentlicht wurde, bleibt unter Apache-2.0 nutzbar. Das Repo war bis dahin
+  privat, deshalb spielt das praktisch keine Rolle.
