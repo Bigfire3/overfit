@@ -8,7 +8,12 @@ import app.overfit.i18n.CoachStrings
  * as demo in the UI; nothing is stored and the plan is never applied.
  */
 object CoachDemo {
-    fun review(workoutName: String, template: Template?, t: CoachStrings): CoachReview {
+    fun review(
+        workoutName: String,
+        template: Template?,
+        t: CoachStrings,
+        comparisons: List<ExerciseComparison> = emptyList(),
+    ): CoachReview {
         var bumped = false
         val plan = template?.let { tpl ->
             PlanSuggestion(
@@ -40,6 +45,9 @@ object CoachDemo {
             photoFeedback = null,
             nextSession = plan,
             memory = null,
+            exerciseReviews = comparisons.map { c ->
+                ExerciseFeedback(c.exerciseId, c.localVerdict ?: Verdict.SAME, t.demoExerciseComment(c.localVerdict), ExerciseReviews.simpleNext(c))
+            },
         )
     }
 }

@@ -48,6 +48,8 @@ data class CoachContext(
     val photoToday: Boolean = false,
     /** Date of the comparison photo (≥ 4 weeks old), if one is attached. */
     val comparisonPhotoDate: String? = null,
+    /** Today vs. last time per exercise, computed by the app (SESSION). */
+    val comparisons: List<ExerciseComparison> = emptyList(),
     val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 )
 
@@ -91,6 +93,11 @@ object CoachPromptBuilder {
                 if (current != null) {
                     appendLine("## Today's workout")
                     appendLine(formatSession(current, ctx.timeZone, detailed = true))
+                }
+                if (ctx.comparisons.isNotEmpty()) {
+                    appendLine("## Per exercise: today vs. last time (computed by the app, use these numbers)")
+                    ExerciseReviews.promptLines(ctx.comparisons).forEach { appendLine(it) }
+                    appendLine()
                 }
                 ctx.template?.let {
                     appendLine("## Current template \"${it.name}\" (plan for the next session)")
@@ -233,8 +240,9 @@ object CoachPromptBuilder {
 
     const val OUTPUT_RULES = """Answer with exactly one JSON object and nothing else (no Markdown, no text around it). Fields:
 - rating: integer 1–10 for the workout (for a progress review: for the progress).
-- summary: 2–4 sentences.
-- positives, improvements, tips: short bullet sentences (0–4 each).
+- summary: workout review: 1–2 sentences overall verdict (details go into exercise_reviews); progress review: 2–4 sentences.
+- exercise_reviews: workout review: one entry per exercise of today's workout (same exercise IDs, same order). verdict = better, same or worse compared to last time (start from "by the numbers", you may correct it with a reason, e.g. more reps at the same weight); first time = same. comment: one short sentence why. next: one concrete working set for next time (weight_kg in kg and reps, or duration_sec for timed exercises; unused values null), or null if it should stay unchanged. Progress review: empty list.
+- positives, improvements, tips: short bullet sentences (0–4 each). In a workout review at most 2 each and only points that are not about a single exercise.
 - photo_feedback: only if a photo is attached, otherwise null. Factual and constructive, focus on visible changes compared to the comparison photo. Never judge the person, only the training progress.
 - next_session: the complete next session in order. Use only exercise IDs from the list below. An exercise that is not in the current plan gets is_new = true and a reason. Sets with target values (weight_kg in kg, may be negative for assistance; reps; duration_sec for timed exercises; unused values null). rest_sec in seconds or null. reason: one short sentence per changed exercise, otherwise null. Keep unchanged exercises unchanged.
 - memory: the complete revised coach memory (max. about 1500 words): goals, progress per main exercise, plateaus, preferences, complaints, what works. Keep everything still relevant, add what you learned today."""
