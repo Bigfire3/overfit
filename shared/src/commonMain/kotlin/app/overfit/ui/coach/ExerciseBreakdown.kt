@@ -74,6 +74,7 @@ fun ExerciseBreakdown(list: List<ExerciseComparison>, unit: WeightUnit, language
 }
 
 @Composable
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 private fun ExerciseBlock(c: ExerciseComparison, unit: WeightUnit, language: Language) {
     val s = LocalCoachStrings.current
     val t = LocalStrings.current
@@ -103,7 +104,7 @@ private fun ExerciseBlock(c: ExerciseComparison, unit: WeightUnit, language: Lan
         }
         if (deltas.isNotEmpty()) {
             Spacer(Modifier.height(Space.xs))
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.m)) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.m)) {
                 deltas.forEach { (text, d) -> DeltaText(text, d) }
             }
         }
