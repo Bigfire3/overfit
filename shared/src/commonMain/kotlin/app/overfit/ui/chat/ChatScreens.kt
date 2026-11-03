@@ -35,6 +35,7 @@ import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.PrimaryButton
+import app.overfit.ui.components.PromptView
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Segmented
@@ -89,6 +90,8 @@ fun AiCoachScreen(
     onProvider: (ChatProvider) -> Unit,
     /** In-app coach (phase 4): model, photo consent, instructions. */
     onCoachSettings: (() -> Unit)? = null,
+    /** Removes the stored key (confirm pattern); moved here from the profile with the Coach tab. */
+    onDisconnect: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val c = LocalChatStrings.current
@@ -107,6 +110,10 @@ fun AiCoachScreen(
             onClick = onOwnKey,
         )
         ListRow(c.fuelWay, if (state.providerId == ProviderId.FUEL) c.wayConnected else c.wayNotConnected, onClick = onFuel)
+        if (onDisconnect != null && state.hasApiKey) {
+            Spacer(Modifier.height(Space.m))
+            app.overfit.ui.components.ConfirmButton(t.disconnect, app.overfit.i18n.LocalCoachStrings.current.hub.disconnectConfirm, onDisconnect)
+        }
         if (onCoachSettings != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.settingsTitle, onClick = onCoachSettings)
 
         SectionTitle(c.waysInChat)
@@ -245,14 +252,12 @@ fun ChatProviderScreen(
             Text(c.photosToggleHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         }
 
+        // The prompts show their full text before copying (shared component with the Coach tab).
         SectionTitle(c.contextCopy)
         Hairline()
-        ListRow(if (copied == "ctx") c.contextCopied else c.contextCopy, onClick = {
-            scope.launch { platform.copyText(chat.contextText(c, today)); copied = "ctx" }
-        })
-        Text(c.contextHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        ListRow(if (copied == "gem") c.gemCopied else c.gemCopy, onClick = { platform.copyText(chat.gemText(c, today)); copied = "gem" })
-        Text(c.gemHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        val contextText by androidx.compose.runtime.produceState<String?>(null, today) { value = chat.contextText(c, today) }
+        PromptView(title = c.contextCopy, hint = c.contextHint, text = contextText, onCopy = platform::copyText)
+        PromptView(title = c.gemCopy, hint = c.gemHint, text = remember(today) { chat.gemText(c, today) }, onCopy = platform::copyText)
 
         if (chat.configured && sync.enabled) {
             Spacer(Modifier.height(Space.l))

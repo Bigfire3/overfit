@@ -127,6 +127,8 @@ class CoachStrings(
     /** Demo comment per exercise (null = first time). */
     val demoExerciseComment: (app.overfit.coach.Verdict?) -> String,
     val demoMemory: String,
+    /** Coach tab: status, chat, prompts, chat connections. */
+    val hub: CoachHubStrings,
 )
 
 val GermanCoach = CoachStrings(
@@ -253,6 +255,7 @@ Regeln:
         }
     },
     demoMemory = "",
+    hub = GermanCoachHub,
 )
 
 val EnglishCoach = CoachStrings(
@@ -379,6 +382,7 @@ Rules:
         }
     },
     demoMemory = "",
+    hub = EnglishCoachHub,
 )
 
 fun coachStringsFor(language: Language): CoachStrings = when (language) {

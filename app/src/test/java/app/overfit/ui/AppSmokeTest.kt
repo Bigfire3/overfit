@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onRoot
@@ -116,12 +117,16 @@ class AppSmokeTest {
         compose.onNodeWithText("Fotos").performClick()
         compose.onNodeWithText("Foto-Tagebuch").assertIsDisplayed()
 
-        // Settings, sub-screens, language switch
-        compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("Verbunden").performScrollTo().assertIsDisplayed()
+        // Coach tab: AI access with provider, memory
+        compose.onNodeWithTag("tab:COACH").performClick()
+        compose.onNodeWithText("Eigener Key · OpenRouter").assertIsDisplayed()
         compose.onNodeWithText("Coach-Gedächtnis").performScrollTo().performClick()
         compose.onNodeWithText("Was der Coach über dich weiß", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Zurück").performClick()
+
+        // Settings, sub-screens, language switch
+        compose.onNodeWithText("Profil").performClick()
+        compose.onNodeWithText("Coach & KI").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Über Overfit").performScrollTo().performClick()
         compose.onNodeWithText("CC BY-SA 4.0", substring = true).assertExists()
         compose.onNodeWithText("Version 0.1.test").assertExists()
@@ -146,8 +151,9 @@ class AppSmokeTest {
         continueButton().performClick()
         compose.onNodeWithText("Später einrichten").performClick()
 
+        compose.onNodeWithTag("tab:COACH").performClick()
+        compose.onNodeWithText("Kein KI-Zugang").assertIsDisplayed()
         compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("Nicht verbunden").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Alle Daten löschen").performScrollTo().performClick()
         compose.onNodeWithText("Wirklich alles löschen?").performClick()
 

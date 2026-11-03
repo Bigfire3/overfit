@@ -112,7 +112,8 @@ class TrainingTabTest {
         compose.onNodeWithText("zuletzt heute").assertExists()
         compose.onNodeWithText("Brust").performClick()
         waitFor("Starten")
-        compose.onNodeWithText("Bench Press").assertExists()
+        // The plan loads its exercises after the footer is shown: wait for them, not only for "Starten".
+        waitFor("Bench Press")
         compose.onNodeWithText("Starten").performClick()
         compose.waitUntil(20_000) { deps.workout.state.value.workout != null }
         val again = requireNotNull(deps.workout.state.value.workout)

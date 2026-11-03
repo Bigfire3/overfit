@@ -15,6 +15,9 @@ import kotlin.time.Instant
 /** A JPEG for the coach (already downscaled) with a short label like "today" / "2026-09-30". */
 class CoachImage(val label: String, val jpeg: ByteArray)
 
+/** An earlier message of a multi-turn conversation (coach chat). */
+data class PromptTurn(val fromUser: Boolean, val text: String)
+
 /**
  * Provider-neutral request. [staticSystem] stays byte-identical between requests (rules, output format, exercise
  * list) so providers can cache it; [dynamicSystem] (profile block with today's date) comes after the cache break.
@@ -31,6 +34,8 @@ data class CoachPrompt(
     val schema: JsonObject? = null,
     val schemaName: String? = null,
     val maxTokens: Int? = null,
+    /** Earlier turns (coach chat), oldest first; they go before [user]. Empty for one-shot requests. */
+    val history: List<PromptTurn> = emptyList(),
 ) {
     val outputSchema: JsonObject get() = schema ?: CoachSchema.schema
     val outputSchemaName: String get() = schemaName ?: CoachSchema.NAME

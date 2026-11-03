@@ -44,6 +44,7 @@ data class Strings(
     val navHistory: String,
     val navExercises: String,
     val navPhotos: String,
+    val navCoach: String,
     val navProfile: String,
 
     // Start
@@ -260,6 +261,7 @@ val German = Strings(
     navHistory = "Verlauf",
     navExercises = "Übungen",
     navPhotos = "Fotos",
+    navCoach = "Coach",
     navProfile = "Profil",
 
     greeting = { "Hallo, $it" },
@@ -467,6 +469,7 @@ val English = Strings(
     navHistory = "History",
     navExercises = "Exercises",
     navPhotos = "Photos",
+    navCoach = "Coach",
     navProfile = "Profile",
 
     greeting = { "Hi, $it" },

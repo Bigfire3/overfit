@@ -101,17 +101,23 @@ class ChatFeature(
     }
 
     /** Text for "Copy context" in the app language. Works offline and without a backend. */
-    suspend fun contextText(t: ChatStrings, today: LocalDate): String {
+    suspend fun contextText(t: ChatStrings, today: LocalDate): String = ChatContext.build(contextInput(today), t, AiPrompt.EXAMPLE)
+
+    /** The same status without the answer instructions (coach chat, prompts with their own question). */
+    suspend fun contextOnly(t: ChatStrings, today: LocalDate): String = ChatContext.status(contextInput(today), t, task = null)
+
+    /** Profile, memory, workouts (saved and done) for [ChatContext]. */
+    suspend fun contextInput(today: LocalDate): ContextInput {
         val s = store.state.value
-        val input = ContextInput(
+        return ContextInput(
             profile = s.profile,
             weights = s.weights,
             memory = memory(),
             workouts = data.workouts.allRecords(),
             language = s.language,
             today = today,
+            templates = data.templates.all(),
         )
-        return ChatContext.build(input, t, AiPrompt.EXAMPLE)
     }
 
     /** Gem/GPT instructions with the profile line on top (name, age, weight as of copying). */
