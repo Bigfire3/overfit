@@ -608,3 +608,11 @@ Offen / Hinweise:
    öffnet die Vorschau
 8. Startbildschirm ganz unten: „Duo · bald“ → Erklärtext
 9. Zwischenablage leer oder Text ohne Training → verständliche Fehlermeldung
+
+## Bitte auf dem Handy testen: App-Icon „of“ (Session W)
+1. Neue APK installieren: Icon „of“ (weiß auf Schwarz) auf dem Homescreen, in der App-Übersicht und in den Einstellungen; Launcher mit runden und eckigen Masken ansehen, die Schrift muss nie angeschnitten sein
+2. Hell/Dunkel: Hintergrundbild hell und dunkel, Icon bleibt gut lesbar; iOS 18: Homescreen auf „Dunkel“ und „Getönt“ stellen
+3. Android 13+: Einstellungen → Hintergrund und Stil → „Themed icons“ an → „of“ erscheint einfarbig in der Systemfarbe
+4. App starten: Splash schwarz mit kleinem weißen „of“ (Android 12+ und iOS), danach direkt die App
+5. Browser: Favicon im Tab der Webseite, „Zum Home-Bildschirm“ auf dem iPhone zeigt das „of“
+6. Variante gefällt nicht? `python3 tools/icon/build_icon.py --variant B2` (B1–B6, siehe docs/DECISIONS.md), committen
