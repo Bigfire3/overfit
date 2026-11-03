@@ -48,6 +48,6 @@ class IosPlatformShare : PlatformShare {
 
     override fun pasteText(): String? = UIPasteboard.generalPasteboard.string
 
-    // The QR code is a link: the iPhone camera app reads it and opens Overfit (docs/DECISIONS.md).
-    override val canScanInApp: Boolean get() = false
+    // In-app scanner with AVFoundation (QrScanner.ios.kt): the compact OF1 code is not a link.
+    override val canScanInApp: Boolean get() = true
 }

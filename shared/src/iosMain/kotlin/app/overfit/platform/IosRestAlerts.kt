@@ -44,7 +44,7 @@ class IosRestAlerts : RestAlerts {
         center.removeDeliveredNotificationsWithIdentifiers(listOf(ID))
     }
 
-    private companion object {
+    companion object {
         const val ID = "app.overfit.rest"
     }
 }

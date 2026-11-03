@@ -197,6 +197,27 @@ final class SmokeTests: OverfitUITestCase {
         waitFor("Push")
     }
 
+    /** iOS edge swipe = Android back: minimizes the workout, then leaves a pushed screen. */
+    func testEdgeSwipeBack() {
+        launch(theme: "light")
+        tap("Beispiel-Workouts hinzufügen")
+        waitFor("Push").tap()
+        tap("Starten")
+        waitFor("Nächsten Satz loggen")
+        swipeFromLeftEdge()
+        waitFor("Zum laufenden Training")
+        tap("Übungen")
+        waitFor("Eigene Übung")
+        swipeFromLeftEdge()
+        waitFor("Zum laufenden Training")
+    }
+
+    private func swipeFromLeftEdge() {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: end)
+    }
+
     /** The running workout survives the app being killed. */
     func testWorkoutSurvivesRelaunch() {
         launch(theme: "light")

@@ -20,7 +20,7 @@ interface PlatformShare {
     /** Current clipboard text, if any. */
     fun pasteText(): String?
 
-    /** True if the app can scan QR codes itself (Android). On iOS the camera app opens the link. */
+    /** True if the app can scan QR codes itself (Android: CameraX + ZXing, iOS: AVFoundation). */
     val canScanInApp: Boolean
 }
 
@@ -44,6 +44,6 @@ class ImportInbox {
     fun consume(): String? = pending.value.also { pending.value = null }
 }
 
-/** Live camera view that reports the first QR code it reads (Android only, see [PlatformShare.canScanInApp]). */
+/** Live camera view that reports the first QR code it reads (see [PlatformShare.canScanInApp]). */
 @Composable
 expect fun QrScanner(modifier: Modifier, onScanned: (String) -> Unit, onPermissionDenied: () -> Unit)

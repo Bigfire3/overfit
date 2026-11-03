@@ -26,15 +26,16 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         OverfitBackendUrl: $(OVERFIT_BACKEND_URL)
+        # Plain launch screen in the app background (white, black in dark mode), like the first frame.
         UILaunchScreen:
-          UIColorName: ""
+          UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # Only HTTPS, which is exempt from export compliance.
         ITSAppUsesNonExemptEncryption: false
         # Compose Multiplatform: allow 120 Hz on ProMotion devices.
         CADisableMinimumFrameDurationOnPhone: true
         # Body photos after a workout (stored only inside the app, never in the photo library).
-        NSCameraUsageDescription: Overfit nimmt auf Wunsch ein Fortschrittsfoto nach dem Training auf. Es bleibt nur in der App. / Overfit takes an optional progress photo after a workout. It stays inside the app.
+        NSCameraUsageDescription: Overfit nutzt die Kamera für Fortschrittsfotos nach dem Training (sie bleiben in der App) und zum Scannen geteilter Workout-QR-Codes. / Overfit uses the camera for progress photos after a workout (they stay inside the app) and to scan shared workout QR codes.
         NSPhotoLibraryUsageDescription: Overfit übernimmt auf Wunsch ein Foto als Fortschrittsfoto. / Overfit can use a photo of your choice as a progress photo.
         # overfit://t#… opens the import screen.
         CFBundleURLTypes:
@@ -56,6 +57,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.overfit
+        # Black-and-white dumbbell like the Android launcher icon (Assets.xcassets/AppIcon).
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # iPhone only for the first release.
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_USER_SCRIPT_SANDBOXING: NO

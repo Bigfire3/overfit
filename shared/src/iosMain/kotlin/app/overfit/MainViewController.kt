@@ -14,6 +14,10 @@ import app.overfit.platform.IosHaptics
 import app.overfit.platform.IosPhotoFiles
 import app.overfit.platform.IosKeyValueStore
 import app.overfit.platform.IosRestAlerts
+import app.overfit.platform.IosAppearance
+import app.overfit.platform.IosNotificationTaps
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.map
 import app.overfit.platform.KeychainSecretStore
 import app.overfit.platform.createHttpClient
 import app.overfit.share.IosIncoming
@@ -64,5 +68,11 @@ fun MainViewController(): UIViewController {
             deps.store.completeOnboarding()
         }
     }
-    return ComposeUIViewController { OverfitApp(deps) }
+    IosNotificationTaps.install { deps.requestOpenWorkout() }
+    IosAppearance.follow(deps.store.state.map { it.settings.theme })
+    return ComposeUIViewController {
+        // The window exists once Compose is shown; apply the theme's interface style to it.
+        LaunchedEffect(Unit) { IosAppearance.applyToWindows() }
+        OverfitApp(deps)
+    }
 }
