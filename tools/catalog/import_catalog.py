@@ -2,13 +2,16 @@
 """Baut den Übungskatalog der App aus Workout Guide (fest gepinnter Commit).
 
 Quelle (Commit-SHA gepinnt, damit der Import reproduzierbar ist):
-  * Workout Guide (Bryl Lim, Grafiken auf Basis von Everkinetic, CC BY-SA 4.0); Frame 1 als SVG wird offline
-    mitgebündelt. free-exercise-db wurde am 3.11.2026 entfernt (Fotos passten nicht zum Design), eigene
+  * Workout Guide (Bryl Lim, Grafiken auf Basis von Everkinetic, CC BY-SA 4.0); alle 3 Frames als SVG werden offline
+    mitgebündelt (Frame 1 = Standbild in Listen, Frames 2/3 nur für die Animation in der großen Detailansicht). free-exercise-db wurde am 3.11.2026 entfernt (Fotos passten nicht zum Design), eigene
     Übungen legt man in der App an (auf Wunsch per KI ausgefüllt).
 
 Ergebnis:
   shared/src/commonMain/composeResources/files/catalog/exercises.json
-  shared/src/commonMain/composeResources/files/catalog/wg/<slug>.svg   (unverändert aus Workout Guide)
+  shared/src/commonMain/composeResources/files/catalog/wg/<slug>.svg      (Frame 1)
+  shared/src/commonMain/composeResources/files/catalog/wg/<slug>-2.svg    (Frame 2)
+  shared/src/commonMain/composeResources/files/catalog/wg/<slug>-3.svg    (Frame 3)
+  (Zahlen in den Pfaden auf PRECISION Nachkommastellen gerundet, sonst unverändert – siehe DECISIONS.md)
   shared/src/commonMain/composeResources/files/catalog/LICENSE-ASSETS-workout-guide.txt
 (Compose Resources: gemeinsam für Android und iOS.)
 
@@ -20,6 +23,7 @@ from __future__ import annotations
 import concurrent.futures
 import hashlib
 import json
+import re
 import urllib.request
 from pathlib import Path
 
@@ -58,6 +62,28 @@ WG_TRACKING = {
     "distance_duration": "TIME",  # Distanz wird nicht erfasst (nur kg/Zeit laut SPEC)
 }
 
+FRAMES = (1, 2, 3)
+PRECISION = 1  # Nachkommastellen in den Pfaddaten (Grafik 512x512; Rundung < 0,05 px, nicht sichtbar)
+_NUM = re.compile(r"-?\d*\.\d+")
+
+
+def shrink(svg: bytes) -> bytes:
+    """Rundet Dezimalzahlen in `d="…"` auf PRECISION Stellen und entfernt Nullen; Struktur bleibt identisch."""
+    def fix_d(m: re.Match) -> str:
+        def num(n: re.Match) -> str:
+            v = round(float(n.group(0)), PRECISION)
+            out = f"{v:.{PRECISION}f}".rstrip("0").rstrip(".")
+            if out in ("", "-0", "-"):
+                out = "0"
+            if out.startswith("0."):
+                out = out[1:]
+            elif out.startswith("-0."):
+                out = "-" + out[2:]
+            return out
+        return 'd="' + _NUM.sub(num, m.group(1)) + '"'
+    return re.sub(r'd="([^"]*)"', fix_d, svg.decode("utf-8")).encode("utf-8")
+
+
 def fetch(url: str, cache_name: str) -> bytes:
     path = CACHE / cache_name
     if path.exists():
@@ -91,15 +117,19 @@ def main() -> None:
     print("Lade Workout Guide Manifest …")
     wg = json.loads(fetch(f"{WG_RAW}/manifest.json", f"wg-{WG_SHA}/manifest.json"))
 
-    def frame1(e: dict) -> tuple[str, bytes]:
-        path = next(f["path"] for f in e["frames"] if f["index"] == 1)
-        if not path.endswith(".svg"):
-            raise SystemExit(f"Frame 1 von {e['slug']} ist kein SVG: {path}")
-        return e["slug"], fetch(f"{WG_RAW}/{path}", f"wg-{WG_SHA}/{path}")
+    def frames(e: dict) -> list[tuple[str, bytes]]:
+        out = []
+        for idx in FRAMES:
+            path = next((f["path"] for f in e["frames"] if f["index"] == idx), None)
+            if path is None or not path.endswith(".svg"):
+                raise SystemExit(f"Frame {idx} von {e['slug']} fehlt oder ist kein SVG: {path}")
+            name = f"{e['slug']}.svg" if idx == 1 else f"{e['slug']}-{idx}.svg"
+            out.append((name, shrink(fetch(f"{WG_RAW}/{path}", f"wg-{WG_SHA}/{path}"))))
+        return out
 
-    print(f"Lade {len(wg)} SVG-Frames …")
+    print(f"Lade {len(wg)} x {len(FRAMES)} SVG-Frames …")
     with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
-        svgs = dict(pool.map(frame1, wg))
+        svgs = dict(f for fl in pool.map(frames, wg) for f in fl)
     license_text = fetch(f"{WG_RAW}/LICENSE-ASSETS", f"wg-{WG_SHA}/LICENSE-ASSETS")
 
     exercises: list[dict] = []
@@ -136,8 +166,8 @@ def main() -> None:
         for old in svg_dir.glob("*.svg"):
             old.unlink()
     svg_dir.mkdir(parents=True, exist_ok=True)
-    for slug, data in svgs.items():
-        (svg_dir / f"{slug}.svg").write_bytes(data)  # Dateien unverändert (Lizenz)
+    for name, data in svgs.items():
+        (svg_dir / name).write_bytes(data)
     (OUT / "LICENSE-ASSETS-workout-guide.txt").write_bytes(license_text)
     (OUT / "exercises.json").write_text(
         json.dumps(doc, ensure_ascii=False, indent=0, sort_keys=False) + "\n", encoding="utf-8"

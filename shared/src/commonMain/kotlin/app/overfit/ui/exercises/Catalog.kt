@@ -104,7 +104,7 @@ fun ExercisesScreen(
     Screen(header = { BackHeader(t.back, onBack) }, footer = { PrimaryButton(t.newCustomExercise, onNewCustomExercise) }) {
         Title(t.exercisesTitle)
         Spacer(Modifier.height(Space.m))
-        CatalogList(catalog, language, onClick = onOpenExercise)
+        CatalogList(catalog, language, onClick = onOpenExercise, onDetails = onOpenExercise)
     }
 }
 
@@ -117,6 +117,8 @@ fun ColumnScope.CatalogList(
     selectedIds: List<String>? = null,
     /** Picker: last row "Create new exercise" (with the search text as name). */
     onCreate: ((String) -> Unit)? = null,
+    /** Tap on a row's image; null = no separate image target. */
+    onDetails: ((Exercise) -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val filter by catalog.filter.collectAsStateWithLifecycle()
@@ -153,7 +155,10 @@ fun ColumnScope.CatalogList(
                     Text(t.exerciseCount(list.size), Modifier.padding(top = Space.m), style = Theme.type.caption, tone = Tone.Faint)
                 }
                 items(list, key = { it.id }) { exercise ->
-                    ExerciseRow(exercise, language, selected = selectedIds?.contains(exercise.id)) { onClick(exercise) }
+                    ExerciseRow(
+                        exercise, language, selected = selectedIds?.contains(exercise.id),
+                        onImageClick = onDetails?.let { open -> { open(exercise) } },
+                    ) { onClick(exercise) }
                 }
             }
         }
@@ -175,14 +180,21 @@ private fun ChipRow(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun ExerciseRow(exercise: Exercise, language: Language, selected: Boolean?, onClick: () -> Unit) {
+fun ExerciseRow(
+    exercise: Exercise,
+    language: Language,
+    selected: Boolean?,
+    /** Tap on the image only (the row itself does [onClick]); null = the image is not a separate target. */
+    onImageClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val t = LocalStrings.current
     Column(Modifier.fillMaxWidth().pressableRow(onClick)) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.s),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ExerciseImage(exercise)
+            ExerciseImage(exercise, onClick = onImageClick)
             Spacer(Modifier.width(Space.m))
             Column(Modifier.weight(1f)) {
                 Text(exercise.name)
@@ -213,6 +225,8 @@ fun ExercisePickerScreen(
     onPicked: (List<String>) -> Unit,
     /** Opens the custom-exercise form with the search text; null hides the row. */
     onCreate: ((String) -> Unit)? = null,
+    /** Opens the details when the image is tapped (the row stays "select"); null = no separate image target. */
+    onDetails: ((String) -> Unit)? = null,
     /** Exercise just created (or chosen under "Did you mean …?") in the form above; it is added right away. */
     created: String? = null,
     onCreatedConsumed: () -> Unit = {},
@@ -244,6 +258,7 @@ fun ExercisePickerScreen(
             },
             selectedIds = selected,
             onCreate = onCreate,
+            onDetails = onDetails?.let { open -> { e: Exercise -> open(e.id) } },
         )
     }
 }

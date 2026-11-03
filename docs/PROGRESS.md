@@ -15,6 +15,20 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Übungsbild → Details mit Animation (Session AH, 3.11.)
+**Erledigt:** Tipp auf ein Übungsbild öffnet überall die Übungsdetails (Katalog, Picker, Editor, laufendes Training); im Training
+schreibgeschützt, Timer und Pausenleiste laufen weiter, Zurück führt ins Training. Detailansicht mit bildschirmbreitem Bild, das
+die 3 Workout-Guide-Frames ruhig durchläuft (1→2→3→2→1, 700 ms). Import bündelt alle Frames (SVGs leicht verkleinert). Details in
+DECISIONS.md. Offen: „Animationen reduzieren“ (Systemeinstellung) braucht `expect/actual`. Tests: `ExerciseImageTapTest`, `ExerciseFramesTest`.
+
+### Bitte auf dem Handy testen (Session AH)
+1. Training starten, auf das Übungsbild im Block-Kopf tippen: Detailseite mit großem Bild, das sich ruhig bewegt; kein „Speichern“,
+   keine Tracking-/Pausen-Einstellung. Zurück: Training, Pausenleiste und Timer liefen weiter.
+2. Workout bearbeiten: Tipp aufs Bild (mit „?“) öffnet die Details, dort „Speichern“ wie bisher; Zurück ins Bearbeiten.
+3. Übung hinzufügen: Tipp aufs Bild einer Zeile = Details, Tipp auf den Namen = auswählen. Übungen (Katalog): Bild und Zeile öffnen Details.
+4. In Listen bleiben die Bilder Standbilder; eine eigene Übung ohne Bild zeigt weiter die Initialen (keine Animation).
+5. App-Größe der APK im Release prüfen (siehe PR), Profil → Über Overfit: Workout-Guide-Hinweis nennt die Rundung.
+
 ## Ticken vor Pausenende (Session AG, 3.11.)
 **Erledigt:** In den letzten 3 Sekunden der Pause tickt es (3, 2, 1), danach das gewohnte Pausenende. Schalter „Ticken vor Pausenende“
 im Profil unter „Vibration“, Standard an. Funktioniert im Hintergrund, in anderen Apps und bei gesperrtem Bildschirm (Android: eigener

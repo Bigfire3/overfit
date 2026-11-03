@@ -97,6 +97,8 @@ fun WorkoutScreen(
     clock: () -> Long,
     onAddExercises: () -> Unit,
     onReplaceExercise: (entryId: String) -> Unit,
+    /** Tap on an exercise image: opens the exercise details (read-only) on top of the running workout. */
+    onExerciseDetails: (exerciseId: String) -> Unit = {},
     onClosed: () -> Unit,
     /** Hides the workout without touching it (the mini bar takes over); also what the system back gesture does. */
     onMinimize: () -> Unit = {},
@@ -206,6 +208,7 @@ fun WorkoutScreen(
                     controller = controller,
                     onRemoveSet = removeSet,
                     onReplace = { onReplaceExercise(e.id) },
+                    onDetails = { onExerciseDetails(e.exercise.id) },
                 )
             }
             item(key = "actions") {
@@ -281,6 +284,7 @@ private fun ExerciseSection(
     controller: WorkoutController,
     onRemoveSet: (setId: String) -> Unit,
     onReplace: () -> Unit,
+    onDetails: () -> Unit,
 ) {
     val t = LocalStrings.current
     val type = entry.exercise.trackingType
@@ -292,7 +296,7 @@ private fun ExerciseSection(
         ) {
             LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
             Spacer(Modifier.width(Space.s))
-            Box(Modifier.clip(BlockShape.field)) { ExerciseImage(entry.exercise, size = 48.dp) }
+            ExerciseImage(entry.exercise, size = 48.dp, onClick = onDetails)
             Spacer(Modifier.width(Space.m))
             Column(Modifier.weight(1f)) {
                 Text(entry.exercise.name, style = Theme.type.label, maxLines = 2)
