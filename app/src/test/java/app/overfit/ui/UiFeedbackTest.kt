@@ -162,14 +162,14 @@ class UiFeedbackTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Pull").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("Legs").assertCountEquals(1)
         compose.onAllNodesWithText("Push").assertCountEquals(0)
-        compose.onNodeWithTag("tab:HISTORY").assertExists()
+        compose.onNodeWithTag("tab:PHOTOS").assertExists()
     }
 
     @Test
     fun tabSwitch_isInstant() {
         launchApp()
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithTag("tab:HISTORY").performClick()
+        compose.onNodeWithTag("tab:PHOTOS").performClick()
         // No transition between tabs: within 50 ms (a screen change fades for 240 ms) the training tab is gone.
         compose.mainClock.advanceTimeBy(50)
         compose.onAllNodesWithText("Push", substring = true).assertCountEquals(0)

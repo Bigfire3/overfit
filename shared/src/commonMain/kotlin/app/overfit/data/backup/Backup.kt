@@ -129,7 +129,8 @@ data class BSet(
 @Serializable
 data class BPhoto(
     val id: String,
-    val workoutId: String,
+    /** null = photo of a calendar day without a training (app v9 and later). */
+    val workoutId: String? = null,
     val file: String,
     val takenAt: Long,
     val position: Int = 0,
@@ -323,7 +324,7 @@ class BackupService(
             }
             val workoutIds = json.workouts.map { it.id }.toSet()
             wDao.insertPhotos(
-                json.photos.filter { it.workoutId in workoutIds && preview.photoBytes.containsKey(it.file) }
+                json.photos.filter { (it.workoutId == null || it.workoutId in workoutIds) && preview.photoBytes.containsKey(it.file) }
                     .distinctBy { it.id }
                     .map { WorkoutPhotoEntity(it.id, it.workoutId, it.file, it.takenAt, it.position) },
             )

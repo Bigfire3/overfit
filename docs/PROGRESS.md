@@ -939,3 +939,19 @@ Offen / Hinweise:
 4. Coach-Auswertung für ein Training mit Sauna starten (oder KI-Chat fragen „Wann war ich zuletzt in der Sauna?“) → der Coach kennt die Sauna
 5. „Kontext kopieren“ (Coach-Tab bzw. KI-Chat-Einstellungen) → in einen Editor einfügen: Zeile des Trainings endet mit „· danach Sauna“
 6. Backup exportieren und wieder einspielen → Sauna-Häkchen bleiben erhalten
+
+## Session AL – Verlauf-Tab weg, Kalender-Tag, Trainings nachträglich bearbeiten (3.11.)
+- Erledigt: Tab „Verlauf“ entfernt; „Fotos“ heißt jetzt „Kalender“. Tipp auf einen Tag öffnet die Tagesansicht mit Trainings und Fotos (Fotos hinzufügen per Kamera/Galerie, ansehen, mit Bestätigung entfernen, auch an Tagen ohne Training). Training → Detail → Stift „Training bearbeiten“: Gefühl, Sauna, Notiz, Sätze (Gewicht/Wdh. ändern, Satz hinzufügen/entfernen, abhaken), Speichern/Verwerfen. DB v9 (Fotos ohne Training) mit Migration und Test. Bildlader-Fehler aus Session AI behoben (Ursache: Coil-Singleton wurde in der Komposition gesetzt). Details in docs/DECISIONS.md.
+- Weiterhin erreichbar (früher nur über Verlauf): Trainingsdetail, Löschen, Teilen, „Als Workout speichern“, Coach-Auswertung/Demo, KI-Chat-Notizen – alles über Kalender → Tag → Training (oder Vollbildfoto → „Training ansehen“).
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Kalender und Bearbeiten)
+1. Unten nur noch vier Tabs: Training, Coach, Kalender, Profil (Kalender mit neuem Kalender-Icon)
+2. Kalender → einen Trainingstag antippen → Tagesansicht mit Datum, „Trainings“ (Name, Uhrzeit, Dauer, Sätze, kg) und „Fotos“
+3. Dort „Aus Fotos wählen“ bzw. „Foto aufnehmen“ → Foto erscheint am Tag und im Kalender; Foto antippen → Vollbild; „×“ → „Entfernen?“ → nochmal tippen → weg
+4. Einen leeren Tag in der Vergangenheit antippen → „An diesem Tag kein Training.“ → Foto hinzufügen → Kalender zeigt es an diesem Tag; im Vollbild steht kein „Training ansehen“
+5. Training antippen → Detail → Stift oben rechts → Sauna anhaken, Gewicht eines Satzes ändern, „Satz hinzufügen“, einen Satz nach links wischen → „Speichern“ → Detail zeigt die neuen Werte; Kalender zeigt den Sauna-Ring
+6. Nochmal bearbeiten, etwas ändern und Zurück → Hinweis „Nicht gespeichert …“, zweites Zurück verwirft
+7. Übung (z. B. Bankdrücken) → Fortschritt/Bestwerte zeigen die geänderten Werte; eine vorher erstellte Coach-Auswertung ist unverändert
+8. Detail: Teilen, Als Workout speichern, Coach-Auswertung, Löschen funktionieren wie früher im Verlauf
+9. Backup exportieren und wieder einspielen → Fotos ohne Training bleiben erhalten

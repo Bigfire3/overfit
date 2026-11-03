@@ -34,7 +34,6 @@ import app.overfit.share.NoopPlatformShare
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
-import kotlinx.datetime.LocalDate
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -114,7 +113,7 @@ class ScreenshotTest {
         store.completeOnboarding()
         val deps = AppDependencies(
             store, Providers(HttpClient(MockEngine { respond("{}") })), data, versionName = "0.1.test", share = share,
-            today = { LocalDate(2026, 11, 3) }, haptics = RecordingHaptics(), restAlerts = RecordingRestAlerts(), kv = kv,
+            today = { realToday() }, haptics = RecordingHaptics(), restAlerts = RecordingRestAlerts(), kv = kv,
         )
         compose.setContent { OverfitApp(deps) }
         compose.waitForTrainingTab()
@@ -133,7 +132,8 @@ class ScreenshotTest {
         waitFor("Link kopieren")
         shot("teilen")
         back()
-        // Edit mode: blocks per exercise, set rows
+        // Edit mode: blocks per exercise, set rows (wait until the workout page is back after the share screen)
+        waitFor("Bearbeiten")
         click("Bearbeiten")
         waitFor("Bearbeitungsmodus")
         shot("workout-bearbeiten")
@@ -156,16 +156,21 @@ class ScreenshotTest {
         shot("beenden")
         click("Speichern")
         compose.waitForTrainingTab()
-        tab("Verlauf")
+        tab("Kalender")
+        waitFor("1 Training")
+        shot("kalender")
+        compose.openCalendarDay(realToday().dayOfMonth)
         waitFor("Push")
-        shot("verlauf")
+        shot("kalender-tag")
         compose.onAllNodes(hasText("Push"))[0].performClick()
         compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Teilen").fetchSemanticsNodes().isNotEmpty() }
-        shot("verlauf-detail")
+        shot("training-detail")
+        compose.onNodeWithContentDescription("Training bearbeiten").performClick()
+        waitFor("Satz hinzufügen")
+        shot("training-nachtraeglich-bearbeiten")
         back()
-        tab("Fotos")
-        waitFor("Foto-Tagebuch")
-        shot("fotos")
+        back()
+        back()
         tab("Profil")
         shot("profil")
         tab("Training")

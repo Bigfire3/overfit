@@ -51,7 +51,6 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -107,7 +106,7 @@ class DayWithOverfitTest {
 
     private fun newProcess() = AppDependencies(
         store, providers, data, versionName = "0.1.test", share = share,
-        today = { LocalDate(2026, 11, 3) }, haptics = haptics, restAlerts = alerts, kv = kv,
+        today = { realToday() }, haptics = haptics, restAlerts = alerts, kv = kv,
         coachTransport = { coachTransport },
     ).also { deps = it }
 
@@ -260,8 +259,8 @@ class DayWithOverfitTest {
         compose.onNodeWithContentDescription("Minimieren").performClick()
         compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         assertNotNull(deps.workout.state.value.workout)
-        tab("Verlauf")
-        tab("Fotos")
+        tab("Kalender")
+        tab("Profil")
         compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         tab("Training")
         compose.onNode(hasContentDescription("Training öffnen", substring = true)).performClick()
@@ -291,7 +290,7 @@ class DayWithOverfitTest {
         compose.onNodeWithContentDescription("Gefühl 4 von 5").assertIsSelected()
         // The name field is the first text field, the note field the second.
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
-        runBlocking { data.workouts.addPhoto(workoutId, byteArrayOf(1, 2, 3, 4), takenAt = 1_000L) }
+        runBlocking { data.workouts.addPhoto(workoutId, byteArrayOf(1, 2, 3, 4)) }
         click("Speichern")
         compose.waitForTrainingTab() // back on the Training tab
         compose.waitUntilState(10_000) { runBlocking { data.workouts.getFinished(workoutId)?.note } == "Stark heute" }
@@ -299,8 +298,8 @@ class DayWithOverfitTest {
         assertEquals(4, finished.feeling)
         assertEquals(1, finished.photos.size)
 
-        // --- History: list, detail with note; share the workout and import it as a template -
-        tab("Verlauf")
+        // --- Calendar → day → training detail with note; share the workout and import it as a template -
+        compose.openCalendarDay(realToday().dayOfMonth)
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
         waitFor("Stark heute")
@@ -310,12 +309,14 @@ class DayWithOverfitTest {
         val workoutLink = share.clipboard.orEmpty()
         assertTrue(workoutLink, workoutLink.isNotBlank())
         back(); back()
-        // Photos tab shows the photo
-        tab("Fotos")
-        waitFor("Foto-Tagebuch")
+        // The calendar day shows the photo
+        tab("Kalender")
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasContentDescription("Tag ${realToday().dayOfMonth}, 1 Foto")).fetchSemanticsNodes().isNotEmpty()
+        }
 
         // --- Coach: the review request waits offline, goes out on the next app start ---------
-        tab("Verlauf")
+        compose.openCalendarDay(realToday().dayOfMonth)
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
         waitFor("Coach-Auswertung")
@@ -324,7 +325,7 @@ class DayWithOverfitTest {
         online = true
         process++ // app restart → the queue is processed
         compose.waitForTrainingTab()
-        tab("Verlauf")
+        compose.openCalendarDay(realToday().dayOfMonth)
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
         waitFor("Coach-Auswertung")
@@ -423,8 +424,8 @@ class DayWithOverfitTest {
         assertEquals(Language.EN, store.state.value.language)
         tab("Workouts")
         compose.waitForTrainingTab("New workout")
-        tab("History")
-        waitFor("Push")
+        tab("Calendar")
+        waitFor("1 workout")
         tab("Profile")
         click("Deutsch")
         waitFor("Einstellungen")

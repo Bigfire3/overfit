@@ -106,8 +106,8 @@ class WorkoutRepository(
         rows.map { DiaryPhoto(WorkoutPhoto(it.id, it.sessionId, it.fileName, it.takenAt, photoFiles.path(it.fileName)), it.sessionName) }
     }
 
-    /** Stores an already prepared JPEG for [sessionId] in the private photo folder. */
-    suspend fun addPhoto(sessionId: String, jpeg: ByteArray, takenAt: Long = clock()): WorkoutPhoto {
+    /** Stores an already prepared JPEG for [sessionId] (null = no training, just the day) in the private photo folder. */
+    suspend fun addPhoto(sessionId: String?, jpeg: ByteArray, takenAt: Long = clock()): WorkoutPhoto {
         val id = Workout.newId()
         val name = "$id.jpg"
         photoFiles.write(name, jpeg)
@@ -165,6 +165,11 @@ class WorkoutRepository(
         val existing = dao.get(workout.id)?.session
         // A finished workout is never turned back into an active one by a late write.
         if (existing?.status == SessionStatus.FINISHED) return
+        writeSession(workout, existing)
+        writeExercises(workout)
+    }
+
+    private suspend fun writeSession(workout: Workout, existing: WorkoutSessionEntity?) {
         dao.upsertSession(
             WorkoutSessionEntity(
                 id = workout.id,
@@ -183,6 +188,10 @@ class WorkoutRepository(
                 updatedAt = clock(),
             ),
         )
+    }
+
+    /** Rewrites exercises and sets of [workout] (the session row must exist). */
+    private suspend fun writeExercises(workout: Workout) {
         dao.deleteExercisesOf(workout.id)
         dao.insertExercises(
             workout.exercises.mapIndexed { i, e ->
@@ -220,6 +229,31 @@ class WorkoutRepository(
         )
     }
 
+    /**
+     * Saves a finished workout edited afterwards (calendar → training → edit): sets, note, feeling
+     * and sauna. Status, start/end, name and AI status stay; photos are untouched. Statistics, bests
+     * and the coach context are read from these rows, so they follow; stored coach reviews do not
+     * change. False if the workout is missing or not finished.
+     */
+    suspend fun updateFinished(workout: Workout, note: String?, feeling: Int?, sauna: Boolean): Boolean {
+        val ok = db.transaction {
+            val existing = dao.get(workout.id)?.session
+            if (existing?.status != SessionStatus.FINISHED) return@transaction false
+            dao.upsertSession(
+                existing.copy(
+                    note = note?.trim()?.ifEmpty { null },
+                    feeling = feeling?.coerceIn(1, 5),
+                    sauna = sauna,
+                    updatedAt = clock(),
+                ),
+            )
+            writeExercises(workout)
+            true
+        }
+        if (ok) onChanged?.invoke(workout.id, true)
+        return ok
+    }
+
     override suspend fun finish(workout: Workout, endedAt: Long) {
         db.transaction {
             write(workout)
@@ -250,13 +284,15 @@ data class FinishedWorkout(
 /** Photo of a workout; [path] is the absolute file path for the image loader. */
 data class WorkoutPhoto(
     val id: String,
-    val sessionId: String,
+    /** null = photo of a calendar day without a training. */
+    val sessionId: String?,
     val fileName: String,
     val takenAt: Long,
     val path: String,
 )
 
-data class DiaryPhoto(val photo: WorkoutPhoto, val workoutName: String)
+/** [workoutName] is null for a photo without a training. */
+data class DiaryPhoto(val photo: WorkoutPhoto, val workoutName: String?)
 
 internal fun ExerciseSetRow.toLogged() = LoggedSet(exerciseId, SetValues(weightKg, reps, durationSec))
 

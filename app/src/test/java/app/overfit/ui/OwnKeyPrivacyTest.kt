@@ -134,7 +134,7 @@ class OwnKeyPrivacyTest {
         deps.coach.processQueue()
 
         // Every tab, the coach with its privacy note and a chat message, the profile with the Fuel row.
-        compose.onNodeWithTag("tab:HISTORY").performClick()
+        // (No History tab any more: finished trainings live in the calendar, tab PHOTOS.)
         compose.onNodeWithTag("tab:PHOTOS").performClick()
         compose.onNodeWithTag("tab:COACH").performClick()
         waitFor("Prompts & Vorlagen")

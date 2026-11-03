@@ -154,7 +154,18 @@ interface WorkoutDao {
     suspend fun delete(id: String)
 
     @Query("DELETE FROM workout_session")
-    suspend fun deleteAll()
+    suspend fun deleteAllSessions()
+
+    /** Photos without a training (v9) have no session to cascade from: delete them explicitly. */
+    @Query("DELETE FROM workout_photo")
+    suspend fun deleteAllPhotos()
+
+    /** All workouts and all photos (photo files are removed by the caller). */
+    @Transaction
+    suspend fun deleteAll() {
+        deleteAllPhotos()
+        deleteAllSessions()
+    }
 
     /**
      * Completed sets of [exerciseId] from the most recent finished workout that has any, in order.
@@ -251,13 +262,13 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_photo WHERE sessionId = :sessionId ORDER BY position, takenAt")
     fun observePhotosOf(sessionId: String): Flow<List<WorkoutPhotoEntity>>
 
-    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM workout_photo WHERE sessionId = :sessionId")
-    suspend fun nextPhotoPosition(sessionId: String): Int
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM workout_photo WHERE sessionId IS :sessionId")
+    suspend fun nextPhotoPosition(sessionId: String?): Int
 
     @Query(
         """SELECT p.id AS id, p.sessionId AS sessionId, p.fileName AS fileName, p.takenAt AS takenAt, p.position AS position,
              ws.name AS sessionName
-           FROM workout_photo p JOIN workout_session ws ON ws.id = p.sessionId
+           FROM workout_photo p LEFT JOIN workout_session ws ON ws.id = p.sessionId
            ORDER BY p.takenAt DESC, p.position DESC""",
     )
     fun observePhotos(): Flow<List<PhotoRow>>

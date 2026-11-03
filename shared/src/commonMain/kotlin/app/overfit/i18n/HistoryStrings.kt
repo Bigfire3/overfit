@@ -40,6 +40,13 @@ data class HistoryStrings(
     val shareWorkout: String,
     val workoutMissing: String,
 
+    // Editing a finished training afterwards (calendar → training → edit)
+    val editWorkout: String,
+    val editTitle: String,
+    val editHint: String,
+    val editSaveFailed: String,
+    val editNoExercises: String,
+
     // Sharing a workout
     val shareWorkoutHint: String,
     val withActual: String,
@@ -100,6 +107,12 @@ val HistoryGerman = HistoryStrings(
     shareWorkout = "Teilen",
     workoutMissing = "Dieses Training gibt es nicht mehr.",
 
+    editWorkout = "Training bearbeiten",
+    editTitle = "Training bearbeiten",
+    editHint = "Statistiken und Bestwerte rechnen mit den neuen Werten. Eine schon erstellte Coach-Auswertung bleibt, wie sie ist.",
+    editSaveFailed = "Konnte nicht gespeichert werden. Versuch es nochmal.",
+    editNoExercises = "Dieses Training hat keine Übungen.",
+
     shareWorkoutHint = "Teilt Übungen und Sätze – nie Fotos, Notizen oder Gefühl.",
     withActual = "Gewichte und Wiederholungen mitsenden",
     withActualHint = { on -> if (on) "An: Der Empfänger sieht, was du geschafft hast (z. B. 80 kg × 8)." else "Aus: Nur Übungen und Satzanzahl, ohne Gewichte." },
@@ -157,6 +170,12 @@ val HistoryEnglish = HistoryStrings(
     useAsTemplate = "Save as workout",
     shareWorkout = "Share",
     workoutMissing = "This workout no longer exists.",
+
+    editWorkout = "Edit workout",
+    editTitle = "Edit workout",
+    editHint = "Statistics and personal bests use the new values. A coach review that already exists stays as it is.",
+    editSaveFailed = "Could not save. Please try again.",
+    editNoExercises = "This workout has no exercises.",
 
     shareWorkoutHint = "Shares exercises and sets – never photos, notes or feeling.",
     withActual = "Include weights and reps",

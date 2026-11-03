@@ -104,6 +104,28 @@ class BackupTest {
         assertEquals(Zip.read(file).getValue(BackupService.JSON_NAME).decodeToString(), Zip.read(backup.export()).getValue(BackupService.JSON_NAME).decodeToString())
     }
 
+    @Test
+    fun photoWithoutWorkoutSurvivesExportAndImport() = runTest {
+        val photo = data.workouts.addPhoto(null, byteArrayOf(5, 4, 3), takenAt = 33_000)
+        val file = backup.export()
+
+        data.resetAll()
+        store.resetAll()
+        assertTrue(data.workouts.allPhotos().isEmpty())
+
+        val preview = backup.preview(file).getOrThrow()
+        assertEquals(1, preview.photos)
+        backup.restore(preview)
+
+        val restored = data.workouts.allPhotos().single()
+        assertEquals(photo.id, restored.id)
+        assertEquals(null, restored.sessionId)
+        assertEquals(33_000L, restored.takenAt)
+        assertEquals(listOf<Byte>(5, 4, 3), photos.read(restored.fileName)?.toList())
+        val diary = data.workouts.photos.first().single()
+        assertEquals(null, diary.workoutName)
+    }
+
     private suspend fun snapshot(): List<Any?> {
         val finished = data.workouts.getFinished("w1")
         return listOf(
