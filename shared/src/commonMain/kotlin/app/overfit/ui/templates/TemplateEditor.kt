@@ -156,6 +156,7 @@ fun TemplateEditorScreen(
     onClose: () -> Unit,
     onAddExercises: () -> Unit,
     onReplaceExercise: () -> Unit,
+    onShare: () -> Unit,
 ) {
     val t = LocalStrings.current
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -205,6 +206,7 @@ fun TemplateEditorScreen(
             item(key = "actions") {
                 ListRow(t.addExercise, onClick = onAddExercises) { LineIcon(Icon.Plus) }
                 if (!draft.isNew) {
+                    ListRow(t.share.shareTemplate, onClick = onShare)
                     ListRow(
                         if (confirmDelete) t.deleteConfirm else t.deleteTemplate,
                         tone = if (confirmDelete) Tone.Default else Tone.Muted,

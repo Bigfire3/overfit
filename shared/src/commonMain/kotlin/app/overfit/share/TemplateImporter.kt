@@ -2,9 +2,10 @@ package app.overfit.share
 
 import app.overfit.data.ExerciseRepository
 import app.overfit.data.TemplateRepository
-import app.overfit.domain.TemplateSummary
+import app.overfit.domain.Exercise
 import app.overfit.shared.resources.Res
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 
 /** Import of shared templates (preview, then save) and the bundled sample templates. */
 class TemplateImporter(
@@ -12,8 +13,21 @@ class TemplateImporter(
     private val templates: TemplateRepository,
     private val readSample: suspend (String) -> ByteArray = { Res.readBytes("files/samples/$it.json") },
 ) {
-    suspend fun preview(training: SharedTraining): ImportPreview =
-        ShareMapper.resolve(training, exercises.exercises.first())
+    suspend fun preview(training: SharedTraining): ImportPreview = preview(training, catalog())
+
+    private fun preview(training: SharedTraining, catalog: List<Exercise>): ImportPreview = ShareMapper.resolve(training, catalog)
+
+    /** All exercises; right after a fresh start this waits for the catalogue to be seeded so nothing is created twice. */
+    private suspend fun catalog(): List<Exercise> {
+        var list = exercises.getActive()
+        var waited = 0L
+        while (list.isEmpty() && waited < CATALOG_WAIT_MS) {
+            delay(CATALOG_POLL_MS)
+            waited += CATALOG_POLL_MS
+            list = exercises.getActive()
+        }
+        return list
+    }
 
     /** Creates the new own exercises (once per name) and saves the template. Returns the template ID. */
     suspend fun accept(preview: ImportPreview): Long {
@@ -28,10 +42,11 @@ class TemplateImporter(
     suspend fun addSamples(): Int {
         val existing = templates.templates.first().map { it.name.lowercase() }.toSet()
         var added = 0
+        val catalog = catalog()
         for (key in SAMPLE_KEYS) {
             val training = (ShareFormat.fromJson(readSample(key).decodeToString()) as? ShareParse.Ok)?.training ?: continue
             if (training.name.lowercase() in existing) continue
-            accept(preview(training))
+            accept(preview(training, catalog))
             added++
         }
         return added
@@ -39,6 +54,8 @@ class TemplateImporter(
 
     companion object {
         val SAMPLE_KEYS = listOf("push", "pull", "legs")
+        private const val CATALOG_WAIT_MS = 15_000L
+        private const val CATALOG_POLL_MS = 200L
     }
 }
 

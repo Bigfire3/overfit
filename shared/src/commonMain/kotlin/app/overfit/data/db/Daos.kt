@@ -15,6 +15,9 @@ interface ExerciseDao {
     @Query("SELECT * FROM exercise WHERE isArchived = 0 ORDER BY name COLLATE NOCASE")
     fun observeActive(): Flow<List<ExerciseEntity>>
 
+    @Query("SELECT * FROM exercise WHERE isArchived = 0 ORDER BY name COLLATE NOCASE")
+    suspend fun getActive(): List<ExerciseEntity>
+
     @Query("SELECT * FROM exercise WHERE id = :id")
     suspend fun get(id: String): ExerciseEntity?
 

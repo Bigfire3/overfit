@@ -8,6 +8,8 @@ import app.overfit.data.db.buildDatabase
 import app.overfit.platform.IosKeyValueStore
 import app.overfit.platform.KeychainSecretStore
 import app.overfit.platform.createHttpClient
+import app.overfit.share.IosIncoming
+import app.overfit.share.IosPlatformShare
 import app.overfit.platform.deviceDefaults
 import app.overfit.ui.AppDependencies
 import app.overfit.ui.OverfitApp
@@ -25,6 +27,8 @@ fun MainViewController(): UIViewController {
         providers = Providers(createHttpClient()),
         data = AppData(buildDatabase(), kv),
         versionName = "$version ($build)",
+        share = IosPlatformShare(),
+        inbox = IosIncoming.inbox,
     )
     return ComposeUIViewController { OverfitApp(deps) }
 }
