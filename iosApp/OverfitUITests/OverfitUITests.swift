@@ -105,6 +105,31 @@ final class ScreenshotTests: OverfitUITestCase {
     func testScreensLight() { screens("light") }
     func testScreensDark() { screens("dark") }
 
+    /** App icon on the home screen and the launch screen (captured right after tapping the icon). */
+    func testHomeScreenAndLaunch() {
+        launch(theme: "light")
+        waitFor("Legs")
+        XCUIDevice.shared.press(.home)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let icon = springboard.icons["overfit"]
+        for _ in 0..<4 where !(icon.exists && icon.isHittable) {
+            springboard.swipeLeft()
+            sleep(1)
+        }
+        suffix = "hell"
+        shot("00-homescreen")
+        guard icon.exists else { return }
+        icon.tap()
+        usleep(150_000)
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "00-launch"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        if let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"], !dir.isEmpty {
+            try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("00-launch.png"))
+        }
+    }
+
     private func onboarding(_ theme: String) {
         launch(theme: theme, skipOnboarding: false)
         waitFor("Weiter")
