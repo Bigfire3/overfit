@@ -29,7 +29,7 @@ import platform.UIKit.UIViewController
 fun MainViewController(): UIViewController {
     val version = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "?"
     val build = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleVersion") as? String ?: "?"
-    // Set at build time (xcodebuild OVERFIT_BACKEND_URL=… → Info.plist); empty = Fuel/Spot not configured.
+    // Set at build time (xcodebuild OVERFIT_BACKEND_URL=… → Info.plist); empty = credit/invite not configured.
     val backendUrl = NSBundle.mainBundle.objectForInfoDictionaryKey("OverfitBackendUrl") as? String ?: ""
     val kv = IosKeyValueStore()
     val fuelAccess = FuelAccess(kv, backendUrl) { url -> FuelApi(createHttpClient(), url, RequestSigner(IosDeviceKey()), IosAttestor()) }

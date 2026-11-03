@@ -1,6 +1,6 @@
 package app.overfit.fuel
 
-/** Creates the proof for Spot redemption on this device (Play Integrity / App Attest). */
+/** Creates the proof for invite redemption on this device (Play Integrity / App Attest). */
 interface Attestor {
     /** Null = this device cannot attest (e.g. simulator, no Play services); the redeem then ends in `attestation_unavailable`. */
     suspend fun attest(challenge: String): Attestation?
@@ -10,7 +10,7 @@ object NoAttestor : Attestor {
     override suspend fun attest(challenge: String): Attestation? = null
 }
 
-/** What the Fuel/Spot screens need; implemented by the real client ([FuelApi]) and by the offline demo. */
+/** What the credit/invite screens need; implemented by the real client ([FuelApi]) and by the offline demo. */
 interface FuelService {
     val isDemo: Boolean
     suspend fun config(): FuelConfig

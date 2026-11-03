@@ -66,7 +66,7 @@ import java.io.File
 /**
  * "Ein Tag mit Overfit": one long walk through the app as a user would use it – onboarding, the Push/Pull/Legs
  * samples, sharing and re-importing, a workout with rest timer, edits, an app restart in the middle,
- * the AI template, Fuel/Spot demo, "copy context", Duo teaser, language, theme and "delete all data".
+ * the AI template, credit/invite demo, "copy context", Duo teaser, language, theme and "delete all data".
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
@@ -349,19 +349,19 @@ class DayWithOverfitTest {
         waitFor("Starten")
         compose.waitUntilState(10_000) { templates().any { it.name == "Oberkörper A" } }
 
-        // --- Profile: Fuel demo + Spot reveal, KI-Coach context, Duo teaser ------------------
+        // --- Profile: Fuel demo + invite reveal, KI-Coach context, Duo teaser ------------------
         tab("Profil")
         click("startet bald")
         waitFor("Guthaben startet bald")
         click("Demo ansehen")
         waitFor("Guthaben · 4,20 €")
-        click("Freund spotten")
+        click("Freunde einladen")
         waitFor("Neuer Code in", substring = true)
         back()
-        click("Ich wurde gespottet")
-        compose.onNodeWithText("Link oder Code").performTextInput("overfit://spot#demo-spot-token-1")
+        click("Einladung einlösen")
+        compose.onNodeWithText("Link oder Code").performTextInput("overfit://invite#demo-spot-token-1")
         click("Einlösen")
-        waitFor("Spot von Fabian")
+        waitFor("Einladung von Fabian")
         assertTrue(HapticPattern.Reveal in haptics.played)
         waitFor("Tippen zum Schließen")
         click("Tippen zum Schließen")

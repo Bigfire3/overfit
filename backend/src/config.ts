@@ -3,7 +3,7 @@ import { currentPrices } from './providers';
 
 /**
  * Einziger Aufschlag auf alle Modellpreise (Basispunkte). Herleitung und Tabelle: docs/monetization.md „Rechnung“.
- * 6900 = 69 %: deckt im ungünstigsten Kanal (Store, 15 % Gebühr auf Netto nach USt) USt, Gebühr, Spot-Gutschriften
+ * 6900 = 69 %: deckt im ungünstigsten Kanal (Store, 15 % Gebühr auf Netto nach USt) USt, Gebühr, Einladungsboni
  * (10 % vom Netto) und lässt 7 % vom Netto als Gewinn.
  */
 export const DEFAULT_MARKUP_BP = 6900;

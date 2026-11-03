@@ -42,7 +42,7 @@ KI-COACH
 
 TEILEN
 • Workouts und Trainings per Link, QR-Code oder Datei teilen
-• „Spot“: Freunde einladen, ihr bekommt beide 1 € Guthaben
+• Freunde einladen (Empfehlungsprogramm): Einladungsbonus von 1 € Guthaben für dich und deinen Freund
 • Duo – gemeinsam trainieren: bald
 
 DEINE DATEN
@@ -89,7 +89,7 @@ AI COACH
 
 SHARING
 • Share workouts and trainings as link, QR code or file
-• "Spot": invite friends, you both get €1 credit
+• Invite friends (referral program): referral bonus of €1 credit for you and your friend
 • Duo – train together: coming soon
 
 YOUR DATA

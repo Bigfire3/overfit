@@ -10,7 +10,7 @@ const dec = new TextDecoder();
 function signingKey(env: Env, cfg: Config): string {
   if (env.SPOT_SIGNING_KEY) return env.SPOT_SIGNING_KEY;
   if (cfg.devMode) return 'dev-only-spot-signing-key';
-  throw new ApiError(503, 'not_configured', 'Spot ist nicht konfiguriert');
+  throw new ApiError(503, 'not_configured', 'Einladungen sind nicht konfiguriert');
 }
 
 async function sealed(prefix: string, payload: object, key: string): Promise<string> {
@@ -46,10 +46,10 @@ export async function createChallenge(env: Env, cfg: Config, device: Device) {
 }
 
 const CONSTRAINT_ERRORS: [string, ApiError][] = [
-  ['spot_tokens_used', new ApiError(409, 'spot_token_used', 'Dieser Spot wurde bereits eingelöst')],
-  ['redeemer_account_id', new ApiError(409, 'spot_already_redeemed', 'Du hast schon einen Spot eingelöst')],
-  ['redeemer_device_id', new ApiError(409, 'spot_already_redeemed', 'Du hast schon einen Spot eingelöst')],
-  ['attestation_key', new ApiError(409, 'spot_device_used', 'Auf diesem Gerät wurde schon ein Spot eingelöst')],
+  ['spot_tokens_used', new ApiError(409, 'spot_token_used', 'Diese Einladung wurde bereits eingelöst')],
+  ['redeemer_account_id', new ApiError(409, 'spot_already_redeemed', 'Du hast schon eine Einladung eingelöst')],
+  ['redeemer_device_id', new ApiError(409, 'spot_already_redeemed', 'Du hast schon eine Einladung eingelöst')],
+  ['attestation_key', new ApiError(409, 'spot_device_used', 'Auf diesem Gerät wurde schon eine Einladung eingelöst')],
 ];
 
 export async function redeemSpot(env: Env, cfg: Config, device: Device, body: Record<string, unknown>) {
@@ -64,36 +64,36 @@ export async function redeemSpot(env: Env, cfg: Config, device: Device, body: Re
   }
   const t = now();
   const tok = await unseal<{ i: string; e: number; n: string }>('spot:', token, key);
-  if (!tok || typeof tok.i !== 'string') throw new ApiError(400, 'spot_token_invalid', 'Spot-Code ungültig');
-  if (tok.e < t) throw new ApiError(410, 'spot_token_expired', 'Spot-Code abgelaufen, bitte neu scannen');
-  if (tok.i === device.accountId) throw new ApiError(400, 'spot_self', 'Du kannst dich nicht selbst spotten');
+  if (!tok || typeof tok.i !== 'string') throw new ApiError(400, 'spot_token_invalid', 'Einladungscode ungültig');
+  if (tok.e < t) throw new ApiError(410, 'spot_token_expired', 'Einladungscode abgelaufen, bitte neu scannen');
+  if (tok.i === device.accountId) throw new ApiError(400, 'spot_self', 'Du kannst dich nicht selbst einladen');
 
   const ch = await unseal<{ d: string; e: number; n: string }>('challenge:', att.challenge, key);
   if (!ch || ch.d !== device.id || ch.e < t) throw new ApiError(400, 'challenge_invalid', 'Herausforderung ungültig oder abgelaufen');
 
   const verifier = getAttestationVerifier(env, cfg, att.platform as Platform);
-  if (!verifier) throw new ApiError(503, 'attestation_unavailable', 'Spot ist noch nicht freigeschaltet');
+  if (!verifier) throw new ApiError(503, 'attestation_unavailable', 'Einladungen sind noch nicht freigeschaltet');
 
   const inviter = await env.DB.prepare('SELECT display_name FROM accounts WHERE id = ?')
     .bind(tok.i)
     .first<{ display_name: string | null }>();
-  if (!inviter) throw new ApiError(400, 'spot_token_invalid', 'Spot-Code ungültig');
+  if (!inviter) throw new ApiError(400, 'spot_token_invalid', 'Einladungscode ungültig');
 
   const month = monthKey(t);
   const count = await env.DB.prepare('SELECT COUNT(*) AS c FROM spot_redemptions WHERE inviter_account_id = ? AND month = ?')
     .bind(tok.i, month)
     .first<{ c: number }>();
   if ((count?.c ?? 0) >= cfg.spotMonthlyLimitPerInviter) {
-    throw new ApiError(429, 'spot_inviter_limit', 'Diese Person hat diesen Monat schon alle Spots vergeben');
+    throw new ApiError(429, 'spot_inviter_limit', 'Diese Person hat diesen Monat schon alle Einladungen vergeben');
   }
   const total = await env.DB.prepare('SELECT COUNT(*) AS c FROM spot_redemptions WHERE month = ?').bind(month).first<{ c: number }>();
   if (((total?.c ?? 0) + 1) * (cfg.spotStarterMicro + cfg.spotRewardMicro) > cfg.spotGlobalMonthlyBudgetMicro) {
-    throw new ApiError(429, 'spot_budget_exhausted', 'Spots sind diesen Monat aufgebraucht, bitte später wieder versuchen');
+    throw new ApiError(429, 'spot_budget_exhausted', 'Einladungsboni sind diesen Monat aufgebraucht, bitte später wieder versuchen');
   }
   const already = await env.DB.prepare('SELECT 1 AS x FROM spot_redemptions WHERE redeemer_account_id = ? OR redeemer_device_id = ?')
     .bind(device.accountId, device.id)
     .first();
-  if (already) throw new ApiError(409, 'spot_already_redeemed', 'Du hast schon einen Spot eingelöst');
+  if (already) throw new ApiError(409, 'spot_already_redeemed', 'Du hast schon eine Einladung eingelöst');
 
   // Challenge einmalig verbrauchen, erst dann die (teure) Attestierung prüfen.
   try {

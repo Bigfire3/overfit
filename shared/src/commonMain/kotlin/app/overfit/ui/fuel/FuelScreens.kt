@@ -62,7 +62,7 @@ private fun ErrorBlock(t: FuelStrings, onRetry: () -> Unit) {
     TextButton(t.retry, onRetry, tone = Tone.Default)
 }
 
-/** Profile → Fuel: balance, top-up packages, Spot, transactions, recovery. Not configured: "coming soon" + demo. */
+/** Profile → Fuel: balance, top-up packages, invitations, transactions, recovery. Not configured: "coming soon" + demo. */
 @Composable
 fun FuelScreen(
     session: FuelSession,

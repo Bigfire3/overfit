@@ -33,7 +33,7 @@ fun formatCost(micro: Long, language: Language): String {
     }
 }
 
-/** Euro amount counted up for the Spot reveal: always two decimals, e.g. "0,37" (no currency sign; the UI adds "€"). */
+/** Euro amount counted up for the invite reveal: always two decimals, e.g. "0,37" (no currency sign; the UI adds "€"). */
 fun formatRevealNumber(micro: Long, language: Language): String {
     val cents = microToCents(micro).coerceAtLeast(0)
     val frac = (cents % 100).toString().padStart(2, '0')

@@ -67,7 +67,7 @@ import kotlin.time.TimeSource
 /** The code is re-fetched this long before it expires so a scan always meets a valid token (backend TTL 45 s → every 30 s). */
 internal fun rotateAfterMs(ttlSec: Int): Long = (minOf(30, maxOf(ttlSec - 10, 5))) * 1_000L
 
-/** "Freund spotten": name + QR code with a rotating one-time token. */
+/** "Freunde einladen": name + QR code with a rotating one-time token. */
 @Composable
 fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
     val t = LocalFuelStrings.current
@@ -153,7 +153,7 @@ fun SpotInviteScreen(session: FuelSession, onBack: () -> Unit) {
 }
 
 /**
- * "Ich wurde gespottet": scan the QR code (when a scanner is available) or paste the link, then redeem.
+ * "Einladung einlösen": scan the QR code (when a scanner is available) or paste the link, then redeem.
  * [canScan]: the in-app QR scanner exists (Android); on iOS the camera app opens the link instead.
  */
 @Composable
@@ -237,8 +237,8 @@ fun SpotRedeemScreen(
 private val RevealNumber = TextStyle(fontSize = 88.sp, lineHeight = 96.sp, letterSpacing = (-2).sp, fontFeatureSettings = "tnum")
 
 /**
- * The Spot reveal: the screen goes black, two heartbeat pulses, then the amount counts up from 0,00 in Inter with tabular
- * digits, "Spot von <Name>" below it, and a strong pulse at the end. Deliberate exception to "no animations".
+ * The invite reveal: the screen goes black, two heartbeat pulses, then the amount counts up from 0,00 in Inter with tabular
+ * digits, "Einladung von <Name>" below it, and a strong pulse at the end. Deliberate exception to "no animations".
  */
 @Composable
 fun SpotRevealScreen(amountMicro: Long, inviterName: String?, haptics: Haptics, vibration: Boolean, onClose: () -> Unit) {

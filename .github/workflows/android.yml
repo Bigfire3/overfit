@@ -66,7 +66,7 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           OVERFIT_KEYSTORE_PASSWORD: ${{ secrets.OVERFIT_KEYSTORE_PASSWORD }}
-          # Guthaben/Spot backend URL (Repository-Variable, optional; leer = "startet bald" in der App)
+          # Guthaben/Einladungs backend URL (Repository-Variable, optional; leer = "startet bald" in der App)
           OVERFIT_BACKEND_URL: ${{ vars.OVERFIT_BACKEND_URL }}
         run: ./gradlew :app:assembleRelease :app:bundleRelease --console=plain
 

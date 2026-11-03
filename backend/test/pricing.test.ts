@@ -6,13 +6,13 @@ import { baseEnv } from './helpers';
 
 /**
  * Die Rechnung aus docs/monetization.md „Rechnung“, als Test: Bei vollständig verbrauchtem Guthaben bleibt in
- * jedem angebotenen Kanal und Paket nach USt, Gebühr, Anbieterkosten und Spot-Allowance mindestens der Zielgewinn.
+ * jedem angebotenen Kanal und Paket nach USt, Gebühr, Anbieterkosten und Einladungs-Allowance mindestens der Zielgewinn.
  */
 const VAT = 0.19; // DE; andere EU-Sätze (17–27 %) weichen leicht ab
 const PADDLE_PCT = 0.05;
 const PADDLE_FIXED_EUR = 0.5;
 const STORE_FEE = 0.15; // Small-Business-Programm, auf den Preis ohne USt
-const SPOT_SHARE = 0.1; // Spot-/Test-Gutschriften als Anteil am Netto
+const SPOT_SHARE = 0.1; // Einladungsboni/Test-Gutschriften als Anteil am Netto
 const MIN_PROFIT_SHARE = 0.05; // Untergrenze des Zielgewinns (Ziel: 7 %)
 
 const webNet = (p: number) => p - (p * VAT) / (1 + VAT) - (p * PADDLE_PCT + PADDLE_FIXED_EUR);
