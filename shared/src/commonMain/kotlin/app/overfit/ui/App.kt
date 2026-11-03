@@ -306,7 +306,7 @@ class AppDependencies(
 @Serializable data class InviteRevealRoute(val reviews: Int, val inviterName: String = "")
 @Serializable data object ImportRoute
 @Serializable data class ShareRoute(val templateId: Long)
-@Serializable data class ExerciseDetailRoute(val id: String)
+@Serializable data class ExerciseDetailRoute(val id: String, val readOnly: Boolean = false)
 /** Finish flow right after "Finish": summary, feeling, note, photos, coach slot. */
 @Serializable data class FinishRoute(val workoutId: String)
 @Serializable data class HistoryDetailRoute(val workoutId: String)
@@ -565,6 +565,7 @@ fun OverfitApp(deps: AppDependencies) {
                             clock = deps.clock,
                             onAddExercises = { pendingReplaceId = null; nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { pendingReplaceId = it; nav.navigate(ExercisePickerRoute(single = true)) },
+                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
                             onClosed = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                             onMinimize = { if (!nav.popBackStack()) nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                             onFinished = { id -> nav.navigate(FinishRoute(id)) { popUpTo(StartRoute) } },
@@ -645,8 +646,10 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<ExerciseDetailRoute> { entry ->
-                        val id = entry.toRoute<ExerciseDetailRoute>().id
+                        val route = entry.toRoute<ExerciseDetailRoute>()
+                        val id = route.id
                         ExerciseDetailScreen(
+                            readOnly = route.readOnly,
                             viewModel = viewModel { ExerciseViewModel(id, deps.data.exercises) },
                             workouts = deps.data.workouts,
                             unit = state.profile.unit,
@@ -704,6 +707,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                             onPicked = { ids -> picked.result.value = ids; nav.popBackStack() },
                             onCreate = { query -> nav.navigate(CustomExerciseRoute(name = query, pick = true)) },
+                            onDetails = { nav.navigate(ExerciseDetailRoute(it)) },
                             created = pickedCreated,
                             onCreatedConsumed = { picked.created.value = null },
                         )

@@ -51,7 +51,7 @@ import app.overfit.ui.components.HeaderDeleteButton
 import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.Chip
-import app.overfit.ui.components.ExerciseImage
+import app.overfit.ui.components.ExerciseHero
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.RowInput
@@ -180,6 +180,8 @@ fun ExerciseDetailScreen(
     workouts: WorkoutRepository,
     unit: WeightUnit,
     language: Language,
+    /** Opened from a running workout: no editing (tracking, rest time, edit/delete), so nothing under the workout changes. */
+    readOnly: Boolean = false,
 ) {
     val t = LocalStrings.current
     val exercise by viewModel.exercise.collectAsStateWithLifecycle()
@@ -194,17 +196,17 @@ fun ExerciseDetailScreen(
         scroll = true,
         header = {
             BackHeader(t.back, onBack) {
-                if (e.isCustom) {
+                if (e.isCustom && !readOnly) {
                     HeaderIconButton(Icon.Edit, t.edit, { onEditCustom(e.id) })
                     HeaderDeleteButton(t.delete, t.deleteConfirm, onConfirm = { viewModel.delete { onBack() } })
                 }
             }
         },
-        footer = if (e.isCustom) null else ({
+        footer = if (e.isCustom || readOnly) null else ({
             PrimaryButton(t.save, { viewModel.saveSettings(tracking, rest.toIntOrNull(), onBack) })
         }),
     ) {
-        ExerciseImage(e, size = 160.dp)
+        ExerciseHero(e)
         Spacer(Modifier.height(Space.l))
         Title(e.name)
         Spacer(Modifier.height(Space.s))
@@ -218,15 +220,17 @@ fun ExerciseDetailScreen(
             Text(it)
         }
 
-        SectionTitle(t.tracking)
-        if (e.isCustom) {
-            Text(t.trackingName(e.trackingType))
-            e.defaultRestSec?.let { ListRow(t.restTime, it.toString()) }
-        } else {
-            TrackingChooser(tracking) { tracking = it }
-            Spacer(Modifier.height(Space.s))
-            ListRow(t.restTime) {
-                RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
+        if (!readOnly) {
+            SectionTitle(t.tracking)
+            if (e.isCustom) {
+                Text(t.trackingName(e.trackingType))
+                e.defaultRestSec?.let { ListRow(t.restTime, it.toString()) }
+            } else {
+                TrackingChooser(tracking) { tracking = it }
+                Spacer(Modifier.height(Space.s))
+                ListRow(t.restTime) {
+                    RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
+                }
             }
         }
 
