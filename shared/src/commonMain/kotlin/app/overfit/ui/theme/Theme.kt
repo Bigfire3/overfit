@@ -19,8 +19,16 @@ import app.overfit.shared.resources.inter_semibold
 import org.jetbrains.compose.resources.Font
 
 /**
- * Black & white design system. No accent colour: hierarchy comes from
- * typography, whitespace and a few greys only.
+ * Black & white design system. No decorative accent colour: hierarchy comes from
+ * typography, whitespace and a few greys.
+ *
+ * Palette (see docs/DECISIONS.md, "Farbpalette"):
+ * - Neutrals: [background], [foreground], [muted], [faint], [hairline], inverse pair.
+ * - Grey highlight: [surface] (highlighted row, chip, selected item, input field fill),
+ *   [surfacePressed] (pressed / dragged state on top of a surface).
+ * - Signal colours, ONLY for meaning in data, never decoration: [positive] (better than
+ *   before, new record, completed) and [negative] (worse, missed, destructive confirmation).
+ *   The *Subtle variants are low-contrast fills behind such values (e.g. a delta badge).
  */
 @Immutable
 data class Colors(
@@ -32,6 +40,16 @@ data class Colors(
     /** Inverted surfaces, e.g. the primary button. */
     val inverseBackground: Color,
     val inverseForeground: Color,
+    /** Grey fill for highlighted rows, chips and selected items. */
+    val surface: Color,
+    /** Pressed or dragged state on top of [surface]. */
+    val surfacePressed: Color,
+    /** Green: improvement, record, done. Only for data, never decoration. */
+    val positive: Color,
+    val positiveSubtle: Color,
+    /** Red: decline, missed, destructive. Only for data and confirmations. */
+    val negative: Color,
+    val negativeSubtle: Color,
     val isDark: Boolean,
 )
 
@@ -43,6 +61,12 @@ val DarkColors = Colors(
     hairline = Color(0xFF262628),
     inverseBackground = Color(0xFFFFFFFF),
     inverseForeground = Color(0xFF000000),
+    surface = Color(0xFF1C1C1E),
+    surfacePressed = Color(0xFF2C2C2E),
+    positive = Color(0xFF30D158),
+    positiveSubtle = Color(0xFF0F2A17),
+    negative = Color(0xFFFF453A),
+    negativeSubtle = Color(0xFF331311),
     isDark = true,
 )
 
@@ -54,6 +78,12 @@ val LightColors = Colors(
     hairline = Color(0xFFE5E5EA),
     inverseBackground = Color(0xFF000000),
     inverseForeground = Color(0xFFFFFFFF),
+    surface = Color(0xFFF2F2F7),
+    surfacePressed = Color(0xFFE5E5EA),
+    positive = Color(0xFF248A3D),
+    positiveSubtle = Color(0xFFE3F4E8),
+    negative = Color(0xFFD70015),
+    negativeSubtle = Color(0xFFFBE4E6),
     isDark = false,
 )
 

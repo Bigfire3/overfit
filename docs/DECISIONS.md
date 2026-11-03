@@ -481,3 +481,14 @@ Zentrale Entscheidungen für alle Nacht-Sessions (Backend, Teilen, Workout-Modus
 - Standardmodelle für OpenAI/OpenRouter (`gpt-5`, `anthropic/claude-sonnet-5.5`) sind Annahmen; bei „Anbieter hat die Anfrage
   abgelehnt“ im Coach-Einstellungen-Screen das Modell anpassen.
 - Kein Senden im Hintergrund bei geschlossener App (siehe oben).
+
+## Farbpalette und iOS-CI (3.11., Koordination)
+- **Farbpalette:** Schwarz-weiß bleibt die Basis. Neu in `Colors` (Theme.kt), je hell/dunkel:
+  `surface` (graue Hervorhebung: markierte Zeile, Chip, Auswahl, Eingabefeld), `surfacePressed` (gedrückt/gezogen),
+  `positive` (grün: besser als zuvor, Bestwert, erledigt), `negative` (rot: schlechter, verpasst, destruktive Bestätigung)
+  und die blassen Hintergründe `positiveSubtle`/`negativeSubtle` (z. B. Delta-Badge in der Auswertung).
+  Werte angelehnt an die iOS-Systemfarben (gut lesbar auf Schwarz bzw. Weiß). Grün/Rot nur für Bedeutung in Daten,
+  nie als Deko oder Markenfarbe; Buttons bleiben schwarz-weiß.
+- **iOS-CI pausiert:** macOS-Minuten kosten 10x und waren am 3.11. rund 90 % der Actions-Kosten. `ios.yml` läuft nur noch
+  per „Run workflow“. Ersatz: Die Android-CI kompiliert `iosMain` (`:shared:compileKotlinIosSimulatorArm64`, Linux).
+  Gemergt wird bei grüner Android-CI; die iOS-CI vor einem iOS-Release oder nach größeren iOS-Änderungen von Hand starten.
