@@ -47,7 +47,10 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp") // a typical phone instead of Robolectric's tiny default screen
 class AppSmokeTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ data }, { database })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     private var keyIsValid = false

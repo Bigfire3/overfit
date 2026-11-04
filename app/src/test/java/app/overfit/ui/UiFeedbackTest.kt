@@ -54,7 +54,14 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class UiFeedbackTest {
-    @get:Rule
+    // The app of launchApp() (set there); closed after the composition is gone, see AppTeardown.
+    private var appData: AppData? = null
+    private var appDatabase: OverfitDatabase? = null
+
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ appData }, { appDatabase ?: error("no database") }, closeDatabase = { appDatabase != null })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     @Test
@@ -116,6 +123,7 @@ class UiFeedbackTest {
         val store = AppStore(kv, InMemorySecretStore(), DeviceDefaults(Language.DE, WeightUnit.KG))
         val database = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext()).build()
         val data = AppData(database, kv, readCatalog = { File("../shared/src/commonMain/composeResources/files/catalog/exercises.json").readBytes() })
+        appData = data; appDatabase = database
         store.setName("Fabi")
         store.completeOnboarding()
         runBlocking { data.seedCatalog(); data.seedSamplesOnce() }

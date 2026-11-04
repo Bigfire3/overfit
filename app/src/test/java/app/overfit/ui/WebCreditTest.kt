@@ -51,7 +51,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import kotlinx.datetime.LocalDate
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -220,7 +219,10 @@ class WebCreditTest {
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class CreditReturnLinkTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ data }, { database })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     private val kv = InMemoryKeyValueStore()
@@ -236,9 +238,6 @@ class CreditReturnLinkTest {
             else -> respond("""{"accountId":"a","balanceMicro":0,"expiring":[]}""", HttpStatusCode.OK, json)
         }
     }
-
-    @After
-    fun tearDown() = database.close()
 
     @Test
     fun returnLinkOpensCreditScreen() {

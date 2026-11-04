@@ -28,9 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
-import kotlinx.coroutines.cancel
 import kotlinx.datetime.LocalDate
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -44,7 +42,10 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class CoachStoryTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ data }, { database })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     private val kv = InMemoryKeyValueStore()
@@ -54,14 +55,6 @@ class CoachStoryTest {
     private val database = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext()).build()
     private val data = AppData(database, kv, readCatalog = { ByteArray(0) })
     private val s = GermanCoachStory
-
-    @After
-    fun tearDown() {
-        // Stop the app's background work first, so no query hits the closed database.
-        compose.waitForIdle()
-        data.scope.cancel()
-        database.close()
-    }
 
     private fun launch() {
         val deps = AppDependencies(

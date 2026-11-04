@@ -46,7 +46,10 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class ShareFlowTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ data }, { database })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     // Tests that look at an empty app opt out of the first-start sample workouts (Push/Pull/Legs), as an existing install would.
