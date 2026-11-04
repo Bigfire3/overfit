@@ -1018,3 +1018,15 @@ Offen / Hinweise:
 3. Eine Zeile antippen → Tagesansicht wie im Kalender; zurück bleibt die Liste
 4. App schließen und neu öffnen → die zuletzt gewählte Ansicht ist noch aktiv
 5. Englisch: Beschreibungen „Show as list“ / „Show as calendar“; Liste ohne Daten zeigt freundlichen Hinweis
+
+## Session AN – Übungsbild: Start | Ende statt Animation (4.11.)
+- Erledigt: Die Detailansicht einer Übung zeigt statt der Animation ruhig zwei Posen nebeneinander, links „Start“, rechts „Ende“ (Frame 1 und 3 aus Workout Guide). Beide gleich groß, im selben Maßstab, auf derselben Bodenlinie, Linien gleich stark (dünnere Pose per Kontur angeglichen). Liegende Übungen (Liegestütz, Crunch …) stehen untereinander. Halteübungen und statische Dehnungen zeigen ein Bild. Frame 2 (Ursache der dicken, springenden Linien) entfernt, Übungsgrafiken 23 → 14 MB. Belege `docs/screenshots/uebungsbild/vorher|nachher/`. Details in docs/DECISIONS.md.
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Übungsbild)
+1. Übung öffnen (Katalog oder Bild antippen), z. B. Reverse Lunge: links stehend „Start“, rechts Ausfallschritt „End(e)“, nichts bewegt sich, beide Figuren gleich dick gezeichnet und unten auf einer Linie
+2. Bench Press, Pull-up, Squat, Bicep Curl, Deadlift: Reihenfolge wirkt plausibel (z. B. Pull-up: hängen | oben; Squat: stehen | tief)
+3. Push-up oder Crunch: die beiden Posen stehen untereinander, gut erkennbar
+4. Plank, Dead Hang, Hamstring Stretch: ein einzelnes Bild in grauer Fläche
+5. Hell und dunkel: Figuren in Schwarz bzw. Weiß, graue Fläche mit feinem Rand wie die anderen Panels
+6. Listen (Katalog, Workout): Icons wie vorher (manche Linien etwas kräftiger); eigene Übung ohne Bild zeigt weiter die Initialen
