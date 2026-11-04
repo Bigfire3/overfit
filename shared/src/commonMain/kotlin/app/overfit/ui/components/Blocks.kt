@@ -81,10 +81,38 @@ object BlockShape {
 /** One exercise (or other group) as a grey rounded area. */
 @Composable
 fun Block(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    // Same card look as [FloatingCard] (fill + 1 dp outline): every exercise is its own card, running or not.
     Column(
-        modifier.fillMaxWidth().clip(BlockShape.block).background(Theme.colors.surface).padding(Space.s),
+        modifier.fillMaxWidth().clip(BlockShape.block).background(Theme.colors.surface)
+            .border(1.dp, Theme.colors.faint, BlockShape.block).padding(Space.s),
         content = content,
     )
+}
+
+/**
+ * Head of an exercise card, the same in the running workout and in every read-only view: preview image (frame 1,
+ * 48 dp, a tap opens the exercise details), name and up to two caption lines. [leading]/[trailing] for the
+ * running workout's chevron and menu.
+ */
+@Composable
+fun ExerciseCardHeader(
+    exercise: app.overfit.domain.Exercise,
+    lines: List<String>,
+    onDetails: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    leading: (@Composable RowScope.() -> Unit)? = null,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).then(modifier), verticalAlignment = Alignment.CenterVertically) {
+        leading?.invoke(this)
+        ExerciseImage(exercise, size = 48.dp, onClick = onDetails)
+        Spacer(Modifier.width(Space.m))
+        Column(Modifier.weight(1f)) {
+            Text(exercise.name, style = Theme.type.label, maxLines = 2)
+            lines.forEach { Text(it, style = Theme.type.caption, tone = Tone.Muted, maxLines = 2) }
+        }
+        trailing?.invoke(this)
+    }
 }
 
 /** Full-width "+ label" action as a grey area (add set, add exercises). [inBlock]: inside a [Block], one shade lighter. */

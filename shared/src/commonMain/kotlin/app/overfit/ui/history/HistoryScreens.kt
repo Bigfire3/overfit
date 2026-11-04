@@ -1,5 +1,9 @@
 package app.overfit.ui.history
 
+import app.overfit.ui.components.FloatingCard
+import androidx.compose.foundation.layout.heightIn
+import app.overfit.ui.components.ExerciseCardHeader
+import app.overfit.ui.components.Block
 import app.overfit.chat.ChatNote
 
 import androidx.compose.foundation.horizontalScroll
@@ -76,8 +80,9 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
         h.photoCount(row.photoCount).takeIf { row.photoCount > 0 },
         h.sauna.takeIf { row.sauna },
     ).joinToString(" · ")
-    Column(Modifier.panelRow { onOpen(row.id) }) {
-        Row(Modifier.fillMaxWidth().padding(vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
+    // Each training is its own floating card (Fabian: lists of standalone things as cards).
+    FloatingCard(onClick = { onOpen(row.id) }) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = Space.m, vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(row.name, Modifier.weight(1f), style = Theme.type.label, maxLines = 1)
@@ -90,7 +95,6 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
             Spacer(Modifier.width(Space.m))
             LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
         }
-        RowDivider()
     }
 }
 
@@ -118,6 +122,8 @@ fun WorkoutDetailScreen(
     onCoach: (() -> Unit)? = null,
     /** Edit sets, feeling, sauna and note afterwards. */
     onEdit: (() -> Unit)? = null,
+    /** Tap on an exercise's image: its details (read only), like in the running workout. */
+    onExerciseDetails: (String) -> Unit = {},
 ) {
     val t = LocalStrings.current
     val h = t.history
@@ -180,34 +186,35 @@ fun WorkoutDetailScreen(
             }
         }
 
-        w.exercises.forEach { e ->
-            Spacer(Modifier.height(Space.l))
-            Panel {
-            Row(Modifier.fillMaxWidth().background(Theme.colors.surface).padding(Space.m), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(e.exercise.name, Modifier.weight(1f, fill = false), style = Theme.type.label)
+        // One card per exercise, as in the running workout (image left, name, sets), only without input.
+        if (w.exercises.isNotEmpty()) Spacer(Modifier.height(Space.l))
+        Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            w.exercises.forEach { e ->
                 val marker = when (e.origin) {
                     ExerciseOrigin.ADDED -> h.markerAdded
                     ExerciseOrigin.REPLACED -> h.markerReplaced
                     ExerciseOrigin.PLANNED -> null
                 }
-                if (marker != null) {
-                    Spacer(Modifier.width(Space.m))
-                    Text(marker, style = Theme.type.caption, tone = Tone.Muted)
+                Block {
+                    ExerciseCardHeader(
+                        e.exercise,
+                        listOfNotNull(listOfNotNull(t.setsDone(e.sets.count { it.completed }, e.sets.size), marker).joinToString(" · ")),
+                        onDetails = { onExerciseDetails(e.exercise.id) },
+                    )
+                    e.sets.forEachIndexed { i, s ->
+                        val v = if (s.completed || s.actual != SetValues()) s.actual else s.target
+                        val text = WorkoutFormat.values(v, e.exercise.trackingType, unit, language, t).ifEmpty { "–" }
+                        val tone = if (s.completed) Tone.Default else Tone.Muted
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = Space.s),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("${i + 1}", Modifier.width(32.dp), tone = Tone.Muted)
+                            Text(text, Modifier.weight(1f), tone = tone)
+                            if (s.completed) LineIcon(Icon.Check, size = 18.dp) else Text(h.notDone, style = Theme.type.caption, tone = Tone.Muted)
+                        }
+                    }
                 }
-            }
-            e.sets.forEachIndexed { i, s ->
-                val v = if (s.completed || s.actual != SetValues()) s.actual else s.target
-                val text = WorkoutFormat.values(v, e.exercise.trackingType, unit, language, t).ifEmpty { "–" }
-                val tone = if (s.completed) Tone.Default else Tone.Muted
-                Row(
-                    Modifier.fillMaxWidth().background(Theme.colors.surface).padding(horizontal = Space.m, vertical = Space.s),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("${i + 1}", Modifier.width(32.dp), tone = Tone.Muted)
-                    Text(text, Modifier.weight(1f), tone = tone)
-                    if (s.completed) LineIcon(Icon.Check, size = 18.dp) else Text(h.notDone, style = Theme.type.caption, tone = Tone.Muted)
-                }
-            }
             }
         }
 

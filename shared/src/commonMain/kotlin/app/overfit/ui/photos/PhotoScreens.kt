@@ -1,5 +1,6 @@
 package app.overfit.ui.photos
 
+import app.overfit.ui.components.FloatingCard
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -167,7 +168,8 @@ fun PhotosScreen(
             LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("diary-list")) {
                 if (loaded) items(listMonths, key = { "${it.first.first}-${it.first.second}" }) { (ym, monthDays) ->
                     Text(p.monthHeader(ym.second, ym.first), Modifier.padding(top = Space.l, bottom = Space.s), style = Theme.type.title)
-                    Panel {
+                    // One floating card per day.
+                    Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
                         monthDays.forEach { DiaryListRow(it, unit, language) { onDay(it.date) } }
                     }
                 }
@@ -540,9 +542,9 @@ private fun DiaryListRow(day: DiaryDay, unit: WeightUnit, language: Language, on
     ).joinToString(" · ")
     val desc = p.dayDescription(day.date.dayOfMonth, day.photos.size, day.workouts.isNotEmpty(), day.sauna)
     val photo = day.photos.lastOrNull()
+    FloatingCard(Modifier.testTag("diary-list-row").semantics(mergeDescendants = true) { contentDescription = "$desc, $title" }, onClick = onClick) {
     Row(
-        Modifier.fillMaxWidth().testTag("diary-list-row").semantics(mergeDescendants = true) { contentDescription = "$desc, $title" }
-            .panelRow(onClick).heightIn(min = 72.dp).padding(vertical = Space.s),
+        Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = Space.m, vertical = Space.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.widthIn(min = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -556,9 +558,10 @@ private fun DiaryListRow(day: DiaryDay, unit: WeightUnit, language: Language, on
         }
         if (photo != null) {
             Spacer(Modifier.width(Space.m))
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Theme.colors.surface)) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Theme.colors.surfacePressed)) {
                 AsyncImage(photo.photo.path, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
         }
+    }
     }
 }

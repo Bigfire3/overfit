@@ -1,5 +1,6 @@
 package app.overfit.ui.photos
 
+import androidx.compose.foundation.layout.Column
 import app.overfit.ui.components.ConfirmTags
 import app.overfit.ui.components.rememberConfirmArm
 import androidx.compose.ui.platform.testTag
@@ -83,7 +84,9 @@ fun DayScreen(
 
         SectionTitle(p.dayTrainings)
         if (history != null && trainings.isEmpty()) Text(p.dayNoTraining, tone = Tone.Muted)
-        if (trainings.isNotEmpty()) Panel { trainings.forEach { TrainingRow(it, unit, language, onOpenWorkout) } }
+        if (trainings.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
+            trainings.forEach { TrainingRow(it, unit, language, onOpenWorkout) }
+        }
 
         SectionTitle(p.dayPhotos)
         if (photos != null && dayPhotos.isEmpty()) {

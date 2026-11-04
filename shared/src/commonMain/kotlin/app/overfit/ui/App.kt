@@ -547,6 +547,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onShare = { nav.navigate(ShareRoute(id)) },
                             // App scope: the screen closes itself as soon as the workout is gone.
                             onDelete = { deps.data.scope.launch { deps.data.templates.delete(id) } },
+                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
                         )
                     }
                     composable<WorkoutRoute> {
@@ -635,6 +636,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onShare = { nav.navigate(WorkoutShareRoute(id, withActual = true)) },
                             onCoach = { nav.navigate(CoachSessionRoute(id)) },
                             onEdit = { nav.navigate(WorkoutEditRoute(id)) },
+                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
                         )
                     }
                     composable<WorkoutEditRoute> { entry ->
@@ -645,6 +647,7 @@ fun OverfitApp(deps: AppDependencies) {
                             language = state.language,
                             appScope = deps.data.scope,
                             onClose = nav::popBackStack,
+                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
                         )
                     }
                     composable<WorkoutShareRoute> { entry ->
