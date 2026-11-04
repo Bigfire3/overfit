@@ -148,5 +148,5 @@ fun ColumnScope.RunningWorkoutChoice(onOpenRunning: () -> Unit, onEndRunning: ()
     val t = LocalStrings.current
     Text(t.runningWorkoutTitle, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
     PrimaryButton(t.toRunningWorkout, onClick = onOpenRunning)
-    ConfirmButton(t.endRunningWorkout, t.finishConfirm, onConfirm = onEndRunning, kind = Confirm.Positive, modifier = Modifier.align(Alignment.CenterHorizontally))
+    ConfirmButton(t.endRunningWorkout, t.finishConfirm, onConfirm = onEndRunning, kind = Confirm.Positive, actionLabel = t.finishWorkout, modifier = Modifier.align(Alignment.CenterHorizontally))
 }

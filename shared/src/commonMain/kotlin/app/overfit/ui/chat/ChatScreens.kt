@@ -266,7 +266,7 @@ fun ChatProviderScreen(
 
         if (chat.configured && sync.enabled) {
             Spacer(Modifier.height(Space.l))
-            ConfirmButton(c.disableChat, c.disableConfirm, onConfirm = { viewModel.disable() })
+            ConfirmButton(c.disableChat, c.disableConfirm, onConfirm = { viewModel.disable() }, message = c.disableConfirmDetail, actionLabel = c.disconnect)
             Text(c.disableHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         }
     }

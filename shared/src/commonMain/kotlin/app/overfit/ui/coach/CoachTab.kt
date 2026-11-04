@@ -344,7 +344,7 @@ fun CoachChatScreen(
             if (id.isNotEmpty()) {
                 SmallButton(h.chatNew, { id = ""; input = ""; attached.clear() })
                 Spacer(Modifier.width(Space.m))
-                // Confirm pattern from the design system: first tap turns red with "Really delete?".
+                // Confirm pattern from the design system: a popup asks "Really delete?".
                 app.overfit.ui.components.ConfirmButton(
                     h.chatDelete, h.chatDeleteConfirm, { chat.delete(id); id = "" },
                     Modifier, compact = true,

@@ -307,7 +307,7 @@ val German = Strings(
     otherWorkoutRunning = "Gerade läuft ein anderes Training. Beende es zuerst.",
     runningNow = "Läuft gerade",
     newWorkoutName = { "Workout vom ${it.day}. ${GERMAN_MONTHS[it.month.ordinal]}" },
-    deletedKeepsHistory = "Deine bisherigen Trainings damit bleiben im Kalender.",
+    deletedKeepsHistory = "Deine bisherigen Trainings bleiben im Kalender.",
     workoutPlanEmpty = "Noch keine Übungen. Tippe auf Bearbeiten, um welche hinzuzufügen.",
 
     exercisesTitle = "Übungen",
