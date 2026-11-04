@@ -41,7 +41,6 @@ data class Strings(
 
     // Tabs
     val navStart: String,
-    val navHistory: String,
     val navExercises: String,
     val navPhotos: String,
     val navCoach: String,
@@ -75,8 +74,6 @@ data class Strings(
     val workoutPlanEmpty: String,
 
     // Other tabs
-    val historyTitle: String,
-    val historyEmpty: String,
     val exercisesTitle: String,
     val photosTitle: String,
     val photosEmpty: String,
@@ -278,10 +275,9 @@ val German = Strings(
     aiPrivacy = "Dein Key bleibt auf diesem Gerät. Nachrichten an den Coach gehen direkt an den gewählten Anbieter.",
     aiLater = "Später einrichten",
 
-    navStart = "Training",
-    navHistory = "Verlauf",
+    navStart = "Workouts",
     navExercises = "Übungen",
-    navPhotos = "Fotos",
+    navPhotos = "Kalender",
     navCoach = "Coach",
     navProfile = "Profil",
 
@@ -304,14 +300,12 @@ val German = Strings(
     otherWorkoutRunning = "Gerade läuft ein anderes Training. Beende es zuerst.",
     runningNow = "Läuft gerade",
     newWorkoutName = { "Workout vom ${it.day}. ${GERMAN_MONTHS[it.month.ordinal]}" },
-    deletedKeepsHistory = "Deine bisherigen Trainings damit bleiben im Verlauf.",
+    deletedKeepsHistory = "Deine bisherigen Trainings damit bleiben im Kalender.",
     workoutPlanEmpty = "Noch keine Übungen. Tippe auf Bearbeiten, um welche hinzuzufügen.",
 
-    historyTitle = "Verlauf",
-    historyEmpty = "Noch keine Trainings. Starte dein erstes Training im Tab „Training“.",
     exercisesTitle = "Übungen",
-    photosTitle = "Foto-Tagebuch",
-    photosEmpty = "Noch keine Fotos. Nach einem Training kannst du ein Fortschrittsfoto aufnehmen.",
+    photosTitle = "Kalender",
+    photosEmpty = "Noch keine Trainings oder Fotos.",
 
     catalog = "Katalog",
     customExercise = "Eigene",
@@ -504,9 +498,8 @@ val English = Strings(
     aiLater = "Set up later",
 
     navStart = "Workouts",
-    navHistory = "History",
     navExercises = "Exercises",
-    navPhotos = "Photos",
+    navPhotos = "Calendar",
     navCoach = "Coach",
     navProfile = "Profile",
 
@@ -529,14 +522,12 @@ val English = Strings(
     otherWorkoutRunning = "Another workout is running. Finish it first.",
     runningNow = "Running now",
     newWorkoutName = { "Workout, ${ENGLISH_MONTHS[it.month.ordinal]} ${it.day}" },
-    deletedKeepsHistory = "Your past sessions with it stay in the history.",
+    deletedKeepsHistory = "Your past sessions with it stay in the calendar.",
     workoutPlanEmpty = "No exercises yet. Tap Edit to add some.",
 
-    historyTitle = "History",
-    historyEmpty = "No workouts yet. Start your first one in the Workouts tab.",
     exercisesTitle = "Exercises",
-    photosTitle = "Photo diary",
-    photosEmpty = "No photos yet. After a workout you can take a progress photo.",
+    photosTitle = "Calendar",
+    photosEmpty = "No workouts or photos yet.",
 
     catalog = "Catalogue",
     customExercise = "Custom",

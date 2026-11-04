@@ -290,6 +290,57 @@ class MigrationTest {
         }
     }
 
+    /**
+     * v8 → v9: `workout_photo.sessionId` becomes nullable (photos on calendar days without a training). Existing photos
+     * stay intact, a photo without session can be stored, deleting a session still removes its photos.
+     */
+    @Test
+    fun migration8to9KeepsPhotosAndAllowsPhotoWithoutWorkout() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v8 = helper.createDatabase(8)
+        v8.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt, sauna) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1000, 5000, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 5000, 0)",
+        )
+        v8.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p1', 'w1', 'p1.jpg', 4000, 2)")
+        v8.close()
+
+        // Validates the migrated schema against schemas/.../9.json.
+        helper.runMigrationsAndValidate(9, OverfitDatabase.MIGRATIONS.toList()).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val dao = db.workoutDao()
+            val old = dao.getPhoto("p1")!!
+            assertEquals("w1", old.sessionId)
+            assertEquals("p1.jpg", old.fileName)
+            assertEquals(4000L, old.takenAt)
+            assertEquals(2, old.position)
+
+            // A photo without training is now allowed.
+            dao.insertPhoto(WorkoutPhotoEntity("p2", null, "p2.jpg", 9000, dao.nextPhotoPosition(null)))
+            val free = dao.getPhoto("p2")!!
+            assertNull(free.sessionId)
+            assertEquals(2, dao.allPhotos().size)
+
+            // Deleting the session still cascades to its photo, the free one stays.
+            dao.delete("w1")
+            assertNull(dao.getPhoto("p1"))
+            assertNotNull(dao.getPhoto("p2"))
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

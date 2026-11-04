@@ -31,6 +31,13 @@ data class PhotoStrings(
     val viewerBests: String,
     val photoPage: (index: Int, total: Int) -> String,
 
+    // Day view (tap on a calendar day)
+    val dayTrainings: String,
+    val dayNoTraining: String,
+    val dayPhotos: String,
+    val dayNoPhotos: String,
+    val removePhotoConfirm: String,
+
     val backupSection: String,
     val backupExport: String,
     val backupExporting: String,
@@ -65,7 +72,7 @@ private val MONTHS_EN: List<String> = listOf("January", "February", "March", "Ap
 val PhotoGerman = PhotoStrings(
     months = MONTHS_DE,
     monthHeader = { month, year -> "${MONTHS_DE[month - 1]} $year" },
-    emptyHint = "Beim Beenden eines Trainings kannst du ein Foto machen. Es bleibt privat in der App.",
+    emptyHint = "Tippe auf einen Tag, um Fotos hinzuzufügen oder dein Training anzusehen. Fotos bleiben privat in der App.",
     compare = "Vergleichen",
     cancel = "Abbrechen",
     selectTwo = "Wähle zwei Fotos zum Vergleichen.",
@@ -91,6 +98,12 @@ val PhotoGerman = PhotoStrings(
     viewerDuration = "Dauer",
     viewerBests = "Neue Bestwerte",
     photoPage = { i, n -> "Foto $i von $n" },
+
+    dayTrainings = "Trainings",
+    dayNoTraining = "An diesem Tag kein Training.",
+    dayPhotos = "Fotos",
+    dayNoPhotos = "Noch keine Fotos an diesem Tag.",
+    removePhotoConfirm = "Entfernen?",
 
     backupSection = "Backup",
     backupExport = "Backup exportieren",
@@ -121,7 +134,7 @@ val PhotoGerman = PhotoStrings(
 val PhotoEnglish = PhotoStrings(
     months = MONTHS_EN,
     monthHeader = { month, year -> "${MONTHS_EN[month - 1]} $year" },
-    emptyHint = "When you finish a workout you can take a photo. It stays private in the app.",
+    emptyHint = "Tap a day to add photos or look at your workout. Photos stay private in the app.",
     compare = "Compare",
     cancel = "Cancel",
     selectTwo = "Pick two photos to compare.",
@@ -147,6 +160,12 @@ val PhotoEnglish = PhotoStrings(
     viewerDuration = "Duration",
     viewerBests = "New personal bests",
     photoPage = { i, n -> "Photo $i of $n" },
+
+    dayTrainings = "Workouts",
+    dayNoTraining = "No workout on this day.",
+    dayPhotos = "Photos",
+    dayNoPhotos = "No photos on this day yet.",
+    removePhotoConfirm = "Remove?",
 
     backupSection = "Backup",
     backupExport = "Export backup",

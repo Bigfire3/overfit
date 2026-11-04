@@ -106,7 +106,7 @@ class MinimizeWorkoutTest {
         assertEquals(true, shown("1:", substring = true))
 
         // Browse all main screens: the bar stays
-        for (tab in listOf("Verlauf", "Fotos", "Profil", "Training")) {
+        for (tab in listOf("Kalender", "Profil", "Workouts")) {
             compose.onNode(hasText(tab) and hasClickAction()).performClick()
             waitForDescription("Training öffnen")
         }

@@ -40,7 +40,6 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.HeaderDeleteButton
 import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.BackHeader
-import app.overfit.ui.components.CheckRow
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
@@ -60,49 +59,43 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** History tab: finished workouts, newest first. [rows] null = still loading. */
+/** One finished training in a list (calendar day): name, time, sets, volume, photos. */
 @Composable
-fun HistoryScreen(
-    rows: List<HistoryRow>?,
-    unit: WeightUnit,
-    language: Language,
-    onOpen: (String) -> Unit,
-) {
-    val t = LocalStrings.current
-    val h = t.history
-    Screen(scroll = true) {
-        Title(t.historyTitle)
-        Spacer(Modifier.height(Space.l))
-        if (rows != null && rows.isEmpty()) Text(t.historyEmpty, tone = Tone.Muted)
-        if (rows != null && rows.isNotEmpty()) Hairline()
-        rows?.forEach { row ->
-            val meta = listOfNotNull(
-                row.endedAt?.let { WorkoutFormat.elapsed(it - row.startedAt) },
-                h.setCount(row.completedSets),
-                formatVolume(row.volumeKg, unit, language).takeIf { row.volumeKg > 0 },
-                h.photoCount(row.photoCount).takeIf { row.photoCount > 0 },
-            ).joinToString(" · ")
-            Column(Modifier.pressableRow { onOpen(row.id) }) {
-                Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(row.name, Modifier.weight(1f), style = Theme.type.label, maxLines = 1)
-                        Spacer(Modifier.width(Space.m))
-                        Text(t.date(localDateTime(row.startedAt).date), style = Theme.type.caption, tone = Tone.Muted)
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Text(meta, style = Theme.type.caption, tone = Tone.Muted)
+internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, onOpen: (String) -> Unit) {
+    val h = LocalStrings.current.history
+    val meta = listOfNotNull(
+        row.endedAt?.let { WorkoutFormat.elapsed(it - row.startedAt) },
+        h.setCount(row.completedSets),
+        formatVolume(row.volumeKg, unit, language).takeIf { row.volumeKg > 0 },
+        h.photoCount(row.photoCount).takeIf { row.photoCount > 0 },
+        h.sauna.takeIf { row.sauna },
+    ).joinToString(" · ")
+    Column(Modifier.pressableRow { onOpen(row.id) }) {
+        Row(Modifier.fillMaxWidth().padding(vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(row.name, Modifier.weight(1f), style = Theme.type.label, maxLines = 1)
+                    Spacer(Modifier.width(Space.m))
+                    Text(clockTime(row.startedAt), style = Theme.type.caption, tone = Tone.Muted)
                 }
-                Hairline()
+                Spacer(Modifier.height(2.dp))
+                Text(meta, style = Theme.type.caption, tone = Tone.Muted)
             }
+            Spacer(Modifier.width(Space.m))
+            LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
         }
+        Hairline()
     }
 }
 
 private data class DetailData(val finished: FinishedWorkout, val summary: WorkoutSummary)
 
-/** One finished workout: numbers, all sets, photos and actions (template, share, delete). */
+/**
+ * One finished training (opened from its calendar day): numbers, all sets, photos and actions
+ * (edit, share, delete, save as workout, coach review). Reloads after every change, e.g. an edit.
+ */
 @Composable
-fun HistoryDetailScreen(
+fun WorkoutDetailScreen(
     workoutId: String,
     workouts: WorkoutRepository,
     templates: TemplateRepository,
@@ -117,19 +110,29 @@ fun HistoryDetailScreen(
     chatNotes: List<ChatNote> = emptyList(),
     /** Coach review of this workout (phase 4). */
     onCoach: (() -> Unit)? = null,
+    /** Edit sets, feeling, sauna and note afterwards. */
+    onEdit: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val h = t.history
     val data by produceState<DetailData?>(null, workoutId) {
-        val finished = workouts.getFinished(workoutId)
-        val summary = workouts.summary(workoutId)
-        if (finished == null || summary == null) onBack() else value = DetailData(finished, summary)
+        // `changes` emits right away and after every write, so an edit shows up when coming back.
+        workouts.changes.collect {
+            val finished = workouts.getFinished(workoutId)
+            val summary = workouts.summary(workoutId)
+            if (finished == null || summary == null) {
+                if (value == null) onBack()
+            } else {
+                value = DetailData(finished, summary)
+            }
+        }
     }
     val photos by remember(workoutId) { workouts.observePhotosOf(workoutId) }.collectAsStateWithLifecycle(emptyList())
 
     Screen(scroll = true, header = {
         BackHeader(t.back, onBack) {
             if (data != null) {
+                if (onEdit != null) HeaderIconButton(Icon.Edit, h.editWorkout, onEdit)
                 HeaderIconButton(Icon.Share, h.shareWorkout, onShare)
                 HeaderDeleteButton(t.delete, t.deleteConfirm, onConfirm = {
                     appScope.launch { workouts.deleteWorkout(workoutId) }
@@ -146,12 +149,8 @@ fun HistoryDetailScreen(
         Spacer(Modifier.height(Space.l))
         SummaryRows(d.summary, unit, language, t)
         d.finished.feeling?.let { ListRow(h.feeling, "$it / 5") }
-        // Can be changed afterwards (forgotten in the finish flow).
-        var sauna by remember(workoutId) { mutableStateOf(d.finished.sauna) }
-        CheckRow(h.sauna, sauna) {
-            sauna = it
-            appScope.launch { workouts.setSauna(workoutId, it) }
-        }
+        // Changed afterwards via "Edit" (pencil top right).
+        if (d.finished.sauna) ListRow(h.sauna) { LineIcon(Icon.Check, size = 20.dp) }
         d.finished.note?.let {
             SectionTitle(h.note)
             Text(it)

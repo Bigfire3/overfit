@@ -9,6 +9,9 @@ import androidx.compose.ui.test.performTextInput
 
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -35,7 +38,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -76,7 +78,7 @@ class WorkoutFlowTest {
             Providers(HttpClient(MockEngine { respond("{}") })),
             data,
             versionName = "0.1.test",
-            today = { LocalDate(2026, 11, 3) },
+            today = { realToday() },
             haptics = haptics,
             restAlerts = alerts,
         )
@@ -126,15 +128,36 @@ class WorkoutFlowTest {
         assertEquals(2, saved.completedSets)
         assertEquals(60.0, saved.exercises.single().sets.first().actual.weightKg)
 
-        // History tab shows the workout; the detail has the note
-        compose.onNodeWithText("Verlauf").performClick()
+        // Calendar → today → the day view lists the training → detail with the note (no History tab any more)
+        compose.onAllNodes(hasText("Verlauf")).assertCountEquals(0)
+        compose.openCalendarDay(realToday().dayOfMonth)
         waitFor("Push")
         compose.onAllNodes(hasText("Push")).onFirst().performClick()
         waitFor("Stark heute")
-        // Sauna can be changed afterwards in the detail.
+
+        // Edit afterwards: sauna off, set 1 from 60 to 62,5 kg, one more set → save
+        compose.onNodeWithContentDescription("Training bearbeiten").performClick()
+        waitFor("Statistiken und Bestwerte", substring = true)
         compose.onNodeWithText("Sauna").performScrollTo().assertIsOn().performClick()
-        compose.waitUntilState(5_000) { runBlocking { data.workouts.getFinished(id)?.sauna } == false }
         compose.onNodeWithText("Sauna").assertIsOff()
+        compose.onNodeWithContentDescription("Gewicht Satz 1").performScrollTo().performTextReplacement("62,5")
+        compose.onNodeWithText("Satz hinzufügen").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Gewicht Satz 3")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Speichern").performClick()
+        compose.waitUntilState(5_000) { runBlocking { data.workouts.getFinished(id)?.sauna } == false }
+        val edited = requireNotNull(runBlocking { data.workouts.get(id) })
+        assertEquals(3, edited.completedSets)
+        assertEquals(62.5, edited.exercises.single().sets.first().actual.weightKg)
+        assertEquals("Stark heute", runBlocking { data.workouts.getFinished(id)?.note })
+
+        // Back on the detail (it reloads): 3 sets; back to the calendar: the day lost its sauna ring
+        waitFor("3 von 3 Sätzen")
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        waitFor("Trainings")
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        val day = realToday().dayOfMonth
+        compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Tag $day, Training")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(hasContentDescription("Tag $day, Training, Sauna")).assertCountEquals(0)
     }
 
     private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(20_000) {

@@ -3,6 +3,7 @@ package app.overfit.ui
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -105,16 +106,17 @@ class AppSmokeTest {
         assertEquals(1995, store.state.value.profile.birthYear)
 
         // Other tabs
-        compose.onNodeWithText("Verlauf").performClick()
-        compose.onNodeWithText("Noch keine Trainings", substring = true).assertIsDisplayed()
+        // No History tab any more: finished trainings are reached through the calendar (Kalender tab)
+        compose.onAllNodes(hasText("Verlauf")).assertCountEquals(0)
+        compose.onAllNodes(hasClickAction() and hasTestTag("tab:HISTORY")).assertCountEquals(0)
         // Exercises are no tab anymore: four tabs, the catalogue opens from the Training tab
         compose.onAllNodes(hasText("Übungen") and hasClickAction()).assertCountEquals(0)
-        compose.onNode(hasText("Training") and hasClickAction()).performClick()
+        compose.onNode(hasText("Workouts") and hasClickAction()).performClick()
         compose.onNodeWithContentDescription("Übungen").performClick()
         compose.onNodeWithText("Eigene Übung").assertIsDisplayed()
         compose.onNodeWithContentDescription("Zurück").performClick()
-        compose.onNodeWithText("Fotos").performClick()
-        compose.onNodeWithText("Foto-Tagebuch").assertIsDisplayed()
+        compose.onNodeWithTag("tab:PHOTOS").performClick()
+        compose.onNodeWithText("Noch keine Trainings oder Fotos.").assertIsDisplayed()
 
         // Coach tab: AI access with provider, memory
         compose.onNodeWithTag("tab:COACH").performClick()

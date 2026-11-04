@@ -82,6 +82,8 @@ dependencies {
     implementation(project(":shared"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    // Only for the Application as Coil image-loader factory (already in the APK through :shared).
+    implementation(libs.coil.compose.mp)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

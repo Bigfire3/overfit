@@ -146,7 +146,9 @@ class UiFeedbackTest {
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
         compose.onAllNodesWithTag("nav-transition").assertCountEquals(0)
-        compose.onNodeWithText("Starten").assertExists()
+        // The workout page reloads its plan from Room (background thread, not covered by waitForIdle): wait for its
+        // content instead of asserting at once, which failed now and then under load in the full suite.
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Bearbeiten").assertExists()
     }
 
@@ -162,14 +164,14 @@ class UiFeedbackTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Pull").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("Legs").assertCountEquals(1)
         compose.onAllNodesWithText("Push").assertCountEquals(0)
-        compose.onNodeWithTag("tab:HISTORY").assertExists()
+        compose.onNodeWithTag("tab:PHOTOS").assertExists()
     }
 
     @Test
     fun tabSwitch_isInstant() {
         launchApp()
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithTag("tab:HISTORY").performClick()
+        compose.onNodeWithTag("tab:PHOTOS").performClick()
         // No transition between tabs: within 50 ms (a screen change fades for 240 ms) the training tab is gone.
         compose.mainClock.advanceTimeBy(50)
         compose.onAllNodesWithText("Push", substring = true).assertCountEquals(0)

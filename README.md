@@ -9,7 +9,7 @@ Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRE
 - **Training loggen**: Übungskatalog (302 Übungen mit Grafiken, deutsche Suche, Filter), eigene und KI-Übungen, Workouts; Workout-Modus mit
   Sätzen abhaken, Werten, Notizen je Übung, Satz/Übung hinzufügen, ersetzen, umsortieren; läuft nach App-Neustart weiter
 - **Pausentimer** mit ±15 s und Überspringen, auch im Hintergrund (Benachrichtigung, Alarm, Haptik; Schalter „Vibration“)
-- **Beenden-Flow**: Zusammenfassung, neue Bestwerte, Gefühl, Notiz, Körperfotos (nur app-privat); **Verlauf** mit Details, Fortschritt je Übung
+- **Beenden-Flow**: Zusammenfassung, neue Bestwerte, Gefühl, Notiz, Körperfotos (nur app-privat); **Kalender** mit Tagesansicht (Trainings und Fotos, Trainings nachträglich bearbeiten), Fortschritt je Übung
 - **Foto-Tagebuch**: Zeitachse, Vollbild, zwei Fotos vergleichen
 - **Teilen und Importieren**: Workouts und Trainings als Link, QR-Code oder Datei; Beispiel-Workouts Push/Pull/Legs;
   **KI-Workout** per Chat (ChatGPT, Claude, Gemini) erstellen und aus der Zwischenablage einfügen

@@ -33,6 +33,7 @@ import platform.UIKit.UIViewController
 /** Entry point for the iOS app (called from Swift). */
 @Suppress("unused", "FunctionName")
 fun MainViewController(): UIViewController {
+    app.overfit.ui.components.installOverfitImageLoader()
     val version = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "?"
     val build = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleVersion") as? String ?: "?"
     // Set at build time (xcodebuild OVERFIT_BACKEND_URL=… → Info.plist); empty = credit/invite not configured.

@@ -322,7 +322,7 @@ private fun ExerciseSection(
             Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
                 entry.sets.forEachIndexed { i, set ->
                     key(set.id) {
-                        SetRow(
+                        WorkoutSetRow(
                             number = i + 1,
                             type = type,
                             unit = unit,
@@ -361,8 +361,12 @@ private fun NoteField(id: String, note: String, onChange: (String) -> Unit) {
     )
 }
 
+/**
+ * One set: weight / reps / time inputs and the check button, swipe left removes it. Shared by the
+ * running workout and the edit screen of a finished training (same inputs, weights are never negative).
+ */
 @Composable
-private fun SetRow(
+internal fun WorkoutSetRow(
     number: Int,
     type: app.overfit.domain.TrackingType,
     unit: WeightUnit,

@@ -92,7 +92,7 @@ class CoachStoryTest {
         await("Prompts & Vorlagen".uppercase())
 
         // Away and back: no story by itself anymore.
-        compose.onNodeWithTag("tab:HISTORY").performClick()
+        compose.onNodeWithTag("tab:PHOTOS").performClick()
         compose.onNodeWithTag("tab:COACH").performClick()
         await("Prompts & Vorlagen".uppercase())
         assertFalse(storyShown())

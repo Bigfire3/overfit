@@ -257,7 +257,8 @@ data class SessionWithExercises(
 )
 data class WorkoutPhotoEntity(
     @PrimaryKey val id: String,
-    val sessionId: String,
+    /** Training the photo belongs to; null = a photo added to a calendar day without a training (v9). */
+    val sessionId: String?,
     val fileName: String,
     val takenAt: Long,
     val position: Int,
@@ -284,11 +285,11 @@ data class HistoryRow(
 /** Photo with the workout it belongs to (photo diary). */
 data class PhotoRow(
     val id: String,
-    val sessionId: String,
+    val sessionId: String?,
     val fileName: String,
     val takenAt: Long,
     val position: Int,
-    val sessionName: String,
+    val sessionName: String?,
 )
 
 /** A completed set of one exercise in a finished workout (progress, best values). */
