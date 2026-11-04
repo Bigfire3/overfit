@@ -940,6 +940,17 @@ Offen / Hinweise:
 4. Guthaben → Buchungen: Eintrag „Einladungsbonus“; beim Einladenden „Einladungsbonus (Freund eingeladen)“ nach der ersten Auswertung des Freundes
 5. Ein alter Link `overfit://spot#…` (aus der Zwischenablage eingefügt) funktioniert weiter; nirgends steht mehr „Spot“
 
+## Session Coach-Story (3.11.)
+- Erledigt: Tipp auf den Titel „Coach“ (mit Info-Icon) öffnet eine Vollbild-Story mit 4 Seiten (Fortschrittsbalken als Haarlinien, Tipp rechts/links = weiter/zurück, Wischen nach unten oder X = schließen, Auto-Weiter nach 6 s). Seite 1: was die KI auswertet; Seiten 2–4: eigener Schlüssel, Guthaben (mit Einladungsbonus), eigenes Abo (Claude/ChatGPT/Gemini) mit Knopf zur passenden Stelle. Beim ersten Öffnen des Coach-Tabs geht sie einmal von selbst auf (Flag `overfit.coachStorySeen`).
+- Coach-Seite entschlackt: Erklär- und Hinweistexte (KI-Zugang ohne Zugang, Prompts-Intro, Verbindungs-Hinweis, Chat-Intro, Hinweiszeilen unter „Letzte Einheit auswerten“/„Fortschritt bewerten“) sind raus; der Inhalt steht in der Story bzw. im KI-Zugang (Profil/Einstellungen).
+- Tests: neue `CoachStoryTest`; bestehende Coach-Tests setzen das Erstes-Mal-Flag vorab.
+
+### Bitte auf dem Handy testen (Coach-Story)
+1. Neue APK, Tab „Coach“ zum ersten Mal öffnen → Story geht von selbst auf; X oder nach unten wischen schließt
+2. Tab wechseln und zurück → keine Story mehr; Tipp auf „Coach ⓘ“ öffnet sie wieder
+3. Rechts tippen = weiter, links = zurück, nach ca. 6 s geht sie von selbst weiter; auf Seite 4 rechts tippen schließt
+4. Knöpfe auf Seite 2–4: „Schlüssel einrichten“, „Zum Guthaben“, „Zu den Verbindungen“ führen zur passenden Stelle
+5. Coach-Seite wirkt ruhiger; Auswerten, Chat, Prompts und Verbindungen funktionieren wie vorher
 ## Session AK – Sauna-Häkchen nach dem Training (3.11.)
 - Erledigt: Häkchen „Sauna“ im Abschluss-Screen (Standard aus) und nachträglich in der Trainingsdetail-Ansicht; DB v8 mit Migration und Test; Kalender zeigt Sauna-Tage mit hohlem Ring (Legende, sobald es einen gibt); Coach-Auswertung, KI-Chat-Kontext und KI-Chat-Sync (Backend `list_workouts`) bekommen die Sauna; Backup führt das Feld mit (alte Backups = keine Sauna). Details in docs/DECISIONS.md.
 - Offen: nichts.
@@ -951,3 +962,19 @@ Offen / Hinweise:
 4. Coach-Auswertung für ein Training mit Sauna starten (oder KI-Chat fragen „Wann war ich zuletzt in der Sauna?“) → der Coach kennt die Sauna
 5. „Kontext kopieren“ (Coach-Tab bzw. KI-Chat-Einstellungen) → in einen Editor einfügen: Zeile des Trainings endet mit „· danach Sauna“
 6. Backup exportieren und wieder einspielen → Sauna-Häkchen bleiben erhalten
+
+## Session AL – Verlauf-Tab weg, Kalender-Tag, Trainings nachträglich bearbeiten (3.11.)
+- Erledigt: Tab „Verlauf“ entfernt; Tabs heißen jetzt Workouts, Coach, Kalender, Profil (neue Icons: Klemmbrett, Sprechblase, Kalenderblatt, Person). Training löschen behält dessen Fotos am Tag. Tipp auf einen Tag öffnet die Tagesansicht mit Trainings und Fotos (Fotos hinzufügen per Kamera/Galerie, ansehen, mit Bestätigung entfernen, auch an Tagen ohne Training). Training → Detail → Stift „Training bearbeiten“: Gefühl, Sauna, Notiz, Sätze (Gewicht/Wdh. ändern, Satz hinzufügen/entfernen, abhaken), Speichern/Verwerfen. DB v9 (Fotos ohne Training) mit Migration und Test. Bildlader-Fehler aus Session AI behoben (Ursache: Coil-Singleton wurde in der Komposition gesetzt). Details in docs/DECISIONS.md.
+- Weiterhin erreichbar (früher nur über Verlauf): Trainingsdetail, Löschen, Teilen, „Als Workout speichern“, Coach-Auswertung/Demo, KI-Chat-Notizen – alles über Kalender → Tag → Training (oder Vollbildfoto → „Training ansehen“).
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Kalender und Bearbeiten)
+1. Unten nur noch vier Tabs: Workouts (Klemmbrett), Coach (Sprechblase), Kalender (Kalenderblatt), Profil (Person); Namen nicht abgeschnitten, auch auf Englisch
+2. Kalender → einen Trainingstag antippen → Tagesansicht mit Datum, „Trainings“ (Name, Uhrzeit, Dauer, Sätze, kg) und „Fotos“
+3. Dort „Aus Fotos wählen“ bzw. „Foto aufnehmen“ → Foto erscheint am Tag und im Kalender; Foto antippen → Vollbild; „×“ → „Entfernen?“ → nochmal tippen → weg
+4. Einen leeren Tag in der Vergangenheit antippen → „An diesem Tag kein Training.“ → Foto hinzufügen → Kalender zeigt es an diesem Tag; im Vollbild steht kein „Training ansehen“
+5. Training antippen → Detail → Stift oben rechts → Sauna anhaken, Gewicht eines Satzes ändern, „Satz hinzufügen“, einen Satz nach links wischen → „Speichern“ → Detail zeigt die neuen Werte; Kalender zeigt den Sauna-Ring
+6. Nochmal bearbeiten, etwas ändern und Zurück → Hinweis „Nicht gespeichert …“, zweites Zurück verwirft
+7. Übung (z. B. Bankdrücken) → Fortschritt/Bestwerte zeigen die geänderten Werte; eine vorher erstellte Coach-Auswertung ist unverändert
+8. Detail: Teilen, Als Workout speichern, Coach-Auswertung, Löschen funktionieren wie früher im Verlauf; nach dem Löschen eines Trainings mit Foto bleibt das Foto am Kalendertag
+9. Backup exportieren und wieder einspielen → Fotos ohne Training bleiben erhalten

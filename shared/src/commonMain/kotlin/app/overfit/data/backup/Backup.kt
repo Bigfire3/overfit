@@ -43,7 +43,15 @@ data class BackupJson(
 ) {
     companion object {
         const val FORMAT = "overfit-backup"
-        const val VERSION = 1
+        /** Newest version this app reads and writes. */
+        const val VERSION = 2
+
+        /**
+         * v1: every photo belongs to a training. v2: photos without a training (calendar day, DB v9). An app that only
+         * knows v1 cannot read a photo without `workoutId`; it says "update the app" instead of "unreadable". Backups
+         * without such photos stay v1, so older apps keep reading them.
+         */
+        fun versionFor(photos: List<BPhoto>): Int = if (photos.any { it.workoutId == null }) 2 else 1
     }
 }
 
@@ -129,7 +137,8 @@ data class BSet(
 @Serializable
 data class BPhoto(
     val id: String,
-    val workoutId: String,
+    /** null = photo of a calendar day without a training (app v9 and later). */
+    val workoutId: String? = null,
     val file: String,
     val takenAt: Long,
     val position: Int = 0,
@@ -179,6 +188,7 @@ class BackupService(
     suspend fun export(): ByteArray {
         val wDao = db.workoutDao()
         val photos = wDao.allPhotos()
+        val bPhotos = photos.map { BPhoto(it.id, it.sessionId, it.fileName, it.takenAt, it.position) }
         val json = BackupJson(
             createdAt = clock(),
             appVersion = appVersion,
@@ -216,7 +226,8 @@ class BackupService(
                     },
                 )
             },
-            photos = photos.map { BPhoto(it.id, it.sessionId, it.fileName, it.takenAt, it.position) },
+            photos = bPhotos,
+            v = BackupJson.versionFor(bPhotos),
             extras = buildMap { contributors().forEach { c -> c.export()?.let { put(c.key, it) } } },
         )
         val entries = mutableListOf(Zip.Entry(JSON_NAME, codec.encodeToString(BackupJson.serializer(), json).encodeToByteArray(), compress = true))
@@ -323,7 +334,7 @@ class BackupService(
             }
             val workoutIds = json.workouts.map { it.id }.toSet()
             wDao.insertPhotos(
-                json.photos.filter { it.workoutId in workoutIds && preview.photoBytes.containsKey(it.file) }
+                json.photos.filter { (it.workoutId == null || it.workoutId in workoutIds) && preview.photoBytes.containsKey(it.file) }
                     .distinctBy { it.id }
                     .map { WorkoutPhotoEntity(it.id, it.workoutId, it.file, it.takenAt, it.position) },
             )

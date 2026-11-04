@@ -76,12 +76,9 @@ import app.overfit.i18n.exerciseFormStringsFor
 import app.overfit.ai.ExerciseAutofill
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.toRoute
-import coil3.ImageLoader
-import coil3.compose.setSingletonImageLoaderFactory
-import coil3.request.crossfade
-import coil3.svg.SvgDecoder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
 import app.overfit.i18n.stringsFor
@@ -109,8 +106,11 @@ import app.overfit.domain.Workout
 import app.overfit.ui.workout.WorkoutScreen
 import app.overfit.ui.templates.TemplateEditorViewModel
 import app.overfit.ui.history.FinishScreen
-import app.overfit.ui.history.HistoryDetailScreen
-import app.overfit.ui.history.HistoryScreen
+import app.overfit.ui.history.WorkoutDetailScreen
+import app.overfit.ui.history.WorkoutEditScreen
+import app.overfit.ui.photos.DayScreen
+import app.overfit.ui.photos.dayPhotoTarget
+import app.overfit.platform.prepareJpeg
 import app.overfit.share.ShareMapper
 import app.overfit.ui.components.Chip
 import app.overfit.ui.photos.PhotosScreen
@@ -147,6 +147,8 @@ import app.overfit.ui.coach.CoachFinishChoice
 import app.overfit.ui.coach.CoachFinishSection
 import app.overfit.ui.coach.CoachHomeScreen
 import app.overfit.ui.coach.CoachChatScreen
+import app.overfit.ui.coach.CoachStoryScreen
+import app.overfit.ui.coach.StoryTarget
 import app.overfit.ui.coach.CoachTabNav
 import app.overfit.ui.coach.CoachTabScreen
 import app.overfit.ui.coach.CoachMemoryScreen
@@ -197,6 +199,8 @@ class AppDependencies(
     coachTransport: ((ProviderId) -> CoachTransport)? = null,
     /** How this build was installed; decides with `/v1/config` whether "Top up on the web" is shown. */
     val distribution: app.overfit.fuel.Distribution = app.overfit.fuel.Distribution.Sideload,
+    /** The Coach story moves on by itself after a few seconds (tests switch it off). */
+    val coachStoryAutoAdvance: Boolean = true,
 ) {
     val fuelSession = FuelSession(fuel)
     /** The AI coach: requests, queue, reviews, memory. Runs in the app scope. */
@@ -278,7 +282,6 @@ class AppDependencies(
 @Serializable data object StartRoute
 @Serializable data object StartWorkoutRoute
 @Serializable data object WorkoutRoute
-@Serializable data object HistoryRoute
 @Serializable data object ExercisesRoute
 @Serializable data object PhotosRoute
 @Serializable data object SettingsRoute
@@ -289,6 +292,8 @@ class AppDependencies(
 @Serializable data object ChatNotesRoute
 @Serializable data object CoachMemoryRoute
 @Serializable data object CoachRoute
+/** Full-screen story from the Coach title: what the AI can evaluate and the ways to use it. */
+@Serializable data object CoachStoryRoute
 /** Coach chat; [chatId] empty = new chat, [draft] prefills the input ("Use in chat"). */
 @Serializable data class CoachChatRoute(val chatId: String = "", val draft: String = "")
 @Serializable data object CoachReviewsRoute
@@ -309,7 +314,12 @@ class AppDependencies(
 @Serializable data class ExerciseDetailRoute(val id: String, val readOnly: Boolean = false)
 /** Finish flow right after "Finish": summary, feeling, note, photos, coach slot. */
 @Serializable data class FinishRoute(val workoutId: String)
-@Serializable data class HistoryDetailRoute(val workoutId: String)
+/** A calendar day (ISO date, e.g. 2026-11-03): its photos and trainings. */
+@Serializable data class DayRoute(val date: String)
+/** One finished training (from its calendar day or a photo). */
+@Serializable data class WorkoutDetailRoute(val workoutId: String)
+/** Edit a finished training afterwards. */
+@Serializable data class WorkoutEditRoute(val workoutId: String)
 /** Share a finished workout (`kind: "workout"`); [withActual] = logged values instead of targets. */
 @Serializable data class WorkoutShareRoute(val workoutId: String, val withActual: Boolean = true)
 @Serializable data class PhotoViewerRoute(val photoId: String)
@@ -336,11 +346,10 @@ class PickedExercises {
 }
 
 enum class Tab(val route: Any, val icon: Icon, val label: (Strings) -> String) {
-    START(StartRoute, Icon.Training, { it.navStart }),
-    HISTORY(HistoryRoute, Icon.History, { it.navHistory }),
+    START(StartRoute, Icon.Workouts, { it.navStart }),
     COACH(CoachRoute, Icon.Coach, { it.navCoach }),
-    PHOTOS(PhotosRoute, Icon.Photos, { it.navPhotos }),
-    PROFILE(SettingsRoute, Icon.Settings, { it.navProfile });
+    PHOTOS(PhotosRoute, Icon.Calendar, { it.navPhotos }),
+    PROFILE(SettingsRoute, Icon.Profile, { it.navProfile });
 
     val routeClass: KClass<*> get() = route::class
 }
@@ -356,14 +365,9 @@ fun OverfitApp(deps: AppDependencies) {
         app.overfit.domain.aiProfileHeader(s.profile, s.weights, deps.today(), s.language)
     } }
     val incoming by deps.inbox.pending.collectAsStateWithLifecycle()
-    setSingletonImageLoaderFactory { context ->
-        ImageLoader.Builder(context)
-            .components {
-                add(SvgDecoder.Factory())
-            }
-            .crossfade(true)
-            .build()
-    }
+    // The image loader is not set here: a process-wide singleton set during composition breaks as soon as
+    // anything drew an image before (tests, previews). Android provides it via the Application, iOS sets it
+    // before the first screen (see [overfitImageLoader]).
     // App scope: the first saved workout changes the screen, a composition scope would cancel the seeding half-way.
     LaunchedEffect(Unit) { deps.data.seedCatalog(); deps.data.scope.launch { deps.data.seedSamplesOnce() } }
     // KI-Chat: back in the foreground → send what is left and fetch the inbox; to the background → send a running workout now.
@@ -588,19 +592,36 @@ fun OverfitApp(deps: AppDependencies) {
                             },
                         )
                     }
-                    composable<HistoryRoute> {
-                        val rows by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
-                        HistoryScreen(
-                            rows = rows,
+                    composable<DayRoute> { entry ->
+                        val date = LocalDate.parse(entry.toRoute<DayRoute>().date)
+                        val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
+                        val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
+                        DayScreen(
+                            date = date,
+                            photos = photos,
+                            history = history,
                             unit = state.profile.unit,
                             language = state.language,
-                            onOpen = { nav.navigate(HistoryDetailRoute(it)) },
+                            onBack = nav::popBackStack,
+                            onOpenPhoto = { nav.navigate(PhotoViewerRoute(it)) },
+                            onOpenWorkout = { nav.navigate(WorkoutDetailRoute(it)) },
+                            onAddPhoto = { bytes ->
+                                // App scope: leaving the day must not drop a photo that is still being prepared.
+                                deps.data.scope.launch {
+                                    val jpeg = withContext(Dispatchers.Default) { prepareJpeg(bytes) } ?: return@launch
+                                    // Read the trainings now (not the screen's state, which may still be loading).
+                                    val workoutsNow = deps.data.workouts.history.first()
+                                    val target = dayPhotoTarget(date, deps.today(), workoutsNow, deps.clock())
+                                    deps.data.workouts.addPhoto(target.sessionId, jpeg, target.takenAt)
+                                }
+                            },
+                            onRemovePhoto = { id -> deps.data.scope.launch { deps.data.workouts.deletePhoto(id) } },
                         )
                     }
-                    composable<HistoryDetailRoute> { entry ->
-                        val id = entry.toRoute<HistoryDetailRoute>().workoutId
+                    composable<WorkoutDetailRoute> { entry ->
+                        val id = entry.toRoute<WorkoutDetailRoute>().workoutId
                         val chatNotes by deps.chat.notes.notes.collectAsStateWithLifecycle()
-                        HistoryDetailScreen(
+                        WorkoutDetailScreen(
                             workoutId = id,
                             chatNotes = chatNotes.filter { it.workoutId == id },
                             workouts = deps.data.workouts,
@@ -613,6 +634,17 @@ fun OverfitApp(deps: AppDependencies) {
                             onTemplateCreated = { nav.navigate(WorkoutPlanRoute(it)) },
                             onShare = { nav.navigate(WorkoutShareRoute(id, withActual = true)) },
                             onCoach = { nav.navigate(CoachSessionRoute(id)) },
+                            onEdit = { nav.navigate(WorkoutEditRoute(id)) },
+                        )
+                    }
+                    composable<WorkoutEditRoute> { entry ->
+                        WorkoutEditScreen(
+                            workoutId = entry.toRoute<WorkoutEditRoute>().workoutId,
+                            workouts = deps.data.workouts,
+                            unit = state.profile.unit,
+                            language = state.language,
+                            appScope = deps.data.scope,
+                            onClose = nav::popBackStack,
                         )
                     }
                     composable<WorkoutShareRoute> { entry ->
@@ -720,8 +752,7 @@ fun OverfitApp(deps: AppDependencies) {
                             history = history,
                             language = state.language,
                             today = deps.today(),
-                            onOpen = { nav.navigate(PhotoViewerRoute(it)) },
-                            onWorkout = { nav.navigate(HistoryDetailRoute(it)) },
+                            onDay = { nav.navigate(DayRoute(it.toString())) },
                             onCompare = { a, b -> nav.navigate(PhotoCompareRoute(a, b)) },
                         )
                     }
@@ -739,7 +770,7 @@ fun OverfitApp(deps: AppDependencies) {
                             loadSummary = { deps.data.workouts.summary(it) },
                             loadJpeg = { deps.data.workouts.photoJpeg(it) },
                             onBack = nav::popBackStack,
-                            onWorkout = { nav.navigate(HistoryDetailRoute(it)) },
+                            onWorkout = { nav.navigate(WorkoutDetailRoute(it)) },
                             onDelete = { photoId ->
                                 deps.data.scope.launch {
                                     deps.data.workouts.deletePhoto(photoId)
@@ -870,7 +901,30 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<CoachMemoryRoute> { CoachMemoryScreen(deps.coach, onBack = nav::popBackStack) }
+                    composable<CoachStoryRoute> {
+                        CoachStoryScreen(
+                            onClose = nav::popBackStack,
+                            autoAdvance = deps.coachStoryAutoAdvance,
+                            onTarget = { target ->
+                                nav.popBackStack()
+                                nav.navigate(
+                                    when (target) {
+                                        StoryTarget.OwnKey -> ConnectRoute
+                                        StoryTarget.Credit -> FuelRoute
+                                        StoryTarget.ChatConnections -> AiCoachRoute
+                                    },
+                                )
+                            },
+                        )
+                    }
                     composable<CoachRoute> {
+                        // First visit: the story opens once by itself; afterwards only via the title.
+                        LaunchedEffect(Unit) {
+                            if (!deps.store.coachStorySeen()) {
+                                deps.store.markCoachStorySeen()
+                                nav.navigate(CoachStoryRoute)
+                            }
+                        }
                         CoachTabScreen(
                             coach = deps.coach,
                             chat = deps.coachChat,
@@ -887,6 +941,7 @@ fun OverfitApp(deps: AppDependencies) {
                                 access = { nav.navigate(AiCoachRoute) },
                                 chatProvider = { nav.navigate(ChatProviderRoute(it.name)) },
                                 chatNotes = { nav.navigate(ChatNotesRoute) },
+                                story = { nav.navigate(CoachStoryRoute) },
                             ),
                         )
                     }

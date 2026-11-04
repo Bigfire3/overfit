@@ -21,6 +21,10 @@ import app.overfit.i18n.stringsFor
 import app.overfit.share.NoopPlatformShare
 import app.overfit.ui.photos.PhotoViewerScreen
 import app.overfit.ui.photos.PhotosScreen
+import app.overfit.ui.photos.DayScreen
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import app.overfit.ui.photos.SAUNA_MARKER_TAG
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasAnyDescendant
@@ -71,35 +75,73 @@ class DiaryScreenTest {
         OverfitTheme(ThemeMode.LIGHT) { CompositionLocalProvider(LocalStrings provides stringsFor(Language.DE)) { content() } }
     }
 
-    @Test fun gridShowsMonthsStatsAndOpensDayWithPhoto() {
-        var opened: String? = null
-        var workout: String? = null
+    @Test fun gridShowsMonthsStatsAndOpensTappedDay() {
+        val days = mutableListOf<LocalDate>()
         show {
-            PhotosScreen(photos, history, Language.DE, today, onOpen = { opened = it }, onWorkout = { workout = it }, onCompare = { _, _ -> })
+            PhotosScreen(photos, history, Language.DE, today, onDay = { days += it }, onCompare = { _, _ -> })
         }
-        compose.onNodeWithText("Foto-Tagebuch").assertIsDisplayed()
+        compose.onNodeWithText("Kalender").assertIsDisplayed()
         compose.onNodeWithText("November 2026").assertIsDisplayed()
         compose.onNodeWithText("3 Trainings").assertIsDisplayed()
         compose.onNodeWithText("3 Fotos").assertIsDisplayed()
         compose.onNodeWithText("Mo").assertIsDisplayed()
-        // Day with two photos opens the viewer at its first (oldest) photo; the badge shows 2.
+        // Every day up to today opens the day view: with photos, training only, and empty (to add a photo).
         compose.onNodeWithContentDescription("Tag 2, 2 Fotos").performClick()
-        assertEquals("p2", opened)
-        // Training without photo opens the workout.
+        // October has a day 3 and 4 too; November (the newest month) comes first.
+        compose.onAllNodesWithContentDescription("Tag 3").onFirst().performClick()
         compose.onNodeWithContentDescription("Tag 20, Training").performScrollTo().performClick()
-        assertEquals("s0", workout)
+        assertEquals(listOf(LocalDate(2026, 11, 2), LocalDate(2026, 11, 3), LocalDate(2026, 10, 20)), days)
+        // Days after today cannot be tapped.
+        compose.onAllNodesWithContentDescription("Tag 4").onFirst().assertHasNoClickAction()
     }
 
-    @Test fun emptyStateExplainsPhotoAfterWorkout() {
-        show { PhotosScreen(emptyList(), emptyList(), Language.DE, today, {}, {}, { _, _ -> }) }
-        compose.onNodeWithText("Beim Beenden eines Trainings kannst du ein Foto machen. Es bleibt privat in der App.").assertIsDisplayed()
+    @Test fun emptyStateExplainsTheDayTap() {
+        show { PhotosScreen(emptyList(), emptyList(), Language.DE, today, {}, { _, _ -> }) }
+        compose.onNodeWithText("Tippe auf einen Tag, um Fotos hinzuzufügen oder dein Training anzusehen. Fotos bleiben privat in der App.").assertIsDisplayed()
         // The calendar is there without a single photo.
         compose.onNodeWithText("November 2026").assertIsDisplayed()
         compose.onNodeWithText("Mo").assertIsDisplayed()
     }
 
+    @Test fun dayViewListsTrainingsAndPhotosAndRemovesAPhotoWithConfirmation() {
+        var workout: String? = null
+        var opened: String? = null
+        var removed: String? = null
+        show {
+            DayScreen(
+                LocalDate(2026, 11, 2), photos, history, WeightUnit.KG, Language.DE,
+                onBack = {}, onOpenPhoto = { opened = it }, onOpenWorkout = { workout = it },
+                onAddPhoto = {}, onRemovePhoto = { removed = it },
+            )
+        }
+        compose.onNodeWithText("TRAININGS").assertIsDisplayed()
+        compose.onNodeWithText("Push").performClick()
+        assertEquals("s1", workout)
+        // Two photos of that day, oldest first; a tap opens the viewer.
+        compose.onNodeWithContentDescription("Foto 1").performScrollTo().performClick()
+        assertEquals("p2", opened)
+        // Remove: the first tap only arms ("Entfernen?"), the second removes.
+        compose.onAllNodesWithContentDescription("Foto entfernen")[1].performScrollTo().performClick()
+        assertEquals(null, removed)
+        compose.onNodeWithContentDescription("Entfernen?").performClick()
+        assertEquals("p3", removed)
+        compose.onNodeWithText("Aus Fotos wählen").assertExists()
+    }
+
+    @Test fun dayWithoutTrainingStillOffersPhotos() {
+        show {
+            DayScreen(
+                LocalDate(2026, 11, 3), photos, history, WeightUnit.KG, Language.DE,
+                onBack = {}, onOpenPhoto = {}, onOpenWorkout = {}, onAddPhoto = {}, onRemovePhoto = {},
+            )
+        }
+        compose.onNodeWithText("An diesem Tag kein Training.").assertIsDisplayed()
+        compose.onNodeWithText("Noch keine Fotos an diesem Tag.").assertIsDisplayed()
+        compose.onNodeWithText("Aus Fotos wählen").assertIsDisplayed()
+    }
+
     @Test fun calendarShowsTrainingDaysWithoutAnyPhoto() {
-        show { PhotosScreen(emptyList(), listOf(session("s1", LocalDate(2026, 11, 2), "Push")), Language.DE, today, {}, {}, { _, _ -> }) }
+        show { PhotosScreen(emptyList(), listOf(session("s1", LocalDate(2026, 11, 2), "Push")), Language.DE, today, {}, { _, _ -> }) }
         compose.onNodeWithText("November 2026").assertIsDisplayed()
         compose.onNodeWithContentDescription("Tag 2, Training").assertIsDisplayed()
     }
@@ -110,7 +152,7 @@ class DiaryScreenTest {
             session("s0", LocalDate(2026, 10, 30), "Legs").copy(sauna = true), // training only
             session("s9", LocalDate(2026, 11, 1), "Pull"), // no sauna
         )
-        show { PhotosScreen(photos.take(2), sauna, Language.DE, today, {}, {}, { _, _ -> }) }
+        show { PhotosScreen(photos.take(2), sauna, Language.DE, today, {}, { _, _ -> }) }
         val ring = hasAnyDescendant(hasTestTag(SAUNA_MARKER_TAG))
         // Legend: filled dot = workout, ring = sauna.
         compose.onNodeWithText("Sauna").assertIsDisplayed()
@@ -121,7 +163,7 @@ class DiaryScreenTest {
     }
 
     @Test fun noLegendWithoutSauna() {
-        show { PhotosScreen(emptyList(), listOf(session("s1", LocalDate(2026, 11, 2), "Push")), Language.DE, today, {}, {}, { _, _ -> }) }
+        show { PhotosScreen(emptyList(), listOf(session("s1", LocalDate(2026, 11, 2), "Push")), Language.DE, today, {}, { _, _ -> }) }
         compose.onAllNodesWithTag(SAUNA_MARKER_TAG, useUnmergedTree = true).assertCountEquals(0)
         compose.onAllNodesWithText("Sauna").assertCountEquals(0)
     }
@@ -150,5 +192,18 @@ class DiaryScreenTest {
         assertEquals(null, deleted)
         compose.onNodeWithText("Wirklich löschen? Nochmal tippen.").performClick()
         assertEquals("p2", deleted)
+    }
+
+    @Test fun viewerOfAPhotoWithoutTrainingHasNoWorkoutLink() {
+        val alone = listOf(DiaryPhoto(WorkoutPhoto("p9", null, "p9.jpg", ms(LocalDate(2026, 11, 1)), "/nonexistent/p9.jpg"), null))
+        show {
+            PhotoViewerScreen(
+                alone, history, photoId = "p9", language = Language.DE, unit = WeightUnit.KG,
+                platform = NoopPlatformShare(), loadSummary = { null }, loadJpeg = { null },
+                onBack = {}, onWorkout = {}, onDelete = {},
+            )
+        }
+        compose.onNodeWithText("1. Nov. 2026", substring = true).assertExists()
+        compose.onAllNodesWithText("Training ansehen").assertCountEquals(0)
     }
 }

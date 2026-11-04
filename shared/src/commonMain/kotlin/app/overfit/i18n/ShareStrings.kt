@@ -57,7 +57,7 @@ val ShareGerman = ShareStrings(
     shareFile = "Als Datei teilen",
     shareMessage = { name, link -> "Mein Training „$name“ für Overfit:\n$link" },
     qrTitle = "QR-Code",
-    qrHint = "Scannen mit Overfit: Training → „+“ → Importieren → QR-Code scannen. Die normale Kamera-App kann diesen kompakten Code nicht öffnen – dafür gibt es den Link.",
+    qrHint = "Scannen mit Overfit: Workouts → „+“ → Importieren → QR-Code scannen. Die normale Kamera-App kann diesen kompakten Code nicht öffnen – dafür gibt es den Link.",
     sharePreviewTitle = "Das wird geteilt",
     sharePreviewCounts = { e, s -> (if (e == 1) "1 Übung" else "$e Übungen") + " · " + (if (s == 1) "1 Satz" else "$s Sätze") },
     sharePreviewValues = { ex -> "Der Empfänger sieht deine Zielwerte, z. B. $ex." },

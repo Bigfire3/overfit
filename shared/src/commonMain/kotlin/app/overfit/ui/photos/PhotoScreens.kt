@@ -81,8 +81,8 @@ import kotlinx.datetime.daysUntil
 // Diary tab: BeReal-style "Memories" — month by month calendar grid
 
 /**
- * [photos] and [history] are null while loading; both newest first. A tap on a day with photos
- * opens the viewer, on a training-only day the workout.
+ * Calendar tab. [photos] and [history] are null while loading; both newest first. A tap on a day
+ * (also one without anything, up to today) opens the day view with its photos and trainings.
  */
 @Composable
 fun PhotosScreen(
@@ -90,8 +90,7 @@ fun PhotosScreen(
     history: List<HistoryRow>?,
     language: Language,
     today: LocalDate,
-    onOpen: (photoId: String) -> Unit,
-    onWorkout: (sessionId: String) -> Unit,
+    onDay: (LocalDate) -> Unit,
     onCompare: (olderId: String, newerId: String) -> Unit,
 ) {
     val t = LocalStrings.current
@@ -146,19 +145,19 @@ fun PhotosScreen(
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             if (loaded) items(months, key = { "${it.first}-${it.second}" }) { (year, month) ->
-                MonthBlock(year, month, weekStart, days, today, valid, selecting) { day ->
-                    val first = day.photos.firstOrNull()
-                    when {
-                        selecting -> if (first != null) {
-                            val id = day.photos.last().photo.id
+                MonthBlock(year, month, weekStart, days, today, valid, selecting) { date, day ->
+                    val last = day?.photos?.lastOrNull()
+                    if (selecting) {
+                        if (last != null) {
+                            val id = last.photo.id
                             selected = when {
                                 id in valid -> valid - id
                                 valid.size < 2 -> valid + id
                                 else -> listOf(valid[1], id)
                             }
                         }
-                        first != null -> onOpen(first.photo.id)
-                        day.workouts.isNotEmpty() -> onWorkout(day.workouts.first().id)
+                    } else {
+                        onDay(date)
                     }
                 }
             }
@@ -223,7 +222,7 @@ private fun MonthBlock(
     today: LocalDate,
     selected: List<String>,
     selecting: Boolean,
-    onDay: (DiaryDay) -> Unit,
+    onDay: (LocalDate, DiaryDay?) -> Unit,
 ) {
     val p = LocalStrings.current.photos
     val cells = remember(year, month, weekStart) { DiaryCalendar.monthGrid(year, month, weekStart) }
@@ -237,7 +236,7 @@ private fun MonthBlock(
             Row(Modifier.fillMaxWidth().padding(bottom = CELL_GAP), horizontalArrangement = Arrangement.spacedBy(CELL_GAP)) {
                 week.forEach { date ->
                     Box(Modifier.weight(1f)) {
-                        if (date != null) DayCell(date, days[date], date == today, selected, selecting, onDay)
+                        if (date != null) DayCell(date, days[date], date == today, date <= today, selected, selecting, onDay)
                     }
                 }
             }
@@ -250,9 +249,11 @@ private fun DayCell(
     date: LocalDate,
     day: DiaryDay?,
     isToday: Boolean,
+    /** Days up to today open the day view (also empty ones, to add a photo); future days do nothing. */
+    tappable: Boolean,
     selected: List<String>,
     selecting: Boolean,
-    onDay: (DiaryDay) -> Unit,
+    onDay: (LocalDate, DiaryDay?) -> Unit,
 ) {
     val p = LocalStrings.current.photos
     val photo = day?.photos?.lastOrNull()
@@ -268,7 +269,7 @@ private fun DayCell(
             .then(if (isToday) Modifier.border(1.dp, Theme.colors.foreground, shape) else Modifier)
             .padding(2.dp)
             .semantics { contentDescription = desc }
-            .then(if (day != null && (photo != null || training)) Modifier.clickable { onDay(day) } else Modifier),
+            .then(if (if (selecting) photo != null else tappable) Modifier.clickable { onDay(date, day) } else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -411,11 +412,13 @@ private fun ViewerInfo(
     val h = t.history
     val white = Color.White
     val dim = white.copy(alpha = 0.6f)
-    val row = history?.firstOrNull { it.id == item.photo.sessionId }
-    val summary by produceState<WorkoutSummary?>(null, item.photo.sessionId) { value = loadSummary(item.photo.sessionId) }
+    val sessionId = item.photo.sessionId
+    val row = history?.firstOrNull { it.id == sessionId }
+    val summary by produceState<WorkoutSummary?>(null, sessionId) { value = sessionId?.let { loadSummary(it) } }
     Column(Modifier.fillMaxWidth().padding(horizontal = Space.l, vertical = Space.m)) {
         BasicText(t.date(dateOf(item.photo.takenAt)), style = Theme.type.label.copy(color = white))
-        BasicText(p.viewerWorkout(item.workoutName), style = Theme.type.caption.copy(color = dim))
+        // A photo of a day without a training has no workout line and no "view workout".
+        item.workoutName?.let { BasicText(p.viewerWorkout(it), style = Theme.type.caption.copy(color = dim)) }
         val facts = buildList {
             val end = row?.endedAt
             if (row != null && end != null) add("${p.viewerDuration} ${Numbers.formatDuration(((end - row.startedAt) / 1000).toInt())}")
@@ -428,8 +431,10 @@ private fun ViewerInfo(
             BasicText(p.viewerBests, style = Theme.type.caption.copy(color = dim))
             records.take(3).forEach { BasicText(recordText(it, unit, language, t), style = Theme.type.caption.copy(color = white)) }
         }
-        Spacer(Modifier.height(Space.s))
-        ViewerAction(p.toWorkout, white) { onWorkout(item.photo.sessionId) }
+        if (sessionId != null && item.workoutName != null) {
+            Spacer(Modifier.height(Space.s))
+            ViewerAction(p.toWorkout, white) { onWorkout(sessionId) }
+        }
     }
 }
 

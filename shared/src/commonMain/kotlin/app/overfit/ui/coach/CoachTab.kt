@@ -29,6 +29,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import app.overfit.ui.components.Icon
+import app.overfit.ui.components.LineIcon
 import androidx.compose.ui.unit.dp
 import app.overfit.ai.ProviderId
 import app.overfit.ai.Providers
@@ -92,6 +96,8 @@ class CoachTabNav(
     val access: () -> Unit,
     val chatProvider: (ChatProvider) -> Unit,
     val chatNotes: () -> Unit,
+    /** Opens the Coach story (what the AI can evaluate, ways to use it). */
+    val story: () -> Unit,
 )
 
 // ---------------------------------------------------------------------------------------------
@@ -117,7 +123,15 @@ fun CoachTabScreen(
     val h = c.hub
     val t = LocalStrings.current
     Screen(scroll = true) {
-        Title(h.tabTitle)
+        // Tapping the title opens the story; the info icon shows that it can be tapped.
+        Row(
+            Modifier.fillMaxWidth().pressableRow(nav.story).semantics { contentDescription = h.story.open }.testTag("coach:storyOpen"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Title(h.tabTitle)
+            Spacer(Modifier.width(Space.s))
+            LineIcon(Icon.Info, size = 20.dp, color = Theme.colors.muted)
+        }
         Spacer(Modifier.height(Space.l))
 
         AccessRow(state, providers, fuelSession, nav.access)
@@ -132,8 +146,8 @@ fun CoachTabScreen(
             val title = if (item.kind == ReviewKind.PROGRESS) c.progressTitle else c.reviewTitle
             ListRow(h.latestReview(dateText(item.createdAt)), item.review?.rating?.let(c.rating) ?: title, onClick = { nav.coach.openReview(item.id) })
         }
-        latest?.let { s -> HintRow(c.reviewLast, c.reviewLastHint) { nav.coach.openSession(s.id) } }
-        HintRow(c.assessProgress, c.assessProgressHint) { nav.coach.openReview(coach.startProgressReview()) }
+        latest?.let { s -> ListRow(c.reviewLast, onClick = { nav.coach.openSession(s.id) }) }
+        ListRow(c.assessProgress, onClick = { nav.coach.openReview(coach.startProgressReview()) })
         if (reviews.isNotEmpty()) ListRow(h.allReviews, reviews.size.toString(), onClick = nav.allReviews)
         MemoryRow(memory, nav.coach.memory)
         ListRow(c.settingsTitle, onClick = nav.coach.settings)
@@ -142,7 +156,6 @@ fun CoachTabScreen(
 
         // Prompts & templates
         SectionTitle(h.promptsTitle)
-        Text(h.promptsIntro, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         Hairline()
         val list by produceState<List<PromptEntry>?>(null, state.language, state.profile, state.weights) { value = prompts() }
         if (list == null) Text(h.promptLoading, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
@@ -160,7 +173,6 @@ fun CoachTabScreen(
         val cs = LocalChatStrings.current
         val sync by chatFeature.sync.state.collectAsState()
         SectionTitle(h.connectionsTitle)
-        Text(h.connectionsHint, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         Hairline()
         val value = when {
             !chatFeature.configured -> cs.waySoon
@@ -195,7 +207,6 @@ private fun AccessRow(state: AppState, providers: Providers, fuelSession: FuelSe
             }
             Text(if (ready) h.accessChange else h.accessSetup, style = Theme.type.label, tone = Tone.Muted)
         }
-        if (!ready) Text(h.accessNoneHint, Modifier.padding(bottom = Space.m), style = Theme.type.caption, tone = Tone.Muted)
         if (state.hasApiKey && !fuel) {
             Text(
                 h.accessOwnKeyPrivacy(providers.get(state.providerId).label),
@@ -218,17 +229,6 @@ private fun MemoryRow(memory: CoachMemoryEntity?, onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun HintRow(label: String, hint: String, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().pressableRow(onClick)) {
-        Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
-            Text(label)
-            Text(hint, style = Theme.type.caption, tone = Tone.Muted)
-        }
-        Hairline()
-    }
-}
-
 /** Chat part of the tab: input that continues the latest chat, its last exchange, new chat, earlier chats. */
 @Composable
 private fun ChatSection(chat: CoachChatService, nav: CoachTabNav) {
@@ -239,7 +239,6 @@ private fun ChatSection(chat: CoachChatService, nav: CoachTabNav) {
     var input by rememberSaveable { mutableStateOf("") }
 
     SectionTitle(h.chatTitle)
-    Text(h.chatIntro, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
     if (!chat.available()) Text(h.chatNoAccess, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
     if (current != null && preview.isNotEmpty()) {
         Hairline()

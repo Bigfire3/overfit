@@ -183,7 +183,7 @@ val ChatGerman = ChatStrings(
         }
     },
     geminiAltTitle = "Ersatzweg für Gemini: eigenes Gem",
-    geminiAltText = "Wenn Gemini keine eigenen Verbindungen erlaubt (z. B. in Deutschland): 1) Unten „Gem-Anleitung kopieren“ tippen. 2) In Gemini „Gems → Neues Gem“, Name „Overfit Coach“, Anleitung einfügen, speichern. 3) Vor jedem Gespräch hier „Kontext kopieren“ tippen und in den Chat einfügen. Neue Workouts kopierst du aus der Antwort und importierst sie in Overfit (Training → „+“ → Aus Link oder QR-Code importieren). Fotos hängst du einzeln an.",
+    geminiAltText = "Wenn Gemini keine eigenen Verbindungen erlaubt (z. B. in Deutschland): 1) Unten „Gem-Anleitung kopieren“ tippen. 2) In Gemini „Gems → Neues Gem“, Name „Overfit Coach“, Anleitung einfügen, speichern. 3) Vor jedem Gespräch hier „Kontext kopieren“ tippen und in den Chat einfügen. Neue Workouts kopierst du aus der Antwort und importierst sie in Overfit (Workouts → „+“ → Aus Link oder QR-Code importieren). Fotos hängst du einzeln an.",
     connectChat = "KI-Chat verbinden",
     consentTitle = "Daten für den KI-Chat freigeben",
     consentPoints = listOf(

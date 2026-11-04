@@ -11,7 +11,6 @@ class CoachHubStrings(
     val accessOwnKey: (provider: String) -> String,
     val accessFuel: (balance: String?) -> String,
     val accessNone: String,
-    val accessNoneHint: String,
     /** Under "AI access" with an own key: the data goes straight to the provider. */
     val accessOwnKeyPrivacy: (provider: String) -> String,
     val accessSetup: String,
@@ -47,7 +46,6 @@ class CoachHubStrings(
     val photoLabel: (date: String) -> String,
     // Prompts
     val promptsTitle: String,
-    val promptsIntro: String,
     val promptMore: String,
     val promptLess: String,
     val promptCopy: String,
@@ -75,13 +73,13 @@ class CoachHubStrings(
     val promptLoading: String,
     // Chat connections
     val connectionsTitle: String,
-    val connectionsHint: String,
     // Profile
     val profileLink: String,
     val profileLinkHint: String,
     // Demo
     val demoReply: String,
     val demoWorkoutName: String,
+    val story: CoachStoryStrings,
 )
 
 val GermanCoachHub = CoachHubStrings(
@@ -90,7 +88,6 @@ val GermanCoachHub = CoachHubStrings(
     accessOwnKey = { "Eigener Key · $it" },
     accessFuel = { it ?: "Guthaben" },
     accessNone = "Kein KI-Zugang",
-    accessNoneHint = "Ohne KI-Zugang zeigt der Coach eine Demo. Prompts kannst du trotzdem kopieren.",
     accessOwnKeyPrivacy = { "Deine Daten gehen direkt an $it, nicht über Overfit-Server." },
     accessSetup = "Einrichten",
     accessChange = "Ändern",
@@ -122,7 +119,6 @@ val GermanCoachHub = CoachHubStrings(
     noPhotos = "Noch keine Fotos.",
     photoLabel = { "Foto vom $it" },
     promptsTitle = "Prompts & Vorlagen",
-    promptsIntro = "Fertige Prompts für ChatGPT, Claude oder Gemini. Du siehst immer den vollständigen Text, bevor du ihn kopierst.",
     promptMore = "Mehr",
     promptLess = "Weniger",
     promptCopy = "Kopieren",
@@ -149,11 +145,11 @@ val GermanCoachHub = CoachHubStrings(
     promptPlateauAsk = "Bei welcher Übung stagniere ich am deutlichsten? Schlag mir eine konkrete Strategie für die nächsten 4 Wochen vor, um das Plateau zu durchbrechen.",
     promptLoading = "Text wird erstellt …",
     connectionsTitle = "KI-Chat-Verbindungen",
-    connectionsHint = "Besprich dein Training direkt in Claude, ChatGPT oder Gemini.",
     profileLink = "Coach & KI",
     profileLinkHint = "Chat, Auswertungen, Prompts und KI-Zugang findest du im Tab Coach.",
     demoReply = "Das ist eine Demo-Antwort, weil noch keine KI verbunden ist. Mit eigenem Key oder Guthaben beantwortet der Coach deine Frage mit deinen echten Trainingsdaten.\n\nSo sieht ein Workout-Vorschlag aus: drei Grundübungen, je drei Sätze. Tippe auf „Workout übernehmen“, um die Import-Vorschau zu sehen.",
     demoWorkoutName = "Ganzkörper (Demo)",
+    story = GermanCoachStory,
 )
 
 val EnglishCoachHub = CoachHubStrings(
@@ -162,7 +158,6 @@ val EnglishCoachHub = CoachHubStrings(
     accessOwnKey = { "Own key · $it" },
     accessFuel = { it ?: "Credit" },
     accessNone = "No AI access",
-    accessNoneHint = "Without AI access the coach shows a demo. You can still copy the prompts.",
     accessOwnKeyPrivacy = { "Your data goes straight to $it, not through Overfit servers." },
     accessSetup = "Set up",
     accessChange = "Change",
@@ -194,7 +189,6 @@ val EnglishCoachHub = CoachHubStrings(
     noPhotos = "No photos yet.",
     photoLabel = { "Photo from $it" },
     promptsTitle = "Prompts & templates",
-    promptsIntro = "Ready-made prompts for ChatGPT, Claude or Gemini. You always see the full text before you copy it.",
     promptMore = "More",
     promptLess = "Less",
     promptCopy = "Copy",
@@ -221,9 +215,9 @@ val EnglishCoachHub = CoachHubStrings(
     promptPlateauAsk = "Which exercise am I most clearly stuck on? Suggest a concrete strategy for the next 4 weeks to break the plateau.",
     promptLoading = "Building the text …",
     connectionsTitle = "AI chat connections",
-    connectionsHint = "Discuss your training directly in Claude, ChatGPT or Gemini.",
     profileLink = "Coach & AI",
     profileLinkHint = "Chat, reviews, prompts and AI access are in the Coach tab.",
     demoReply = "This is a demo answer because no AI is connected yet. With your own key or credit the coach answers your question with your real training data.\n\nThis is what a workout proposal looks like: three basic exercises, three sets each. Tap “Use workout” to see the import preview.",
     demoWorkoutName = "Full body (demo)",
+    story = EnglishCoachStory,
 )

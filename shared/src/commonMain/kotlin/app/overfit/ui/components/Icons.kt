@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -17,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, Training, History, Exercises, Photos, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More }
+enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -44,12 +45,6 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
             Icon.Back -> path(15f to 5f, 8f to 12f, 15f to 19f)
             Icon.Check -> path(5f to 12.5f, 9.5f to 17f, 19f to 7.5f)
             Icon.Home -> path(4f to 11f, 12f to 4.5f, 20f to 11f, 20f to 20f, 4f to 20f, close = true)
-            // Lightning bolt: the Training tab.
-            Icon.Training -> path(13.5f to 3f, 5.5f to 13.5f, 11.5f to 13.5f, 10.5f to 21f, 18.5f to 10.5f, 12.5f to 10.5f, close = true)
-            Icon.History -> {
-                circle(12f, 12f, 8f)
-                path(12f to 8f, 12f to 12f, 15f to 14f)
-            }
             Icon.Exercises -> {
                 line(7f, 12f, 17f, 12f)
                 drawRoundRect(color, p(4f, 8f), Size(3f * u, 8f * u), style = stroke)
@@ -58,6 +53,27 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
             Icon.Photos -> {
                 drawRoundRect(color, p(4f, 6f), Size(16f * u, 13f * u), style = stroke)
                 circle(12f, 12.5f, 3.25f)
+            }
+            // Calendar tab: sheet with a header line, two rings and one dot for a day.
+            Icon.Calendar -> {
+                drawRoundRect(color, p(4f, 5.5f), Size(16f * u, 14.5f * u), style = stroke)
+                line(4f, 10f, 20f, 10f)
+                line(8.5f, 3.5f, 8.5f, 7f)
+                line(15.5f, 3.5f, 15.5f, 7f)
+                drawCircle(color, 1.4f * u, p(12f, 14.75f))
+            }
+            // Workouts tab: a clipboard with a plan on it (a workout is a plan).
+            Icon.Workouts -> {
+                drawRoundRect(color, p(5f, 4.5f), Size(14f * u, 16.5f * u), CornerRadius(1.5f * u), style = stroke)
+                drawRoundRect(color, p(9f, 3f), Size(6f * u, 3f * u), CornerRadius(1f * u), style = stroke)
+                line(8.5f, 10.5f, 15.5f, 10.5f)
+                line(8.5f, 14f, 15.5f, 14f)
+                line(8.5f, 17.5f, 12.5f, 17.5f)
+            }
+            // Profile tab: head and shoulders.
+            Icon.Profile -> {
+                circle(12f, 8.5f, 3.5f)
+                path(5f to 20f, 5.6f to 17.4f, 7.6f to 15.3f, 10f to 14.3f, 14f to 14.3f, 16.4f to 15.3f, 18.4f to 17.4f, 19f to 20f)
             }
             Icon.Plus -> {
                 line(12f, 5f, 12f, 19f)
@@ -108,6 +124,32 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 drawCircle(color, 1.4f * u, p(12f, 5.5f))
                 drawCircle(color, 1.4f * u, p(12f, 12f))
                 drawCircle(color, 1.4f * u, p(12f, 18.5f))
+            }
+            // Circle with an "i": info.
+            Icon.Info -> {
+                circle(12f, 12f, 8.5f)
+                line(12f, 11f, 12f, 16.5f)
+                drawCircle(color, 1.1f * u, p(12f, 7.75f))
+            }
+            // Four-pointed spark: what the AI can do.
+            Icon.Sparkle -> path(12f to 3.5f, 14f to 10f, 20.5f to 12f, 14f to 14f, 12f to 20.5f, 10f to 14f, 3.5f to 12f, 10f to 10f, close = true)
+            // Key: own API key.
+            Icon.Key -> {
+                circle(8f, 12f, 3.75f)
+                line(11.75f, 12f, 20.5f, 12f)
+                line(17f, 12f, 17f, 15f)
+                line(20.5f, 12f, 20.5f, 14.5f)
+            }
+            // Wallet: credit.
+            Icon.Wallet -> {
+                drawRoundRect(color, p(3.5f, 6.5f), Size(17f * u, 12f * u), style = stroke)
+                line(3.5f, 10f, 20.5f, 10f)
+                drawCircle(color, 1.1f * u, p(16.5f, 14.25f))
+            }
+            // Two linked rings: connect a chat.
+            Icon.Link -> {
+                drawRoundRect(color, p(3.5f, 8.5f), Size(10f * u, 7f * u), androidx.compose.ui.geometry.CornerRadius(3.5f * u), style = stroke)
+                drawRoundRect(color, p(10.5f, 8.5f), Size(10f * u, 7f * u), androidx.compose.ui.geometry.CornerRadius(3.5f * u), style = stroke)
             }
             Icon.Settings -> {
                 line(4f, 8f, 20f, 8f)
