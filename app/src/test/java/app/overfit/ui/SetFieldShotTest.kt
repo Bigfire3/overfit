@@ -41,7 +41,7 @@ import java.io.File
 
 /**
  * Evidence screenshots of the set rows (running training / edit training) on a 360 dp phone with the
- * values 1, 11, 102.5 and 1000, at font scale 1.0 and 1.3, light and dark. Only runs when `SCREENSHOT_DIR`
+ * values 1, 11, 102.5 and 1000, at font scale 1.0 and 1.3, German and English. Only runs when `SCREENSHOT_DIR`
  * is set, like [ScreenshotTest].
  */
 @RunWith(RobolectricTestRunner::class)

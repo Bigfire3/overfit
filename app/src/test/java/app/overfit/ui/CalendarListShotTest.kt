@@ -41,7 +41,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
-/** Evidence screenshots (360 dp, light/dark): workouts as cards, calendar tab as grid and list. Runs only with `SCREENSHOT_DIR`. */
+/** Evidence screenshots (360 dp, dark): workouts as cards, calendar tab as grid and list. Runs only with `SCREENSHOT_DIR`. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35], qualifiers = "w360dp-h640dp-xxhdpi")

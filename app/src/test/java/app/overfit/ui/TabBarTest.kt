@@ -37,7 +37,7 @@ import java.io.File
 /**
  * The bottom bar on a narrow phone (360 dp): exactly four tabs (no History any more), each label one word on
  * one line without being cut off, in German and English. With `SCREENSHOT_DIR` set it also saves the screen
- * in light and dark (evidence for the tab icons).
+ * in German and English (evidence for the tab icons).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

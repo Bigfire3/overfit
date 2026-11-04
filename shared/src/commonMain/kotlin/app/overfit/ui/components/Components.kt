@@ -587,7 +587,7 @@ fun FloatingCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, c
     Column(
         modifier
             .fillMaxWidth()
-                        .clip(PanelShape)
+            .clip(PanelShape)
             .background(if (pressed) c.surfacePressed else c.surface)
             .border(1.dp, c.faint, PanelShape)
             .then(if (onClick != null) Modifier.clickable(interaction, indication = null, role = Role.Button, onClick = onClick) else Modifier),
@@ -665,7 +665,7 @@ fun ListRow(
     val inPanel = LocalInPanel.current
     val base = if (inPanel) Modifier.background(Theme.colors.surface) else Modifier
     Column(base.then(if (onClick != null) Modifier.pressableRow(onClick) else Modifier)) {
-        // Label and control share one line; if both do not fit (e.g. "Darstellung" + three segments on a
+        // Label and control share one line; if both do not fit (e.g. a long label + several segments on a
         // 360 dp phone), the control moves below the label instead of squeezing the label mid-word.
         if (trailing != null) {
             FlowRow(
@@ -745,7 +745,7 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
 
 /**
  * A list row with a plain on/off switch at the end (vibration, ticks, photos …). No "An/Aus" text: knob left =
- * off (dark track with outline, grey knob), knob right = on (filled light track, black knob); mirrored in RTL.
+ * off (dark track with grey outline, grey knob; outline [Colors.muted] for >= 3:1 contrast on black), knob right = on (filled light track, black knob); mirrored in RTL.
  * The whole row toggles; screen readers get role Switch and the on/off state from the semantics.
  */
 @Composable
@@ -787,7 +787,7 @@ private fun SwitchTrack(checked: Boolean) {
         Modifier
             .size(width = 52.dp, height = 32.dp)
             .background(if (checked) c.foreground else c.background, shape)
-            .then(if (checked) Modifier else Modifier.border(1.5.dp, c.faint, shape))
+            .then(if (checked) Modifier else Modifier.border(1.5.dp, c.muted, shape))
             .padding(4.dp),
         contentAlignment = BiasAlignment(bias, 0f),
     ) {

@@ -41,7 +41,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Evidence screenshots of the exercise detail image (start | end pose) on a 360 dp phone, light and dark, for a mix
+ * Evidence screenshots of the exercise detail image (start | end pose) on a 360 dp phone (dark), for a mix
  * of standing, hanging, lying, hold and stretch exercises. Only runs when `SCREENSHOT_DIR` is set.
  */
 @RunWith(RobolectricTestRunner::class)

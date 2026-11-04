@@ -44,7 +44,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Evidence screenshots of the main screens in light and dark. Only runs when `SCREENSHOT_DIR` is set
+ * Evidence screenshots of the main screens (dark only). Only runs when `SCREENSHOT_DIR` is set
  * (`SCREENSHOT_DIR=docs/screenshots/before ./gradlew … :app:testDebugUnitTest --tests '*ScreenshotTest*'`);
  * otherwise it is skipped, so normal builds are not slowed down.
  */
