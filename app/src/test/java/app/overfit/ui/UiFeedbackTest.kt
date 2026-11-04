@@ -120,7 +120,7 @@ class UiFeedbackTest {
     fun confirmButton_disarmsAfterTimeout_andOnScroll() {
         var deleted = 0
         compose.setContent {
-            OverfitTheme(app.overfit.domain.ThemeMode.DARK) {
+            OverfitTheme {
                 ConfirmArea(Modifier.fillMaxSize()) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("scroll")) {
                         ConfirmButton("Löschen", onConfirm = { deleted++ })

@@ -18,7 +18,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
 import app.overfit.ui.components.BackHeader
@@ -49,12 +48,12 @@ class ConfirmShotTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private fun shot(theme: ThemeMode, name: String, arm: (() -> Unit)? = null) {
+    private fun shot(name: String, arm: (() -> Unit)? = null) {
         val dir = System.getenv("SCREENSHOT_DIR")
         assumeTrue(dir != null)
         val t = stringsFor(Language.DE)
         compose.setContent {
-            OverfitTheme(theme) {
+            OverfitTheme {
                 CompositionLocalProvider(LocalStrings provides t) {
                     Box(Modifier.width(360.dp).height(640.dp).background(Theme.colors.background).testTag("shot")) {
                         ConfirmArea(Modifier.fillMaxSize()) {
@@ -94,14 +93,9 @@ class ConfirmShotTest {
     private fun armFinish() { compose.onNodeWithText(t.finishWorkout).performClick() }
     private fun armRestore() { compose.onNodeWithText(t.photos.importReplace).performClick() }
 
-    @Test fun normalLight() = shot(ThemeMode.LIGHT, "normal-hell")
-    @Test fun normalDark() = shot(ThemeMode.DARK, "normal-dunkel")
-    @Test fun binLight() = shot(ThemeMode.LIGHT, "muelleimer-scharf-hell", ::armBin)
-    @Test fun binDark() = shot(ThemeMode.DARK, "muelleimer-scharf-dunkel", ::armBin)
-    @Test fun discardLight() = shot(ThemeMode.LIGHT, "verwerfen-scharf-hell", ::armDiscard)
-    @Test fun discardDark() = shot(ThemeMode.DARK, "verwerfen-scharf-dunkel", ::armDiscard)
-    @Test fun finishLight() = shot(ThemeMode.LIGHT, "beenden-scharf-hell", ::armFinish)
-    @Test fun finishDark() = shot(ThemeMode.DARK, "beenden-scharf-dunkel", ::armFinish)
-    @Test fun restoreLight() = shot(ThemeMode.LIGHT, "backup-scharf-hell", ::armRestore)
-    @Test fun restoreDark() = shot(ThemeMode.DARK, "backup-scharf-dunkel", ::armRestore)
+    @Test fun normalDark() = shot("normal-dunkel")
+    @Test fun binDark() = shot("muelleimer-scharf-dunkel", ::armBin)
+    @Test fun discardDark() = shot("verwerfen-scharf-dunkel", ::armDiscard)
+    @Test fun finishDark() = shot("beenden-scharf-dunkel", ::armFinish)
+    @Test fun restoreDark() = shot("backup-scharf-dunkel", ::armRestore)
 }
