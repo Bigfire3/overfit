@@ -45,7 +45,7 @@ class SetFieldFocusTest {
     private val t = stringsFor(Language.DE)
     private var toggled = 0
 
-    private fun content() {
+    private fun content(type: TrackingType = TrackingType.WEIGHT_REPS) {
         compose.setContent {
             OverfitTheme(ThemeMode.LIGHT) {
                 CompositionLocalProvider(LocalStrings provides t) {
@@ -56,7 +56,7 @@ class SetFieldFocusTest {
                         sets.forEachIndexed { i, set ->
                             WorkoutSetRow(
                                 number = i + 1,
-                                type = TrackingType.WEIGHT_REPS,
+                                type = type,
                                 unit = WeightUnit.KG,
                                 language = Language.DE,
                                 set = set,
@@ -103,6 +103,17 @@ class SetFieldFocusTest {
         node(t.completeSet(1)).performClick()
         compose.waitForIdle()
         assertEquals(1, toggled)
+        nothingFocused()
+    }
+
+    @Test
+    fun weightAndTime_nextGoesToTime_thenNextSet() {
+        content(TrackingType.WEIGHT_TIME)
+        node(t.weightOfSet(1)).performClick()
+        node(t.weightOfSet(1)).performImeAction()
+        node(t.durationOfSet(1)).assertIsFocused().performImeAction()
+        node(t.weightOfSet(2)).assertIsFocused().performImeAction()
+        node(t.durationOfSet(2)).assertIsFocused().performImeAction()
         nothingFocused()
     }
 }
