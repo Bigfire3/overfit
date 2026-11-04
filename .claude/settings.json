@@ -6,7 +6,7 @@
           {
             "type": "command",
             "command": "[ ! -f \"$CLAUDE_PROJECT_DIR/.claude/skills/impeccable/scripts/impeccable\" ] || sh \"$CLAUDE_PROJECT_DIR/.claude/skills/impeccable/scripts/impeccable\" hook || true",
-            "timeout": 5
+            "timeout": 60
           }
         ]
       }
