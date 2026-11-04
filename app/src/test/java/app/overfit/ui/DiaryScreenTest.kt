@@ -75,7 +75,7 @@ class DiaryScreenTest {
     )
 
     private fun show(content: @androidx.compose.runtime.Composable () -> Unit) = compose.setContent {
-        OverfitTheme { CompositionLocalProvider(LocalStrings provides stringsFor(Language.DE)) { content() } }
+        OverfitTheme { CompositionLocalProvider(LocalStrings provides stringsFor(Language.DE)) { app.overfit.ui.components.ConfirmArea(androidx.compose.ui.Modifier) { content() } } }
     }
 
     @Test fun gridShowsMonthsStatsAndOpensTappedDay() {
