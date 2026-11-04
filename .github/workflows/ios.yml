@@ -51,7 +51,7 @@ jobs:
         id: sim
         run: |
           set -u
-          read -r UDID NAME DEVICETYPE RUNTIME < <(xcrun simctl list devices available -j | python3 -c '
+          IFS=$'\t' read -r UDID NAME DEVICETYPE RUNTIME < <(xcrun simctl list devices available -j | python3 -c '
           import json, sys
           data = json.load(sys.stdin)["devices"]
           def ver(rt): return [int(x) for x in rt.split("iOS-")[-1].split("-") if x.isdigit()]
@@ -62,10 +62,9 @@ jobs:
               if phones:
                   phones.sort(key=lambda d: d["name"], reverse=True)
                   p = phones[0]
-                  print(p["udid"], p["name"].replace(" ", "_"), p.get("deviceTypeIdentifier", ""), rt)
+                  print("\t".join([p["udid"], p["name"], p.get("deviceTypeIdentifier", ""), rt]))
                   break
           ')
-          NAME=${NAME//_/ }
           echo "Gewählt: $NAME ($UDID), Runtime $RUNTIME"
 
           is_booted() { xcrun simctl list devices | grep "$UDID" | grep -q "(Booted)"; }
