@@ -33,7 +33,11 @@ import app.overfit.share.PlatformShare
 import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelItem
+import app.overfit.ui.components.PanelSection
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.PromptView
 import app.overfit.ui.components.Screen
@@ -101,30 +105,30 @@ fun AiCoachScreen(
         Spacer(Modifier.height(Space.m))
         Text(c.aiCoachIntro, tone = Tone.Muted)
 
-        SectionTitle(c.waysInApp)
-        Text(c.wayInAppHint, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        Hairline()
-        ListRow(
-            if (state.hasApiKey && state.providerId != ProviderId.FUEL) "${c.ownKey} · ${providers.get(state.providerId).label}" else c.ownKey,
-            if (state.hasApiKey) c.wayConnected else c.wayNotConnected,
-            onClick = onOwnKey,
-        )
-        ListRow(c.fuelWay, if (state.providerId == ProviderId.FUEL) c.wayConnected else c.wayNotConnected, onClick = onFuel)
+        PanelSection(c.waysInApp) {
+            ListRow(
+                if (state.hasApiKey && state.providerId != ProviderId.FUEL) "${c.ownKey} · ${providers.get(state.providerId).label}" else c.ownKey,
+                if (state.hasApiKey) c.wayConnected else c.wayNotConnected,
+                onClick = onOwnKey,
+            )
+            ListRow(c.fuelWay, if (state.providerId == ProviderId.FUEL) c.wayConnected else c.wayNotConnected, onClick = onFuel)
+            if (onCoachSettings != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.settingsTitle, onClick = onCoachSettings)
+        }
+        Hint(c.wayInAppHint)
         if (onDisconnect != null && state.hasApiKey) {
             Spacer(Modifier.height(Space.m))
             app.overfit.ui.components.ConfirmButton(t.disconnect, app.overfit.i18n.LocalCoachStrings.current.hub.disconnectConfirm, onDisconnect)
         }
-        if (onCoachSettings != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.settingsTitle, onClick = onCoachSettings)
 
-        SectionTitle(c.waysInChat)
-        Text(c.wayInChatHint, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        Hairline()
         val value = when {
             !chat.configured -> c.waySoon
             sync.enabled -> c.wayConnected
             else -> c.wayNotConnected
         }
-        ChatProvider.entries.forEach { p -> ListRow(p.displayName, value, onClick = { onProvider(p) }) }
+        PanelSection(c.waysInChat) {
+            ChatProvider.entries.forEach { p -> ListRow(p.displayName, value, onClick = { onProvider(p) }) }
+        }
+        Hint(c.wayInChatHint)
     }
 }
 
@@ -172,9 +176,8 @@ fun ChatProviderScreen(
                 Text(if (sync.total > 0) c.uploading(sync.done, sync.total) else c.uploadingNoCount, style = Theme.type.caption)
             }
             Spacer(Modifier.height(Space.l))
-            Hairline()
-            ListRow(c.consentPhotos) { Segmented(photos, listOf(true to t.on, false to t.off)) { photos = it } }
-            Text(c.consentPhotosHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+            Panel { ListRow(c.consentPhotos) { Segmented(photos, listOf(true to t.on, false to t.off)) { photos = it } } }
+            Hint(c.consentPhotosHint)
         }
         return
     }
@@ -203,10 +206,10 @@ fun ChatProviderScreen(
             SectionTitle(c.soonTitle)
             Text(c.soonText, tone = Tone.Muted)
         } else {
-            SectionTitle(c.serverUrl)
-            Hairline()
-            ListRow(url, onClick = { platform.copyText(url); copied = "url" }) {
-                Text(if (copied == "url") c.serverUrlCopied else c.serverUrlCopy, style = Theme.type.caption, tone = Tone.Muted)
+            PanelSection(c.serverUrl) {
+                ListRow(url, onClick = { platform.copyText(url); copied = "url" }) {
+                    Text(if (copied == "url") c.serverUrlCopied else c.serverUrlCopy, style = Theme.type.caption, tone = Tone.Muted)
+                }
             }
         }
 
@@ -223,10 +226,10 @@ fun ChatProviderScreen(
         }
 
         if (chat.configured && sync.enabled) {
-            SectionTitle(c.chatOn)
-            Hairline()
-            ListRow(sync.lastSyncAt?.let { c.lastSync(formatMillis(it, t)) } ?: c.neverSynced) {
-                SmallButton(c.syncNow, onClick = chat.sync::flush)
+            PanelSection(c.chatOn) {
+                ListRow(sync.lastSyncAt?.let { c.lastSync(formatMillis(it, t)) } ?: c.neverSynced) {
+                    SmallButton(c.syncNow, onClick = chat.sync::flush)
+                }
             }
             if (sync.busy && sync.total > 0) Text(c.uploading(sync.done, sync.total), Modifier.padding(vertical = Space.s), style = Theme.type.caption)
             when (sync.problem) {
@@ -239,17 +242,19 @@ fun ChatProviderScreen(
 
             PairingSection(ui, clock, c)
 
-            SectionTitle(c.connections)
-            Hairline()
             val connections = ui.status?.connections.orEmpty()
-            if (connections.isEmpty()) Text(c.connectionsNone, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
-            connections.forEach { ConnectionRow(it, t, c) { viewModel.revoke(it.id) } }
+            PanelSection(c.connections) {
+                if (connections.isEmpty()) PanelItem { Text(c.connectionsNone, tone = Tone.Muted) }
+                connections.forEach { ConnectionRow(it, t, c) { viewModel.revoke(it.id) } }
+            }
 
             Spacer(Modifier.height(Space.m))
-            ListRow(c.photosToggle) {
-                Segmented(sync.photos, listOf(true to t.on, false to t.off)) { viewModel.setPhotos(it) }
+            Panel {
+                ListRow(c.photosToggle) {
+                    Segmented(sync.photos, listOf(true to t.on, false to t.off)) { viewModel.setPhotos(it) }
+                }
             }
-            Text(c.photosToggleHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+            Hint(c.photosToggleHint)
         }
 
         // The prompts show their full text before copying (shared component with the Coach tab).
@@ -278,20 +283,24 @@ private fun PairingSection(ui: ChatViewModel.UiState, clock: () -> Long, c: Chat
             val remaining = pairing.ttlSec - (now - ui.pairingAt) / 1000
             Text(c.pairText, tone = Tone.Muted)
             Spacer(Modifier.height(Space.l))
-            Text(
-                if (remaining > 0) pairing.code else "– – – –",
-                Modifier.fillMaxWidth(),
-                style = Theme.type.hero.copy(fontSize = 52.sp, letterSpacing = 6.sp, fontFeatureSettings = "tnum"),
-                align = TextAlign.Center,
-            )
-            Spacer(Modifier.height(Space.s))
-            Text(
-                if (remaining > 0) c.pairExpires(countdownText(remaining)) else c.pairExpired,
-                Modifier.fillMaxWidth(),
-                style = Theme.type.caption,
-                tone = Tone.Muted,
-                align = TextAlign.Center,
-            )
+            Panel {
+                PanelItem {
+                    Text(
+                        if (remaining > 0) pairing.code else "– – – –",
+                        Modifier.fillMaxWidth(),
+                        style = Theme.type.hero.copy(fontSize = 52.sp, letterSpacing = 6.sp, fontFeatureSettings = "tnum"),
+                        align = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(Space.s))
+                    Text(
+                        if (remaining > 0) c.pairExpires(countdownText(remaining)) else c.pairExpired,
+                        Modifier.fillMaxWidth(),
+                        style = Theme.type.caption,
+                        tone = Tone.Muted,
+                        align = TextAlign.Center,
+                    )
+                }
+            }
         }
         ui.newClient != null -> Text(c.pairConnected(ui.newClient), style = Theme.type.label)
         else -> Text(c.pairText, tone = Tone.Muted)
@@ -300,9 +309,9 @@ private fun PairingSection(ui: ChatViewModel.UiState, clock: () -> Long, c: Chat
 
 @Composable
 private fun ConnectionRow(conn: ChatConnection, t: Strings, c: ChatStrings, onRevoke: () -> Unit) {
-    Column {
+    PanelItem {
         Row(
-            Modifier.fillMaxWidth().padding(vertical = Space.m),
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -316,6 +325,5 @@ private fun ConnectionRow(conn: ChatConnection, t: Strings, c: ChatStrings, onRe
             }
             SmallButton(c.disconnect, onClick = onRevoke)
         }
-        Hairline()
     }
 }

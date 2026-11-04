@@ -62,6 +62,8 @@ import app.overfit.ui.chat.NoteBody
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelSection
 import app.overfit.ui.components.MultilineInput
 import app.overfit.ui.components.PromptView
 import app.overfit.ui.components.Screen
@@ -140,17 +142,17 @@ fun CoachTabScreen(
         val reviews by coach.reviews.collectAsState(initial = emptyList())
         val latest by coach.latestFinished.collectAsState(initial = null)
         val memory by coach.memory.collectAsState(initial = null)
-        SectionTitle(c.reviews)
-        Hairline()
-        reviews.firstOrNull { it.status == ReviewStatus.DONE }?.let { item ->
-            val title = if (item.kind == ReviewKind.PROGRESS) c.progressTitle else c.reviewTitle
-            ListRow(h.latestReview(dateText(item.createdAt)), item.review?.rating?.let(c.rating) ?: title, onClick = { nav.coach.openReview(item.id) })
+        PanelSection(c.reviews) {
+            reviews.firstOrNull { it.status == ReviewStatus.DONE }?.let { item ->
+                val title = if (item.kind == ReviewKind.PROGRESS) c.progressTitle else c.reviewTitle
+                ListRow(h.latestReview(dateText(item.createdAt)), item.review?.rating?.let(c.rating) ?: title, onClick = { nav.coach.openReview(item.id) })
+            }
+            latest?.let { s -> ListRow(c.reviewLast, onClick = { nav.coach.openSession(s.id) }) }
+            ListRow(c.assessProgress, onClick = { nav.coach.openReview(coach.startProgressReview()) })
+            if (reviews.isNotEmpty()) ListRow(h.allReviews, reviews.size.toString(), onClick = nav.allReviews)
+            MemoryRow(memory, nav.coach.memory)
+            ListRow(c.settingsTitle, onClick = nav.coach.settings)
         }
-        latest?.let { s -> ListRow(c.reviewLast, onClick = { nav.coach.openSession(s.id) }) }
-        ListRow(c.assessProgress, onClick = { nav.coach.openReview(coach.startProgressReview()) })
-        if (reviews.isNotEmpty()) ListRow(h.allReviews, reviews.size.toString(), onClick = nav.allReviews)
-        MemoryRow(memory, nav.coach.memory)
-        ListRow(c.settingsTitle, onClick = nav.coach.settings)
 
         ChatSection(chat, nav)
 
@@ -172,15 +174,15 @@ fun CoachTabScreen(
         // AI chat connections
         val cs = LocalChatStrings.current
         val sync by chatFeature.sync.state.collectAsState()
-        SectionTitle(h.connectionsTitle)
-        Hairline()
         val value = when {
             !chatFeature.configured -> cs.waySoon
             sync.enabled -> cs.wayConnected
             else -> cs.wayNotConnected
         }
-        ChatProvider.entries.forEach { p -> ListRow(p.displayName, value, onClick = { nav.chatProvider(p) }) }
-        ListRow(cs.notesTitle, onClick = nav.chatNotes)
+        PanelSection(h.connectionsTitle) {
+            ChatProvider.entries.forEach { p -> ListRow(p.displayName, value, onClick = { nav.chatProvider(p) }) }
+            ListRow(cs.notesTitle, onClick = nav.chatNotes)
+        }
     }
 }
 
@@ -198,8 +200,8 @@ private fun AccessRow(state: AppState, providers: Providers, fuelSession: FuelSe
         else -> h.accessNone
     }
     val ready = (fuel && service != null) || (state.hasApiKey && !fuel)
-    Hairline()
-    Column(Modifier.fillMaxWidth().pressableRow(onClick).testTag("coach:access")) {
+    Panel {
+    Column(Modifier.fillMaxWidth().background(Theme.colors.surface).pressableRow(onClick).padding(horizontal = Space.m).testTag("coach:access")) {
         Row(Modifier.fillMaxWidth().padding(vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(h.accessTitle, style = Theme.type.caption, tone = Tone.Muted)
@@ -213,19 +215,18 @@ private fun AccessRow(state: AppState, providers: Providers, fuelSession: FuelSe
                 Modifier.padding(bottom = Space.m).testTag("coach:access-privacy"), style = Theme.type.caption, tone = Tone.Muted,
             )
         }
-        Hairline()
+    }
     }
 }
 
 @Composable
 private fun MemoryRow(memory: CoachMemoryEntity?, onClick: () -> Unit) {
     val t = LocalStrings.current
-    Column(Modifier.fillMaxWidth().pressableRow(onClick)) {
+    Column(Modifier.fillMaxWidth().background(Theme.colors.surface).pressableRow(onClick).padding(horizontal = Space.m)) {
         Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
             Text(t.coachMemory)
             memory?.text?.takeIf { it.isNotBlank() }?.let { Text(it, style = Theme.type.caption, tone = Tone.Muted, maxLines = 2) }
         }
-        Hairline()
     }
 }
 
@@ -241,19 +242,21 @@ private fun ChatSection(chat: CoachChatService, nav: CoachTabNav) {
     SectionTitle(h.chatTitle)
     if (!chat.available()) Text(h.chatNoAccess, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
     if (current != null && preview.isNotEmpty()) {
-        Hairline()
-        Column(Modifier.fillMaxWidth().pressableRow { nav.openChat(current.id, "") }.padding(vertical = Space.m)) {
-            preview.takeLast(2).forEach { m ->
-                Text(
-                    (if (m.fromUser) h.you else h.coach) + ": " + previewText(m, h.chatThinking),
-                    style = Theme.type.caption,
-                    tone = if (m.fromUser) Tone.Muted else Tone.Default,
-                    maxLines = 3,
-                )
-                Spacer(Modifier.height(Space.xs))
+        Panel {
+            Column(Modifier.fillMaxWidth().background(Theme.colors.surface).pressableRow { nav.openChat(current.id, "") }.padding(Space.m)) {
+                preview.takeLast(2).forEach { m ->
+                    Text(
+                        (if (m.fromUser) h.you else h.coach) + ": " + previewText(m, h.chatThinking),
+                        style = Theme.type.caption,
+                        tone = if (m.fromUser) Tone.Muted else Tone.Default,
+                        maxLines = 3,
+                    )
+                    Spacer(Modifier.height(Space.xs))
+                }
+                Text(h.chatContinue, style = Theme.type.label)
             }
-            Text(h.chatContinue, style = Theme.type.label)
         }
+        Spacer(Modifier.height(Space.s))
     }
     MultilineInput(input, { input = it }, h.chatPlaceholder, Modifier.testTag("coach:tabInput"), minHeight = 48.dp)
     Row(Modifier.fillMaxWidth().padding(vertical = Space.s), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -269,9 +272,9 @@ private fun ChatSection(chat: CoachChatService, nav: CoachTabNav) {
     }
     val earlier = chats.drop(1).take(EARLIER_CHATS)
     if (earlier.isNotEmpty()) {
-        Text(h.chatEarlier, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        Hairline()
-        earlier.forEach { ch -> ListRow(ch.title, dateText(ch.updatedAt), onClick = { nav.openChat(ch.id, "") }) }
+        PanelSection(h.chatEarlier) {
+            earlier.forEach { ch -> ListRow(ch.title, dateText(ch.updatedAt), onClick = { nav.openChat(ch.id, "") }) }
+        }
     }
 }
 

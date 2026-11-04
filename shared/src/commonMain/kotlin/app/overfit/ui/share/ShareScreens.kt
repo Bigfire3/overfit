@@ -58,7 +58,10 @@ import app.overfit.share.TemplateImporter
 import app.overfit.share.AiPrompt
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelItem
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
@@ -220,14 +223,14 @@ fun ImportScreen(
             Spacer(Modifier.height(Space.m))
             Text(s.importIntro, tone = Tone.Muted)
             Spacer(Modifier.height(Space.l))
-            Hairline()
-            if (share.platform.canScanInApp) {
-                ListRow(s.scanQr, onClick = { denied = false; scanning = true })
-            } else {
-                Column(Modifier.padding(vertical = Space.m)) { Text(s.scanIosHint, tone = Tone.Muted) }
-                Hairline()
+            Panel {
+                if (share.platform.canScanInApp) {
+                    ListRow(s.scanQr, onClick = { denied = false; scanning = true })
+                } else {
+                    PanelItem { Text(s.scanIosHint, tone = Tone.Muted) }
+                }
+                ListRow(s.importPickFile, onClick = { denied = false; pickFile() })
             }
-            ListRow(s.importPickFile, onClick = { denied = false; pickFile() })
             // The AI prompt with its full text (shared component with the Coach tab).
             app.overfit.ui.components.PromptView(
                 title = s.aiTemplateCopy,
@@ -235,7 +238,7 @@ fun ImportScreen(
                 text = remember { aiTemplateText(s, share.aiProfile()) },
                 onCopy = { share.platform.copyText(it); aiCopied = true },
             )
-            Column(Modifier.padding(vertical = Space.m)) { Text(s.importFileHint, style = Theme.type.caption, tone = Tone.Muted) }
+            Hint(s.importFileHint)
         }
     }
 }
@@ -272,11 +275,9 @@ internal fun PreviewScreen(
         preview.note?.let { Spacer(Modifier.height(Space.m)); Text(it, style = Theme.type.caption, tone = Tone.Muted) }
         intro?.let { Spacer(Modifier.height(Space.m)); it(this) }
         Spacer(Modifier.height(Space.l))
-        Hairline()
-        preview.exercises.forEach { PreviewRow(it, unit, language) }
+        Panel { preview.exercises.forEach { PreviewRow(it, unit, language) } }
         if (preview.newExerciseNames.isNotEmpty()) {
-            Spacer(Modifier.height(Space.m))
-            Text(s.previewNewNote(preview.newExerciseNames), style = Theme.type.caption, tone = Tone.Muted)
+            Hint(s.previewNewNote(preview.newExerciseNames))
         }
     }
 }
@@ -296,9 +297,9 @@ private fun PreviewRow(line: PreviewExercise, unit: WeightUnit, language: Langua
             if (value.isNotBlank()) add(value)
         }
     }.joinToString(" · ")
-    Column(Modifier.fillMaxWidth()) {
+    PanelItem {
         Row(
-            Modifier.fillMaxWidth().padding(vertical = Space.m),
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -308,7 +309,6 @@ private fun PreviewRow(line: PreviewExercise, unit: WeightUnit, language: Langua
             }
             if (line.isNew) Text(s.previewNewTag.uppercase(), style = Theme.type.caption, tone = Tone.Default)
         }
-        Hairline()
     }
 }
 
@@ -396,13 +396,14 @@ fun ShareScreen(
                 Text(s.qrTooLarge, tone = Tone.Muted)
             }
             Spacer(Modifier.height(Space.l))
-            Hairline()
-            ListRow(if (copied) s.linkCopied else s.copyLink, onClick = { platform.copyText(link); copied = true })
-            state.json?.let { json ->
-                ListRow(s.shareFile, onClick = {
-                    val file = state.name.filter { it.isLetterOrDigit() || it == ' ' || it == '-' }.trim().ifEmpty { "overfit" }
-                    platform.shareFile("$file.${ShareFormat.FILE_EXTENSION}", json)
-                })
+            Panel {
+                ListRow(if (copied) s.linkCopied else s.copyLink, onClick = { platform.copyText(link); copied = true })
+                state.json?.let { json ->
+                    ListRow(s.shareFile, onClick = {
+                        val file = state.name.filter { it.isLetterOrDigit() || it == ' ' || it == '-' }.trim().ifEmpty { "overfit" }
+                        platform.shareFile("$file.${ShareFormat.FILE_EXTENSION}", json)
+                    })
+                }
             }
         }
     }
@@ -425,13 +426,13 @@ private fun SharePreview(training: SharedTraining, unit: WeightUnit, language: L
             set.sec?.let { add(Numbers.formatDuration(it)) }
         }.joinToString(" ")
     }
-    Hairline()
-    Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
-        Text(s.sharePreviewTitle, style = Theme.type.caption, tone = Tone.Muted)
-        Text(s.sharePreviewCounts(training.exercises.size, sets), style = Theme.type.label)
-        Text(if (example != null) s.sharePreviewValues(example) else s.sharePreviewNoValues, style = Theme.type.caption, tone = Tone.Muted)
+    Panel {
+        PanelItem {
+            Text(s.sharePreviewTitle, style = Theme.type.caption, tone = Tone.Muted)
+            Text(s.sharePreviewCounts(training.exercises.size, sets), style = Theme.type.label)
+            Text(if (example != null) s.sharePreviewValues(example) else s.sharePreviewNoValues, style = Theme.type.caption, tone = Tone.Muted)
+        }
     }
-    Hairline()
 }
 
 /**
@@ -470,7 +471,7 @@ const val QR_QUIET_ZONE = 3
 fun TemplateImportRows(share: ShareDependencies, onImport: () -> Unit) {
     val s = LocalStrings.current.share
     var aiCopied by remember { mutableStateOf(false) }
-    ListRow(s.importTitle, onClick = onImport)
+    Panel { ListRow(s.importTitle, onClick = onImport) }
     app.overfit.ui.components.PromptView(
         title = s.aiTemplateCopy,
         hint = if (aiCopied) s.aiTemplateCopied else null,
