@@ -1,5 +1,6 @@
 package app.overfit.ui
 
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -97,7 +98,7 @@ class TrainingTabTest {
 
         // Finish (confirm pattern) → finish flow: the name is set here
         compose.onNodeWithText("Beenden").performClick()
-        compose.onNodeWithText("Beenden? Nochmal tippen").performClick()
+        compose.onNodeWithTag("dialog:confirm").performClick()
         waitFor("Wie war das Training?")
         compose.waitUntilState(20_000) { runBlocking { data.workouts.status(running.id) } == SessionStatus.FINISHED }
         // Saved right away, without asking, under the default name
@@ -151,7 +152,7 @@ class TrainingTabTest {
         compose.waitUntilState(20_000) { deps.workout.state.value.workout?.exercises?.size == 2 }
 
         compose.onNodeWithText("Beenden").performClick()
-        compose.onNodeWithText("Beenden? Nochmal tippen").performClick()
+        compose.onNodeWithTag("dialog:confirm").performClick()
         waitFor("Wie war das Training?")
 
         // No dialog: the saved workout has the new structure; planned values of kept sets stay

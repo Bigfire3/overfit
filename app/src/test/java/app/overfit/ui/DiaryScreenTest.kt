@@ -1,6 +1,7 @@
 package app.overfit.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -120,10 +121,13 @@ class DiaryScreenTest {
         // Two photos of that day, oldest first; a tap opens the viewer.
         compose.onNodeWithContentDescription("Foto 1").performScrollTo().performClick()
         assertEquals("p2", opened)
-        // Remove: the first tap only arms ("Entfernen?"), the second removes.
+        // Remove: the "x" asks in a popup, "Entfernen" there removes; tapping "Abbrechen" keeps the photo.
         compose.onAllNodesWithContentDescription("Foto entfernen")[1].performScrollTo().performClick()
+        compose.onNodeWithText("Foto vom Tag entfernen?").assertExists()
+        compose.onNodeWithTag("dialog:cancel").performClick()
         assertEquals(null, removed)
-        compose.onNodeWithContentDescription("Entfernen?").performClick()
+        compose.onAllNodesWithContentDescription("Foto entfernen")[1].performScrollTo().performClick()
+        compose.onNodeWithTag("dialog:confirm").performClick()
         assertEquals("p3", removed)
         compose.onNodeWithText("Aus Fotos wählen").assertExists()
     }
@@ -190,7 +194,7 @@ class DiaryScreenTest {
         compose.onNodeWithContentDescription("Foto 1 von 2").assertIsDisplayed()
         compose.onNodeWithContentDescription("Foto löschen").performClick() // bin icon top right
         assertEquals(null, deleted)
-        compose.onNodeWithText("Wirklich löschen? Nochmal tippen.").performClick()
+        compose.onNodeWithTag("dialog:confirm").performClick()
         assertEquals("p2", deleted)
     }
 

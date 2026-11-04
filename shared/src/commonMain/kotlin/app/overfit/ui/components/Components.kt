@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import app.overfit.i18n.LocalStrings
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.TextAutoSize
@@ -171,8 +172,8 @@ fun HeaderIconButton(icon: Icon, label: String, onClick: () -> Unit, color: Colo
 }
 
 /**
- * Delete in a [BackHeader]: a bin icon; the first tap turns it into a red "Delete?" pill
- * ([confirmLabel]), the second tap deletes. Same arming rules as [ConfirmButton].
+ * Delete in a [BackHeader]: a bin icon that opens a [ConfirmDialog] with the question [confirmLabel]
+ * ("Wirklich löschen?") and an optional [message]; "Löschen" there runs [onConfirm].
  */
 @Composable
 fun HeaderDeleteButton(
@@ -181,17 +182,13 @@ fun HeaderDeleteButton(
     onConfirm: () -> Unit,
     onConfirmingChange: (Boolean) -> Unit = {},
     color: Color = Theme.colors.foreground,
+    message: String? = null,
 ) {
-    val arm = rememberConfirmArm(onConfirmingChange)
-    if (arm.armed) {
-        val c = Theme.colors
-        PillButton(
-            confirmLabel, { arm.disarm(); onConfirm() }, arm.modifier, enabled = true, compact = true, haptic = true,
-            fill = c.negativeSubtle, pressedFill = c.negativeSubtle.copy(alpha = 0.6f), contentTone = c.negative,
-        )
-    } else {
-        HeaderIconButton(Icon.Delete, label, { arm.arm() }, color)
-    }
+    var open by remember { mutableStateOf(false) }
+    val callback by androidx.compose.runtime.rememberUpdatedState(onConfirmingChange)
+    LaunchedEffect(open) { callback(open) }
+    HeaderIconButton(Icon.Delete, label, { open = true }, color)
+    if (open) ConfirmDialog(confirmLabel, LocalStrings.current.delete, onConfirm, onDismiss = { open = false }, message = message)
 }
 
 // ---------------------------------------------------------------------------
@@ -323,9 +320,9 @@ fun DestructiveButton(
 }
 
 /**
- * Confirm pattern: first tap changes the text ([confirmLabel]) and the colours, the second tap runs
- * [onConfirm]. The armed state ends after 4 s, when another confirm button is armed, or on a tap
- * anywhere else ([ConfirmArea]). [kind] picks red (destructive) or green (positive), without a border.
+ * Button for actions that need a confirmation (finish, discard, reset): a tap opens a [ConfirmDialog] with
+ * the question [confirmLabel] and [label] as the action; tapping beside it or "Abbrechen" closes it.
+ * [kind] picks a red (destructive) or black (positive) action in the popup.
  */
 @Composable
 fun ConfirmButton(
@@ -336,20 +333,17 @@ fun ConfirmButton(
     kind: Confirm = Confirm.Destructive,
     compact: Boolean = false,
     enabled: Boolean = true,
-    /** Lets a crowded parent make room while the longer confirm text shows. */
+    /** Called with true while the popup is open. */
     onConfirmingChange: (Boolean) -> Unit = {},
+    message: String? = null,
+    /** Short action text in the popup when [label] is long ("Verwerfen" for "Training abbrechen und verwerfen"). */
+    actionLabel: String = label,
 ) {
-    val arm = rememberConfirmArm(onConfirmingChange)
-    val c = Theme.colors
-    if (arm.armed) {
-        val (fill, tone) = if (kind == Confirm.Destructive) c.negativeSubtle to c.negative else c.positiveSubtle to c.positive
-        PillButton(
-            confirmLabel, { arm.disarm(); onConfirm() }, modifier.then(arm.modifier), enabled, compact, haptic = true,
-            fill = fill, pressedFill = fill.copy(alpha = 0.6f), contentTone = tone,
-        )
-    } else {
-        SecondaryButton(label, { arm.arm() }, modifier, enabled, compact)
-    }
+    var open by remember { mutableStateOf(false) }
+    val callback by androidx.compose.runtime.rememberUpdatedState(onConfirmingChange)
+    LaunchedEffect(open) { callback(open) }
+    SecondaryButton(label, { open = true }, modifier, enabled, compact)
+    if (open) ConfirmDialog(confirmLabel, actionLabel, onConfirm, onDismiss = { open = false }, message = message, kind = kind)
 }
 
 /**

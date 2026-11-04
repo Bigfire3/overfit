@@ -1,5 +1,6 @@
 package app.overfit.ui.settings
 
+import app.overfit.ui.components.ConfirmDialog
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -66,7 +67,6 @@ fun BackupImportScreen(
     var confirm by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
     var failure by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(confirm) { if (confirm) { delay(4000); confirm = false } }
 
     val preview = (parsed as? Parsed.Ok)?.preview
     Screen(
@@ -75,30 +75,29 @@ fun BackupImportScreen(
         footer = {
             failure?.let { Text(it, style = Theme.type.caption) }
             if (preview != null && !workoutRunning) {
-                PrimaryButton(
-                    if (confirm) p.importReplaceConfirm else p.importReplace,
-                    loading = running,
-                    onClick = {
-                        if (!confirm) { confirm = true; return@PrimaryButton }
-                        running = true
-                        failure = null
-                        appScope.launch {
-                            val error = try {
-                                backup.restore(preview)
-                                null
-                            } catch (e: BackupError.WorkoutRunning) {
-                                p.importWorkoutRunning
-                            } catch (e: Exception) {
-                                p.importFailed
-                            }
-                            withContext(Dispatchers.Main) {
-                                running = false
-                                confirm = false
-                                if (error == null) onRestored() else failure = error
-                            }
+                val restore = {
+                    running = true
+                    failure = null
+                    appScope.launch {
+                        val error = try {
+                            backup.restore(preview)
+                            null
+                        } catch (e: BackupError.WorkoutRunning) {
+                            p.importWorkoutRunning
+                        } catch (e: Exception) {
+                            p.importFailed
                         }
-                    },
-                )
+                        withContext(Dispatchers.Main) {
+                            running = false
+                            confirm = false
+                            if (error == null) onRestored() else failure = error
+                        }
+                    }
+                }
+                PrimaryButton(p.importReplace, loading = running, onClick = { confirm = true })
+                if (confirm) {
+                    ConfirmDialog(p.importReplaceConfirm, p.importReplace, onConfirm = { restore() }, onDismiss = { confirm = false })
+                }
             }
         },
     ) {

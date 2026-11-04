@@ -2,6 +2,7 @@ package app.overfit.ui
 
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasClickAction
@@ -139,9 +140,9 @@ class MinimizeWorkoutTest {
 
         // Second workout: choice instead of a start; "end running" needs a second tap
         compose.onNodeWithText("Laufendes beenden").performClick()
-        compose.onNodeWithText("Beenden? Nochmal tippen").assertIsDisplayed()
+        compose.onNodeWithText("Training beenden?").assertIsDisplayed()
         assertNotNull(deps.workout.state.value.workout)
-        compose.onNodeWithText("Beenden? Nochmal tippen").performClick()
+        compose.onNodeWithTag("dialog:confirm").performClick()
         waitFor("Wie war das Training?")
         assertNull(deps.workout.state.value.workout)
     }
