@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link }
+enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link, List }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -145,6 +145,13 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 drawRoundRect(color, p(3.5f, 6.5f), Size(17f * u, 12f * u), style = stroke)
                 line(3.5f, 10f, 20.5f, 10f)
                 drawCircle(color, 1.1f * u, p(16.5f, 14.25f))
+            }
+            // List view: three rows, each with a dot and a line.
+            Icon.List -> {
+                for (y in listOf(6.5f, 12f, 17.5f)) {
+                    drawCircle(color, 1.1f * u, p(5.5f, y))
+                    line(9.5f, y, 20f, y)
+                }
             }
             // Two linked rings: connect a chat.
             Icon.Link -> {

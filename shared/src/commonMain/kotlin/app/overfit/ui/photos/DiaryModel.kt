@@ -40,3 +40,16 @@ internal fun dayPhotoTarget(date: LocalDate, today: LocalDate, workouts: List<Hi
     val takenAt = if (date == today) now else LocalDateTime(date, LocalTime(12, 0)).toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
     return DayPhotoTarget(session, takenAt)
 }
+
+/** Remembers whether the calendar tab shows the list (true) or the month grid (false). */
+class DiaryViewPref(private val kv: app.overfit.data.KeyValueStore) {
+    var list: Boolean
+        get() = kv.get(KEY) == "list"
+        set(value) = kv.put(KEY, if (value) "list" else "calendar")
+
+    private companion object { const val KEY = "diary.view" }
+}
+
+/** Days with a photo or workout, newest first, grouped by (year, month), for the list view. */
+internal fun diaryListMonths(days: Map<LocalDate, DiaryDay>): List<Pair<Pair<Int, Int>, List<DiaryDay>>> =
+    days.values.sortedByDescending { it.date }.groupBy { it.date.year to it.date.monthNumber }.toList()
