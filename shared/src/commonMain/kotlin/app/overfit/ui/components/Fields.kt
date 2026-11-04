@@ -152,13 +152,14 @@ fun MultilineInput(
     val style = Theme.type.body.copy(color = c.foreground)
     val shape = RoundedCornerShape(16.dp)
     val inPanel = LocalInPanel.current
-    BasicTextField(
+    // Outer box carries the caller's modifier (test tags, weights), the field sits inside it as before.
+    Box(modifier.fillMaxWidth()) { BasicTextField(
         value = value,
         onValueChange = onValueChange,
         textStyle = style,
         cursorBrush = SolidColor(c.foreground),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = minHeight)
             .then(if (inPanel) Modifier.background(c.surface) else Modifier.clip(shape).background(c.surface).border(1.dp, c.hairline, shape))
@@ -169,5 +170,5 @@ fun MultilineInput(
                 inner()
             }
         },
-    )
+    ) }
 }

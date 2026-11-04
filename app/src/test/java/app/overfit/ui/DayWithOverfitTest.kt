@@ -420,7 +420,7 @@ class DayWithOverfitTest {
         compose.waitUntilState(10_000) { !store.state.value.settings.restTicks }
         assertFalse(store.state.value.settings.vibration)
         click("English")
-        waitFor("Settings")
+        waitFor("ABOUT YOU")
         assertEquals(Language.EN, store.state.value.language)
         tab("Workouts")
         compose.waitForTrainingTab("New workout")
@@ -428,7 +428,7 @@ class DayWithOverfitTest {
         waitFor("1 workout")
         tab("Profile")
         click("Deutsch")
-        waitFor("Einstellungen")
+        waitFor("ÜBER DICH")
 
         // Backup round trip: export → delete everything (UI) → restore = same data
         val beforeTemplates = templates().map { it.name }
