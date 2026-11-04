@@ -176,6 +176,12 @@ open class ScreenshotTest {
         back()
         tab("Profil")
         shot("profil")
+        // Coach tab without its first-time story (the story itself is not part of this tour).
+        store.markCoachStorySeen()
+        tab("Coach")
+        compose.waitForIdle()
+        shot("coach")
+        tab("Profil")
         tab("Workouts")
         compose.onNodeWithContentDescription("Übungen").performClick()
         waitFor("Eigene Übung")

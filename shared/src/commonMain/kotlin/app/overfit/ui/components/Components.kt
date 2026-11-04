@@ -487,15 +487,20 @@ fun RowInput(
 ) {
     // Done removes the cursor; losing focus commits the value.
     val focusManager = LocalFocusManager.current
+    val style = Theme.type.body.copy(color = Theme.colors.muted, textAlign = TextAlign.End)
+    // As wide as the value (at least a comfortable tap target), so a label and its value share one line.
+    val width = (IntrinsicTextWidth(value, style) + 8.dp).coerceIn(64.dp, 200.dp)
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
-        textStyle = Theme.type.body.copy(color = Theme.colors.muted, textAlign = TextAlign.End),
+        textStyle = style,
         cursorBrush = SolidColor(Theme.colors.foreground),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-        modifier = Modifier.widthIn(min = 120.dp).onFocusLost(onCommit),
+        modifier = Modifier.width(width).onFocusLost(onCommit),
+        // 48 dp high tap area, text vertically centred.
+        decorationBox = { inner -> Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) { inner() } },
     )
 }
 
