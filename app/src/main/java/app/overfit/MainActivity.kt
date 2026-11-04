@@ -14,11 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import app.overfit.platform.AndroidRestAlerts
 import app.overfit.platform.AppVisibility
 import app.overfit.platform.EXTRA_OPEN_WORKOUT
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import app.overfit.ui.OverfitApp
-import app.overfit.ui.theme.isDark
 
 class MainActivity : ComponentActivity() {
     // Notification permission (Android 13+), asked when the first workout starts.
@@ -27,20 +23,13 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The app is always dark: light status and navigation bar icons on the black app, whatever the system setting.
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         val deps = (application as OverfitApp).dependencies
         (deps.restAlerts as? AndroidRestAlerts)?.permissionRequester = { permissionLauncher.launch(it) }
         handleIncoming(intent)
         setContent {
-            val state by deps.store.state.collectAsState()
-            val dark = state.settings.theme.isDark()
-            // System bar icons follow the in-app theme (dark by default).
-            LaunchedEffect(dark) {
-                val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
-                else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-                enableEdgeToEdge(style, style)
-            }
             OverfitApp(deps)
         }
     }

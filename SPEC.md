@@ -4,7 +4,7 @@
 - App-Name: Overfit, Android applicationId und iOS Bundle-ID: `app.overfit`
 - Extrem minimalistisch in Funktion und Design.
 - UI-Sprache **Deutsch und Englisch**: aus der Gerätesprache übernommen, in den Einstellungen umschaltbar. Die App-Sprache ist auch die Antwortsprache des Coaches.
-- Design **schwarz-weiß**, angelehnt an den Stil von Trade Republic (Inspiration, keine Kopie von Logo, Name, Hausschrift oder Screens): keine Akzentfarbe, Typografie und Weißraum tragen das Design, Haarlinien statt Cards, ein invertierter Pill-Button pro Screen, dünne Linien-Icons. Dunkel als Standard, Hell und System wählbar. Große Touch-Flächen.
+- Design **schwarz-weiß**, angelehnt an den Stil von Trade Republic (Inspiration, keine Kopie von Logo, Name, Hausschrift oder Screens): keine Akzentfarbe, Typografie und Weißraum tragen das Design, Haarlinien statt Cards, ein invertierter Pill-Button pro Screen, dünne Linien-Icons. Nur Dunkelmodus (seit 4.11., kein Hell-Modus). Große Touch-Flächen.
 - Erledigte Sätze werden über Kontrast und Häkchen markiert, nicht über Farbe.
 - Einheit kg oder lb (aus der Region vorbelegt, umschaltbar). Intern immer kg.
 - Keine Werbung, kein Tracking, keine Analytics-SDKs.
@@ -106,7 +106,7 @@ API-Key: Eingabe im Onboarding oder in den Einstellungen, Prüfung beim Verbinde
 - Verlauf: vergangene Trainings, Detail mit Sätzen + Coach-Bewertung (seit 3.11.26 ohne eigenen Tab: Kalender → Tag → Training, nachträglich bearbeitbar)
 - Foto-Tagebuch: Zeitleiste/Grid, zwei Fotos nebeneinander vergleichen. Fotos nur im app-privaten Speicher, nicht in der Galerie
 - Coach-Gedächtnis: lesen, bearbeiten, Versionen
-- Profil/Einstellungen: Sprache, Darstellung, Name, Alter, Einheit, KI-Zugang, Modell, Standard-Pause, Ton, Bildschirm an, RPE an/aus, Bilder offline laden, Backup, Alle Daten löschen
+- Profil/Einstellungen: Sprache, Name, Alter, Einheit, KI-Zugang, Modell, Standard-Pause, Ton, Bildschirm an, RPE an/aus, Bilder offline laden, Backup, Alle Daten löschen
 - Backup: Export/Import als JSON, optional ZIP mit Fotos, über die Dateiauswahl
 - Über: App-Version, Lizenzen und Namensnennungen
 

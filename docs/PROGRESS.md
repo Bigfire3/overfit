@@ -1030,3 +1030,13 @@ Offen / Hinweise:
 4. Plank, Dead Hang, Hamstring Stretch: ein einzelnes Bild in grauer Fläche
 5. Hell und dunkel: Figuren in Schwarz bzw. Weiß, graue Fläche mit feinem Rand wie die anderen Panels
 6. Listen (Katalog, Workout): Icons wie vorher (manche Linien etwas kräftiger); eigene Übung ohne Bild zeigt weiter die Initialen
+
+## Session AQ – Nur Dunkelmodus, schlichte Schalter (4.11.)
+- Erledigt: App immer dunkel, auch wenn das Handy auf hell steht; „Darstellung“ im Profil entfernt. Schalter (Vibration, Ticken, Coach-/KI-Chat-Fotos) sind schlichte Schalter ohne „An/Aus“: links aus, rechts an. Details in docs/DECISIONS.md, Belege `docs/screenshots/nur-dunkel/`.
+
+### Bitte auf dem Handy testen (Dunkelmodus, Schalter)
+1. Handy-Einstellung auf hell stellen → App öffnen: alles dunkel, Statusleiste und Navigationsleiste mit hellen Symbolen, Startbildschirm schwarz
+2. Profil: keine Zeile „Darstellung“ mehr
+3. Profil → Vibration und „Ticken vor Pausenende“: Schalter ohne Text; aus = Knopf links, dunkle Spur mit Rand; an = Knopf rechts, weiße Spur; Tippen auf die ganze Zeile schaltet um
+4. Coach → Einstellungen „Fotos senden“ und KI-Chat → Fotos: gleiche Schalter
+5. TalkBack an: Schalter wird als „Schalter, an/aus“ mit Namen angesagt

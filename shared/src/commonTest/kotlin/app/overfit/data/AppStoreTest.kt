@@ -47,6 +47,22 @@ class AppStoreTest {
     }
 
     @Test
+    fun olderStateWithLightThemeStillDecodes_themeIsGone() {
+        // Before "dark only" the settings stored a theme; it is ignored now and dropped on the next save.
+        val kv = InMemoryKeyValueStore()
+        kv.put(
+            "overfit.state.v1",
+            """{"version":1,"profile":{"name":"Fabi"},"settings":{"language":"EN","theme":"LIGHT","vibration":false},"onboardingDone":true}""",
+        )
+        val store = AppStore(kv, InMemorySecretStore(), defaults)
+        assertEquals(Language.EN, store.state.value.language)
+        assertFalse(store.state.value.settings.vibration)
+        assertTrue(store.state.value.onboardingDone)
+        store.setRestTicks(false)
+        assertFalse(kv.get("overfit.state.v1")!!.contains("theme"))
+    }
+
+    @Test
     fun persistsAcrossInstances() {
         val kv = InMemoryKeyValueStore()
         val secrets = InMemorySecretStore()

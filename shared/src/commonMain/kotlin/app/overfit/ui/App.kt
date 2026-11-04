@@ -378,7 +378,7 @@ fun OverfitApp(deps: AppDependencies) {
         onPauseOrDispose { deps.chat.onBackground() }
     }
     val chatInbox by deps.chat.inbox.state.collectAsStateWithLifecycle()
-    OverfitTheme(state.settings.theme) {
+    OverfitTheme {
         CompositionLocalProvider(
             LocalStrings provides stringsFor(state.language),
             LocalFuelStrings provides fuelStringsFor(state.language),

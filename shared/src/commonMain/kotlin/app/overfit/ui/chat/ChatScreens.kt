@@ -176,7 +176,7 @@ fun ChatProviderScreen(
                 Text(if (sync.total > 0) c.uploading(sync.done, sync.total) else c.uploadingNoCount, style = Theme.type.caption)
             }
             Spacer(Modifier.height(Space.l))
-            Panel { ListRow(c.consentPhotos) { Segmented(photos, listOf(true to t.on, false to t.off)) { photos = it } } }
+            Panel { app.overfit.ui.components.SwitchRow(c.consentPhotos, photos) { photos = it } }
             Hint(c.consentPhotosHint)
         }
         return
@@ -250,9 +250,7 @@ fun ChatProviderScreen(
 
             Spacer(Modifier.height(Space.m))
             Panel {
-                ListRow(c.photosToggle) {
-                    Segmented(sync.photos, listOf(true to t.on, false to t.off)) { viewModel.setPhotos(it) }
-                }
+                app.overfit.ui.components.SwitchRow(c.photosToggle, sync.photos) { viewModel.setPhotos(it) }
             }
             Hint(c.photosToggleHint)
         }

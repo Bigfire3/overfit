@@ -3,7 +3,6 @@ package app.overfit.data
 import app.overfit.ai.ProviderId
 import app.overfit.domain.Language
 import app.overfit.domain.Profile
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.WeightEntry
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.upsertWeight
@@ -19,7 +18,6 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class Settings(
     val language: Language,
-    val theme: ThemeMode = ThemeMode.DARK,
     /** Rest when neither template nor exercise sets one. */
     val defaultRestSec: Int = WorkoutPrefs.DEFAULT_REST_SEC,
     val vibration: Boolean = true,
@@ -90,7 +88,6 @@ class AppStore(
     fun logWeight(kg: Double, date: LocalDate) =
         edit { it.copy(weights = upsertWeight(it.weights, WeightEntry(date.toString(), kg))) }
     fun setLanguage(language: Language) = edit { it.copy(settings = it.settings.copy(language = language)) }
-    fun setTheme(theme: ThemeMode) = edit { it.copy(settings = it.settings.copy(theme = theme)) }
     fun setDefaultRest(sec: Int) =
         edit { it.copy(settings = it.settings.copy(defaultRestSec = sec.coerceIn(0, MAX_REST_SEC))) }
     fun setVibration(on: Boolean) = edit { it.copy(settings = it.settings.copy(vibration = on)) }

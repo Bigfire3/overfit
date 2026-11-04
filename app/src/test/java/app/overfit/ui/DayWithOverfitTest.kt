@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -39,7 +41,6 @@ import app.overfit.data.InMemorySecretStore
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.data.db.SessionStatus
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.WeightUnit
 import app.overfit.platform.HapticPattern
 import app.overfit.platform.RecordingHaptics
@@ -411,15 +412,14 @@ class DayWithOverfitTest {
         assertTrue(shown("Ohne diese Erlaubnis meldet sich der Pausentimer", substring = true))
         compose.onNodeWithText("Benachrichtigungen erlauben").performScrollTo().performClick()
         assertEquals(1, alerts.allowRequests)
-        click("Dunkel")
-        assertEquals(ThemeMode.DARK, store.state.value.settings.theme)
-        click("Hell")
-        assertEquals(ThemeMode.LIGHT, store.state.value.settings.theme)
-        // Two on/off rows: vibration first, then the countdown ticks.
-        compose.onAllNodes(hasText("Aus"))[0].performScrollTo().performClick()
+        // No theme choice any more (always dark).
+        assertFalse(shown("Darstellung"))
+        // Two plain switches (no "An/Aus" text): vibration first, then the countdown ticks.
+        assertFalse(shown("Aus"))
+        compose.onNode(hasText("Vibration") and isToggleable()).performScrollTo().assertIsOn().performClick()
         assertFalse(store.state.value.settings.vibration)
         assertTrue(store.state.value.settings.restTicks)
-        compose.onAllNodes(hasText("Aus"))[1].performScrollTo().performClick()
+        compose.onNode(hasText("Ticken vor Pausenende") and isToggleable()).performScrollTo().performClick()
         compose.waitUntilState(10_000) { !store.state.value.settings.restTicks }
         assertFalse(store.state.value.settings.vibration)
         click("English")

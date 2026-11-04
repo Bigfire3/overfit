@@ -27,7 +27,6 @@ import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.data.InMemorySecretStore
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.WeightUnit
 import app.overfit.platform.RecordingHaptics
 import app.overfit.platform.RecordingRestAlerts
@@ -45,7 +44,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Evidence screenshots of the main screens in light and dark. Only runs when `SCREENSHOT_DIR` is set
+ * Evidence screenshots of the main screens (dark only). Only runs when `SCREENSHOT_DIR` is set
  * (`SCREENSHOT_DIR=docs/screenshots/before ./gradlew … :app:testDebugUnitTest --tests '*ScreenshotTest*'`);
  * otherwise it is skipped, so normal builds are not slowed down.
  */
@@ -104,16 +103,14 @@ open class ScreenshotTest {
     }
     private fun back() { compose.onNodeWithContentDescription("Zurück").performClick() }
 
-    @Test fun light() = run(ThemeMode.LIGHT, "hell")
-    @Test fun dark() = run(ThemeMode.DARK, "dunkel")
+    @Test fun dark() = run("dunkel")
 
-    private fun run(theme: ThemeMode, label: String) {
+    private fun run(label: String) {
         val dir = System.getenv("SCREENSHOT_DIR")
         assumeTrue(dir != null)
         out = File(dir!!).also { it.mkdirs() }
         suffix = label
         store.setName("Fabi")
-        store.setTheme(theme)
         store.completeOnboarding()
         val deps = AppDependencies(
             store, Providers(HttpClient(MockEngine { respond("{}") })), data, versionName = "0.1.test", share = share,

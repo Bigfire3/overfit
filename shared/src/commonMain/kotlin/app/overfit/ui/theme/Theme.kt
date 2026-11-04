@@ -1,6 +1,5 @@
 package app.overfit.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -15,7 +14,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.overfit.domain.ThemeMode
 import app.overfit.shared.resources.Res
 import app.overfit.shared.resources.inter_medium
 import app.overfit.shared.resources.inter_regular
@@ -24,7 +22,7 @@ import org.jetbrains.compose.resources.Font
 
 /**
  * Black & white design system. No decorative accent colour: hierarchy comes from
- * typography, whitespace and a few greys.
+ * typography, whitespace and a few greys. Dark only: there is no light mode (DECISIONS "Nur Dunkelmodus").
  *
  * Palette (see docs/DECISIONS.md, "Farbpalette"):
  * - Neutrals: [background], [foreground], [muted], [faint], [hairline], inverse pair.
@@ -54,7 +52,6 @@ data class Colors(
     /** Red: decline, missed, destructive. Only for data and confirmations. */
     val negative: Color,
     val negativeSubtle: Color,
-    val isDark: Boolean,
 )
 
 val DarkColors = Colors(
@@ -71,24 +68,6 @@ val DarkColors = Colors(
     positiveSubtle = Color(0xFF0F2A17),
     negative = Color(0xFFFF453A),
     negativeSubtle = Color(0xFF331311),
-    isDark = true,
-)
-
-val LightColors = Colors(
-    background = Color(0xFFFFFFFF),
-    foreground = Color(0xFF000000),
-    muted = Color(0xFF6E6E73),
-    faint = Color(0xFFC7C7CC),
-    hairline = Color(0xFFE5E5EA),
-    inverseBackground = Color(0xFF000000),
-    inverseForeground = Color(0xFFFFFFFF),
-    surface = Color(0xFFF2F2F7),
-    surfacePressed = Color(0xFFE5E5EA),
-    positive = Color(0xFF248A3D),
-    positiveSubtle = Color(0xFFE3F4E8),
-    negative = Color(0xFFD70015),
-    negativeSubtle = Color(0xFFFBE4E6),
-    isDark = false,
 )
 
 /** Only a handful of sizes on purpose. */
@@ -127,16 +106,9 @@ private fun inter() = FontFamily(
     Font(Res.font.inter_semibold, FontWeight.SemiBold),
 )
 
+/** The app is always dark, whatever the system setting (Fabian: "Nimm den Light mode raus"). */
 @Composable
-fun ThemeMode.isDark(): Boolean = when (this) {
-    ThemeMode.SYSTEM -> isSystemInDarkTheme()
-    ThemeMode.DARK -> true
-    ThemeMode.LIGHT -> false
-}
-
-@Composable
-fun OverfitTheme(mode: ThemeMode, content: @Composable () -> Unit) {
-    val dark = mode.isDark()
+fun OverfitTheme(content: @Composable () -> Unit) {
     val family = inter()
     val typography = Typography(
         hero = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 56.sp, lineHeight = 62.sp, letterSpacing = (-1.5).sp),
@@ -147,7 +119,7 @@ fun OverfitTheme(mode: ThemeMode, content: @Composable () -> Unit) {
         number = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp, fontFeatureSettings = "tnum"),
     )
     CompositionLocalProvider(
-        LocalColors provides if (dark) DarkColors else LightColors,
+        LocalColors provides DarkColors,
         LocalTypography provides typography,
     ) {
         Box {

@@ -11,9 +11,6 @@ enum class Language { DE, EN }
 enum class WeightUnit(val symbol: String) { KG("kg"), LB("lb") }
 
 @Serializable
-enum class ThemeMode { SYSTEM, DARK, LIGHT }
-
-@Serializable
 data class Profile(
     /** How the user wants to be called. */
     val name: String = "",

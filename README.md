@@ -16,7 +16,7 @@ Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRE
 - **KI-Coach**: Coach-Tab mit Chat (Workout-Vorschläge, Auswertungen, Gedächtnis, Prompts); mit eigenem API-Key oder Guthaben (Coach-Guthaben in Euro, Modell frei wählbar, Kosten immer sichtbar); **KI-Chat-Verbindung** (Claude, ChatGPT, Gemini) oder „Kontext kopieren“
 - **Guthaben und Einladungen**: Guthaben in Euro; Freunde per QR einladen (Empfehlungsprogramm), Einladungsbonus: 1 € Guthaben für dich und deinen Freund
 - **Backup** als eine ZIP-Datei (Export/Import), **Alle Daten löschen**
-- Deutsch und Englisch, Hell/Dunkel/System, kg/lb, ohne Werbung und Tracking
+- Deutsch und Englisch, nur Dunkelmodus, kg/lb, ohne Werbung und Tracking
 
 ## App aufs Handy laden und installieren
 

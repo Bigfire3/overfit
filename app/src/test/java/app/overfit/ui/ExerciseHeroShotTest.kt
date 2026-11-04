@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import app.overfit.domain.Exercise
 import app.overfit.domain.ExerciseSource
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.TrackingType
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
@@ -42,7 +41,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Evidence screenshots of the exercise detail image (start | end pose) on a 360 dp phone, light and dark, for a mix
+ * Evidence screenshots of the exercise detail image (start | end pose) on a 360 dp phone (dark), for a mix
  * of standing, hanging, lying, hold and stretch exercises. Only runs when `SCREENSHOT_DIR` is set.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -58,7 +57,7 @@ class ExerciseHeroShotTest {
         "push-up" to "Push-up", "weighted-crunch" to "Weighted Crunch",
     )
 
-    private fun shot(theme: ThemeMode, label: String) {
+    private fun shot(label: String) {
         val dir = System.getenv("SCREENSHOT_DIR")
         assumeTrue(dir != null)
         val t = stringsFor(Language.EN)
@@ -68,7 +67,7 @@ class ExerciseHeroShotTest {
             Exercise("wg:$slug", name, ExerciseSource.WORKOUT_GUIDE, "catalog/wg/$slug.svg", emptyList(), emptyList(), null, TrackingType.WEIGHT_REPS, null)
         var current by mutableStateOf(exercise(slugs[0].first, slugs[0].second))
         compose.setContent {
-            OverfitTheme(theme) {
+            OverfitTheme {
                 CompositionLocalProvider(LocalStrings provides t) {
                     Column(Modifier.width(360.dp).testTag("shot").background(Theme.colors.background).padding(Space.l)) {
                         ExerciseHero(current, Modifier.testTag("hero"))
@@ -107,6 +106,5 @@ class ExerciseHeroShotTest {
         error("images did not load")
     }
 
-    @Test fun light() = shot(ThemeMode.LIGHT, "hell")
-    @Test fun dark() = shot(ThemeMode.DARK, "dunkel")
+    @Test fun dark() = shot("dunkel")
 }

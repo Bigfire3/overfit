@@ -170,7 +170,7 @@ class CoachStoryTest {
         compose.mainClock.autoAdvance = false
         val closed = mutableStateOf(false)
         compose.setContent {
-            app.overfit.ui.theme.OverfitTheme(app.overfit.domain.ThemeMode.DARK) {
+            app.overfit.ui.theme.OverfitTheme {
                 androidx.compose.runtime.CompositionLocalProvider(
                     app.overfit.i18n.LocalCoachStrings provides app.overfit.i18n.GermanCoach,
                 ) { CoachStoryScreen(onClose = { closed.value = true }, onTarget = {}, autoAdvance = true) }

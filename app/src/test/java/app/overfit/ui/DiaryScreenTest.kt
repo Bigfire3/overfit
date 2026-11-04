@@ -15,7 +15,6 @@ import app.overfit.data.DiaryPhoto
 import app.overfit.data.WorkoutPhoto
 import app.overfit.data.db.HistoryRow
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.WeightUnit
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
@@ -76,7 +75,7 @@ class DiaryScreenTest {
     )
 
     private fun show(content: @androidx.compose.runtime.Composable () -> Unit) = compose.setContent {
-        OverfitTheme(ThemeMode.LIGHT) { CompositionLocalProvider(LocalStrings provides stringsFor(Language.DE)) { content() } }
+        OverfitTheme { CompositionLocalProvider(LocalStrings provides stringsFor(Language.DE)) { content() } }
     }
 
     @Test fun gridShowsMonthsStatsAndOpensTappedDay() {
