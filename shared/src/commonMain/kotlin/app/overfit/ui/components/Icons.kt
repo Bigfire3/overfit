@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, Training, History, Exercises, Photos, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More }
+enum class Icon { Back, Check, Home, Training, History, Exercises, Photos, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -108,6 +108,32 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 drawCircle(color, 1.4f * u, p(12f, 5.5f))
                 drawCircle(color, 1.4f * u, p(12f, 12f))
                 drawCircle(color, 1.4f * u, p(12f, 18.5f))
+            }
+            // Circle with an "i": info.
+            Icon.Info -> {
+                circle(12f, 12f, 8.5f)
+                line(12f, 11f, 12f, 16.5f)
+                drawCircle(color, 1.1f * u, p(12f, 7.75f))
+            }
+            // Four-pointed spark: what the AI can do.
+            Icon.Sparkle -> path(12f to 3.5f, 14f to 10f, 20.5f to 12f, 14f to 14f, 12f to 20.5f, 10f to 14f, 3.5f to 12f, 10f to 10f, close = true)
+            // Key: own API key.
+            Icon.Key -> {
+                circle(8f, 12f, 3.75f)
+                line(11.75f, 12f, 20.5f, 12f)
+                line(17f, 12f, 17f, 15f)
+                line(20.5f, 12f, 20.5f, 14.5f)
+            }
+            // Wallet: credit.
+            Icon.Wallet -> {
+                drawRoundRect(color, p(3.5f, 6.5f), Size(17f * u, 12f * u), style = stroke)
+                line(3.5f, 10f, 20.5f, 10f)
+                drawCircle(color, 1.1f * u, p(16.5f, 14.25f))
+            }
+            // Two linked rings: connect a chat.
+            Icon.Link -> {
+                drawRoundRect(color, p(3.5f, 8.5f), Size(10f * u, 7f * u), androidx.compose.ui.geometry.CornerRadius(3.5f * u), style = stroke)
+                drawRoundRect(color, p(10.5f, 8.5f), Size(10f * u, 7f * u), androidx.compose.ui.geometry.CornerRadius(3.5f * u), style = stroke)
             }
             Icon.Settings -> {
                 line(4f, 8f, 20f, 8f)

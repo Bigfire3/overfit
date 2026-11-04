@@ -53,7 +53,7 @@ class ChatFlowTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private val kv = InMemoryKeyValueStore()
+    private val kv = InMemoryKeyValueStore().apply { put(app.overfit.data.AppStore.KEY_COACH_STORY_SEEN, "1") }
     private val store = AppStore(kv, InMemorySecretStore(), DeviceDefaults(Language.DE, WeightUnit.KG)).also {
         it.setName("Fabian"); it.completeOnboarding()
     }
