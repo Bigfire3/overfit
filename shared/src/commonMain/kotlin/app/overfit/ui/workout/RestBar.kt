@@ -91,7 +91,8 @@ fun RestBar(
                     Modifier.pressableRow { expanded = true }.padding(vertical = Space.xs).semantics { contentDescription = toggleLabel },
                     style = Theme.type.label,
                 )
-                Actions()
+                Spacer(Modifier.width(Space.s))
+                Actions(Modifier.weight(1f, fill = false))
             }
             NextLine(Theme.type.caption, Modifier.fillMaxWidth().padding(vertical = Space.xs))
         } else {
