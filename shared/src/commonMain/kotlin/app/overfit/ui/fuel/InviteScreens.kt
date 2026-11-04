@@ -56,7 +56,11 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelItem
+import app.overfit.ui.components.PanelSection
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.coroutines.CancellationException
@@ -128,29 +132,33 @@ fun InviteShowScreen(session: FuelSession, onBack: () -> Unit) {
         Spacer(Modifier.height(Space.l))
 
         val current = token
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (current != null) {
-                QrView(inviteLink(current.token), Modifier.size(240.dp))
-                Spacer(Modifier.height(Space.m))
-                HairlineProgress(1f - progress, Modifier.padding(horizontal = Space.xl))
-                Spacer(Modifier.height(Space.s))
-                Text(t.inviteRotates(secondsLeft.toInt()), style = Theme.type.caption, tone = Tone.Muted)
-            } else {
-                Text(error ?: t.loading, tone = Tone.Muted)
+        Panel {
+            PanelItem {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (current != null) {
+                        QrView(inviteLink(current.token), Modifier.size(240.dp))
+                        Spacer(Modifier.height(Space.m))
+                        HairlineProgress(1f - progress, Modifier.padding(horizontal = Space.xl))
+                        Spacer(Modifier.height(Space.s))
+                        Text(t.inviteRotates(secondsLeft.toInt()), style = Theme.type.caption, tone = Tone.Muted)
+                    } else {
+                        Text(error ?: t.loading, tone = Tone.Muted)
+                    }
+                }
             }
         }
 
-        SectionTitle(t.inviteName)
-        ListRow(s.name) {
-            RowInput(shownName, { name = it.take(24) }, onCommit = {
-                val value = name ?: return@RowInput
-                scope.launch { runCatching { service?.setDisplayName(value) } }
-            })
+        PanelSection(t.inviteName) {
+            ListRow(s.name) {
+                RowInput(shownName, { name = it.take(24) }, onCommit = {
+                    val value = name ?: return@RowInput
+                    scope.launch { runCatching { service?.setDisplayName(value) } }
+                })
+            }
         }
-        Text(t.inviteNameHint, style = Theme.type.caption, tone = Tone.Muted)
+        Hint(t.inviteNameHint)
         (account as? Loaded.Ready)?.value?.invite?.takeIf { it.monthlyLimit > 0 }?.let {
-            Spacer(Modifier.height(Space.m))
-            Text(t.inviteCount(it.invitedThisMonth, it.monthlyLimit), style = Theme.type.caption, tone = Tone.Muted)
+            Hint(t.inviteCount(it.invitedThisMonth, it.monthlyLimit))
         }
     }
 }

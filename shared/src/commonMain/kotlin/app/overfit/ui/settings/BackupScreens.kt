@@ -17,6 +17,7 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
@@ -116,12 +117,13 @@ fun BackupImportScreen(
                 Text(p.importCreated(t.date(date)), tone = Tone.Muted)
                 Text(p.importVersion(pv.appVersion), style = Theme.type.caption, tone = Tone.Muted)
                 Spacer(Modifier.height(Space.l))
-                Hairline()
-                ListRow(p.importWorkouts(pv.workouts))
-                ListRow(p.importTemplates(pv.templates))
-                ListRow(p.importExercises(pv.customExercises))
-                ListRow(p.importPhotos(pv.photos))
-                if (pv.hasProfile) ListRow(p.importProfile)
+                Panel {
+                    ListRow(p.importWorkouts(pv.workouts))
+                    ListRow(p.importTemplates(pv.templates))
+                    ListRow(p.importExercises(pv.customExercises))
+                    ListRow(p.importPhotos(pv.photos))
+                    if (pv.hasProfile) ListRow(p.importProfile)
+                }
                 Spacer(Modifier.height(Space.m))
                 Text(if (workoutRunning) p.importWorkoutRunning else p.importWarning, style = Theme.type.caption, tone = if (workoutRunning) Tone.Default else Tone.Muted)
             }

@@ -24,6 +24,9 @@ import app.overfit.domain.WeightUnit
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.panelRow
+import app.overfit.ui.components.RowDivider
 import app.overfit.ui.components.HeaderDeleteButton
 import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.Icon
@@ -101,9 +104,8 @@ fun WorkoutPlanScreen(
         Spacer(Modifier.height(Space.s))
         Text(if (deleteArmed) t.deletedKeepsHistory else lastDone, style = Theme.type.caption, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
-        Hairline()
         if (w.exercises.isEmpty()) Text(t.workoutPlanEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
-        w.exercises.forEach { PlanExerciseRow(it, unit, language) }
+        else Panel { w.exercises.forEach { PlanExerciseRow(it, unit, language) } }
     }
 }
 
@@ -111,9 +113,9 @@ fun WorkoutPlanScreen(
 private fun PlanExerciseRow(e: TemplateExercise, unit: WeightUnit, language: Language) {
     val t = LocalStrings.current
     val values = e.sets.map { WorkoutFormat.values(it, e.exercise.trackingType, unit, language, t) }.filter { it.isNotEmpty() }.distinct()
-    Column(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = Space.m)) {
+    Column(Modifier.fillMaxWidth().panelRow().heightIn(min = 56.dp).padding(vertical = Space.m)) {
         Text(e.exercise.name, style = Theme.type.label)
         Text(listOf(t.setCount(e.sets.size)).plus(values).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
     }
-    Hairline()
+    RowDivider()
 }

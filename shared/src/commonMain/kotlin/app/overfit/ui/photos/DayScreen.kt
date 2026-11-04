@@ -35,6 +35,8 @@ import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.Title
@@ -78,8 +80,7 @@ fun DayScreen(
 
         SectionTitle(p.dayTrainings)
         if (history != null && trainings.isEmpty()) Text(p.dayNoTraining, tone = Tone.Muted)
-        if (trainings.isNotEmpty()) Hairline()
-        trainings.forEach { TrainingRow(it, unit, language, onOpenWorkout) }
+        if (trainings.isNotEmpty()) Panel { trainings.forEach { TrainingRow(it, unit, language, onOpenWorkout) } }
 
         SectionTitle(p.dayPhotos)
         if (photos != null && dayPhotos.isEmpty()) {
@@ -98,7 +99,7 @@ fun DayScreen(
             if (picker.canTakePhoto) SmallButton(h.takePhoto, picker.takePhoto, tone = Tone.Default)
             SmallButton(h.pickPhoto, picker.pickFromLibrary, tone = Tone.Default)
         }
-        Text(h.photosPrivate, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Faint)
+        Hint(h.photosPrivate)
     }
 }
 

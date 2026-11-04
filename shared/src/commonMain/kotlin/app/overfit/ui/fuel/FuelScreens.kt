@@ -2,6 +2,7 @@ package app.overfit.ui.fuel
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -32,7 +33,11 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelItem
+import app.overfit.ui.components.PanelSection
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
@@ -136,29 +141,36 @@ fun FuelScreen(
 
         SectionTitle(t.topUp)
         val packages = (config as? Loaded.Ready<FuelConfig>)?.value?.packages.orEmpty()
-        if (packages.isNotEmpty()) Text(t.storeChannel, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        packages.forEach { p ->
-            // Both values openly: what you get and what the store charges (VAT and store fee on top).
-            ListRow(t.storePackage(formatEuro(p.creditMicro, language), formatEuro(p.priceMicro, language)), Tone.Muted) {
-                Text(t.storeSoon, style = Theme.type.caption, tone = Tone.Muted)
+        if (packages.isNotEmpty()) {
+            Panel {
+                packages.forEach { p ->
+                    // Both values openly: what you get and what the store charges (VAT and store fee on top).
+                    ListRow(t.storePackage(formatEuro(p.creditMicro, language), formatEuro(p.priceMicro, language)), Tone.Muted) {
+                        Text(t.storeSoon, style = Theme.type.caption, tone = Tone.Muted)
+                    }
+                }
             }
+            Hint(t.storeChannel)
         }
-        Text(t.topUpNote, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.s))
+        Hint(t.topUpNote)
         val markupBp = (config as? Loaded.Ready<FuelConfig>)?.value?.markupBp ?: 0
         if (markupBp > 0) {
             val uriHandler = LocalUriHandler.current
-            Text(t.pricesNote(formatPercent(markupBp)), style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.xs))
-            ListRow(t.pricesHow, onClick = { uriHandler.openUri(PRICES_URL + if (language == Language.EN) "?lang=en" else "?lang=de") })
+            Hint(t.pricesNote(formatPercent(markupBp)))
+            Spacer(Modifier.height(Space.s))
+            Panel { ListRow(t.pricesHow, onClick = { uriHandler.openUri(PRICES_URL + if (language == Language.EN) "?lang=en" else "?lang=de") }) }
         }
         WebCreditSection(service, (config as? Loaded.Ready<FuelConfig>)?.value, distribution, language, isDemo, onRedeemCode)
 
-        SectionTitle(t.invite)
-        ListRow(t.inviteShow, onClick = onInviteShow)
-        ListRow(t.inviteRedeem, onClick = onInviteRedeem)
+        PanelSection(t.invite) {
+            ListRow(t.inviteShow, onClick = onInviteShow)
+            ListRow(t.inviteRedeem, onClick = onInviteRedeem)
+        }
 
-        SectionTitle(t.fuel)
-        ListRow(t.ledger, onClick = onLedger)
-        ListRow(t.recovery, onClick = onRecovery)
+        PanelSection(t.fuel) {
+            ListRow(t.ledger, onClick = onLedger)
+            ListRow(t.recovery, onClick = onRecovery)
+        }
     }
 }
 
@@ -170,32 +182,36 @@ fun FuelScreen(
 private fun Balance(account: FuelAccount, config: FuelConfig?, language: Language, t: FuelStrings) {
     val s = LocalStrings.current
     Spacer(Modifier.height(Space.m))
-    Text(t.balanceLabel, style = Theme.type.caption, tone = Tone.Muted)
-    Text(t.creditAmount(formatEuro(account.balanceMicro, language)), style = Theme.type.title)
-    val reviews = account.giftReviews
-    if (reviews.remaining > 0) {
-        Spacer(Modifier.height(Space.xs))
-        Text(t.giftReviews(reviews.remaining))
-    }
-    val gifted = account.giftedMicro ?: 0
-    val bought = account.purchasedMicro
-    if (bought != null && gifted > 0) {
-        Spacer(Modifier.height(Space.xs))
-        Text(t.balanceSplit(formatEuro(bought, language), formatEuro(gifted, language)), style = Theme.type.caption, tone = Tone.Muted)
-    }
-    account.expiring.sumOf { it.amountMicro }.takeIf { it > 0 }?.let { amount ->
-        val until = account.expiring.minOf { it.expiresAt }
-        Text(t.expiringLine(formatEuro(amount, language), s.date(epochToDate(until))), style = Theme.type.caption, tone = Tone.Muted)
-    }
-    reviews.expiring.forEach { item ->
-        Text(t.giftReviewsExpiring(item.count, s.date(epochToDate(item.expiresAt))), style = Theme.type.caption, tone = Tone.Muted)
-    }
-    if (gifted > 0 || reviews.remaining > 0) {
-        Text(t.giftedFirst, style = Theme.type.caption, tone = Tone.Muted)
-    }
-    if (reviews.remaining > 0) {
-        Spacer(Modifier.height(Space.xs))
-        Text(t.giftReviewsScope(giftModelName(config)), style = Theme.type.caption, tone = Tone.Muted)
+    Panel {
+        PanelItem {
+            Text(t.balanceLabel, style = Theme.type.caption, tone = Tone.Muted)
+            Text(t.creditAmount(formatEuro(account.balanceMicro, language)), style = Theme.type.title)
+            val reviews = account.giftReviews
+            if (reviews.remaining > 0) {
+                Spacer(Modifier.height(Space.xs))
+                Text(t.giftReviews(reviews.remaining))
+            }
+            val gifted = account.giftedMicro ?: 0
+            val bought = account.purchasedMicro
+            if (bought != null && gifted > 0) {
+                Spacer(Modifier.height(Space.xs))
+                Text(t.balanceSplit(formatEuro(bought, language), formatEuro(gifted, language)), style = Theme.type.caption, tone = Tone.Muted)
+            }
+            account.expiring.sumOf { it.amountMicro }.takeIf { it > 0 }?.let { amount ->
+                val until = account.expiring.minOf { it.expiresAt }
+                Text(t.expiringLine(formatEuro(amount, language), s.date(epochToDate(until))), style = Theme.type.caption, tone = Tone.Muted)
+            }
+            reviews.expiring.forEach { item ->
+                Text(t.giftReviewsExpiring(item.count, s.date(epochToDate(item.expiresAt))), style = Theme.type.caption, tone = Tone.Muted)
+            }
+            if (gifted > 0 || reviews.remaining > 0) {
+                Text(t.giftedFirst, style = Theme.type.caption, tone = Tone.Muted)
+            }
+            if (reviews.remaining > 0) {
+                Spacer(Modifier.height(Space.xs))
+                Text(t.giftReviewsScope(giftModelName(config)), style = Theme.type.caption, tone = Tone.Muted)
+            }
+        }
     }
 }
 
@@ -240,9 +256,8 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
     Screen(scroll = true, header = { BackHeader(s.back, onBack) }) {
         Title(t.ledger)
         Spacer(Modifier.height(Space.l))
-        Hairline()
         if (entries.isEmpty() && state is Loaded.Ready) Text(t.ledgerEmpty, tone = Tone.Muted, modifier = Modifier.padding(top = Space.m))
-        entries.forEach { e ->
+        if (entries.isNotEmpty()) Panel { entries.forEach { e ->
             val w = app.overfit.i18n.webCreditStringsFor(language)
             val title = when (e.type) {
                 "usage" -> if (e.reviews != null && e.reviews < 0) t.ledgerGiftReviewUsage else t.ledgerUsage
@@ -264,7 +279,14 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
                 e.reviews != null -> t.creditAmount(sign + formatEuro(e.amountMicro, language)) + " · " + t.ledgerReviews(e.reviews)
                 else -> t.creditAmount(sign + formatEuro(e.amountMicro, language))
             }
-            ListRow(title, tone = Tone.Default, trailing = { Text(amount) })
+            PanelItem {
+            androidx.compose.foundation.layout.Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+            ) {
+                Text(title, Modifier.weight(1f).padding(end = Space.m))
+                Text(amount)
+            }
             // detail line under the row: paid/gifted/used/refunded, date and, for usage, tokens
             val detail = buildString {
                 append(ledgerKindLabel(e.kind, t)).append(" · ")
@@ -275,9 +297,10 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
                 }
             }
             val chosen = if (e.type == "usage" && e.fallback) e.tier?.let { app.overfit.fuel.modelOfTier(it) }?.let { app.overfit.fuel.modelShortName(it) } else null
-            Text(detail, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(bottom = if (chosen == null) Space.s else Space.xs))
-            if (chosen != null) Text(t.ledgerFallback(chosen), style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(bottom = Space.s))
-        }
+            Text(detail, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.xs))
+            if (chosen != null) Text(t.ledgerFallback(chosen), style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.xs))
+            }
+        } }
         when (val st = state) {
             is Loaded.Loading -> Text(t.loading, tone = Tone.Muted, modifier = Modifier.padding(top = Space.m))
             is Loaded.Failed -> ErrorBlock(t) { load(next) }
@@ -316,11 +339,16 @@ fun RecoveryScreen(session: FuelSession, onBack: () -> Unit, onRestored: () -> U
         Spacer(Modifier.height(Space.l))
         val shown = code
         if (shown != null) {
-            Text(shown, style = Theme.type.title)
+            Panel {
+                PanelItem {
+                    Text(shown, style = Theme.type.title)
+                    Spacer(Modifier.height(Space.s))
+                    SmallButton(if (copied) t.recoveryCopied else t.recoveryCopy, {
+                        clipboard.setText(AnnotatedString(shown)); copied = true
+                    }, tone = Tone.Default)
+                }
+            }
             Spacer(Modifier.height(Space.s))
-            SmallButton(if (copied) t.recoveryCopied else t.recoveryCopy, {
-                clipboard.setText(AnnotatedString(shown)); copied = true
-            }, tone = Tone.Default)
         }
         Text(t.recoveryReplaceWarning, style = Theme.type.caption, tone = Tone.Muted)
         Spacer(Modifier.height(Space.m))

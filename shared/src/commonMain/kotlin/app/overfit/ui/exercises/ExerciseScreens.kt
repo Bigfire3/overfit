@@ -52,7 +52,10 @@ import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.Chip
 import app.overfit.ui.components.ExerciseHero
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelItem
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.RowInput
 import app.overfit.ui.components.Screen
@@ -222,14 +225,15 @@ fun ExerciseDetailScreen(
 
         if (!readOnly) {
             SectionTitle(t.tracking)
-            if (e.isCustom) {
-                Text(t.trackingName(e.trackingType))
-                e.defaultRestSec?.let { ListRow(t.restTime, it.toString()) }
-            } else {
-                TrackingChooser(tracking) { tracking = it }
-                Spacer(Modifier.height(Space.s))
-                ListRow(t.restTime) {
-                    RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
+            Panel {
+                if (e.isCustom) {
+                    PanelItem { Text(t.trackingName(e.trackingType)) }
+                    e.defaultRestSec?.let { ListRow(t.restTime, it.toString()) }
+                } else {
+                    PanelItem { TrackingChooser(tracking) { tracking = it } }
+                    ListRow(t.restTime) {
+                        RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
+                    }
                 }
             }
         }
@@ -254,10 +258,13 @@ private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepositor
     fun kg(v: Double) = "${Numbers.formatWeight(v, unit, language)} ${unit.symbol}"
     val bests = WorkoutStats.bests(list.map { SetValues(it.weightKg, it.reps, it.durationSec) }, type)
     Text(h.bests, style = Theme.type.caption, tone = Tone.Muted)
-    bests.maxWeightKg?.let { ListRow(h.maxWeight, kg(it)) }
-    bests.bestE1rmKg?.let { ListRow(h.bestE1rm, kg(it)) }
-    bests.maxReps?.let { ListRow(h.maxReps, "$it ${t.repsUnit}") }
-    bests.maxDurationSec?.let { ListRow(h.longestTime, Numbers.formatDuration(it)) }
+    Spacer(Modifier.height(Space.s))
+    Panel {
+        bests.maxWeightKg?.let { ListRow(h.maxWeight, kg(it)) }
+        bests.bestE1rmKg?.let { ListRow(h.bestE1rm, kg(it)) }
+        bests.maxReps?.let { ListRow(h.maxReps, "$it ${t.repsUnit}") }
+        bests.maxDurationSec?.let { ListRow(h.longestTime, Numbers.formatDuration(it)) }
+    }
 
     Spacer(Modifier.height(Space.l))
     Text(h.recentWorkouts, style = Theme.type.caption, tone = Tone.Muted)
@@ -270,15 +277,16 @@ private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepositor
             TrackingType.TIME, TrackingType.WEIGHT_TIME -> b.maxDurationSec?.toDouble()
         }
     }
-    allSessions.take(10).forEachIndexed { index, sets ->
+    Spacer(Modifier.height(Space.s))
+    Panel { allSessions.take(10).forEachIndexed { index, sets ->
         val delta = metric(sets)?.let { cur -> allSessions.getOrNull(index + 1)?.let(::metric)?.let { cur - it } }
         val ordered = sets.sortedBy { it.position }
         val values = ordered.map { SetValues(it.weightKg, it.reps, it.durationSec) }
         val e1rm = if (type == TrackingType.WEIGHT_REPS) WorkoutStats.bests(values, type).bestE1rmKg else null
         val date = t.date(Instant.fromEpochMilliseconds(ordered.first().startedAt).toLocalDateTime(TimeZone.currentSystemDefault()).date)
         val text = values.map { WorkoutFormat.values(it, type, unit, language, t) }.filter { it.isNotEmpty() }.joinToString(" · ")
-        Column {
-            Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
+        PanelItem {
+            Column(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(date, Modifier.weight(1f), tone = Tone.Muted)
                     if (e1rm != null) Text(h.e1rmShort(kg(e1rm)), style = Theme.type.caption, tone = Tone.Muted)
@@ -294,9 +302,8 @@ private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepositor
                 }
                 Text(text)
             }
-            Hairline()
         }
-    }
+    } }
 }
 
 /**
@@ -369,17 +376,19 @@ fun CustomExerciseScreen(
         Spacer(Modifier.height(Space.m))
         if (viewModel.aiAvailable) {
             val loading = autofillState == ExerciseViewModel.AutofillState.Loading
-            ListRow(
-                if (loading) f.aiFilling else f.aiFill,
-                tone = if (name.isBlank() || loading) Tone.Muted else Tone.Default,
-                onClick = { if (!loading && name.isNotBlank()) viewModel.autofill(name, language) },
-            )
+            Panel {
+                ListRow(
+                    if (loading) f.aiFilling else f.aiFill,
+                    tone = if (name.isBlank() || loading) Tone.Muted else Tone.Default,
+                    onClick = { if (!loading && name.isNotBlank()) viewModel.autofill(name, language) },
+                )
+            }
             val hint = when (val st = autofillState) {
                 ExerciseViewModel.AutofillState.Done -> f.aiFilled
                 is ExerciseViewModel.AutofillState.Failed -> f.aiError(st.kind)
                 else -> if (name.isBlank()) f.aiNeedName else f.aiFillHint
             }
-            Text(hint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+            Hint(hint)
         } else {
             Text(f.aiNoAccess, style = Theme.type.caption, tone = Tone.Muted)
         }
@@ -391,27 +400,37 @@ fun CustomExerciseScreen(
         }
 
         SectionTitle(t.tracking)
-        TrackingChooser(tracking) { tracking = it }
+        Panel { PanelItem { TrackingChooser(tracking) { tracking = it } } }
 
         SectionTitle(f.primaryMuscles)
-        MultiChoiceChips(Muscle.entries, MuscleKeys.parse(primary), { t.muscle(it) }) { m ->
-            val list = MuscleKeys.parse(primary)
-            primary = MuscleKeys.of(if (m in list) list - m else list + m)
-            if (m !in list) secondary = MuscleKeys.of(MuscleKeys.parse(secondary) - m)
+        Panel {
+            PanelItem {
+                MultiChoiceChips(Muscle.entries, MuscleKeys.parse(primary), { t.muscle(it) }) { m ->
+                    val list = MuscleKeys.parse(primary)
+                    primary = MuscleKeys.of(if (m in list) list - m else list + m)
+                    if (m !in list) secondary = MuscleKeys.of(MuscleKeys.parse(secondary) - m)
+                }
+            }
         }
 
         SectionTitle(f.secondaryMuscles)
-        MultiChoiceChips(Muscle.entries.filter { it !in MuscleKeys.parse(primary) }, MuscleKeys.parse(secondary), { t.muscle(it) }) { m ->
-            val list = MuscleKeys.parse(secondary)
-            secondary = MuscleKeys.of(if (m in list) list - m else list + m)
+        Panel {
+            PanelItem {
+                MultiChoiceChips(Muscle.entries.filter { it !in MuscleKeys.parse(primary) }, MuscleKeys.parse(secondary), { t.muscle(it) }) { m ->
+                    val list = MuscleKeys.parse(secondary)
+                    secondary = MuscleKeys.of(if (m in list) list - m else list + m)
+                }
+            }
         }
 
         SectionTitle(t.equipment)
-        ChoiceChips(Equipment.entries, equipment, { t.equipmentName(it) }) { equipment = it }
+        Panel { PanelItem { ChoiceChips(Equipment.entries, equipment, { t.equipmentName(it) }) { equipment = it } } }
 
         Spacer(Modifier.height(Space.m))
-        ListRow(t.restTime) {
-            RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
+        Panel {
+            ListRow(t.restTime) {
+                RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
+            }
         }
 
         SectionTitle(f.note)

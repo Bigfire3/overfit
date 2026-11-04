@@ -67,9 +67,9 @@ internal fun DeltaText(text: String, delta: Double, modifier: Modifier = Modifie
 /** The exercises of a reviewed workout with today against last time (local numbers, plus the coach's words if any). */
 @Composable
 fun ExerciseBreakdown(list: List<ExerciseComparison>, unit: WeightUnit, language: Language) {
-    list.forEach { c ->
-        ExerciseBlock(c, unit, language)
-        Hairline()
+    if (list.isEmpty()) return
+    app.overfit.ui.components.Panel {
+        list.forEach { c -> app.overfit.ui.components.PanelItem { ExerciseBlock(c, unit, language) } }
     }
 }
 

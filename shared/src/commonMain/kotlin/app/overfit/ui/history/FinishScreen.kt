@@ -34,6 +34,10 @@ import app.overfit.ui.components.CheckRow
 import app.overfit.ui.components.BigInput
 import app.overfit.domain.Workout
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelItem
+import app.overfit.ui.components.PanelSection
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.MultilineInput
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
@@ -156,15 +160,16 @@ fun FinishScreen(
             SummaryRows(d.summary, unit, language, t)
 
             if (d.summary.records.isNotEmpty()) {
-                SectionTitle(h.newRecords)
-                d.summary.records.forEach { r -> RecordRow(r, unit, language, t) }
+                PanelSection(h.newRecords) {
+                    d.summary.records.forEach { r -> RecordRow(r, unit, language, t) }
+                }
             }
         }
 
-        SectionTitle(h.feeling)
-        FeelingPicker(feeling, h.feelingValue) { feeling = it }
-        Spacer(Modifier.height(Space.m))
-        CheckRow(h.sauna, sauna == true) { sauna = it }
+        PanelSection(h.feeling) {
+            PanelItem { FeelingPicker(feeling, h.feelingValue) { feeling = it } }
+            CheckRow(h.sauna, sauna == true) { sauna = it }
+        }
 
         SectionTitle(h.note)
         MultilineInput(note, { note = it.take(2000) }, h.notePlaceholder)
@@ -186,7 +191,7 @@ fun FinishScreen(
             if (picker.canTakePhoto) SmallButton(h.takePhoto, picker.takePhoto, tone = Tone.Default)
             SmallButton(h.pickPhoto, picker.pickFromLibrary, tone = Tone.Default)
         }
-        Text(h.photosPrivate, style = Theme.type.caption, tone = Tone.Faint)
+        Hint(h.photosPrivate)
 
         Spacer(Modifier.height(Space.l))
         coachSection(workoutId)
@@ -194,15 +199,23 @@ fun FinishScreen(
 }
 
 @Composable
-internal fun SummaryRows(s: WorkoutSummary, unit: WeightUnit, language: Language, t: Strings) {
+internal fun SummaryRows(
+    s: WorkoutSummary,
+    unit: WeightUnit,
+    language: Language,
+    t: Strings,
+    extra: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {},
+) {
     val h = t.history
-    ListRow(h.duration, WorkoutFormat.elapsed(s.durationMs))
-    ListRow(h.setsLabel, h.setsOf(s.completedSets, s.totalSets))
-    if (s.volumeKg > 0) ListRow(h.volume, formatVolume(s.volumeKg, unit, language))
-    ListRow(h.exercisesLabel, s.exerciseCount.toString())
+    Panel {
+        ListRow(h.duration, WorkoutFormat.elapsed(s.durationMs))
+        ListRow(h.setsLabel, h.setsOf(s.completedSets, s.totalSets))
+        if (s.volumeKg > 0) ListRow(h.volume, formatVolume(s.volumeKg, unit, language))
+        ListRow(h.exercisesLabel, s.exerciseCount.toString())
+        extra()
+    }
     if (s.skippedSets > 0 || s.addedExercises > 0 || s.replacedExercises > 0) {
-        Spacer(Modifier.height(Space.s))
-        Text(h.deviations(s.skippedSets, s.addedExercises, s.replacedExercises), style = Theme.type.caption, tone = Tone.Muted)
+        Hint(h.deviations(s.skippedSets, s.addedExercises, s.replacedExercises))
     }
 }
 

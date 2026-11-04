@@ -15,7 +15,9 @@ import app.overfit.data.backup.BackupContributor
 import app.overfit.data.db.CoachMemoryEntity
 import app.overfit.data.db.CoachReviewEntity
 import app.overfit.i18n.LocalCoachStrings
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.PanelSection
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Segmented
 import app.overfit.ui.components.Text
@@ -36,14 +38,15 @@ class CoachFinishChoice {
 fun CoachFinishSection(coach: CoachService, choice: CoachFinishChoice, workoutId: String) {
     val c = LocalCoachStrings.current
     LaunchedEffect(workoutId) { choice.send = true }
-    SectionTitle(c.coachTitle)
     if (coach.access() is CoachAccess.Ready) {
-        ListRow(c.sendToCoach) {
-            Segmented(choice.send, listOf(true to c.finishSend, false to c.finishLater)) { choice.send = it }
+        PanelSection(c.coachTitle) {
+            ListRow(c.sendToCoach) {
+                Segmented(choice.send, listOf(true to c.finishSend, false to c.finishLater)) { choice.send = it }
+            }
         }
-        Spacer(Modifier.height(Space.s))
-        Text(c.finishHint, style = Theme.type.caption, tone = Tone.Muted)
+        Hint(c.finishHint)
     } else {
+        SectionTitle(c.coachTitle)
         Text(c.finishNoAccess, style = Theme.type.caption, tone = Tone.Muted)
     }
 }

@@ -1,5 +1,14 @@
 package app.overfit.ui.workout
 
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import app.overfit.ui.components.Icon
+import app.overfit.ui.components.LineIcon
+import app.overfit.ui.components.RowDivider
+import app.overfit.ui.components.panelRow
+import app.overfit.ui.components.Panel
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -48,8 +57,7 @@ fun NewWorkoutScreen(
         },
     ) {
         Title(t.newWorkout)
-        Column(Modifier.padding(top = Space.l)) {
-            Hairline()
+        Panel(Modifier.padding(top = Space.l)) {
             ChoiceRow(t.createWorkout, t.createWorkoutHint, onCreate)
             // Only one workout at a time: while one runs, "start empty" says so instead of starting.
             if (workoutRunning) ChoiceRow(t.emptyWorkout, t.otherWorkoutRunning, null)
@@ -62,11 +70,17 @@ fun NewWorkoutScreen(
 
 @Composable
 private fun ChoiceRow(title: String, hint: String, onClick: (() -> Unit)?) {
-    Column(if (onClick != null) Modifier.fillMaxWidth().pressableRow(onClick) else Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.m)) {
-            Text(title, style = Theme.type.label, tone = if (onClick != null) Tone.Default else Tone.Muted)
-            Text(hint, style = Theme.type.caption, tone = Tone.Muted)
+    Column(Modifier.fillMaxWidth().panelRow(onClick)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = Theme.type.label, tone = if (onClick != null) Tone.Default else Tone.Muted)
+                Text(hint, style = Theme.type.caption, tone = Tone.Muted)
+            }
+            if (onClick != null) {
+                Spacer(Modifier.width(Space.m))
+                LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+            }
         }
-        Hairline()
+        RowDivider()
     }
 }
