@@ -52,7 +52,10 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w411dp-h891dp-xxhdpi")
 class ScreenshotTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ data }, { database })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     private val kv = InMemoryKeyValueStore()

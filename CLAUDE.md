@@ -36,6 +36,7 @@
 
 ## Tests
 - UI-Tests (Robolectric/Compose): nie `compose.waitUntil { state }` mit reiner State-Bedingung, das pumpt den Main-Looper nicht und führt zu wackeligen Tests. Stattdessen `compose.waitUntilState { … }` (`app/src/test/.../ui/TestWaits.kt`) oder auf sichtbaren Text warten. Vor einem Klick sicherstellen, dass der Inhalt geladen ist (nicht nur der Button sichtbar).
+- UI-Tests mit Room-Datenbank: `@get:Rule(order = 0) val teardown = AppTeardown({ data }, { database })` vor der Compose-Rule (`order = 1`), nie `database.close()` in `@After` (läuft noch innerhalb der Compose-Rule → „connection pool has been closed“).
 - Tests nie abschalten, um grün zu werden. Ein wackeliger Test ist ein Fehler, den du findest und behebst.
 
 ## Lokal bauen in der Claude-Umgebung

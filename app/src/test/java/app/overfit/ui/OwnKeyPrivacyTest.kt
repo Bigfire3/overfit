@@ -43,7 +43,6 @@ import io.ktor.http.headersOf
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -69,7 +68,10 @@ private class PrivacyKey : DeviceKey {
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class OwnKeyPrivacyTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ data }, { database })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     private val backendHost = "backend.test"
@@ -98,9 +100,6 @@ class OwnKeyPrivacyTest {
     private val fake = FakeCoachTransport { prompt, _ ->
         if (prompt.schemaName == CoachChatSchema.NAME) CoachReply(chatAnswer, chatAnswer) else CoachReply("{}", "{}")
     }
-
-    @After
-    fun tearDown() = database.close()
 
     private fun waitFor(text: String) {
         try { compose.waitUntil(15_000) { compose.onAllNodes(hasText(text, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty() } }
