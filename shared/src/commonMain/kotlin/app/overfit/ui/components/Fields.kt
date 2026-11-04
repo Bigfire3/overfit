@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
@@ -105,6 +106,8 @@ fun SmallInput(
     align: TextAlign = TextAlign.Center,
     placeholder: String = unit,
     description: String? = null,
+    /** > 1 for short texts (notes): the field grows instead of cutting the text off. */
+    maxLines: Int = 1,
 ) {
     val style = Theme.type.label.copy(color = Theme.colors.foreground, textAlign = align)
     val focusManager = LocalFocusManager.current
@@ -113,7 +116,8 @@ fun SmallInput(
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
-                singleLine = true,
+                singleLine = maxLines == 1,
+                maxLines = maxLines,
                 textStyle = style,
                 cursorBrush = SolidColor(Theme.colors.foreground),
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
@@ -135,7 +139,7 @@ fun SmallInput(
     }
 }
 
-/** Multi-line, borderless text field with a hairline underneath (notes). */
+/** Multi-line text field (notes) as its own grey, outlined area, so it reads as an input. */
 @Composable
 fun MultilineInput(
     value: String,
@@ -144,22 +148,26 @@ fun MultilineInput(
     modifier: Modifier = Modifier,
     minHeight: androidx.compose.ui.unit.Dp = 96.dp,
 ) {
-    val style = Theme.type.body.copy(color = Theme.colors.foreground)
-    Column(modifier.fillMaxWidth()) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = style,
-            cursorBrush = SolidColor(Theme.colors.foreground),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-            modifier = Modifier.fillMaxWidth().heightIn(min = minHeight).padding(vertical = Space.m),
-            decorationBox = { inner ->
-                Box {
-                    if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
-                    inner()
-                }
-            },
-        )
-        Hairline()
-    }
+    val c = Theme.colors
+    val style = Theme.type.body.copy(color = c.foreground)
+    val shape = RoundedCornerShape(16.dp)
+    val inPanel = LocalInPanel.current
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle = style,
+        cursorBrush = SolidColor(c.foreground),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight)
+            .then(if (inPanel) Modifier.background(c.surface) else Modifier.clip(shape).background(c.surface).border(1.dp, c.hairline, shape))
+            .padding(Space.m),
+        decorationBox = { inner ->
+            Box {
+                if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = c.muted))
+                inner()
+            }
+        },
+    )
 }

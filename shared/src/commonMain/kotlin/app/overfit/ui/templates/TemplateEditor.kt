@@ -364,6 +364,7 @@ private fun ExerciseBlock(
                         placeholder = t.note,
                         keyboardType = KeyboardType.Text,
                         align = TextAlign.Start,
+                        maxLines = 3,
                         modifier = Modifier.weight(1f),
                     )
                 }

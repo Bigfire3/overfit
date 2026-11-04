@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.background
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,11 @@ import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.panelRow
+import app.overfit.ui.components.RowDivider
+import app.overfit.ui.components.PanelItem
+import app.overfit.ui.components.PanelSection
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
@@ -70,7 +76,7 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
         h.photoCount(row.photoCount).takeIf { row.photoCount > 0 },
         h.sauna.takeIf { row.sauna },
     ).joinToString(" · ")
-    Column(Modifier.pressableRow { onOpen(row.id) }) {
+    Column(Modifier.panelRow { onOpen(row.id) }) {
         Row(Modifier.fillMaxWidth().padding(vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -84,7 +90,7 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
             Spacer(Modifier.width(Space.m))
             LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
         }
-        Hairline()
+        RowDivider()
     }
 }
 
@@ -147,21 +153,23 @@ fun WorkoutDetailScreen(
         Spacer(Modifier.height(Space.s))
         Title(w.name)
         Spacer(Modifier.height(Space.l))
-        SummaryRows(d.summary, unit, language, t)
-        d.finished.feeling?.let { ListRow(h.feeling, "$it / 5") }
-        // Changed afterwards via "Edit" (pencil top right).
-        if (d.finished.sauna) ListRow(h.sauna) { LineIcon(Icon.Check, size = 20.dp) }
+        SummaryRows(d.summary, unit, language, t) {
+            d.finished.feeling?.let { ListRow(h.feeling, "$it / 5") }
+            // Changed afterwards via "Edit" (pencil top right).
+            if (d.finished.sauna) ListRow(h.sauna) { LineIcon(Icon.Check, size = 20.dp) }
+        }
         d.finished.note?.let {
-            SectionTitle(h.note)
-            Text(it)
+            PanelSection(h.note) { PanelItem { Text(it) } }
         }
         if (chatNotes.isNotEmpty()) {
-            SectionTitle(h.chatNotes)
-            chatNotes.forEach { n ->
-                n.title?.let { Text(it, style = Theme.type.label) }
-                Text(n.text)
-                if (n.clientName.isNotBlank()) Text(n.clientName, style = Theme.type.caption, tone = Tone.Muted)
-                Spacer(Modifier.height(Space.m))
+            PanelSection(h.chatNotes) {
+                chatNotes.forEach { n ->
+                    PanelItem {
+                        n.title?.let { Text(it, style = Theme.type.label) }
+                        Text(n.text)
+                        if (n.clientName.isNotBlank()) Text(n.clientName, style = Theme.type.caption, tone = Tone.Muted)
+                    }
+                }
             }
         }
 
@@ -173,8 +181,9 @@ fun WorkoutDetailScreen(
         }
 
         w.exercises.forEach { e ->
-            Spacer(Modifier.height(Space.xl))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Spacer(Modifier.height(Space.l))
+            Panel {
+            Row(Modifier.fillMaxWidth().background(Theme.colors.surface).padding(Space.m), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(e.exercise.name, Modifier.weight(1f, fill = false), style = Theme.type.label)
                 val marker = when (e.origin) {
                     ExerciseOrigin.ADDED -> h.markerAdded
@@ -183,33 +192,35 @@ fun WorkoutDetailScreen(
                 }
                 if (marker != null) {
                     Spacer(Modifier.width(Space.m))
-                    Text(marker, style = Theme.type.caption, tone = Tone.Faint)
+                    Text(marker, style = Theme.type.caption, tone = Tone.Muted)
                 }
             }
-            Spacer(Modifier.height(Space.s))
-            Hairline()
             e.sets.forEachIndexed { i, s ->
                 val v = if (s.completed || s.actual != SetValues()) s.actual else s.target
                 val text = WorkoutFormat.values(v, e.exercise.trackingType, unit, language, t).ifEmpty { "–" }
-                val tone = if (s.completed) Tone.Default else Tone.Faint
-                Row(Modifier.fillMaxWidth().padding(vertical = Space.s), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${i + 1}", Modifier.width(32.dp), tone = Tone.Faint)
+                val tone = if (s.completed) Tone.Default else Tone.Muted
+                Row(
+                    Modifier.fillMaxWidth().background(Theme.colors.surface).padding(horizontal = Space.m, vertical = Space.s),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${i + 1}", Modifier.width(32.dp), tone = Tone.Muted)
                     Text(text, Modifier.weight(1f), tone = tone)
-                    if (s.completed) LineIcon(Icon.Check, size = 18.dp) else Text(h.notDone, style = Theme.type.caption, tone = Tone.Faint)
+                    if (s.completed) LineIcon(Icon.Check, size = 18.dp) else Text(h.notDone, style = Theme.type.caption, tone = Tone.Muted)
                 }
             }
-            Hairline()
+            }
         }
 
         Spacer(Modifier.height(Space.xl))
-        Hairline()
-        ListRow(h.useAsTemplate, onClick = {
-            appScope.launch {
-                val id = templates.save(w.toTemplate())
-                withContext(Dispatchers.Main) { onTemplateCreated(id) }
-            }
-        })
-        if (onCoach != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.reviewTitle, onClick = onCoach)
+        Panel {
+            ListRow(h.useAsTemplate, onClick = {
+                appScope.launch {
+                    val id = templates.save(w.toTemplate())
+                    withContext(Dispatchers.Main) { onTemplateCreated(id) }
+                }
+            })
+            if (onCoach != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.reviewTitle, onClick = onCoach)
+        }
     }
 }
 

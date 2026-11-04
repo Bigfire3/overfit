@@ -365,6 +365,7 @@ private fun NoteField(id: String, note: String, onChange: (String) -> Unit) {
         placeholder = t.note,
         keyboardType = KeyboardType.Text,
         align = TextAlign.Start,
+        maxLines = 3,
         modifier = Modifier.fillMaxWidth(),
     )
 }

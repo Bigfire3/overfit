@@ -562,6 +562,25 @@ fun PanelItem(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
     )
 }
 
+/**
+ * For custom rows that should work both in a [Panel] and on the plain background: in a panel the row gets
+ * the panel fill and inner padding (press feedback spans the full width), [onClick] makes it pressable.
+ */
+@Composable
+fun Modifier.panelRow(onClick: (() -> Unit)? = null): Modifier {
+    val inPanel = LocalInPanel.current
+    return this
+        .then(if (inPanel) Modifier.background(Theme.colors.surface) else Modifier)
+        .then(if (onClick != null) Modifier.pressableRow(onClick) else Modifier)
+        .then(if (inPanel) Modifier.padding(horizontal = Space.m) else Modifier)
+}
+
+/** Hairline under a custom row, left out inside a [Panel] (the panel draws its own dividers). */
+@Composable
+fun RowDivider() {
+    if (!LocalInPanel.current) Hairline()
+}
+
 /** Short inline explanation under a panel or row: small, muted, a little indented to the panel's text. */
 @Composable
 fun Hint(text: String, modifier: Modifier = Modifier) {
