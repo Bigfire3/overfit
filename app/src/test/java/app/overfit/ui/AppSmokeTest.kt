@@ -129,7 +129,7 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Zurück").performClick()
 
         // Settings, sub-screens, language switch
-        compose.onNodeWithText("Profil").performClick()
+        compose.onNode(androidx.compose.ui.test.hasText("Profil") and androidx.compose.ui.test.hasClickAction()).performClick()
         compose.onNodeWithText("Coach & KI").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Über Overfit").performScrollTo().performClick()
         compose.onNodeWithText("CC BY-SA 4.0", substring = true).assertExists()
@@ -137,8 +137,9 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Zurück").performClick()
 
         compose.onNodeWithText("English").performScrollTo().performClick()
-        compose.onNodeWithText("Settings").assertExists()
-        compose.onNodeWithText("Profile").assertIsDisplayed()
+        // Page title and tab both say "Profile" now (one word per tab, same on the page).
+        compose.onNodeWithText("ABOUT YOU").assertExists()
+        compose.onNode(hasText("Profile") and hasClickAction()).assertIsDisplayed()
         compose.onNode(hasText("Workouts") and hasClickAction()).performClick()
         compose.onNodeWithContentDescription("New workout").assertIsDisplayed()
     }
@@ -156,7 +157,7 @@ class AppSmokeTest {
 
         compose.onNodeWithTag("tab:COACH").performClick()
         compose.onNodeWithText("Kein KI-Zugang").assertIsDisplayed()
-        compose.onNodeWithText("Profil").performClick()
+        compose.onNode(androidx.compose.ui.test.hasText("Profil") and androidx.compose.ui.test.hasClickAction()).performClick()
         compose.onNodeWithText("Alle Daten löschen").performScrollTo().performClick()
         compose.onNodeWithText("Wirklich alles löschen?").performClick()
 

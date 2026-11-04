@@ -989,3 +989,12 @@ Offen / Hinweise:
 3. In ein Feld tippen und dann den Haken des Satzes antippen → Tastatur zu, kein Cursor
 4. Dasselbe im Workout-Editor (Workout → Bearbeiten) und unter Kalender → Training → Stift
 5. Notizfeld / Suche: „Fertig“ bzw. Suchen-Taste schließt Tastatur und Cursor
+
+## Session AM – UI-Audit, Teil 2: Panels und Audit-Funde (4.11.)
+- Erledigt: Bereiche heben sich als graue, umrandete Panels vom Hintergrund ab (überall, wo Zeilen zusammengehören), kurze Erklärtexte stehen grau darunter. Funde der 360-dp-Tour behoben (Wortumbruch „Darstellung“, abgeschnittene Knopftexte, einzeilige Notizen, Titel „Profil“). Vorher/Nachher: `docs/screenshots/audit/tour-vorher` und `tour-nachher`. Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (Panels)
+1. Hell und dunkel: Workouts-Liste, Workout öffnen, Profil, Coach, Kalender → Tag → Training: Zeilen stehen in grauen Flächen mit feinem Rand und runden Ecken, nichts verschwimmt mit dem Hintergrund
+2. Profil: „Darstellung“ steht ganz, die Auswahl System/Dunkel/Hell darunter; Standard-Pause und Wert in einer Zeile; Name/Alter antippen, ändern, „Fertig“ → gespeichert, Cursor weg
+3. Training: „+ Satz hinzufügen“, „Überspringen“ in der Pause und „Beenden? Nochmal tippen“ sind ganz lesbar (ggf. etwas kleiner); lange Übungsnotiz bricht um statt abgeschnitten zu werden
+4. Guthaben, Einladungen, KI-Chat und Übungsdetail: Flächen sichtbar, Knöpfe in Flächen gut erkennbar

@@ -25,6 +25,7 @@ import app.overfit.ui.components.Icon
 import app.overfit.ui.components.KeyInput
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
@@ -100,8 +101,7 @@ fun ConnectAiScreen(
         Text(t.aiSubtitle, tone = Tone.Muted)
 
         Spacer(Modifier.height(Space.xl))
-        Column {
-            Hairline()
+        Panel {
             (if (onUseFuel != null) listOf(providers.fuel) else emptyList<LlmProvider>()).plus(providers.all).forEach { p ->
                 val active = p.id == providerId
                 ListRow(

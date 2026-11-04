@@ -60,6 +60,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import app.overfit.ui.theme.Space
@@ -111,7 +112,10 @@ fun BlockButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
             LineIcon(icon, size = 20.dp)
             Spacer(Modifier.width(Space.xs))
         }
-        BasicText(label, style = Theme.type.label.copy(color = c.foreground), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        BasicText(
+            label, style = Theme.type.label.copy(color = c.foreground), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = Theme.type.label.fontSize),
+        )
     }
 }
 

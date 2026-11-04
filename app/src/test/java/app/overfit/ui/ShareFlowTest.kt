@@ -148,7 +148,7 @@ class ShareFlowTest {
         assertEquals(listOf("Push", "Legs"), runBlocking { data.templates.templates.first() }.map { it.name })
         // There is no "add sample workouts" row anymore, neither in the Training tab nor in the profile.
         compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
-        compose.onNodeWithText("Profil").performClick()
+        compose.onNode(androidx.compose.ui.test.hasText("Profil") and androidx.compose.ui.test.hasClickAction()).performClick()
         waitFor("Über Overfit")
         compose.onAllNodesWithText("Beispiel-Workouts hinzufügen").assertCountEquals(0)
     }

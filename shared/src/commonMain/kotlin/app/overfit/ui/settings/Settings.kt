@@ -40,6 +40,8 @@ import app.overfit.domain.parseAge
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.PanelSection
+import app.overfit.ui.components.Hint
 import app.overfit.ui.components.RowInput
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
@@ -97,76 +99,81 @@ fun SettingsScreen(
     Screen(scroll = true) {
         Title(t.settingsTitle)
 
-        SectionTitle(t.general)
-        ListRow(t.language) {
-            Segmented(state.language, listOf(Language.DE to "Deutsch", Language.EN to "English"), store::setLanguage)
-        }
-        ListRow(t.theme) {
-            Segmented(
-                state.settings.theme,
-                listOf(ThemeMode.SYSTEM to t.themeSystem, ThemeMode.DARK to t.themeDark, ThemeMode.LIGHT to t.themeLight),
-                store::setTheme,
-            )
-        }
-
-        SectionTitle(t.profile)
-        ListRow(t.name) {
-            RowInput(name, { name = it.take(40) }, onCommit = {
-                if (name.isNotBlank()) store.setName(name) else name = state.profile.name
-            })
-        }
-        ListRow(t.age) {
-            RowInput(age, { age = it.filter(Char::isDigit).take(3) }, keyboardType = KeyboardType.Number, onCommit = {
-                parseAge(age)?.let { store.setBirthYear(birthYearFromAge(it, today)) } ?: run { age = storedAge }
-            })
-        }
-        ListRow(t.unit) {
-            Segmented(state.profile.unit, listOf(WeightUnit.KG to "kg", WeightUnit.LB to "lb"), store::setUnit)
-        }
-
-        SectionTitle(t.workoutSettings)
-        ListRow(t.defaultRest) {
-            RowInput(restText, { restText = it.filter(Char::isDigit).take(4) }, keyboardType = KeyboardType.Number, onCommit = {
-                restText.toIntOrNull()?.let(store::setDefaultRest) ?: run { restText = storedRest }
-            })
-        }
-
-        SectionTitle(t.notifications)
-        when (notificationsAllowed) {
-            true -> ListRow(t.notificationsPermission, t.notificationsAllowed)
-            false -> {
-                ListRow(t.notificationsPermission, t.exactAlarmAllow, onClick = restAlerts::allowNotifications)
-                Text(t.notificationsDeniedHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        PanelSection(t.general) {
+            ListRow(t.language) {
+                Segmented(state.language, listOf(Language.DE to "Deutsch", Language.EN to "English"), store::setLanguage)
             }
-            null -> Unit
+            ListRow(t.theme) {
+                Segmented(
+                    state.settings.theme,
+                    listOf(ThemeMode.SYSTEM to t.themeSystem, ThemeMode.DARK to t.themeDark, ThemeMode.LIGHT to t.themeLight),
+                    store::setTheme,
+                )
+            }
         }
-        if (exactAllowed == false) {
-            ListRow(t.exactAlarm, t.exactAlarmAllow, onClick = restAlerts::openExactAlarmSettings)
-            Text(t.exactAlarmHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+
+        PanelSection(t.profile) {
+            ListRow(t.name) {
+                RowInput(name, { name = it.take(40) }, onCommit = {
+                    if (name.isNotBlank()) store.setName(name) else name = state.profile.name
+                })
+            }
+            ListRow(t.age) {
+                RowInput(age, { age = it.filter(Char::isDigit).take(3) }, keyboardType = KeyboardType.Number, onCommit = {
+                    parseAge(age)?.let { store.setBirthYear(birthYearFromAge(it, today)) } ?: run { age = storedAge }
+                })
+            }
+            ListRow(t.unit) {
+                Segmented(state.profile.unit, listOf(WeightUnit.KG to "kg", WeightUnit.LB to "lb"), store::setUnit)
+            }
         }
-        ListRow(t.vibration) {
-            Segmented(state.settings.vibration, listOf(true to t.on, false to t.off), store::setVibration)
+
+        PanelSection(t.workoutSettings) {
+            ListRow(t.defaultRest) {
+                RowInput(restText, { restText = it.filter(Char::isDigit).take(4) }, keyboardType = KeyboardType.Number, onCommit = {
+                    restText.toIntOrNull()?.let(store::setDefaultRest) ?: run { restText = storedRest }
+                })
+            }
         }
-        ListRow(t.restTicks) {
-            Segmented(state.settings.restTicks, listOf(true to t.on, false to t.off), store::setRestTicks)
+
+        PanelSection(t.notifications) {
+            when (notificationsAllowed) {
+                true -> ListRow(t.notificationsPermission, t.notificationsAllowed)
+                false -> ListRow(t.notificationsPermission, t.exactAlarmAllow, onClick = restAlerts::allowNotifications)
+                null -> Unit
+            }
+            if (exactAllowed == false) {
+                ListRow(t.exactAlarm, t.exactAlarmAllow, onClick = restAlerts::openExactAlarmSettings)
+            }
+            ListRow(t.vibration) {
+                Segmented(state.settings.vibration, listOf(true to t.on, false to t.off), store::setVibration)
+            }
+            ListRow(t.restTicks) {
+                Segmented(state.settings.restTicks, listOf(true to t.on, false to t.off), store::setRestTicks)
+            }
         }
-        Text(t.restTicksHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        Text(t.notificationsInfo, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        if (notificationsAllowed == false) Hint(t.notificationsDeniedHint)
+        if (exactAllowed == false) Hint(t.exactAlarmHint)
+        Hint(t.restTicksHint)
+        Hint(t.notificationsInfo)
 
         // Everything about the coach and AI access lives in the Coach tab; here only the link (and Fuel, the wallet).
-        SectionTitle(t.ai)
         val hub = app.overfit.i18n.LocalCoachStrings.current.hub
-        ListRow(hub.profileLink, onClick = onCoach)
-        Text(hub.profileLinkHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        FuelRow(fuelSession, fuelActive = state.providerId == app.overfit.ai.ProviderId.FUEL, onClick = onFuel)
+        PanelSection(t.ai) {
+            ListRow(hub.profileLink, onClick = onCoach)
+            FuelRow(fuelSession, fuelActive = state.providerId == app.overfit.ai.ProviderId.FUEL, onClick = onFuel)
+        }
+        Hint(hub.profileLinkHint)
 
-        SectionTitle(t.app)
-        ListRow(t.about, onClick = onAbout)
+        PanelSection(t.app) {
+            ListRow(t.about, onClick = onAbout)
+        }
 
-        SectionTitle(t.photos.backupSection)
-        ListRow(if (exportingBackup) t.photos.backupExporting else t.photos.backupExport, onClick = { if (!exportingBackup) onExportBackup() })
-        Text(t.photos.backupExportHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-        ListRow(t.photos.backupImport, onClick = onImportBackup)
+        PanelSection(t.photos.backupSection) {
+            ListRow(if (exportingBackup) t.photos.backupExporting else t.photos.backupExport, onClick = { if (!exportingBackup) onExportBackup() })
+            ListRow(t.photos.backupImport, onClick = onImportBackup)
+        }
+        Hint(t.photos.backupExportHint)
 
         SectionTitle(t.data)
         Spacer(Modifier.height(Space.s))

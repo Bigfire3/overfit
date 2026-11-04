@@ -51,7 +51,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-class ScreenshotTest {
+open class ScreenshotTest {
     @get:Rule(order = 0)
     val teardown = AppTeardown({ data }, { database })
 
@@ -176,6 +176,12 @@ class ScreenshotTest {
         back()
         tab("Profil")
         shot("profil")
+        // Coach tab without its first-time story (the story itself is not part of this tour).
+        store.markCoachStorySeen()
+        tab("Coach")
+        compose.waitForIdle()
+        shot("coach")
+        tab("Profil")
         tab("Workouts")
         compose.onNodeWithContentDescription("Übungen").performClick()
         waitFor("Eigene Übung")
@@ -189,3 +195,7 @@ class ScreenshotTest {
         shot("import")
     }
 }
+
+/** Same tour on a narrow phone (360 dp), for the UI audit. */
+@Config(qualifiers = "w360dp-h780dp-xxhdpi")
+class ScreenshotTest360 : ScreenshotTest()

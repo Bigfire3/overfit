@@ -28,6 +28,8 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelItem
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.SmallButton
@@ -79,14 +81,15 @@ fun ChatInboxScreen(
         Spacer(Modifier.height(Space.m))
         if (inbox.full) Text(c.inboxFull, Modifier.padding(bottom = Space.m), style = Theme.type.caption)
         if (inbox.items.isEmpty()) Text(c.inboxEmpty, tone = Tone.Muted)
-        Hairline()
-        inbox.items.forEach { item ->
-            when (item) {
-                is InboxTemplate -> ListRow(
-                    item.clientName.takeIf { it.isNotBlank() }?.let(c.inboxFrom) ?: c.inboxTitle,
-                    onClick = { open = item },
-                ) { Text(templateTitle(item), style = Theme.type.caption, tone = Tone.Muted, maxLines = 1) }
-                is InboxNote -> NoteCard(chat, item)
+        if (inbox.items.isNotEmpty()) Panel {
+            inbox.items.forEach { item ->
+                when (item) {
+                    is InboxTemplate -> ListRow(
+                        item.clientName.takeIf { it.isNotBlank() }?.let(c.inboxFrom) ?: c.inboxTitle,
+                        onClick = { open = item },
+                    ) { Text(templateTitle(item), style = Theme.type.caption, tone = Tone.Muted, maxLines = 1) }
+                    is InboxNote -> NoteCard(chat, item)
+                }
             }
         }
     }
@@ -99,7 +102,7 @@ private fun templateTitle(item: InboxTemplate): String =
 private fun NoteCard(chat: ChatFeature, item: InboxNote) {
     val c = LocalChatStrings.current
     val scope = rememberCoroutineScope()
-    Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
+    PanelItem {
         Text(item.title ?: c.noteForWorkout.takeIf { item.workoutId != null } ?: c.notesTitle, style = Theme.type.label)
         Text(
             listOfNotNull(item.clientName.takeIf { it.isNotBlank() }?.let(c.inboxFrom), item.rating?.let(c.notesRating)).joinToString(" · "),
@@ -114,7 +117,6 @@ private fun NoteCard(chat: ChatFeature, item: InboxNote) {
             SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item) } })
         }
     }
-    Hairline()
 }
 
 /** The chat's template proposal: the normal import preview, plus the chat's message and, when it replaces one, the diff. */
@@ -194,15 +196,14 @@ fun ChatNotesScreen(chat: ChatFeature, onBack: () -> Unit) {
         Title(c.notesTitle)
         Spacer(Modifier.height(Space.m))
         if (notes.isEmpty()) Text(c.notesEmpty, tone = Tone.Muted)
-        Hairline()
-        notes.forEach { note -> SavedNote(note) { chat.notes.remove(note.id) } }
+        if (notes.isNotEmpty()) Panel { notes.forEach { note -> SavedNote(note) { chat.notes.remove(note.id) } } }
     }
 }
 
 @Composable
 private fun SavedNote(note: ChatNote, onDelete: () -> Unit) {
     val c = LocalChatStrings.current
-    Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
+    PanelItem {
         Text(note.title ?: c.notesTitle, style = Theme.type.label)
         Text(
             listOfNotNull(note.clientName.takeIf { it.isNotBlank() }?.let(c.inboxFrom), note.rating?.let(c.notesRating)).joinToString(" · "),
@@ -213,5 +214,4 @@ private fun SavedNote(note: ChatNote, onDelete: () -> Unit) {
         NoteBody(note.text)
         SmallButton(c.notesDelete, onClick = onDelete, modifier = Modifier.padding(top = Space.s))
     }
-    Hairline()
 }

@@ -33,6 +33,10 @@ import app.overfit.ui.components.Icon
 import app.overfit.ui.components.IconButton
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.Hint
+import app.overfit.ui.components.panelRow
+import app.overfit.ui.components.RowDivider
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
@@ -88,23 +92,24 @@ fun StartScreen(
         Spacer(Modifier.height(Space.l))
 
         if (running != null) {
-            Text(t.runningNow, style = Theme.type.caption, tone = Tone.Muted)
-            ListRow(running.name, t.setsDone(running.completedSets, running.totalSets), onClick = onOpenRunning)
-            Spacer(Modifier.height(Space.m))
+            Text(t.runningNow, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+            Panel { ListRow(running.name, t.setsDone(running.completedSets, running.totalSets), onClick = onOpenRunning) }
+            Spacer(Modifier.height(Space.l))
         }
 
         if (chatInboxCount > 0) {
             val chatText = app.overfit.i18n.LocalChatStrings.current
-            Hairline()
-            ListRow(chatText.inboxStart(chatInboxCount), onClick = onChatInbox) { LineIcon(Icon.Plus) }
-            if (chatInboxFull) Text(chatText.inboxFull, Modifier.padding(vertical = Space.s), style = Theme.type.caption)
+            Panel { ListRow(chatText.inboxStart(chatInboxCount), onClick = onChatInbox) { LineIcon(Icon.Plus) } }
+            if (chatInboxFull) Hint(chatText.inboxFull)
+            Spacer(Modifier.height(Space.l))
         }
 
         if (templates != null && templates.isEmpty()) {
             Text(t.templatesEmpty, tone = Tone.Muted)
         }
-        if (templates != null && templates.isNotEmpty()) Hairline()
-        templates?.forEach { w -> WorkoutRow(w, lastDoneText(t, lastDone[w.id], today)) { onOpenWorkout(w.id) } }
+        if (templates != null && templates.isNotEmpty()) {
+            Panel { templates.forEach { w -> WorkoutRow(w, lastDoneText(t, lastDone[w.id], today)) { onOpenWorkout(w.id) } } }
+        }
     }
 }
 
@@ -112,7 +117,7 @@ fun StartScreen(
 @Composable
 fun WorkoutRow(workout: TemplateSummary, lastDone: String, onClick: () -> Unit) {
     val t = LocalStrings.current
-    Column(Modifier.fillMaxWidth().pressableRow(onClick)) {
+    Column(Modifier.fillMaxWidth().panelRow(onClick)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(workout.name, style = Theme.type.label)
@@ -123,7 +128,7 @@ fun WorkoutRow(workout: TemplateSummary, lastDone: String, onClick: () -> Unit) 
             Spacer(Modifier.width(Space.m))
             LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
         }
-        Hairline()
+        RowDivider()
     }
 }
 

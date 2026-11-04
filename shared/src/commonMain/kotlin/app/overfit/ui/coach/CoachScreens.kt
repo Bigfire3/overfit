@@ -1,5 +1,6 @@
 package app.overfit.ui.coach
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,6 +58,10 @@ import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
+import app.overfit.ui.components.Hint
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.PanelItem
+import app.overfit.ui.components.PanelSection
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
@@ -97,36 +102,39 @@ fun CoachHomeScreen(coach: CoachService, nav: CoachNav) {
     Screen(scroll = true, header = { BackHeader(t.back, nav.back) }) {
         Title(c.coachTitle)
         Spacer(Modifier.height(Space.l))
-        latest?.let { s -> RowWithHint(c.reviewLast, c.reviewLastHint) { nav.openSession(s.id) } }
-        RowWithHint(c.assessProgress, c.assessProgressHint) { nav.openReview(coach.startProgressReview()) }
-
-        SectionTitle(c.reviews)
-        if (reviews.isEmpty()) Text(c.reviewsEmpty, tone = Tone.Muted)
-        reviews.forEach { item ->
-            val title = (if (item.kind == ReviewKind.PROGRESS) c.progressTitle else c.reviewTitle) + " · " + dateText(item.createdAt)
-            val value = when (item.status) {
-                ReviewStatus.DONE -> item.review?.rating?.let(c.rating) ?: "✓"
-                ReviewStatus.QUEUED -> c.statusQueued
-                ReviewStatus.SENDING -> c.statusSending
-                ReviewStatus.FAILED -> c.statusFailed
-            }
-            ListRow(title, value, onClick = { nav.openReview(item.id) })
+        Panel {
+            latest?.let { s -> RowWithHint(c.reviewLast, c.reviewLastHint) { nav.openSession(s.id) } }
+            RowWithHint(c.assessProgress, c.assessProgressHint) { nav.openReview(coach.startProgressReview()) }
         }
 
-        SectionTitle(t.coach)
-        ListRow(t.coachMemory, onClick = nav.memory)
-        ListRow(c.settingsTitle, onClick = nav.settings)
+        if (reviews.isEmpty()) {
+            SectionTitle(c.reviews)
+            Text(c.reviewsEmpty, tone = Tone.Muted)
+        } else PanelSection(c.reviews) {
+            reviews.forEach { item ->
+                val title = (if (item.kind == ReviewKind.PROGRESS) c.progressTitle else c.reviewTitle) + " · " + dateText(item.createdAt)
+                val value = when (item.status) {
+                    ReviewStatus.DONE -> item.review?.rating?.let(c.rating) ?: "✓"
+                    ReviewStatus.QUEUED -> c.statusQueued
+                    ReviewStatus.SENDING -> c.statusSending
+                    ReviewStatus.FAILED -> c.statusFailed
+                }
+                ListRow(title, value, onClick = { nav.openReview(item.id) })
+            }
+        }
+
+        PanelSection(t.coach) {
+            ListRow(t.coachMemory, onClick = nav.memory)
+            ListRow(c.settingsTitle, onClick = nav.settings)
+        }
     }
 }
 
 @Composable
 private fun RowWithHint(label: String, hint: String, onClick: () -> Unit) {
-    Column(Modifier.pressableRow(onClick)) {
-        Column(Modifier.fillMaxWidth().padding(vertical = Space.m)) {
-            Text(label)
-            Text(hint, style = Theme.type.caption, tone = Tone.Muted)
-        }
-        Hairline()
+    Column(Modifier.fillMaxWidth().background(Theme.colors.surface).pressableRow(onClick).padding(Space.m)) {
+        Text(label)
+        Text(hint, style = Theme.type.caption, tone = Tone.Muted)
     }
 }
 
@@ -349,8 +357,8 @@ private fun Failure(item: ReviewItem, nav: CoachNav, onDemo: (() -> Unit)?) {
     Text(errorText(item.errorKind, c))
     Spacer(Modifier.height(Space.m))
     when (item.errorKind) {
-        CoachErrorKind.AUTH, CoachErrorKind.BAD_REQUEST -> ListRow(c.changeAccess, onClick = nav.connect)
-        CoachErrorKind.NO_FUEL -> ListRow(c.openFuel, onClick = nav.fuel)
+        CoachErrorKind.AUTH, CoachErrorKind.BAD_REQUEST -> Panel { ListRow(c.changeAccess, onClick = nav.connect) }
+        CoachErrorKind.NO_FUEL -> Panel { ListRow(c.openFuel, onClick = nav.fuel) }
         else -> Unit
     }
     RawAnswer(item.rawResponse ?: item.errorMessage)
@@ -384,10 +392,11 @@ private fun NoAccess(nav: CoachNav, onDemo: (() -> Unit)?) {
     Spacer(Modifier.height(Space.s))
     Text(c.noAccessText, tone = Tone.Muted)
     Spacer(Modifier.height(Space.l))
-    Hairline()
-    ListRow(c.connectAi, onClick = nav.connect)
-    ListRow(c.useFuel, onClick = nav.fuel)
-    if (onDemo != null) ListRow(c.demoReview, onClick = onDemo)
+    Panel {
+        ListRow(c.connectAi, onClick = nav.connect)
+        ListRow(c.useFuel, onClick = nav.fuel)
+        if (onDemo != null) ListRow(c.demoReview, onClick = onDemo)
+    }
 }
 
 @Composable
@@ -417,7 +426,7 @@ private fun Result(
     Bullets(c.tips, review.tips)
     review.photoFeedback?.let {
         SectionTitle(c.photoFeedback)
-        Text(it)
+        Panel { PanelItem { Text(it) } }
     }
     if (review.nextSession != null && item.kind == ReviewKind.SESSION) {
         SectionTitle(c.nextSession)
@@ -433,9 +442,11 @@ private fun Result(
             }
             diff == null || diff.isEmpty -> Text(c.planNoChanges, tone = Tone.Muted)
             else -> {
-                diff.changes.forEach { change ->
-                    ChangeRow(change, unit, language, checked = change.key in selected, enabled = planOpen) {
-                        onSelect(if (change.key in selected) selected - change.key else selected + change.key)
+                Panel {
+                    diff.changes.forEach { change ->
+                        ChangeRow(change, unit, language, checked = change.key in selected, enabled = planOpen) {
+                            onSelect(if (change.key in selected) selected - change.key else selected + change.key)
+                        }
                     }
                 }
                 diff.unknownIds.forEach { Text(c.planUnknown(it), style = Theme.type.caption, tone = Tone.Muted) }
@@ -465,12 +476,15 @@ private fun Result(
 @Composable
 private fun Bullets(title: String, items: List<String>) {
     if (items.isEmpty()) return
-    SectionTitle(title)
-    items.forEach { line ->
-        Row(Modifier.padding(vertical = Space.xs)) {
-            Text("–", tone = Tone.Muted)
-            Spacer(Modifier.width(Space.s))
-            Text(line)
+    PanelSection(title) {
+        PanelItem {
+            items.forEach { line ->
+                Row(Modifier.padding(vertical = Space.xs)) {
+                    Text("–", tone = Tone.Muted)
+                    Spacer(Modifier.width(Space.s))
+                    Text(line)
+                }
+            }
         }
     }
 }
@@ -494,10 +508,10 @@ private fun ChangeRow(change: PlanChange, unit: WeightUnit, language: Language, 
         is PlanChange.Removed -> "${c.changeRemoved}: ${change.exercise.name}" to ""
     }
     Column(
-        (if (enabled) Modifier.pressableRow(onToggle) else Modifier)
+        Modifier.background(Theme.colors.surface).then(if (enabled) Modifier.pressableRow(onToggle) else Modifier)
             .semantics { selected = checked; role = Role.Checkbox },
     ) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = Space.s), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Space.m, vertical = Space.s), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(title)
                 if (detail.isNotEmpty()) Text(detail, tone = Tone.Muted)
@@ -509,7 +523,6 @@ private fun ChangeRow(change: PlanChange, unit: WeightUnit, language: Language, 
                 else Box(Modifier.size(20.dp).border(1.dp, Theme.colors.muted, CircleShape))
             }
         }
-        Hairline()
     }
 }
 
@@ -518,15 +531,19 @@ private fun ChangeRow(change: PlanChange, unit: WeightUnit, language: Language, 
 
 @Composable
 internal fun TextArea(value: String, onValueChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().heightIn(min = 160.dp).border(0.5.dp, Theme.colors.hairline).padding(Space.m)) {
-        if (value.isEmpty()) Text(placeholder, tone = Tone.Faint)
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = Theme.type.body.copy(color = Theme.colors.foreground),
-            cursorBrush = SolidColor(Theme.colors.foreground),
-            modifier = Modifier.fillMaxWidth(),
-        )
+    Panel(modifier) {
+        PanelItem(Modifier.heightIn(min = 160.dp)) {
+            Box(Modifier.fillMaxWidth()) {
+                if (value.isEmpty()) Text(placeholder, tone = Tone.Faint)
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    textStyle = Theme.type.body.copy(color = Theme.colors.foreground),
+                    cursorBrush = SolidColor(Theme.colors.foreground),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 
@@ -555,10 +572,11 @@ fun CoachMemoryScreen(coach: CoachService, onBack: () -> Unit) {
         TextArea(text, { text = it; saved = false }, c.memoryPlaceholder, Modifier.testTag("coach-memory-input"))
         if (saved) { Spacer(Modifier.height(Space.s)); Text(c.memorySaved, style = Theme.type.caption, tone = Tone.Muted) }
         if (versions.size > 1) {
-            SectionTitle(c.memoryVersions)
-            versions.drop(1).take(20).forEach { v ->
-                val who = if (v.source == CoachService.SOURCE_COACH) c.memoryByCoach else c.memoryByYou
-                ListRow("${dateText(v.createdAt)} · $who", c.memoryRestore, onClick = { text = v.text; saved = false })
+            PanelSection(c.memoryVersions) {
+                versions.drop(1).take(20).forEach { v ->
+                    val who = if (v.source == CoachService.SOURCE_COACH) c.memoryByCoach else c.memoryByYou
+                    ListRow("${dateText(v.createdAt)} · $who", c.memoryRestore, onClick = { text = v.text; saved = false })
+                }
             }
         }
         if (current != null) {
@@ -589,20 +607,23 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
         },
     ) {
         Title(c.settingsTitle)
-        SectionTitle(c.model)
         if (provider == app.overfit.ai.ProviderId.FUEL) {
+            SectionTitle(c.model)
             FuelQuality(coach, settings.model(provider))
         } else {
-            ListRow(providerLabel(provider)) {
-                app.overfit.ui.components.RowInput(model, { model = it.trim().take(100) }, onCommit = { coach.settings.setModel(provider, model) })
+            PanelSection(c.model) {
+                ListRow(providerLabel(provider)) {
+                    app.overfit.ui.components.RowInput(model, { model = it.trim().take(100) }, onCommit = { coach.settings.setModel(provider, model) })
+                }
             }
-            Text(c.modelHint(app.overfit.coach.CoachModels.default(provider)), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+            Hint(c.modelHint(app.overfit.coach.CoachModels.default(provider)))
         }
-        SectionTitle(c.sendPhotos)
-        ListRow(c.sendPhotos) {
-            app.overfit.ui.components.Segmented(settings.sendPhotos, listOf(true to t.on, false to t.off), coach.settings::setSendPhotos)
+        PanelSection(c.sendPhotos) {
+            ListRow(c.sendPhotos) {
+                app.overfit.ui.components.Segmented(settings.sendPhotos, listOf(true to t.on, false to t.off), coach.settings::setSendPhotos)
+            }
         }
-        Text(c.sendPhotosHint, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        Hint(c.sendPhotosHint)
         SectionTitle(c.instructions)
         Text(c.instructionsHint, style = Theme.type.caption, tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
@@ -657,37 +678,34 @@ private fun FuelQuality(coach: CoachService, tier: String) {
     val selected = offered.firstOrNull { it.first == tier } ?: offered.first()
     fun cost(info: app.overfit.fuel.FuelTierInfo, task: app.overfit.fuel.FuelTask) =
         app.overfit.fuel.CostEstimate.micro(info, cfg.markupBp, task, cfg.usageProfiles)
-    if (offered.size > 1) offered.forEach { (id, info) ->
-        val on = id == selected.first
-        ListRow(info.label, tone = if (on) Tone.Default else Tone.Muted, onClick = { coach.settings.setModel(app.overfit.ai.ProviderId.FUEL, id) }, trailing = {
-            if (on) LineIcon(Icon.Check, size = 20.dp)
-        })
-        Text(
-            c.modelCosts(
-                app.overfit.fuel.formatCents(cost(info, app.overfit.fuel.FuelTask.COACH), language),
-                app.overfit.fuel.formatCents(cost(info, app.overfit.fuel.FuelTask.CHAT), language),
-            ),
-            Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted,
-        )
-    } else Text(
+    if (offered.size > 1) Panel {
+        offered.forEach { (id, info) ->
+            val on = id == selected.first
+            ListRow(info.label, tone = if (on) Tone.Default else Tone.Muted, onClick = { coach.settings.setModel(app.overfit.ai.ProviderId.FUEL, id) }, trailing = {
+                if (on) LineIcon(Icon.Check, size = 20.dp)
+            })
+            PanelItem {
+                Text(
+                    c.modelCosts(
+                        app.overfit.fuel.formatCents(cost(info, app.overfit.fuel.FuelTask.COACH), language),
+                        app.overfit.fuel.formatCents(cost(info, app.overfit.fuel.FuelTask.CHAT), language),
+                    ),
+                    style = Theme.type.caption, tone = Tone.Muted,
+                )
+            }
+        }
+    } else Hint(
         c.modelCosts(
             app.overfit.fuel.formatCents(cost(selected.second, app.overfit.fuel.FuelTask.COACH), language),
             app.overfit.fuel.formatCents(cost(selected.second, app.overfit.fuel.FuelTask.CHAT), language),
         ),
-        Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted,
     )
     val review = cost(selected.second, app.overfit.fuel.FuelTask.COACH)
     balance?.let {
-        Text(
-            c.modelAffordable(formatEuro(it, language), app.overfit.fuel.CostEstimate.affordable(it, review)),
-            Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted,
-        )
+        Hint(c.modelAffordable(formatEuro(it, language), app.overfit.fuel.CostEstimate.affordable(it, review)))
     }
     tiers?.get(app.overfit.ai.TIER_LITE)?.takeIf { it.available }?.let { lite ->
-        Text(
-            c.modelAutofill(lite.label, app.overfit.fuel.formatCents(cost(lite, app.overfit.fuel.FuelTask.AUTOFILL), language)),
-            Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted,
-        )
+        Hint(c.modelAutofill(lite.label, app.overfit.fuel.formatCents(cost(lite, app.overfit.fuel.FuelTask.AUTOFILL), language)))
     }
     Text(c.modelEstimateNote((cfg.markupBp / 100).toString()), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Faint)
 }
