@@ -23,6 +23,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import kotlinx.coroutines.delay
 
+/** Test tag (accessibility identifier on iOS) of a confirm button while it is armed. */
+object ConfirmTags {
+    const val armed = "confirm:armed"
+}
+
 /**
  * At most one armed confirm button ([ConfirmButton], [HeaderDeleteButton]) in the whole app. Arming
  * one disarms the other; [ConfirmArea] disarms on a tap anywhere outside the armed button.
@@ -70,9 +75,14 @@ fun ConfirmArea(modifier: Modifier = Modifier, content: @Composable () -> Unit) 
 /** State of one confirm button: armed or not, plus the modifier that reports its bounds while armed. */
 internal class ConfirmArm(private val arming: ConfirmArming, private val token: Any) {
     val armed: Boolean get() = arming.armed === token
-    fun arm() { arming.armed = token; arming.bounds = null }
+    /** Always tracked: arming changes only colours, not the layout, so no new positioning call follows. */
+    private var lastBounds: Rect? = null
+    fun arm() { arming.armed = token; arming.bounds = lastBounds }
     fun disarm() { if (armed) arming.disarm() }
-    val modifier: Modifier = Modifier.onGloballyPositioned { if (armed) arming.bounds = it.boundsInWindow() }
+    val modifier: Modifier = Modifier.onGloballyPositioned {
+        lastBounds = it.boundsInWindow()
+        if (armed) arming.bounds = lastBounds
+    }
 }
 
 /** How long a confirm button stays armed without the second tap. */
