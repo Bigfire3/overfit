@@ -11,7 +11,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import app.overfit.domain.Language
 import app.overfit.domain.TemplateSummary
-import app.overfit.domain.ThemeMode
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
 import app.overfit.ui.main.WorkoutRow
@@ -33,7 +32,7 @@ class FloatingCardTest {
     @Test fun everyWorkoutIsItsOwnCardAndOpensOnTap() {
         val opened = mutableListOf<Long>()
         compose.setContent {
-            OverfitTheme(ThemeMode.LIGHT) {
+            OverfitTheme {
                 CompositionLocalProvider(LocalStrings provides stringsFor(Language.DE)) {
                     Column(verticalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.Dp(12f))) {
                         listOf(TemplateSummary(1, "Push", listOf("Bankdrücken")), TemplateSummary(2, "Pull", listOf("Klimmzüge"))).forEach {

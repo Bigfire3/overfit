@@ -19,7 +19,6 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import app.overfit.domain.Language
 import app.overfit.domain.SetValues
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.TrackingType
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.WorkoutSet
@@ -47,7 +46,7 @@ class SetFieldFocusTest {
 
     private fun content(type: TrackingType = TrackingType.WEIGHT_REPS) {
         compose.setContent {
-            OverfitTheme(ThemeMode.LIGHT) {
+            OverfitTheme {
                 CompositionLocalProvider(LocalStrings provides t) {
                     val first = remember { FocusRequester() }
                     val second = remember { FocusRequester() }

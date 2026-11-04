@@ -32,7 +32,6 @@ import app.overfit.ui.fuel.rememberLoaded
 import app.overfit.data.AppState
 import app.overfit.data.AppStore
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.ageFromBirthYear
 import app.overfit.domain.birthYearFromAge
@@ -46,6 +45,7 @@ import app.overfit.ui.components.RowInput
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Segmented
+import app.overfit.ui.components.SwitchRow
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
@@ -103,13 +103,6 @@ fun SettingsScreen(
             ListRow(t.language) {
                 Segmented(state.language, listOf(Language.DE to "Deutsch", Language.EN to "English"), store::setLanguage)
             }
-            ListRow(t.theme) {
-                Segmented(
-                    state.settings.theme,
-                    listOf(ThemeMode.SYSTEM to t.themeSystem, ThemeMode.DARK to t.themeDark, ThemeMode.LIGHT to t.themeLight),
-                    store::setTheme,
-                )
-            }
         }
 
         PanelSection(t.profile) {
@@ -145,12 +138,8 @@ fun SettingsScreen(
             if (exactAllowed == false) {
                 ListRow(t.exactAlarm, t.exactAlarmAllow, onClick = restAlerts::openExactAlarmSettings)
             }
-            ListRow(t.vibration) {
-                Segmented(state.settings.vibration, listOf(true to t.on, false to t.off), store::setVibration)
-            }
-            ListRow(t.restTicks) {
-                Segmented(state.settings.restTicks, listOf(true to t.on, false to t.off), store::setRestTicks)
-            }
+            SwitchRow(t.vibration, state.settings.vibration, onCheckedChange = store::setVibration)
+            SwitchRow(t.restTicks, state.settings.restTicks, onCheckedChange = store::setRestTicks)
         }
         if (notificationsAllowed == false) Hint(t.notificationsDeniedHint)
         if (exactAllowed == false) Hint(t.exactAlarmHint)

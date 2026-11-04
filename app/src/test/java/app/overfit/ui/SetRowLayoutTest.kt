@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
 import app.overfit.ui.components.SetField
@@ -38,7 +37,7 @@ class SetRowLayoutTest {
     private fun check(language: Language, weight: String, reps: String, time: String?) {
         val t = stringsFor(language)
         compose.setContent {
-            OverfitTheme(ThemeMode.DARK) {
+            OverfitTheme {
                 androidx.compose.runtime.CompositionLocalProvider(LocalStrings provides t) {
                     Box(Modifier.modWidth(360.dp)) {
                         SetRowSurface("x", {}, Modifier.testTag("row")) {

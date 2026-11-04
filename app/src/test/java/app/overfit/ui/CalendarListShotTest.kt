@@ -20,7 +20,6 @@ import app.overfit.data.WorkoutPhoto
 import app.overfit.data.db.HistoryRow
 import app.overfit.domain.Language
 import app.overfit.domain.TemplateSummary
-import app.overfit.domain.ThemeMode
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
 import app.overfit.ui.components.Screen
@@ -60,11 +59,11 @@ class CalendarListShotTest {
         session("s0", LocalDate(2026, 10, 20), "Legs"),
     )
 
-    private fun shot(theme: ThemeMode, language: Language, name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
+    private fun shot(language: Language, name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
         val dir = System.getenv("SCREENSHOT_DIR")
         assumeTrue(dir != null)
         compose.setContent {
-            OverfitTheme(theme) {
+            OverfitTheme {
                 CompositionLocalProvider(LocalStrings provides stringsFor(language)) {
                     Box(Modifier.width(360.dp).height(640.dp).background(Theme.colors.background).testTag("shot")) { content() }
                 }
@@ -94,10 +93,7 @@ class CalendarListShotTest {
         }
     }
 
-    @Test fun workoutsLight() = shot(ThemeMode.LIGHT, Language.DE, "workouts-hell") { WorkoutsTab(Language.DE) }
-    @Test fun workoutsDark() = shot(ThemeMode.DARK, Language.DE, "workouts-dunkel") { WorkoutsTab(Language.DE) }
-    @Test fun calendarLight() = shot(ThemeMode.LIGHT, Language.DE, "kalender-hell") { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }) }
-    @Test fun calendarDark() = shot(ThemeMode.DARK, Language.DE, "kalender-dunkel") { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }) }
-    @Test fun listLight() = shot(ThemeMode.LIGHT, Language.DE, "kalender-liste-hell") { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }, listView = true) }
-    @Test fun listDark() = shot(ThemeMode.DARK, Language.DE, "kalender-liste-dunkel") { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }, listView = true) }
+    @Test fun workoutsDark() = shot(Language.DE, "workouts-dunkel") { WorkoutsTab(Language.DE) }
+    @Test fun calendarDark() = shot(Language.DE, "kalender-dunkel") { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }) }
+    @Test fun listDark() = shot(Language.DE, "kalender-liste-dunkel") { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }, listView = true) }
 }

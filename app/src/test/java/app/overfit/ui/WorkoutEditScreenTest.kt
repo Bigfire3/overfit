@@ -19,7 +19,6 @@ import app.overfit.domain.Language
 import app.overfit.domain.PlannedSet
 import app.overfit.domain.Template
 import app.overfit.domain.TemplateExercise
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.TrackingType
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.Workout
@@ -64,7 +63,7 @@ class WorkoutEditScreenTest {
     }
 
     private fun show(id: String, onClose: () -> Unit) = compose.setContent {
-        OverfitTheme(ThemeMode.LIGHT) {
+        OverfitTheme {
             CompositionLocalProvider(LocalStrings provides stringsFor(Language.DE)) {
                 WorkoutEditScreen(id, workouts, WeightUnit.KG, Language.DE, scope, onClose)
             }

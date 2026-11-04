@@ -19,7 +19,6 @@ import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.data.InMemorySecretStore
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.WeightUnit
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -55,20 +54,19 @@ class TabBarTest {
     private val database = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext()).build()
     private val data = AppData(database, kv, readCatalog = { File("../shared/src/commonMain/composeResources/files/catalog/exercises.json").readBytes() })
 
-    @Test fun germanLight() = check(Language.DE, ThemeMode.LIGHT, listOf("Workouts", "Coach", "Kalender", "Profil"))
-    @Test fun englishDark() = check(Language.EN, ThemeMode.DARK, listOf("Workouts", "Coach", "Calendar", "Profile"))
+    @Test fun german() = check(Language.DE, listOf("Workouts", "Coach", "Kalender", "Profil"))
+    @Test fun english() = check(Language.EN, listOf("Workouts", "Coach", "Calendar", "Profile"))
 
-    private fun check(language: Language, theme: ThemeMode, labels: List<String>) {
+    private fun check(language: Language, labels: List<String>) {
         store.setName("Fabi")
         store.setLanguage(language)
-        store.setTheme(theme)
         store.completeOnboarding()
         val deps = AppDependencies(store, Providers(HttpClient(MockEngine { respond("{}") })), data, versionName = "0.1.test")
         compose.setContent { OverfitApp(deps) }
         compose.waitUntil(20_000) { compose.onAllNodes(hasTestTag("tab:PROFILE")).fetchSemanticsNodes().isNotEmpty() }
 
         System.getenv("SCREENSHOT_DIR")?.let { dir ->
-            val file = File(File(dir).also { it.mkdirs() }, "tabbar-360dp-${language.name.lowercase()}-${theme.name.lowercase()}.png")
+            val file = File(File(dir).also { it.mkdirs() }, "tabbar-360dp-${language.name.lowercase()}.png")
             compose.waitForIdle()
             file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         }

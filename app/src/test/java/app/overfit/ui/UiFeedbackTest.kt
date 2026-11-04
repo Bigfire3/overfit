@@ -68,7 +68,7 @@ class UiFeedbackTest {
     fun confirmButton_asksInAPopup_cancelKeeps_confirmRuns() {
         var deleted = 0
         compose.setContent {
-            OverfitTheme(app.overfit.domain.ThemeMode.DARK) {
+            OverfitTheme {
                 ConfirmArea(Modifier.fillMaxSize()) {
                     Column {
                         Text("Irgendwo", Modifier.testTag("elsewhere"))
@@ -99,7 +99,7 @@ class UiFeedbackTest {
     fun setRow_swipeLeftDeletes_swipeRightDoesNothing() {
         val sets = mutableStateListOf(1, 2, 3)
         compose.setContent {
-            OverfitTheme(app.overfit.domain.ThemeMode.DARK) {
+            OverfitTheme {
                 Column {
                     sets.toList().forEach { n ->
                         androidx.compose.runtime.key(n) {

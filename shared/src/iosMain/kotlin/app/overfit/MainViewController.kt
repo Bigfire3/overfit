@@ -65,16 +65,14 @@ fun MainViewController(): UIViewController {
         distribution = app.overfit.fuel.Distribution.Store,
     )
     if (launch.uiTest) {
-        launch.theme?.let(deps.store::setTheme)
         if (launch.skipOnboarding && !launch.keepData) {
             deps.store.setName("Fabi")
             deps.store.completeOnboarding()
         }
     }
     IosNotificationTaps.onRestNotification { deps.requestOpenWorkout() }
-    IosAppearance.follow(deps.store.state.map { it.settings.theme })
     return ComposeUIViewController {
-        // The window exists once Compose is shown; apply the theme's interface style to it.
+        // The window exists once Compose is shown; force the dark interface style on it.
         LaunchedEffect(Unit) { IosAppearance.applyToWindows() }
         OverfitApp(deps)
     }

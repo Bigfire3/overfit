@@ -619,9 +619,7 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
             Hint(c.modelHint(app.overfit.coach.CoachModels.default(provider)))
         }
         PanelSection(c.sendPhotos) {
-            ListRow(c.sendPhotos) {
-                app.overfit.ui.components.Segmented(settings.sendPhotos, listOf(true to t.on, false to t.off), coach.settings::setSendPhotos)
-            }
+            app.overfit.ui.components.SwitchRow(c.sendPhotos, settings.sendPhotos, onCheckedChange = coach.settings::setSendPhotos)
         }
         Hint(c.sendPhotosHint)
         SectionTitle(c.instructions)

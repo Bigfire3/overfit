@@ -26,7 +26,6 @@ import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.data.InMemorySecretStore
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.WeightUnit
 import app.overfit.fuel.DeviceKey
 import app.overfit.fuel.Distribution
@@ -125,7 +124,7 @@ class WebCreditTest {
     }
 
     private fun showFuel(distribution: Distribution, onRedeem: () -> Unit = {}) = compose.setContent {
-        OverfitTheme(ThemeMode.LIGHT) {
+        OverfitTheme {
             CompositionLocalProvider(
                 LocalStrings provides stringsFor(Language.DE),
                 LocalFuelStrings provides GermanFuel,

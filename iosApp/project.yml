@@ -33,6 +33,9 @@ targets:
           UIColorName: LaunchBackground
           UIImageName: LaunchLogo
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Always dark (no light mode): dark system UI, light status bar text.
+        UIUserInterfaceStyle: Dark
+        UIStatusBarStyle: UIStatusBarStyleLightContent
         # Only HTTPS, which is exempt from export compliance.
         ITSAppUsesNonExemptEncryption: false
         # Compose Multiplatform: allow 120 Hz on ProMotion devices.

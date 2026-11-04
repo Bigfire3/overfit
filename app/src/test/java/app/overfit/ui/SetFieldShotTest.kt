@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.overfit.domain.Language
 import app.overfit.domain.SetValues
-import app.overfit.domain.ThemeMode
 import app.overfit.domain.TrackingType
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.WorkoutSet
@@ -54,14 +53,14 @@ class SetFieldShotTest {
 
     private val rows = listOf(1.0 to 1, 11.0 to 11, 102.5 to 10, 1000.0 to 1000)
 
-    private fun shot(theme: ThemeMode, language: Language, fontScale: Float, name: String) {
+    private fun shot(language: Language, fontScale: Float, name: String) {
         val dir = System.getenv("SCREENSHOT_DIR")
         assumeTrue(dir != null)
         val t = stringsFor(language)
         compose.setContent {
             val base = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale)) {
-                OverfitTheme(theme) {
+                OverfitTheme {
                     CompositionLocalProvider(LocalStrings provides t) {
                         Column(
                             Modifier.width(360.dp).background(Theme.colors.background).padding(horizontal = Space.l, vertical = Space.m)
@@ -106,8 +105,8 @@ class SetFieldShotTest {
         }
     }
 
-    @Test fun light_de_1_0() = shot(ThemeMode.LIGHT, Language.DE, 1.0f, "satz-hell-de-1.0")
-    @Test fun light_de_1_3() = shot(ThemeMode.LIGHT, Language.DE, 1.3f, "satz-hell-de-1.3")
-    @Test fun dark_en_1_0() = shot(ThemeMode.DARK, Language.EN, 1.0f, "satz-dunkel-en-1.0")
-    @Test fun dark_en_1_3() = shot(ThemeMode.DARK, Language.EN, 1.3f, "satz-dunkel-en-1.3")
+    @Test fun dark_de_1_0() = shot(Language.DE, 1.0f, "satz-dunkel-de-1.0")
+    @Test fun dark_de_1_3() = shot(Language.DE, 1.3f, "satz-dunkel-de-1.3")
+    @Test fun dark_en_1_0() = shot(Language.EN, 1.0f, "satz-dunkel-en-1.0")
+    @Test fun dark_en_1_3() = shot(Language.EN, 1.3f, "satz-dunkel-en-1.3")
 }

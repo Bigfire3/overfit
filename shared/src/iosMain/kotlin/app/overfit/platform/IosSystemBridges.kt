@@ -1,8 +1,6 @@
 package app.overfit.platform
 
-import app.overfit.domain.ThemeMode
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import platform.UIKit.UIApplication
 import platform.UIKit.UIUserInterfaceStyle
@@ -51,27 +49,12 @@ object IosNotificationTaps {
 }
 
 /**
- * The app theme (Light/Dark/System) also sets the iOS interface style of the window: status bar
- * text, keyboard, share sheet and pickers then match the app instead of the system setting.
+ * The app is always dark: the iOS windows are forced to the dark interface style, so status bar text,
+ * keyboard, share sheet and pickers are dark too, whatever the system setting (Info.plist also sets
+ * `UIUserInterfaceStyle = Dark`, this covers windows created later, e.g. the share sheet's).
  */
 object IosAppearance {
-    fun follow(themes: kotlinx.coroutines.flow.Flow<ThemeMode>) {
-        MainScope().launch { themes.distinctUntilChanged().collect { apply(it) } }
-    }
-
-    private fun apply(mode: ThemeMode) {
-        val style = when (mode) {
-            ThemeMode.LIGHT -> UIUserInterfaceStyle.UIUserInterfaceStyleLight
-            ThemeMode.DARK -> UIUserInterfaceStyle.UIUserInterfaceStyleDark
-            ThemeMode.SYSTEM -> UIUserInterfaceStyle.UIUserInterfaceStyleUnspecified
-        }
-        current = style
-        windows().forEach { it.overrideUserInterfaceStyle = style }
-    }
-
-    /** Last style; also applied when the window appears after launch (see MainViewController). */
-    var current: UIUserInterfaceStyle = UIUserInterfaceStyle.UIUserInterfaceStyleUnspecified
-        private set
+    private val current: UIUserInterfaceStyle = UIUserInterfaceStyle.UIUserInterfaceStyleDark
 
     fun applyToWindows() = windows().forEach { it.overrideUserInterfaceStyle = current }
 

@@ -1,5 +1,9 @@
 package app.overfit.ui.components
 
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.BiasAlignment
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -40,7 +44,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -572,8 +575,8 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
 
 /**
  * One standalone item that floats above the background (a workout in the list): own [Colors.surface] fill,
- * 1 dp [Colors.hairline] outline, rounded corners and a soft shadow (light mode; in dark mode the shadow is
- * invisible on black, so the outline and the lighter fill carry the lift). Pressable when [onClick] is set;
+ * 1 dp [Colors.faint] outline and rounded corners (no shadow: it would be invisible on black, the outline and
+ * the lighter fill carry the lift). Pressable when [onClick] is set;
  * put cards in a Column with [Space.m] gaps. Black and white only.
  */
 @Composable
@@ -584,10 +587,9 @@ fun FloatingCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, c
     Column(
         modifier
             .fillMaxWidth()
-            .shadow(if (c.isDark) 0.dp else 6.dp, PanelShape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
-            .clip(PanelShape)
+                        .clip(PanelShape)
             .background(if (pressed) c.surfacePressed else c.surface)
-            .border(1.dp, if (c.isDark) c.faint else c.hairline, PanelShape)
+            .border(1.dp, c.faint, PanelShape)
             .then(if (onClick != null) Modifier.clickable(interaction, indication = null, role = Role.Button, onClick = onClick) else Modifier),
         content = content,
     )
@@ -738,6 +740,58 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
             }
         }
         if (!inPanel) Hairline()
+    }
+}
+
+/**
+ * A list row with a plain on/off switch at the end (vibration, ticks, photos …). No "An/Aus" text: knob left =
+ * off (dark track with outline, grey knob), knob right = on (filled light track, black knob); mirrored in RTL.
+ * The whole row toggles; screen readers get role Switch and the on/off state from the semantics.
+ */
+@Composable
+fun SwitchRow(label: String, checked: Boolean, modifier: Modifier = Modifier, onCheckedChange: (Boolean) -> Unit) {
+    val inPanel = LocalInPanel.current
+    Column(
+        modifier.then(if (inPanel) Modifier.background(Theme.colors.surface).padding(horizontal = Space.m) else Modifier).toggleable(
+            value = checked,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            role = Role.Switch,
+            onValueChange = onCheckedChange,
+        ),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, Modifier.weight(1f, fill = false))
+            Spacer(Modifier.width(Space.m))
+            SwitchTrack(checked)
+        }
+        if (!inPanel) Hairline()
+    }
+}
+
+/** Test tag of the knob inside a [SwitchRow] (tests read its position). */
+const val SWITCH_KNOB_TAG = "switch:knob"
+
+/** The visual switch of [SwitchRow]: 52 × 32 dp track, 24 dp knob that slides from start (off) to end (on). */
+@Composable
+private fun SwitchTrack(checked: Boolean) {
+    val c = Theme.colors
+    val shape = RoundedCornerShape(50)
+    // BiasAlignment follows the layout direction: -1 = start (left in LTR), 1 = end.
+    val bias by animateFloatAsState(if (checked) 1f else -1f, label = "switch")
+    Box(
+        Modifier
+            .size(width = 52.dp, height = 32.dp)
+            .background(if (checked) c.foreground else c.background, shape)
+            .then(if (checked) Modifier else Modifier.border(1.5.dp, c.faint, shape))
+            .padding(4.dp),
+        contentAlignment = BiasAlignment(bias, 0f),
+    ) {
+        Box(Modifier.testTag(SWITCH_KNOB_TAG).size(24.dp).background(if (checked) c.background else c.muted, CircleShape))
     }
 }
 

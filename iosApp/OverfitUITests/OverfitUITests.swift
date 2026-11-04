@@ -10,16 +10,17 @@ import XCTest
  */
 class OverfitUITestCase: XCTestCase {
     var app: XCUIApplication!
-    var suffix = "hell"
+    var suffix = "dunkel"
 
     override func setUp() {
         continueAfterFailure = false
     }
 
-    func launch(theme: String, skipOnboarding: Bool = true, keepData: Bool = false) {
-        suffix = theme == "dark" ? "dunkel" : "hell"
+    /** The app is always dark (no light mode); the simulator itself stays in its default light appearance. */
+    func launch(skipOnboarding: Bool = true, keepData: Bool = false) {
+        suffix = "dunkel"
         app = XCUIApplication()
-        app.launchArguments = ["-overfitUITest", "-overfitTheme", theme, "-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
+        app.launchArguments = ["-overfitUITest", "-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         if skipOnboarding { app.launchArguments.append("-overfitSkipOnboarding") }
         if keepData { app.launchArguments.append("-overfitKeepData") }
         app.launch()
@@ -129,16 +130,14 @@ class OverfitUITestCase: XCTestCase {
     }
 }
 
-/** Screenshots of the main screens, light and dark (compare with docs/screenshots/after from Android). */
+/** Screenshots of the main screens, dark only (compare with docs/screenshots/after from Android). */
 final class ScreenshotTests: OverfitUITestCase {
-    func testOnboardingLight() { onboarding("light") }
-    func testOnboardingDark() { onboarding("dark") }
-    func testScreensLight() { screens("light") }
-    func testScreensDark() { screens("dark") }
+    func testOnboardingDark() { onboarding() }
+    func testScreensDark() { screens() }
 
     /** App icon on the home screen and the launch screen (captured right after tapping the icon). */
     func testHomeScreenAndLaunch() {
-        launch(theme: "light")
+        launch()
         waitFor("Legs")
         // Pressing home twice shows the first home screen page, where new apps land.
         XCUIDevice.shared.press(.home)
@@ -147,7 +146,6 @@ final class ScreenshotTests: OverfitUITestCase {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let icon = springboard.icons["overfit"]
         _ = icon.waitForExistence(timeout: 5)
-        suffix = "hell"
         shot("00-homescreen")
         guard icon.exists && icon.isHittable else { return } // icon on another page: launch screen not captured
         app.terminate() // cold start, so the launch screen shows
@@ -162,8 +160,8 @@ final class ScreenshotTests: OverfitUITestCase {
         }
     }
 
-    private func onboarding(_ theme: String) {
-        launch(theme: theme, skipOnboarding: false)
+    private func onboarding() {
+        launch(skipOnboarding: false)
         waitFor("Weiter")
         shot("00a-onboarding-name")
         app.typeText("Fabi")
@@ -179,8 +177,8 @@ final class ScreenshotTests: OverfitUITestCase {
         waitFor("Push") // sample workouts are there on first start
     }
 
-    private func screens(_ theme: String) {
-        launch(theme: theme)
+    private func screens() {
+        launch()
         waitFor("Legs")
         shot("02-training")
 
@@ -239,7 +237,7 @@ final class ScreenshotTests: OverfitUITestCase {
         // While the text field has focus, Compose's accessibility snapshot lists the text buttons
         // below it without labels; restart with the same data instead of searching "Senden".
         app.terminate()
-        launch(theme: theme, keepData: true)
+        launch(keepData: true)
         waitFor("Legs")
         tab("PHOTOS")
         waitFor("1 Training") // calendar content, not the always visible tab label
@@ -267,7 +265,7 @@ final class ScreenshotTests: OverfitUITestCase {
 /** Smoke test: start a workout, tick a set, minimize, reopen, finish. Runs in every iOS CI build. */
 final class SmokeTests: OverfitUITestCase {
     func testWorkoutFlow() {
-        launch(theme: "light")
+        launch()
         waitFor("Push").tap()
         tap("Starten")
         allowNotificationsIfAsked()
@@ -287,7 +285,7 @@ final class SmokeTests: OverfitUITestCase {
 
     /** iOS edge swipe = Android back: minimizes the workout, then leaves a pushed screen. */
     func testEdgeSwipeBack() {
-        launch(theme: "light")
+        launch()
         waitFor("Push").tap()
         tap("Starten")
         allowNotificationsIfAsked()
@@ -308,13 +306,13 @@ final class SmokeTests: OverfitUITestCase {
 
     /** The running workout survives the app being killed. */
     func testWorkoutSurvivesRelaunch() {
-        launch(theme: "light")
+        launch()
         waitFor("Push").tap()
         tap("Starten")
         allowNotificationsIfAsked()
         waitFor("Satz 1 abhaken").tap()
         app.terminate()
-        launch(theme: "light", keepData: true)
+        launch(keepData: true)
         waitFor("Nächsten Satz loggen")
     }
 }

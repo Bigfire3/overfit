@@ -15,7 +15,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import app.overfit.domain.Language
-import app.overfit.domain.ThemeMode
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
 import app.overfit.ui.components.Confirm
@@ -44,12 +43,12 @@ class DialogShotTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private fun shot(theme: ThemeMode, language: Language, name: String) {
+    private fun shot(language: Language, name: String) {
         val dir = System.getenv("SCREENSHOT_DIR")
         assumeTrue(dir != null)
         val t = stringsFor(language)
         compose.setContent {
-            OverfitTheme(theme) {
+            OverfitTheme {
                 CompositionLocalProvider(LocalStrings provides t) {
                     Column(
                         Modifier.width(360.dp).background(Theme.colors.background).background(Color.Black.copy(alpha = 0.55f))
@@ -70,6 +69,6 @@ class DialogShotTest {
         }
     }
 
-    @Test fun light_de() = shot(ThemeMode.LIGHT, Language.DE, "popup-hell-de")
-    @Test fun dark_en() = shot(ThemeMode.DARK, Language.EN, "popup-dunkel-en")
+    @Test fun dark_de() = shot(Language.DE, "popup-dunkel-de")
+    @Test fun dark_en() = shot(Language.EN, "popup-dunkel-en")
 }
