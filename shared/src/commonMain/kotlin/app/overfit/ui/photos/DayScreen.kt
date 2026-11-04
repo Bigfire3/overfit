@@ -113,6 +113,7 @@ private fun DayPhoto(item: DiaryPhoto, description: String, onOpen: () -> Unit, 
     val arm = rememberConfirmArm()
     val armed = arm.armed
     val c = Theme.colors
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     Box {
         PhotoThumb(item.photo, description, size = 104.dp, onClick = onOpen)
         Box(
@@ -126,7 +127,8 @@ private fun DayPhoto(item: DiaryPhoto, description: String, onOpen: () -> Unit, 
                     if (armed) stateDescription = t.tapAgainToConfirm
                 }
                 .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) {
-                    if (armed) { arm.disarm(); onRemove() } else arm.arm()
+                    if (armed) { arm.disarm(); onRemove() }
+                    else { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); arm.arm() }
                 },
             contentAlignment = Alignment.Center,
         ) {
