@@ -27,3 +27,6 @@ tools/catalog/.cache/
 *.p12
 *.keystore
 __pycache__/
+
+# impeccable-Hook: Laufzeit-Cache
+.impeccable/*.cache.json
