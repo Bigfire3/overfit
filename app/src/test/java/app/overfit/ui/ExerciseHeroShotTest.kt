@@ -25,6 +25,9 @@ import app.overfit.domain.TrackingType
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
 import app.overfit.ui.components.ExerciseHero
+import app.overfit.ui.components.overfitImageLoader
+import androidx.test.core.app.ApplicationProvider
+import coil3.SingletonImageLoader
 import app.overfit.ui.components.Title
 import app.overfit.ui.theme.OverfitTheme
 import app.overfit.ui.theme.Space
@@ -59,14 +62,16 @@ class ExerciseHeroShotTest {
         val dir = System.getenv("SCREENSHOT_DIR")
         assumeTrue(dir != null)
         val t = stringsFor(Language.EN)
+        // Same loader as the app (with the SVG decoder), set explicitly so the test does not depend on the Application.
+        SingletonImageLoader.setUnsafe(overfitImageLoader(ApplicationProvider.getApplicationContext()))
         fun exercise(slug: String, name: String) =
             Exercise("wg:$slug", name, ExerciseSource.WORKOUT_GUIDE, "catalog/wg/$slug.svg", emptyList(), emptyList(), null, TrackingType.WEIGHT_REPS, null)
         var current by mutableStateOf(exercise(slugs[0].first, slugs[0].second))
         compose.setContent {
             OverfitTheme(theme) {
                 CompositionLocalProvider(LocalStrings provides t) {
-                    Column(Modifier.width(360.dp).background(Theme.colors.background).padding(Space.l).testTag("shot")) {
-                        ExerciseHero(current)
+                    Column(Modifier.width(360.dp).testTag("shot").background(Theme.colors.background).padding(Space.l)) {
+                        ExerciseHero(current, Modifier.testTag("hero"))
                         Spacer(Modifier.height(Space.l))
                         Title(current.name)
                     }
@@ -75,13 +80,31 @@ class ExerciseHeroShotTest {
         }
         for ((slug, name) in slugs) {
             current = exercise(slug, name)
-            // Coil decodes off the main thread: give it time, then let Compose settle.
-            repeat(30) { Thread.sleep(50); compose.mainClock.advanceTimeBy(50); compose.waitForIdle() }
+            // Coil decodes the SVGs off the main thread (slow at xxhdpi under Robolectric): wait until lines show up.
+            waitForInk(if (slug in singles) 1 else 2)
             File(dir!!).mkdirs()
             File(dir, "$slug-$label.png").outputStream().use {
                 compose.onNodeWithTag("shot").captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
             }
         }
+    }
+
+    private val singles = setOf("plank", "hamstring-stretch")
+
+    /** Pumps until the image area (above the title) holds [cells] drawn poses: enough foreground pixels per cell. */
+    private fun waitForInk(cells: Int) {
+        val deadline = System.currentTimeMillis() + 30_000
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(50); compose.mainClock.advanceTimeBy(50); compose.waitForIdle()
+            val bmp = compose.onNodeWithTag("hero").captureToImage().asAndroidBitmap()
+            val bg = bmp.getPixel(bmp.width / 2, 2) and 0xff // panel fill at the top edge
+            var ink = 0
+            for (y in 0 until bmp.height step 3) for (x in 0 until bmp.width step 3) {
+                if (kotlin.math.abs((bmp.getPixel(x, y) and 0xff) - bg) > 120) ink++
+            }
+            if (ink > 150 * cells) { repeat(5) { compose.mainClock.advanceTimeBy(50); compose.waitForIdle() }; return }
+        }
+        error("images did not load")
     }
 
     @Test fun light() = shot(ThemeMode.LIGHT, "hell")
