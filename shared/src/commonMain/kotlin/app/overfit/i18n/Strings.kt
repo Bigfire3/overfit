@@ -275,7 +275,7 @@ val German = Strings(
     aiPrivacy = "Dein Key bleibt auf diesem Gerät. Nachrichten an den Coach gehen direkt an den gewählten Anbieter.",
     aiLater = "Später einrichten",
 
-    navStart = "Training",
+    navStart = "Workouts",
     navExercises = "Übungen",
     navPhotos = "Kalender",
     navCoach = "Coach",

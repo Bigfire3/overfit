@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -17,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, Training, History, Exercises, Photos, Calendar, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More }
+enum class Icon { Back, Check, Home, Training, History, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -66,6 +67,19 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 line(8.5f, 3.5f, 8.5f, 7f)
                 line(15.5f, 3.5f, 15.5f, 7f)
                 drawCircle(color, 1.4f * u, p(12f, 14.75f))
+            }
+            // Workouts tab: a clipboard with a plan on it (a workout is a plan).
+            Icon.Workouts -> {
+                drawRoundRect(color, p(5f, 4.5f), Size(14f * u, 16.5f * u), CornerRadius(1.5f * u), style = stroke)
+                drawRoundRect(color, p(9f, 3f), Size(6f * u, 3f * u), CornerRadius(1f * u), style = stroke)
+                line(8.5f, 10.5f, 15.5f, 10.5f)
+                line(8.5f, 14f, 15.5f, 14f)
+                line(8.5f, 17.5f, 12.5f, 17.5f)
+            }
+            // Profile tab: head and shoulders.
+            Icon.Profile -> {
+                circle(12f, 8.5f, 3.5f)
+                path(5f to 20f, 5.6f to 17.4f, 7.6f to 15.3f, 10f to 14.3f, 14f to 14.3f, 16.4f to 15.3f, 18.4f to 17.4f, 19f to 20f)
             }
             Icon.Plus -> {
                 line(12f, 5f, 12f, 19f)

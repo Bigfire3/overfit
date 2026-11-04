@@ -174,7 +174,7 @@ class DayWithOverfitTest {
 
         // --- Share every template as a link and import it again from the clipboard ----------
         for (name in listOf("Push", "Pull", "Legs")) {
-            tab("Training")
+            tab("Workouts")
             waitFor(name)
             compose.onAllNodes(hasText(name))[0].performScrollTo().performClick()
             waitFor("Starten") // the workout plan screen
@@ -202,7 +202,7 @@ class DayWithOverfitTest {
         assertEquals(6, templates().size)
 
         // --- Start Push as a workout ----------------------------------------------------------
-        tab("Training")
+        tab("Workouts")
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
         waitFor("Starten")
@@ -262,7 +262,7 @@ class DayWithOverfitTest {
         tab("Kalender")
         tab("Profil")
         compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).fetchSemanticsNodes().isNotEmpty() }
-        tab("Training")
+        tab("Workouts")
         compose.onNode(hasContentDescription("Training öffnen", substring = true)).performClick()
         waitFor("Nächsten Satz loggen")
         assertEquals(workoutId, deps.workout.state.value.workout!!.id)
@@ -341,7 +341,7 @@ class DayWithOverfitTest {
         back(); back()
 
         // --- AI template: copy the prompt, import a sample answer from the clipboard --------
-        tab("Training")
+        tab("Workouts")
         compose.waitForTrainingTab()
         compose.onNodeWithContentDescription("Neues Workout").performClick()
         compose.onNodeWithTag("prompt-copy:KI-Prompt kopieren").performScrollTo().performClick()
@@ -399,7 +399,7 @@ class DayWithOverfitTest {
         compose.waitUntilState(10_000) { templates().any { it.name == "Coach Push" } }
         tab("Coach")
 
-        tab("Training")
+        tab("Workouts")
 
         // Language, theme, notifications (permission denied: "Allow" asks the platform)
         alerts.allowed = false

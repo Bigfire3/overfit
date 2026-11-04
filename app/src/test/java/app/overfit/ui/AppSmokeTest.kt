@@ -111,7 +111,7 @@ class AppSmokeTest {
         compose.onAllNodes(hasClickAction() and hasTestTag("tab:HISTORY")).assertCountEquals(0)
         // Exercises are no tab anymore: four tabs, the catalogue opens from the Training tab
         compose.onAllNodes(hasText("Übungen") and hasClickAction()).assertCountEquals(0)
-        compose.onNode(hasText("Training") and hasClickAction()).performClick()
+        compose.onNode(hasText("Workouts") and hasClickAction()).performClick()
         compose.onNodeWithContentDescription("Übungen").performClick()
         compose.onNodeWithText("Eigene Übung").assertIsDisplayed()
         compose.onNodeWithContentDescription("Zurück").performClick()

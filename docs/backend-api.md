@@ -407,7 +407,7 @@ unabhängig von Groß-/Kleinschreibung, Bindestrich und Leerzeichen. Limit: 10/h
 ```
 `template` ist exakt das Teilen-Format v1 (`docs/share-format.md`) → dieselbe Import-Vorschau wie beim Link. Mit
 `replacesTemplateId` bietet die Vorschau „Vorlage aktualisieren“ (Diff zur bestehenden) neben „Als neue Vorlage“ an. Notizen
-mit `workoutId` erscheinen am Training im Verlauf, sonst in einer Liste „Notizen aus dem Chat“. Höchstens 50 offene Einträge.
+mit `workoutId` erscheinen am Training (Kalender → Tag → Training), sonst in einer Liste „Notizen aus dem Chat“. Höchstens 50 offene Einträge.
 
 ### `POST /v1/chat/inbox/ack` → Body `{ "ids": ["in_…"] }` → `{ "removed": 1 }`
 Auch für verworfene Einträge aufrufen.

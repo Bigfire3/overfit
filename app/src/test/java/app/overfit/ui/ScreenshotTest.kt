@@ -173,7 +173,7 @@ class ScreenshotTest {
         back()
         tab("Profil")
         shot("profil")
-        tab("Training")
+        tab("Workouts")
         compose.onNodeWithContentDescription("Übungen").performClick()
         waitFor("Eigene Übung")
         shot("uebungskatalog")

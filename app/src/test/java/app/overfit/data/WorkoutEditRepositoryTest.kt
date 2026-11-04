@@ -125,4 +125,24 @@ class WorkoutEditRepositoryTest {
         assertEquals(setOf(free.id, withTraining.id), workouts.allPhotos().map { it.id }.toSet())
         assertEquals(1, workouts.history.first().single().photoCount)
     }
+
+    @Test
+    fun deletingATrainingKeepsItsPhotosOnTheirDay() = runTest {
+        val a = custom("A")
+        var w = workoutOf("w1", a, PlannedSet(50.0, 10))
+        w = w.completeSet(w.exercises[0].sets[0].id, 2000)
+        workouts.finish(w, endedAt = 9000)
+        val photo = workouts.addPhoto("w1", byteArrayOf(1, 2), takenAt = 5000)
+
+        workouts.deleteWorkout("w1")
+
+        assertNull(workouts.getFinished("w1"))
+        val left = workouts.allPhotos().single()
+        assertEquals(photo.id, left.id)
+        assertNull(left.sessionId)
+        assertEquals(5000L, left.takenAt)
+        // The file is still there.
+        assertTrue(workouts.readPhoto(left)!!.contentEquals(byteArrayOf(1, 2)))
+        assertNull(workouts.photos.first().single().workoutName)
+    }
 }

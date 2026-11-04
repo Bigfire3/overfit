@@ -83,11 +83,15 @@ class WorkoutRepository(
         if (trimmed.isNotEmpty()) dao.rename(id, trimmed.take(80), clock())
     }
 
-    /** Deletes a finished workout with its sets and photo files. */
+    /**
+     * Deletes a finished workout with its sets. Its photos stay on their calendar day (they become photos
+     * without a training): a photo is removed only on its own, never as a side effect.
+     */
     suspend fun deleteWorkout(id: String) {
-        val photos = dao.photosOf(id)
-        dao.delete(id)
-        photos.forEach { photoFiles.delete(it.fileName) }
+        db.transaction {
+            dao.detachPhotos(id)
+            dao.delete(id)
+        }
         onChanged?.invoke(id, true)
     }
 

@@ -88,7 +88,7 @@ class OverfitUITestCase: XCTestCase {
         }
     }
 
-    /** Taps a tab bar entry by its test tag (`tab:START`, `tab:HISTORY`, `tab:COACH`, `tab:PHOTOS`, `tab:PROFILE`). */
+    /** Taps a tab bar entry by its test tag (`tab:START`, `tab:COACH`, `tab:PHOTOS` = Kalender, `tab:PROFILE`). */
     func tab(_ id: String, file: StaticString = #filePath, line: UInt = #line) {
         let button = app.buttons["tab:\(id)"]
         for _ in 0..<3 where !button.waitForExistence(timeout: 5) {
@@ -207,12 +207,17 @@ final class ScreenshotTests: OverfitUITestCase {
         tap("Speichern")
         waitFor("Legs")
 
-        tab("HISTORY")
+        // No History tab any more: calendar → today → the day's training → detail
+        tab("PHOTOS")
+        waitFor("1 Training")
+        shot("09-kalender")
+        tap("Tag \(Calendar.current.component(.day, from: Date())), Training")
         waitFor("Push")
-        shot("09-verlauf")
+        shot("09b-kalender-tag")
         tap("Push")
         waitFor("Dauer")
-        shot("10-verlauf-detail")
+        shot("10-training-detail")
+        tap("Zurück")
         tap("Zurück")
         tab("COACH")
         sleep(1)
@@ -227,8 +232,8 @@ final class ScreenshotTests: OverfitUITestCase {
         launch(theme: theme, keepData: true)
         waitFor("Legs")
         tab("PHOTOS")
-        waitFor("Foto-Tagebuch")
-        shot("11-fotos")
+        waitFor("Kalender")
+        shot("11-kalender")
         tab("PROFILE")
         shot("12-profil")
         tab("START")
@@ -265,8 +270,9 @@ final class SmokeTests: OverfitUITestCase {
         confirm("Beenden")
         waitFor("Training beendet")
         tap("Speichern")
-        tab("HISTORY")
-        waitFor("Push")
+        // The finished training shows in the calendar (no History tab any more)
+        tab("PHOTOS")
+        waitFor("1 Training")
     }
 
     /** iOS edge swipe = Android back: minimizes the workout, then leaves a pushed screen. */

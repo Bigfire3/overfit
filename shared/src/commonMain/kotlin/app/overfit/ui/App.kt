@@ -78,6 +78,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.toRoute
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
 import app.overfit.i18n.stringsFor
@@ -339,10 +340,10 @@ class PickedExercises {
 }
 
 enum class Tab(val route: Any, val icon: Icon, val label: (Strings) -> String) {
-    START(StartRoute, Icon.Training, { it.navStart }),
+    START(StartRoute, Icon.Workouts, { it.navStart }),
     COACH(CoachRoute, Icon.Coach, { it.navCoach }),
     PHOTOS(PhotosRoute, Icon.Calendar, { it.navPhotos }),
-    PROFILE(SettingsRoute, Icon.Settings, { it.navProfile });
+    PROFILE(SettingsRoute, Icon.Profile, { it.navProfile });
 
     val routeClass: KClass<*> get() = route::class
 }
@@ -600,9 +601,10 @@ fun OverfitApp(deps: AppDependencies) {
                             onOpenWorkout = { nav.navigate(WorkoutDetailRoute(it)) },
                             onAddPhoto = { bytes ->
                                 // App scope: leaving the day must not drop a photo that is still being prepared.
-                                val workoutsNow = history.orEmpty()
                                 deps.data.scope.launch {
                                     val jpeg = withContext(Dispatchers.Default) { prepareJpeg(bytes) } ?: return@launch
+                                    // Read the trainings now (not the screen's state, which may still be loading).
+                                    val workoutsNow = deps.data.workouts.history.first()
                                     val target = dayPhotoTarget(date, deps.today(), workoutsNow, deps.clock())
                                     deps.data.workouts.addPhoto(target.sessionId, jpeg, target.takenAt)
                                 }

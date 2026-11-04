@@ -250,6 +250,10 @@ interface WorkoutDao {
     @Insert
     suspend fun insertPhotos(photos: List<WorkoutPhotoEntity>)
 
+    /** Photos of a training that is about to be deleted stay as photos of their day (v9). */
+    @Query("UPDATE workout_photo SET sessionId = NULL WHERE sessionId = :sessionId")
+    suspend fun detachPhotos(sessionId: String)
+
     @Query("SELECT * FROM workout_photo WHERE id = :id")
     suspend fun getPhoto(id: String): WorkoutPhotoEntity?
 

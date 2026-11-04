@@ -103,7 +103,7 @@ API-Key: Eingabe im Onboarding oder in den Einstellungen, Prüfung beim Verbinde
 
 ## Weitere Screens
 - Start: Vorlagen, „Training starten", letzte Coach-Tipps
-- Verlauf: vergangene Trainings, Detail mit Sätzen + Coach-Bewertung
+- Verlauf: vergangene Trainings, Detail mit Sätzen + Coach-Bewertung (seit 3.11.26 ohne eigenen Tab: Kalender → Tag → Training, nachträglich bearbeitbar)
 - Foto-Tagebuch: Zeitleiste/Grid, zwei Fotos nebeneinander vergleichen. Fotos nur im app-privaten Speicher, nicht in der Galerie
 - Coach-Gedächtnis: lesen, bearbeiten, Versionen
 - Profil/Einstellungen: Sprache, Darstellung, Name, Alter, Einheit, KI-Zugang, Modell, Standard-Pause, Ton, Bildschirm an, RPE an/aus, Bilder offline laden, Backup, Alle Daten löschen

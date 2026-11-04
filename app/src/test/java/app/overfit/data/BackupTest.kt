@@ -126,6 +126,20 @@ class BackupTest {
         assertEquals(null, diary.workoutName)
     }
 
+    @Test
+    fun backupVersionIsTwoOnlyWithPhotosWithoutTraining() = runTest {
+        fun version(file: ByteArray): Int {
+            val json = String(Zip.read(file).getValue("backup.json"))
+            return Regex("\"v\":(\\d+)").find(json)!!.groupValues[1].toInt()
+        }
+        fill()
+        // Only photos of trainings: still v1, so an older app keeps reading the backup.
+        assertEquals(1, version(backup.export()))
+        data.workouts.addPhoto(null, byteArrayOf(1), takenAt = 7_000)
+        // A photo without training: v2, an older app says "update the app" instead of failing to read it.
+        assertEquals(2, version(backup.export()))
+    }
+
     private suspend fun snapshot(): List<Any?> {
         val finished = data.workouts.getFinished("w1")
         return listOf(
