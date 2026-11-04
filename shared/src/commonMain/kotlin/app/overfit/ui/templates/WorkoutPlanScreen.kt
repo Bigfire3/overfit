@@ -83,7 +83,7 @@ fun WorkoutPlanScreen(
             BackHeader(t.back, onBack) {
                 if (w != null) {
                     HeaderIconButton(Icon.Share, t.share.shareTemplate, onShare)
-                    HeaderDeleteButton(t.deleteTemplate, t.deleteConfirm, onDelete, message = t.deletedKeepsHistory)
+                    HeaderDeleteButton(t.deleteTemplate, t.deleteWorkoutConfirm, onDelete, message = t.deletedKeepsHistory)
                 }
             }
         },

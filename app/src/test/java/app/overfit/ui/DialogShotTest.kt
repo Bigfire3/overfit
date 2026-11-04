@@ -58,7 +58,7 @@ class DialogShotTest {
                     ) {
                         DialogCard(t.finishConfirm) { ConfirmDialogContent(t.finishWorkout, {}, {}, kind = Confirm.Positive) }
                         DialogCard(t.discardConfirm) { ConfirmDialogContent(t.discard, {}, {}) }
-                        DialogCard(t.deleteConfirm) { ConfirmDialogContent(t.delete, {}, {}, message = t.deletedKeepsHistory) }
+                        DialogCard(t.deleteWorkoutConfirm) { ConfirmDialogContent(t.delete, {}, {}, message = t.deletedKeepsHistory) }
                     }
                 }
             }

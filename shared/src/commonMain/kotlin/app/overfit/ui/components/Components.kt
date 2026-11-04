@@ -166,7 +166,7 @@ fun BackHeader(label: String, onBack: () -> Unit, actions: @Composable RowScope.
 @Composable
 fun HeaderIconButton(icon: Icon, label: String, onClick: () -> Unit, color: Color = Theme.colors.foreground) {
     Box(
-        Modifier.size(44.dp).semantics { contentDescription = label }.pressable(onClick = onClick),
+        Modifier.size(48.dp).semantics { contentDescription = label }.pressable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { LineIcon(icon, color = color) }
 }
@@ -223,7 +223,7 @@ fun Modifier.pressableRow(onClick: () -> Unit): Modifier {
         .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
 }
 
-/** Standard button height; [ButtonHeight.compact] for inline actions. Touch targets stay >= 44 dp. */
+/** Standard button height; [ButtonHeight.compact] for inline actions (40 dp visible, 48 dp touch area via padding). */
 object ButtonHeight {
     val standard = 48.dp
     val compact = 40.dp
@@ -256,13 +256,15 @@ private fun PillButton(
     val pressedFill = if (inPanel && pressedFill == c.surfacePressed) c.hairline else pressedFill
     Row(
         modifier
-            .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
-            .alpha(if (enabled) 1f else 0.3f)
-            .background(if (pressed) pressedFill else fill, shape)
+            // Touch area first: compact pills are 40 dp visible, the extra 4 dp above and below keep 48 dp to tap.
             .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) {
                 if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             }
+            .padding(vertical = if (compact) 4.dp else 0.dp)
+            .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
+            .alpha(if (enabled) 1f else 0.3f)
+            .background(if (pressed) pressedFill else fill, shape)
             .padding(horizontal = Space.l),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -361,15 +363,23 @@ fun SmallButton(
     val shape = RoundedCornerShape(50)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val inPanel = LocalInPanel.current
+    val fill = if (inPanel) c.surfacePressed else c.surface
+    val pressedFill = if (inPanel) c.hairline else c.surfacePressed
     Box(
         modifier
-            .heightIn(min = ButtonHeight.compact)
-            .background(if (pressed) c.surfacePressed else c.surface, shape)
+            // 40 dp visible, 48 dp to tap (like the compact pills).
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(vertical = 4.dp)
+            .heightIn(min = ButtonHeight.compact)
+            .background(if (pressed) pressedFill else fill, shape)
             .padding(horizontal = Space.m),
         contentAlignment = Alignment.Center,
     ) {
-        BasicText(label, style = Theme.type.label.copy(color = tone.color()), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        BasicText(
+            label, style = Theme.type.label.copy(color = tone.color()), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = Theme.type.label.fontSize),
+        )
     }
 }
 
@@ -377,7 +387,7 @@ fun SmallButton(
 fun IconButton(icon: Icon, label: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(44.dp)
+            .size(48.dp)
             .semantics { contentDescription = label }
             .pressable(onClick = onClick),
         contentAlignment = Alignment.CenterStart,
