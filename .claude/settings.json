@@ -1,13 +1,38 @@
 {
-  "extraKnownMarketplaces": {
-    "impeccable": {
-      "source": {
-        "source": "github",
-        "repo": "pbakaus/impeccable"
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ ! -f \"$CLAUDE_PROJECT_DIR/.claude/skills/impeccable/scripts/impeccable\" ] || sh \"$CLAUDE_PROJECT_DIR/.claude/skills/impeccable/scripts/impeccable\" hook || true",
+            "timeout": 60
+          }
+        ]
       }
-    }
-  },
-  "enabledPlugins": {
-    "impeccable@impeccable": true
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ ! -f \"$CLAUDE_PROJECT_DIR/.claude/skills/impeccable/scripts/impeccable\" ] || sh \"$CLAUDE_PROJECT_DIR/.claude/skills/impeccable/scripts/impeccable\" hook || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ ! -f \"$CLAUDE_PROJECT_DIR/.claude/skills/impeccable/scripts/impeccable\" ] || sh \"$CLAUDE_PROJECT_DIR/.claude/skills/impeccable/scripts/impeccable\" hook || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }

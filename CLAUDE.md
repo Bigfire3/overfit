@@ -11,7 +11,7 @@
 ## Architektur (Kurzfassung)
 - Kotlin Multiplatform: `:shared` enthält UI (Compose Multiplatform) und Logik für Android und iOS. `:app` ist die Android-Hülle (Signatur, CI-APK), `iosApp/` die iOS-Hülle (XcodeGen-Spec + SwiftUI-Host).
 - Designsystem in `shared/.../ui/theme` und `ui/components`: schwarz-weiß, keine Akzentfarbe, nur Compose Foundation (kein Material), Schrift Inter, zusammengehörige Zeilen in `Panel`/`PanelSection` (graue Fläche, 1-dp-Rand, runde Ecken, Trennlinien; Ersatz für „Haarlinien statt Cards“, siehe DECISIONS 4.11.), kurze Erklärtexte als `Hint` darunter, ein `PrimaryButton` pro Screen, `LineIcon` für Icons.
-- Plugin „impeccable“ (Design-Skill mit Hooks, aktiviert in `.claude/settings.json`): Seine Hinweise sind Anregungen. Bei Widerspruch gilt das Overfit-Designsystem oben (schwarz-weiß, keine Akzentfarbe, Foundation, Panels). Für Compose gelten seine CSS-Regeln sinngemäß.
+- Skill „impeccable“ (Design-Audit, `/impeccable audit|critique|polish …`, Referenzen u. a. `reference/android.md`, `audit.native.md`; vendored unter `.claude/skills/impeccable`, Hooks in `.claude/settings.json`; die Hooks prüfen nur Web-Dateien wie `web/`, nicht Kotlin): Seine Hinweise sind Anregungen. Bei Widerspruch gilt das Overfit-Designsystem oben (schwarz-weiß, keine Akzentfarbe, Foundation, Panels). Für Compose gelten seine Regeln sinngemäß.
 - Alle Texte in `shared/.../i18n/Strings.kt` (Deutsch + Englisch, fehlende Übersetzung = Compile-Fehler). Keine Android-`strings.xml` für UI-Texte.
 - Plattformcode nur über `expect`/`actual` bzw. Interfaces (`KeyValueStore`, `SecretStore`) in `androidMain`/`iosMain`.
 
