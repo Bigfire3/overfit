@@ -166,9 +166,9 @@ class CoachTabTest {
         compose.waitUntilState(10_000) { runBlocking { database.coachChatDao().allChats() }.size == 1 }
 
         compose.onNodeWithText("Chat löschen").performClick()
-        waitFor("Chat löschen?")
+        compose.onNodeWithTag("confirm:armed").assertExists()
         assertEquals(1, runBlocking { database.coachChatDao().allChats() }.size)
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
         compose.waitUntilState(10_000) { runBlocking { database.coachChatDao().allChats() }.isEmpty() }
         assertTrue(runBlocking { database.coachChatDao().allMessages() }.isEmpty())
     }

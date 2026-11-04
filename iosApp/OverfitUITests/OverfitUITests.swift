@@ -68,20 +68,29 @@ class OverfitUITestCase: XCTestCase {
     }
 
     /**
-     * Confirm buttons open a popup (question, "Abbrechen", action): tap the button, screenshot the popup,
-     * then tap the popup's action (test tag `dialog:confirm`, accessibility identifier on iOS).
+     * Confirm buttons use two taps: the first arms the button (it turns red and gets the accessibility
+     * identifier `confirm:armed`), a second tap within 3 s runs the action. No blind double tap: wait for the
+     * armed element, then tap exactly that element. If the 3 s ran out meanwhile (slow screenshot), that tap
+     * only arms it again; then it is still armed and gets one more tap.
      */
     func confirm(_ label: String, shotName: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
         tap(label, file: file, line: line)
-        let action = app.descendants(matching: .any).matching(identifier: "dialog:confirm").firstMatch
-        if !action.waitForExistence(timeout: 5) {
-            failShot("dialog-\(label)")
-            XCTFail("Popup für \"\(label)\" fehlt\n\(app.debugDescription)", file: file, line: line)
+        let armed = app.descendants(matching: .any).matching(identifier: "confirm:armed").firstMatch
+        if !armed.waitForExistence(timeout: 5) {
+            failShot("confirm-\(label)")
+            XCTFail("\"\(label)\" wurde nicht scharf geschaltet\n\(app.debugDescription)", file: file, line: line)
             return
         }
-        usleep(400_000)
-        if let shotName { save(XCUIScreen.main.screenshot(), name: shotName) }
-        action.tap()
+        if let shotName { usleep(200_000); save(XCUIScreen.main.screenshot(), name: shotName) }
+        for _ in 0..<2 {
+            guard armed.exists else { return }
+            armed.tap()
+            usleep(500_000)
+        }
+        if armed.exists {
+            failShot("confirm-still-armed-\(label)")
+            XCTFail("\"\(label)\" wurde nicht bestätigt", file: file, line: line)
+        }
     }
 
     /** Confirms the system notification prompt that appears on the first workout start. */

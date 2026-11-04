@@ -185,13 +185,15 @@ class DiaryScreenTest {
         // Two photos of that day, oldest first; a tap opens the viewer.
         compose.onNodeWithContentDescription("Foto 1").performScrollTo().performClick()
         assertEquals("p2", opened)
-        // Remove: the "x" asks in a popup, "Entfernen" there removes; tapping "Abbrechen" keeps the photo.
+        // Remove, two taps: the first arms the "x" (red, screen readers hear "zum Bestätigen erneut tippen"),
+        // a tap elsewhere disarms it and keeps the photo.
         compose.onAllNodesWithContentDescription("Foto entfernen")[1].performScrollTo().performClick()
-        compose.onNodeWithText("Foto vom Tag entfernen?").assertExists()
-        compose.onNodeWithTag("dialog:cancel").performClick()
+        compose.onNodeWithContentDescription("Foto entfernen – zum Bestätigen erneut tippen").assertExists()
+        compose.onNodeWithText("TRAININGS").performClick()
+        compose.onAllNodesWithTag("confirm:armed").assertCountEquals(0)
         assertEquals(null, removed)
         compose.onAllNodesWithContentDescription("Foto entfernen")[1].performScrollTo().performClick()
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
         assertEquals("p3", removed)
         compose.onNodeWithText("Aus Fotos wählen").assertExists()
     }
@@ -258,7 +260,7 @@ class DiaryScreenTest {
         compose.onNodeWithContentDescription("Foto 1 von 2").assertIsDisplayed()
         compose.onNodeWithContentDescription("Foto löschen").performClick() // bin icon top right
         assertEquals(null, deleted)
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
         assertEquals("p2", deleted)
     }
 

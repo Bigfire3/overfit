@@ -1,9 +1,9 @@
 package app.overfit.ui.photos
 
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
-import app.overfit.ui.components.ConfirmDialog
+import app.overfit.ui.components.ConfirmTags
+import app.overfit.ui.components.rememberConfirmArm
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -106,26 +106,33 @@ fun DayScreen(
     }
 }
 
-/** Thumbnail with an "x" in the corner: it asks in a popup ("Foto entfernen?") before removing. */
+/** Thumbnail with an "x" in the corner, two-tap pattern: the first tap turns the "x" red, the second removes. */
 @Composable
 private fun DayPhoto(item: DiaryPhoto, description: String, onOpen: () -> Unit, onRemove: () -> Unit) {
     val t = LocalStrings.current
-    var asking by remember { mutableStateOf(false) }
+    val arm = rememberConfirmArm()
+    val armed = arm.armed
     val c = Theme.colors
     Box {
         PhotoThumb(item.photo, description, size = 104.dp, onClick = onOpen)
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .size(36.dp)
-                    .semantics { contentDescription = t.history.removePhoto }
-                    .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { asking = true },
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(Modifier.size(24.dp).background(c.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
-                    LineIcon(Icon.Close, size = 16.dp)
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .then(arm.modifier)
+                .size(36.dp)
+                .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
+                .semantics {
+                    contentDescription = if (armed) "${t.history.removePhoto} – ${t.tapAgainToConfirm}" else t.history.removePhoto
+                    if (armed) stateDescription = t.tapAgainToConfirm
                 }
+                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) {
+                    if (armed) { arm.disarm(); onRemove() } else arm.arm()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.size(24.dp).background(c.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
+                LineIcon(Icon.Close, size = 16.dp, color = if (armed) c.armed else c.foreground)
             }
+        }
     }
-    if (asking) ConfirmDialog(t.photos.removePhotoConfirm, t.remove, onConfirm = onRemove, onDismiss = { asking = false })
 }

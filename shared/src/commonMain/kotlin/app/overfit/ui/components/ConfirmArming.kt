@@ -11,7 +11,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -41,7 +40,7 @@ class ConfirmArming {
 /** Fallback for screens rendered without [ConfirmArea] (previews, single-screen tests). */
 val LocalConfirmArming = staticCompositionLocalOf { ConfirmArming() }
 
-/** Wraps the whole app once: a tap anywhere outside the armed confirm button disarms it. */
+/** Wraps the whole app once: a tap anywhere outside the armed confirm button, or any scroll/drag, disarms it. */
 @Composable
 fun ConfirmArea(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val arming = remember { ConfirmArming() }
@@ -55,6 +54,13 @@ fun ConfirmArea(modifier: Modifier = Modifier, content: @Composable () -> Unit) 
                         // Initial pass: seen before the children handle the tap, nothing is consumed.
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         if (arming.armed != null && arming.bounds?.contains(down.position + origin[0]) != true) arming.disarm()
+                        // A finger that moves (scrolling, even when it started on the armed button) disarms too.
+                        val slop = viewConfiguration.touchSlop
+                        while (true) {
+                            val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            if (arming.armed != null && (change.position - down.position).getDistance() > slop) arming.disarm()
+                        }
                     }
                 },
         ) { content() }
@@ -69,16 +75,17 @@ internal class ConfirmArm(private val arming: ConfirmArming, private val token: 
     val modifier: Modifier = Modifier.onGloballyPositioned { if (armed) arming.bounds = it.boundsInWindow() }
 }
 
-/** Arms for at most 4 s; [onArmedChange] lets a parent make room for the longer confirm text. */
+/** How long a confirm button stays armed without the second tap. */
+const val CONFIRM_ARMED_MILLIS = 3000L
+
+/** Arms for at most [CONFIRM_ARMED_MILLIS]. */
 @Composable
-internal fun rememberConfirmArm(onArmedChange: (Boolean) -> Unit = {}): ConfirmArm {
+internal fun rememberConfirmArm(): ConfirmArm {
     val arming = LocalConfirmArming.current
     val arm = remember(arming) { ConfirmArm(arming, Any()) }
     val armed = arm.armed
-    val callback by rememberUpdatedState(onArmedChange)
     LaunchedEffect(armed) {
-        callback(armed)
-        if (armed) { delay(4000); arm.disarm() }
+        if (armed) { delay(CONFIRM_ARMED_MILLIS); arm.disarm() }
     }
     DisposableEffect(arm) { onDispose { arm.disarm() } }
     return arm

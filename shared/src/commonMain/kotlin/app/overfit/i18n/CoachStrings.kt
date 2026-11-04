@@ -102,7 +102,6 @@ class CoachStrings(
     val memoryByYou: String,
     val memoryRestore: String,
     val memoryDelete: String,
-    val memoryDeleteConfirm: String,
     val memoryPlaceholder: String,
     // Settings
     val model: String,
@@ -235,7 +234,6 @@ val GermanCoach = CoachStrings(
     memoryByYou = "Du",
     memoryRestore = "Wiederherstellen",
     memoryDelete = "Gedächtnis löschen",
-    memoryDeleteConfirm = "Coach-Gedächtnis löschen?",
     memoryPlaceholder = "Z. B. Ziel: 100 kg Bankdrücken. Linke Schulter zwickt bei Überkopf.",
     model = "Modell",
     modelHint = { "Standard: $it. Bei OpenRouter z. B. anthropic/…, openai/…" },
@@ -368,7 +366,6 @@ val EnglishCoach = CoachStrings(
     memoryByYou = "You",
     memoryRestore = "Restore",
     memoryDelete = "Delete memory",
-    memoryDeleteConfirm = "Delete coach memory?",
     memoryPlaceholder = "E.g. goal: 100 kg bench press. Left shoulder hurts on overhead work.",
     model = "Model",
     modelHint = { "Default: $it. On OpenRouter e.g. anthropic/…, openai/…" },
