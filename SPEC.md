@@ -56,7 +56,7 @@ Nicht im Onboarding: Sprache (Gerät/Einstellungen), Ziel, Größe, Erfahrung, E
 - UserProfile: Ziele, Erfahrung, Körpergewicht, Einschränkungen, Freitext
 
 ## Übungsbilder & Katalog
-- Hauptquelle: Workout Guide (github.com/bryllim/workout-guide, npm @bryllim/workout-guide): 302 Übungen, je 3 schematische SVG-Frames. Frame 1 als Standbild in Listen; in der großen Detailansicht laufen alle 3 Frames ruhig durch (1→2→3→2→1, seit Session AH). SVG beim Rendern in der Theme-Farbe einfärben.
+- Hauptquelle: Workout Guide (github.com/bryllim/workout-guide, npm @bryllim/workout-guide): 302 Übungen, je 3 schematische SVG-Frames. Frame 1 als Standbild in Listen; die große Detailansicht zeigt ruhig zwei Posen nebeneinander, Ausgangs- und Endposition (Frame 1 und Frame 3, gleich groß, gleich skaliert, auf derselben Bodenlinie, Linienstärke angeglichen; seit Session AN statt der Animation aus Session AH). Halteübungen und statische Dehnungen: nur Frame 1. Frame 2 wird nicht gebündelt. SVG beim Rendern in der Theme-Farbe einfärben.
 - ~~Ergänzung durch free-exercise-db~~ – am 3.11.2026 entfernt (Fotos passten nicht ins Design). Fehlende Übungen legt man als eigene Übung an; „Mit KI ausfüllen“ ergänzt aus dem Namen Erfassungsart, Muskeln, Equipment, Pause und eine Ausführungsnotiz (alles bearbeitbar), vorher „Meintest du …?“ gegen Dubletten. Auch im Workout-Modus über den Übungs-Picker.
 - Import-Skript im Repo: Workout Guide an festen Commit gepinnt laden, Ergebnis als exercises.json ins App-Asset. Workout-Guide-SVGs offline mitbündeln. Keine Bilder aus dem Netz.
 - Lizenz: Workout-Guide-Grafiken sind CC BY-SA 4.0 → Namensnennung (Bryl Lim, Everkinetic) im „Über"-Screen, Dateien unverändert lassen (Einfärben beim Rendern ist erlaubt).
@@ -111,7 +111,7 @@ API-Key: Eingabe im Onboarding oder in den Einstellungen, Prüfung beim Verbinde
 - Über: App-Version, Lizenzen und Namensnennungen
 
 ## Bewusst NICHT
-Login-Accounts, Cloud-Sync, Social-Feed, Gamification, Werbung, Tracking, Übungsanleitungen, Videos, Animationen (Ausnahme: die ruhige Frame-Animation der Übungsgrafik in der Detailansicht).
+Login-Accounts, Cloud-Sync, Social-Feed, Gamification, Werbung, Tracking, Übungsanleitungen, Videos, Animationen.
 Erlaubt sind: einzelne Trainings per Link/QR teilen, das optionale Coach-Guthaben mit anonymer Geräte-Identität und die
 ausdrücklich freiwillige KI-Chat-Verbindung (verschlüsselter Upload nur für Claude/ChatGPT/Gemini, siehe unten).
 

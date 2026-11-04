@@ -1,17 +1,29 @@
 package app.overfit.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.draw.clipToBounds
+import app.overfit.ui.theme.Space
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.overfit.i18n.LocalStrings
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,25 +60,48 @@ object ExerciseImages {
     private fun uriOf(ref: String?): String? =
         if (ref == null || ref.startsWith("http")) null else Res.getUri("files/$ref")
 
+    /** Workout Guide slug of a bundled frame-1 image (`catalog/wg/<slug>.svg`), else null. */
+    fun slug(imageRef: String?): String? =
+        imageRef?.takeIf { it.startsWith(WG_DIR) && it.endsWith(".svg") }?.removePrefix(WG_DIR)?.removeSuffix(".svg")
+
+    /** File (relative to `files/`) of source frame [frame] of a Workout Guide image: `slug.svg` (1) or `slug-N.svg`. */
+    fun frameRef(imageRef: String, frame: Int): String =
+        if (frame == 1) imageRef else imageRef.removeSuffix(".svg") + "-$frame.svg"
+
     /**
-     * Files (relative to `files/`) of an exercise's animation frames, in file order: `slug.svg` (frame 1, also the still
-     * image), `slug-2.svg`, `slug-3.svg`. Only bundled Workout Guide vectors have more than one frame (import script
-     * writes all three for every exercise); anything else is a single image or none.
+     * Start and end pose of [exercise] for the detail view, in that order (frame files and crop), or null when it
+     * shows a single image (holds, static stretches, custom exercises, not loaded yet).
      */
-    fun frameRefs(imageRef: String?): List<String> {
-        if (imageRef == null || !imageRef.endsWith(".svg")) return listOfNotNull(imageRef)
-        val base = imageRef.removeSuffix(".svg")
-        return listOf(imageRef) + (2..FRAME_COUNT).map { "$base-$it.svg" }
+    fun poses(exercise: Exercise, pairs: Map<String, PosePair>?): List<Pose>? {
+        val ref = exercise.imageRef ?: return null
+        val pair = pairs?.get(slug(ref) ?: return null) ?: return null
+        return pair.frames.mapIndexed { i, frame ->
+            Pose(frameRef(ref, frame), pair.origin[i][0], pair.origin[i][1], pair.size[0], pair.size[1])
+        }
     }
 
-    /** Frame index per animation step: 1→2→3→2→1 … (ping-pong), or a still image if there is only one frame. */
-    fun sequence(frameCount: Int): List<Int> =
-        if (frameCount <= 1) listOf(0) else (0 until frameCount) + (frameCount - 2 downTo 1)
+    const val CANVAS = 512f
+    private const val WG_DIR = "catalog/wg/"
+}
 
-    fun frameModels(exercise: Exercise): List<String> = frameRefs(exercise.imageRef).mapNotNull(::uriOf)
+/** One pose: frame file plus the crop (SVG units of the 512 x 512 canvas) that shows it. */
+data class Pose(val ref: String, val x: Float, val y: Float, val width: Float, val height: Float)
 
-    const val FRAME_COUNT = 3
-    const val FRAME_MILLIS = 700L
+/** Entry of files/catalog/poses.json (tools/catalog/import_catalog.py): start/end frame, shared crop size, origins. */
+@Serializable
+data class PosePair(val frames: List<Int>, val size: List<Float>, val origin: List<List<Float>>)
+
+/** Loads files/catalog/poses.json once (small, about 25 KB) and keeps it for the app's lifetime. */
+object ExercisePoses {
+    private var cache: Map<String, PosePair>? = null
+    private val json = Json { ignoreUnknownKeys = true }
+
+    fun cached(): Map<String, PosePair>? = cache
+
+    fun parse(bytes: ByteArray): Map<String, PosePair> = json.decodeFromString(bytes.decodeToString())
+
+    suspend fun load(): Map<String, PosePair> =
+        cache ?: parse(Res.readBytes("files/catalog/poses.json")).also { cache = it }
 }
 
 /**
@@ -123,44 +158,76 @@ private fun ExerciseImageContent(exercise: Exercise, model: String?, vector: Boo
 }
 
 /**
- * Large image for the detail screen: full width, square. With several frames it loops 1→2→3→2→1 (hard switch,
- * 700 ms per frame, theme colour); without more frames, or when [animate] is off, it is a still image of frame 1.
- * All frames stay composed (only one visible) so a switch never waits for decoding.
+ * Large image for the detail screen, in a [Panel]: start and end pose next to each other (stacked for wide, lying
+ * poses), both crops the same size and scale with the figure standing on the same line (data from poses.json), small
+ * "Start"/"End" captions. Holds, static stretches and anything without a pose pair show frame 1 as one still image;
+ * custom exercises without an image get the large initials tile. Theme colour, no animation.
  */
 @Composable
-fun ExerciseHero(exercise: Exercise, modifier: Modifier = Modifier, animate: Boolean = true) {
-    val frames = remember(exercise.id, exercise.imageRef) { ExerciseImages.frameModels(exercise) }
-    val vector = ExerciseImages.isBundledVector(exercise)
-    if (frames.isEmpty() || !vector) {
+fun ExerciseHero(exercise: Exercise, modifier: Modifier = Modifier) {
+    if (!ExerciseImages.isBundledVector(exercise) || ExerciseImages.model(exercise) == null) {
         BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             ExerciseImage(exercise, size = maxWidth)
         }
         return
     }
-    val steps = remember(frames.size) { ExerciseImages.sequence(frames.size) }
-    var step by remember(frames) { mutableStateOf(0) }
-    LaunchedEffect(frames, animate) {
-        step = 0
-        if (!animate || steps.size < 2) return@LaunchedEffect
-        while (true) {
-            delay(ExerciseImages.FRAME_MILLIS)
-            step = (step + 1) % steps.size
+    val t = LocalStrings.current
+    val pairs by produceState(ExercisePoses.cached()) { value = runCatching { ExercisePoses.load() }.getOrElse { emptyMap() } }
+    if (pairs == null) {
+        // poses.json not read yet (first detail view after start, a few ms): keep the space, avoid a jump.
+        Box(modifier.fillMaxWidth().aspectRatio(1f))
+        return
+    }
+    val poses = remember(exercise.id, exercise.imageRef, pairs) { ExerciseImages.poses(exercise, pairs) }
+    Panel(modifier) {
+        if (poses == null) {
+            PanelItem {
+                AsyncImage(
+                    model = ExerciseImages.model(exercise),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(Theme.colors.foreground),
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                )
+            }
+            return@Panel
+        }
+        val labels = listOf(t.poseStart, t.poseEnd)
+        val wide = poses[0].width / poses[0].height > WIDE_POSE
+        if (wide) {
+            poses.forEachIndexed { i, pose -> PoseCell(pose, labels[i], Modifier.fillMaxWidth()) }
+        } else {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                poses.forEachIndexed { i, pose -> PoseCell(pose, labels[i], Modifier.weight(1f).fillMaxHeight()) }
+            }
         }
     }
-    val current = steps[step]
-    val shape = RoundedCornerShape(24.dp)
-    Box(
-        modifier.fillMaxWidth().aspectRatio(1f).clip(shape).border(0.5.dp, Theme.colors.hairline, shape),
-        contentAlignment = Alignment.Center,
+}
+
+/** Crops wider than this (width / height) are stacked instead of side by side, so lying poses stay large enough. */
+private const val WIDE_POSE = 1.4f
+
+@Composable
+private fun PoseCell(pose: Pose, label: String, modifier: Modifier) {
+    Column(
+        modifier.background(Theme.colors.surface).padding(Space.m),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        frames.forEachIndexed { i, model ->
+        BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(pose.width / pose.height).clipToBounds()) {
+            // Draw the whole 512 x 512 frame at the crop's scale and shift it so only the crop is visible.
+            val scale = maxWidth / pose.width
             AsyncImage(
-                model = model,
+                model = remember(pose.ref) { Res.getUri("files/${pose.ref}") },
                 contentDescription = null,
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.FillBounds,
                 colorFilter = ColorFilter.tint(Theme.colors.foreground),
-                modifier = Modifier.fillMaxSize().padding(24.dp).alpha(if (i == current) 1f else 0f),
+                modifier = Modifier
+                    .offset(x = -scale * pose.x, y = -scale * pose.y)
+                    .wrapContentSize(Alignment.TopStart, unbounded = true)
+                    .requiredSize(scale * ExerciseImages.CANVAS),
             )
         }
+        Spacer(Modifier.height(Space.s))
+        Text(label, style = Theme.type.caption, tone = Tone.Muted)
     }
 }

@@ -25,8 +25,9 @@ import kotlin.test.fail
  * have caught it:
  *  1. every file parses strictly (commands, argument counts, arc flags),
  *  2. the path stays inside the viewBox,
- *  3. a sample (5 exercises x 3 frames, see svg-reference/README.md) is rasterised and compared with the unrounded source frames (`svg-reference/`, verbatim from the pinned
- *     Workout Guide commit).
+ *  3. a sample (see svg-reference/README.md) is rasterised and compared with the unrounded source frames
+ *     (`svg-reference/`, verbatim from the pinned Workout Guide commit). The renderer fills the path only, so the
+ *     line-matching outline (`stroke`, added by the import for the thinner pose of a pair) is checked separately (4.).
  */
 class ExerciseSvgIntegrityTest {
     private val dir = File("src/commonMain/composeResources/files/catalog/wg")
@@ -35,7 +36,7 @@ class ExerciseSvgIntegrityTest {
     @Test
     fun everyFileParsesAndStaysInsideViewBox() {
         val files = dir.listFiles { f -> f.name.endsWith(".svg") }!!.sortedBy { it.name }
-        assertEquals(906, files.size, "302 exercises x 3 frames")
+        assertEquals(580, files.size, "302 list icons (frame 1) + 278 end poses (frame 3)")
         val problems = mutableListOf<String>()
         for (f in files) {
             try {
@@ -55,13 +56,30 @@ class ExerciseSvgIntegrityTest {
     @Test
     fun sampleRendersLikeTheUnroundedSource() {
         val refs = refDir.listFiles { f -> f.name.endsWith(".svg") }!!.sortedBy { it.name }
-        assertEquals(15, refs.size)
+        assertEquals(9, refs.size)
         for (ref in refs) {
             val (slug, frame) = Regex("(.+)-frame-(\\d)\\.svg").matchEntire(ref.name)!!.destructured
             val bundled = File(dir, if (frame == "1") "$slug.svg" else "$slug-$frame.svg")
             val diff = mismatch(render(Svg.read(ref.readText())), render(Svg.read(bundled.readText())))
             assertTrue(diff < 0.005, "${bundled.name} differs from the source in ${"%.2f".format(diff * 100)} % of pixels")
         }
+    }
+
+    /** 4. The outline that evens out line weights: fill colour, round joins, a plausible width, never on both poses. */
+    @Test
+    fun strokeOnlyEvensOutLineWeight() {
+        val stroke = Regex("""<path stroke="#fff" stroke-width="([0-9.]+)" stroke-linejoin="round" fill="#fff" """)
+        var stroked = 0
+        for (f in dir.listFiles { f -> f.name.endsWith(".svg") }!!) {
+            val text = f.readText()
+            if (!text.contains("stroke")) continue
+            val w = stroke.find(text)?.groupValues?.get(1)?.toDouble() ?: fail("${f.name}: unexpected stroke markup")
+            assertTrue(w in 0.3..8.0, "${f.name}: stroke-width $w")
+            val partner = if (f.name.endsWith("-3.svg")) f.name.removeSuffix("-3.svg") + ".svg" else f.name.removeSuffix(".svg") + "-3.svg"
+            assertTrue(!File(dir, partner).readText().contains("stroke"), "${f.name} and $partner both stroked")
+            stroked++
+        }
+        assertTrue(stroked > 50, "stroked files: $stroked")
     }
 
     /** Self-check: the comparison is sensitive enough to tell two frames of one exercise apart. */
