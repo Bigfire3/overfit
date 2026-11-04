@@ -51,7 +51,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-class ScreenshotTest {
+open class ScreenshotTest {
     @get:Rule
     val compose = createComposeRule()
 
@@ -186,3 +186,7 @@ class ScreenshotTest {
         shot("import")
     }
 }
+
+/** Same tour on a narrow phone (360 dp), for the UI audit. */
+@Config(qualifiers = "w360dp-h780dp-xxhdpi")
+class ScreenshotTest360 : ScreenshotTest()

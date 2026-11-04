@@ -35,6 +35,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -214,8 +220,9 @@ private fun Modifier.pressable(
 fun Modifier.pressableRow(onClick: () -> Unit): Modifier {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val pressedFill = if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface
     return this
-        .background(if (pressed) Theme.colors.surface else Color.Transparent)
+        .background(if (pressed) pressedFill else Color.Transparent)
         .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
 }
 
@@ -245,6 +252,11 @@ private fun PillButton(
     val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
     val shape = RoundedCornerShape(50)
+    // A grey button inside a grey panel gets one shade darker, so it still reads as a button.
+    val c = Theme.colors
+    val inPanel = LocalInPanel.current
+    val fill = if (inPanel && fill == c.surface) c.surfacePressed else fill
+    val pressedFill = if (inPanel && pressedFill == c.surfacePressed) c.hairline else pressedFill
     Row(
         modifier
             .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
@@ -258,7 +270,11 @@ private fun PillButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        BasicText(label, style = Theme.type.label.copy(color = contentTone), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // Long labels on narrow phones shrink a little before they would be cut off.
+        BasicText(
+            label, style = Theme.type.label.copy(color = contentTone), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = Theme.type.label.fontSize),
+        )
         if (trailing != null) { Spacer(Modifier.width(Space.s)); trailing() }
     }
 }
@@ -490,7 +506,7 @@ fun RowInput(
 fun <T> Segmented(value: T, options: List<Pair<T, String>>, onChange: (T) -> Unit) {
     Row(
         Modifier
-            .background(Theme.colors.surface, RoundedCornerShape(50))
+            .background(if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface, RoundedCornerShape(50))
             .padding(3.dp),
     ) {
         options.forEach { (option, label) ->
@@ -506,6 +522,57 @@ fun <T> Segmented(value: T, options: List<Pair<T, String>>, onChange: (T) -> Uni
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Panels
+
+/** True inside a [Panel]: rows paint the panel fill and leave the dividers to the panel. */
+val LocalInPanel = staticCompositionLocalOf { false }
+
+val PanelShape = RoundedCornerShape(16.dp)
+
+/**
+ * Grouped area that stands out from the background: grey [Colors.surface] fill, 1 dp [Colors.hairline] outline,
+ * rounded corners, 1 dp dividers between its children (the outline colour shows through the gaps). Rows
+ * ([ListRow], [CheckRow]) adapt by themselves; other content goes into [PanelItem].
+ */
+@Composable
+fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val c = Theme.colors
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(PanelShape)
+            .background(c.hairline)
+            .border(1.dp, c.hairline, PanelShape)
+            .padding(1.dp),
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        CompositionLocalProvider(LocalInPanel provides true) { content() }
+    }
+}
+
+/** Free content inside a [Panel] (text, chart, buttons): panel fill and inner padding. */
+@Composable
+fun PanelItem(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier.fillMaxWidth().background(Theme.colors.surface).padding(horizontal = Space.m, vertical = Space.m),
+        content = content,
+    )
+}
+
+/** Short inline explanation under a panel or row: small, muted, a little indented to the panel's text. */
+@Composable
+fun Hint(text: String, modifier: Modifier = Modifier) {
+    Text(text, modifier.padding(start = Space.m, end = Space.m, top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+}
+
+/** Section heading plus a [Panel] with its rows. */
+@Composable
+fun PanelSection(title: String?, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    if (title != null) SectionTitle(title)
+    Panel(modifier, content = content)
 }
 
 // ---------------------------------------------------------------------------
@@ -534,22 +601,34 @@ fun ListRow(
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    Column(if (onClick != null) Modifier.pressableRow(onClick) else Modifier) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp),
+    val inPanel = LocalInPanel.current
+    val base = if (inPanel) Modifier.background(Theme.colors.surface) else Modifier
+    Column(base.then(if (onClick != null) Modifier.pressableRow(onClick) else Modifier)) {
+        // Label and control share one line; if both do not fit (e.g. "Darstellung" + three segments on a
+        // 360 dp phone), the control moves below the label instead of squeezing the label mid-word.
+        if (trailing != null) {
+            FlowRow(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                    .then(if (inPanel) Modifier.padding(horizontal = Space.m, vertical = Space.xs) else Modifier.padding(vertical = Space.xs)),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(Space.xs, Alignment.CenterVertically),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(label, Modifier.padding(end = Space.m), tone = tone)
+                trailing()
+            }
+        } else Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).then(if (inPanel) Modifier.padding(horizontal = Space.m, vertical = Space.xs) else Modifier),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(label, Modifier.weight(1f, fill = false), tone = tone)
-            if (trailing != null) {
-                Spacer(Modifier.width(Space.m))
-                trailing()
-            } else if (onClick != null) {
+            if (onClick != null) {
                 Spacer(Modifier.width(Space.m))
                 LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
             }
         }
-        Hairline()
+        if (!inPanel) Hairline()
     }
 }
 
@@ -569,8 +648,9 @@ fun ListRow(label: String, value: String, tone: Tone = Tone.Default, onClick: ((
  */
 @Composable
 fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val inPanel = LocalInPanel.current
     Column(
-        Modifier.toggleable(
+        (if (inPanel) Modifier.background(Theme.colors.surface).padding(horizontal = Space.m) else Modifier).toggleable(
             value = checked,
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
@@ -598,7 +678,7 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
                 if (checked) LineIcon(Icon.Check, size = 18.dp, color = Theme.colors.inverseForeground)
             }
         }
-        Hairline()
+        if (!inPanel) Hairline()
     }
 }
 
