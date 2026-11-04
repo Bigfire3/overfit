@@ -31,7 +31,6 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -44,7 +43,10 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class CoachFlowTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ data }, { database })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     private val kv = InMemoryKeyValueStore().apply { put(app.overfit.data.AppStore.KEY_COACH_STORY_SEEN, "1") }
@@ -54,9 +56,6 @@ class CoachFlowTest {
     private var templateId = 0L
 
     private val answer = """{"rating":8,"summary":"Starkes Training","positives":["Sauber"],"improvements":[],"tips":["Mehr schlafen"],"photo_feedback":null,"next_session":{"exercises":[{"exercise_id":"wg:bench-press","is_new":false,"rest_sec":90,"sets":[{"weight_kg":62.5,"reps":8,"duration_sec":null},{"weight_kg":62.5,"reps":8,"duration_sec":null}],"reason":"Alle Sätze geschafft"}],"note":null},"memory":"Ziel: Kraft."}"""
-
-    @After
-    fun tearDown() = database.close()
 
     private fun setUp(withKey: Boolean, seedWorkout: Boolean = true): AppDependencies {
         store.setName("Fabi")

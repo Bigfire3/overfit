@@ -44,10 +44,14 @@ jobs:
             -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO OVERFIT_BACKEND_URL="$OVERFIT_BACKEND_URL" build | tail -n 60
 
       # The newest iPhone with Dynamic Island on the newest iOS runtime of the runner.
+      # Booting a simulator on a shared runner sometimes hangs (bootstatus never finishes, then the device is gone
+      # for xcodebuild). So: every attempt has a timeout, a failed one shuts the device down and erases it, the last
+      # one creates a fresh device; and the device must be "Booted" before it is handed on.
       - name: Simulator wählen und starten
         id: sim
         run: |
-          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          set -u
+          read -r UDID NAME DEVICETYPE RUNTIME < <(xcrun simctl list devices available -j | python3 -c '
           import json, sys
           data = json.load(sys.stdin)["devices"]
           def ver(rt): return [int(x) for x in rt.split("iOS-")[-1].split("-") if x.isdigit()]
@@ -57,11 +61,50 @@ jobs:
               phones = phones or [d for d in data[rt] if d["name"].startswith("iPhone")]
               if phones:
                   phones.sort(key=lambda d: d["name"], reverse=True)
-                  print(phones[0]["udid"]); break
+                  p = phones[0]
+                  print(p["udid"], p["name"].replace(" ", "_"), p.get("deviceTypeIdentifier", ""), rt)
+                  break
           ')
+          NAME=${NAME//_/ }
+          echo "Gewählt: $NAME ($UDID), Runtime $RUNTIME"
+
+          is_booted() { xcrun simctl list devices | grep "$UDID" | grep -q "(Booted)"; }
+          # No `timeout` on macOS runners: perl's alarm ends the command after N seconds.
+          with_timeout() { local secs=$1; shift; perl -e 'alarm shift; exec @ARGV' "$secs" "$@"; }
+
+          for attempt in 1 2 3; do
+            echo "::group::Boot-Versuch $attempt"
+            if [ "$attempt" -gt 1 ]; then
+              echo "Vorheriger Versuch fehlgeschlagen: Simulatoren herunterfahren, Gerät zurücksetzen"
+              xcrun simctl shutdown all || true
+              if [ "$attempt" -eq 2 ]; then
+                xcrun simctl erase "$UDID" || true
+              else
+                # Last attempt: a fresh device (the old one may be stuck for good).
+                xcrun simctl delete "$UDID" || true
+                if [ -n "$DEVICETYPE" ]; then
+                  NEW=$(xcrun simctl create "$NAME" "$DEVICETYPE" "$RUNTIME") && UDID=$NEW
+                fi
+                echo "Neues Gerät: $UDID"
+              fi
+              sleep 5
+            fi
+            xcrun simctl boot "$UDID" || true
+            if with_timeout 240 xcrun simctl bootstatus "$UDID" -b && is_booted; then
+              echo "::endgroup::"
+              break
+            fi
+            echo "Boot-Versuch $attempt nicht erfolgreich (Timeout oder Fehler)"
+            xcrun simctl list devices | grep "$UDID" || true
+            echo "::endgroup::"
+          done
+
+          if ! is_booted; then
+            echo "::error::Simulator $UDID ist nach 3 Boot-Versuchen nicht gestartet"
+            xcrun simctl list devices
+            exit 1
+          fi
           xcrun simctl list devices | grep "$UDID"
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b
           # Clean status bar for the screenshots.
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
@@ -72,6 +115,8 @@ jobs:
           TEST_RUNNER_SCREENSHOT_DIR: ${{ github.workspace }}/ios-screenshots
         run: |
           set -o pipefail
+          # The simulator must still be booted (xcodebuild would otherwise fail with "Unable to find a device").
+          xcrun simctl list devices | grep "${{ steps.sim.outputs.udid }}" | grep -q "(Booted)" || { echo "::error::Simulator nicht gebootet"; xcrun simctl list devices; exit 1; }
           xcodebuild -project iosApp/Overfit.xcodeproj -scheme Overfit -configuration Debug \
             -destination "id=${{ steps.sim.outputs.udid }}" -resultBundlePath ios-ui-tests.xcresult \
             OVERFIT_BACKEND_URL="" test 2>&1 | grep -E "Test Case|error:|failed|passed|XCTAssert|Nicht gefunden" | tail -n 80

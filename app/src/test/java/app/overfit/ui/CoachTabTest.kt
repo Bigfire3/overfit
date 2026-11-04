@@ -40,7 +40,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -54,7 +53,10 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class CoachTabTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val teardown = AppTeardown({ data }, { database })
+
+    @get:Rule(order = 1)
     val compose = createComposeRule()
 
     private val kv = InMemoryKeyValueStore().apply { put(app.overfit.data.AppStore.KEY_COACH_STORY_SEEN, "1") }
@@ -70,9 +72,6 @@ class CoachTabTest {
     private val fake = FakeCoachTransport { prompt, _ ->
         if (prompt.schemaName == CoachChatSchema.NAME) CoachReply(chatAnswer, chatAnswer, costMicro = 4_200, servedModel = "gemini-3.6-flash") else CoachReply("{}", "{}")
     }
-
-    @After
-    fun tearDown() = database.close()
 
     private fun setUp(withKey: Boolean) {
         store.setName("Fabi")
