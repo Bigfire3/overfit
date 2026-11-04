@@ -22,6 +22,9 @@ import app.overfit.i18n.stringsFor
 import app.overfit.share.NoopPlatformShare
 import app.overfit.ui.photos.PhotoViewerScreen
 import app.overfit.ui.photos.PhotosScreen
+import app.overfit.ui.photos.DiaryViewPref
+import app.overfit.data.InMemoryKeyValueStore
+import androidx.compose.runtime.remember
 import app.overfit.ui.photos.DayScreen
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.assertHasNoClickAction
@@ -94,6 +97,68 @@ class DiaryScreenTest {
         assertEquals(listOf(LocalDate(2026, 11, 2), LocalDate(2026, 11, 3), LocalDate(2026, 10, 20)), days)
         // Days after today cannot be tapped.
         compose.onAllNodesWithContentDescription("Tag 4").onFirst().assertHasNoClickAction()
+    }
+
+    /** Like the app's route: the remembered choice comes from the key-value store and is written back on each switch. */
+    private fun showWithPref(kv: InMemoryKeyValueStore, days: MutableList<LocalDate> = mutableListOf()) = show {
+        val pref = remember { DiaryViewPref(kv) }
+        PhotosScreen(
+            photos, history, Language.DE, today, onDay = { days += it }, onCompare = { _, _ -> },
+            listView = pref.list, onListViewChange = { pref.list = it },
+        )
+    }
+
+    @Test fun iconSwitchesBetweenCalendarAndListAndBack() {
+        showWithPref(InMemoryKeyValueStore())
+        // Calendar first; the icon offers the list.
+        compose.onNodeWithText("Mo").assertIsDisplayed()
+        compose.onAllNodesWithTag("diary-list").assertCountEquals(0)
+        compose.onNodeWithContentDescription("Als Liste anzeigen").performClick()
+        compose.onNodeWithTag("diary-list").assertIsDisplayed()
+        compose.onAllNodesWithTag("diary-list-row").assertCountEquals(3)
+        // Newest first, grouped by month, with workout name and short numbers.
+        compose.onNodeWithText("November 2026").assertIsDisplayed()
+        compose.onNodeWithText("Push").assertIsDisplayed()
+        compose.onAllNodesWithText("1:00:00 · 9 Sätze · 4.200 kg", substring = true).assertCountEquals(3)
+        // The icon now offers the calendar.
+        compose.onNodeWithContentDescription("Als Kalender anzeigen").performClick()
+        compose.onNodeWithText("Mo").assertIsDisplayed()
+        compose.onAllNodesWithTag("diary-list").assertCountEquals(0)
+    }
+
+    @Test fun chosenViewIsRemembered() {
+        val kv = InMemoryKeyValueStore()
+        showWithPref(kv)
+        compose.onNodeWithContentDescription("Als Liste anzeigen").performClick()
+        assertEquals(true, DiaryViewPref(kv).list)
+        // A fresh screen (new start) comes up in the list.
+        val kv2 = InMemoryKeyValueStore().apply { put("diary.view", "list") }
+        assertEquals(true, DiaryViewPref(kv2).list)
+        compose.onNodeWithContentDescription("Als Kalender anzeigen").performClick()
+        assertEquals(false, DiaryViewPref(kv).list)
+    }
+
+    @Test fun tapInTheListOpensTheDay() {
+        val days = mutableListOf<LocalDate>()
+        showWithPref(InMemoryKeyValueStore().apply { put("diary.view", "list") }, days)
+        compose.onNodeWithText("Push").performClick()
+        compose.onNodeWithText("Legs").performScrollTo().performClick()
+        assertEquals(listOf(LocalDate(2026, 11, 2), LocalDate(2026, 10, 20)), days)
+    }
+
+    @Test fun listShowsPhotoOnlyDaysAndSumsTwoWorkoutsOfOneDay() {
+        val two = listOf(session("a", LocalDate(2026, 11, 2), "Push"), session("b", LocalDate(2026, 11, 2), "Core"))
+        show { PhotosScreen(listOf(photo("p9", LocalDate(2026, 10, 5), "x", "x")), two, Language.DE, today, {}, { _, _ -> }, listView = true) }
+        compose.onAllNodesWithTag("diary-list-row").assertCountEquals(2)
+        compose.onNodeWithText("Push, Core").assertIsDisplayed()
+        compose.onNodeWithText("2:00:00 · 18 Sätze · 8.400 kg", substring = true).assertIsDisplayed()
+        compose.onAllNodesWithText("1 Foto").assertCountEquals(2)
+    }
+
+    @Test fun emptyListIsFriendly() {
+        show { PhotosScreen(emptyList(), emptyList(), Language.DE, today, {}, { _, _ -> }, listView = true) }
+        compose.onNodeWithText("Noch nichts in deiner Liste.").assertIsDisplayed()
+        compose.onAllNodesWithTag("diary-list-row").assertCountEquals(0)
     }
 
     @Test fun emptyStateExplainsTheDayTap() {

@@ -1,7 +1,10 @@
 package app.overfit.ui.main
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.platform.testTag
+import app.overfit.ui.components.FloatingCard
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -108,7 +111,9 @@ fun StartScreen(
             Text(t.templatesEmpty, tone = Tone.Muted)
         }
         if (templates != null && templates.isNotEmpty()) {
-            Panel { templates.forEach { w -> WorkoutRow(w, lastDoneText(t, lastDone[w.id], today)) { onOpenWorkout(w.id) } } }
+            Column(Modifier.fillMaxWidth().padding(bottom = Space.l), verticalArrangement = Arrangement.spacedBy(Space.m)) {
+                templates.forEach { w -> WorkoutRow(w, lastDoneText(t, lastDone[w.id], today)) { onOpenWorkout(w.id) } }
+            }
         }
     }
 }
@@ -117,8 +122,8 @@ fun StartScreen(
 @Composable
 fun WorkoutRow(workout: TemplateSummary, lastDone: String, onClick: () -> Unit) {
     val t = LocalStrings.current
-    Column(Modifier.fillMaxWidth().panelRow(onClick)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
+    FloatingCard(Modifier.testTag("workout-card"), onClick = onClick) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = Space.m, vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(workout.name, style = Theme.type.label)
                 Spacer(Modifier.height(2.dp))
@@ -128,7 +133,6 @@ fun WorkoutRow(workout: TemplateSummary, lastDone: String, onClick: () -> Unit) 
             Spacer(Modifier.width(Space.m))
             LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
         }
-        RowDivider()
     }
 }
 

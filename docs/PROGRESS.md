@@ -1009,6 +1009,16 @@ Offen / Hinweise:
 4. Kalender → Tag → Foto „×“ → „Foto vom Tag entfernen?“ → „Abbrechen“ behält es, „Entfernen“ entfernt es
 5. Profil → ganz unten „Alle Daten löschen“ und Backup einspielen fragen ebenfalls per Popup; Zurück-Taste schließt jedes Popup
 
+## Session AP – Kalender als Liste, Workouts als schwebende Karten (4.11.)
+- Erledigt: Kalender-Tab: Icon rechts oben schaltet zwischen Kalender und Liste (neueste oben, nach Monat, mit Name, Kurzinfo, Foto-Vorschau; Tipp öffnet den Tag); Wahl wird gemerkt. Workouts-Tab: jedes Workout als eigene schwebende Karte (`FloatingCard`). Tests und Screenshots (`docs/screenshots/kalender-liste/`). Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (Kalender-Liste, Karten)
+1. Workouts-Tab: jedes Workout ist eine eigene Karte mit Abstand, Rand und leichtem Schatten (hell) bzw. kräftigerem Rand (dunkel); ganze Karte antippbar öffnet das Workout
+2. Kalender-Tab: oben rechts Listen-Symbol → Liste (neueste oben, Monate, Trainingsname, Dauer/Sätze/kg, „Sauna“, Foto-Vorschau); Symbol wird zum Kalender-Symbol → zurück
+3. Eine Zeile antippen → Tagesansicht wie im Kalender; zurück bleibt die Liste
+4. App schließen und neu öffnen → die zuletzt gewählte Ansicht ist noch aktiv
+5. Englisch: Beschreibungen „Show as list“ / „Show as calendar“; Liste ohne Daten zeigt freundlichen Hinweis
+
 ## Session AN – Übungsbild: Start | Ende statt Animation (4.11.)
 - Erledigt: Die Detailansicht einer Übung zeigt statt der Animation ruhig zwei Posen nebeneinander, links „Start“, rechts „Ende“ (Frame 1 und 3 aus Workout Guide). Beide gleich groß, im selben Maßstab, auf derselben Bodenlinie, Linien gleich stark (dünnere Pose per Kontur angeglichen). Liegende Übungen (Liegestütz, Crunch …) stehen untereinander. Halteübungen und statische Dehnungen zeigen ein Bild. Frame 2 (Ursache der dicken, springenden Linien) entfernt, Übungsgrafiken 23 → 14 MB. Belege `docs/screenshots/uebungsbild/vorher|nachher/`. Details in docs/DECISIONS.md.
 - Offen: nichts.

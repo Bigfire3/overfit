@@ -5,6 +5,11 @@ data class PhotoStrings(
     val months: List<String>,
     val monthHeader: (month: Int, year: Int) -> String,
     val emptyHint: String,
+    /** Header toggle: the icon shows the other view, these are its screen-reader labels. */
+    val showList: String,
+    val showCalendar: String,
+    val listEmpty: String,
+    val listEmptyHint: String,
     val compare: String,
     val cancel: String,
     val selectTwo: String,
@@ -72,6 +77,10 @@ private val MONTHS_EN: List<String> = listOf("January", "February", "March", "Ap
 val PhotoGerman = PhotoStrings(
     months = MONTHS_DE,
     monthHeader = { month, year -> "${MONTHS_DE[month - 1]} $year" },
+    showList = "Als Liste anzeigen",
+    showCalendar = "Als Kalender anzeigen",
+    listEmpty = "Noch nichts in deiner Liste.",
+    listEmptyHint = "Sobald du trainiert oder ein Foto gemacht hast, steht der Tag hier.",
     emptyHint = "Tippe auf einen Tag, um Fotos hinzuzufügen oder dein Training anzusehen. Fotos bleiben privat in der App.",
     compare = "Vergleichen",
     cancel = "Abbrechen",
@@ -134,6 +143,10 @@ val PhotoGerman = PhotoStrings(
 val PhotoEnglish = PhotoStrings(
     months = MONTHS_EN,
     monthHeader = { month, year -> "${MONTHS_EN[month - 1]} $year" },
+    showList = "Show as list",
+    showCalendar = "Show as calendar",
+    listEmpty = "Nothing in your list yet.",
+    listEmptyHint = "Once you have trained or taken a photo, the day shows up here.",
     emptyHint = "Tap a day to add photos or look at your workout. Photos stay private in the app.",
     compare = "Compare",
     cancel = "Cancel",
