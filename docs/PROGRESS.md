@@ -15,6 +15,18 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Hotfix: kaputte Übungsbilder (Hotfix-Session Bilder, 3.11.)
+**Erledigt:** Seit 0.1.257 waren fast alle Workout-Guide-Bilder (Standbilder und Animation) verzerrt. Ursache: Das Runden der
+Pfaddaten im Import hat kompakte Zahlen wie `8.002.392` zu `8.4` verschmolzen. Import jetzt mit echtem Pfad-Parser, 2 Nachkommastellen,
+Rückprüfung jeder Datei; alle 906 Frames neu erzeugt. Regressionstest `ExerciseSvgIntegrityTest` (parst alle Dateien, prüft viewBox,
+rendert 15 Frames und vergleicht mit den Originalen). Details in DECISIONS.md.
+
+### Bitte auf dem Handy testen (Hotfix Bilder)
+1. Tab „Übungen“: Die Strichgrafiken sind wieder vollständige Figuren (keine Flecken, Dreiecke oder fehlenden Bilder), auch im Picker,
+   im Workout-Editor und im laufenden Training.
+2. Übung antippen (z. B. Klimmzug, Ab Wheel): Das große Bild bewegt sich ruhig 1→2→3→2→1, jeder Frame ist eine saubere Figur.
+3. Hell- und Dunkelmodus: Bilder in der Theme-Farbe (schwarz bzw. weiß).
+
 ## Übungsbild → Details mit Animation (Session AH, 3.11.)
 **Erledigt:** Tipp auf ein Übungsbild öffnet überall die Übungsdetails (Katalog, Picker, Editor, laufendes Training); im Training
 schreibgeschützt, Timer und Pausenleiste laufen weiter, Zurück führt ins Training. Detailansicht mit bildschirmbreitem Bild, das

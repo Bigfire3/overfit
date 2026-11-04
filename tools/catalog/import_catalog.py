@@ -63,25 +63,96 @@ WG_TRACKING = {
 }
 
 FRAMES = (1, 2, 3)
-PRECISION = 1  # Nachkommastellen in den Pfaddaten (Grafik 512x512; Rundung < 0,05 px, nicht sichtbar)
-_NUM = re.compile(r"-?\d*\.\d+")
+# Nachkommastellen in den Pfaddaten (Grafik 512x512; Rundung <= 0,005 px, nicht sichtbar). Bis 0.1.257 wurde hier per
+# Regex auf 1 Stelle gerundet und dabei kompakte Zahlenfolgen wie `8.002.392` zu `8.4` verschmolzen (kaputte Bilder).
+# Deshalb jetzt ein echter Pfad-Parser (Befehle, Parameterzahl, Arc-Flags, Exponenten) mit Rückprüfung.
+PRECISION = 2
+
+_ARGS = {"M": 2, "L": 2, "H": 1, "V": 1, "C": 6, "S": 4, "Q": 4, "T": 2, "A": 7, "Z": 0}
+_NUMBER = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+_SEP = re.compile(r"[\s,]*")
+
+
+def parse_path(d: str) -> list[tuple[str, list[float]]]:
+    """Zerlegt SVG-Pfaddaten streng nach Grammatik (SVG 1.1, Kap. 8.3.9) in (Befehl, Zahlen)."""
+    out: list[tuple[str, list[float]]] = []
+    i, n, cmd = 0, len(d), None
+    while True:
+        i = _SEP.match(d, i).end()
+        if i >= n:
+            return out
+        if d[i].isalpha():
+            cmd = d[i]
+            if cmd.upper() not in _ARGS:
+                raise ValueError(f"Unbekannter Befehl {cmd!r} an Stelle {i}")
+            i += 1
+            if cmd.upper() == "Z":
+                out.append((cmd, []))
+                continue
+        elif cmd is None or cmd.upper() == "Z":
+            raise ValueError(f"Zahl ohne Befehl an Stelle {i}")
+        vals: list[float] = []
+        for k in range(_ARGS[cmd.upper()]):
+            i = _SEP.match(d, i).end()
+            if cmd.upper() == "A" and k in (3, 4):
+                if i >= n or d[i] not in "01":
+                    raise ValueError(f"Arc-Flag erwartet an Stelle {i}")
+                vals.append(float(d[i]))
+                i += 1
+                continue
+            m = _NUMBER.match(d, i)
+            if not m:
+                raise ValueError(f"Zahl erwartet an Stelle {i}: {d[i:i + 20]!r}")
+            vals.append(float(m.group(0)))
+            i = m.end()
+        out.append((cmd, vals))
+        # Wiederholte Parameter nach M/m gelten als L/l.
+        if cmd in "Mm":
+            cmd = "L" if cmd == "M" else "l"
+
+
+def _fmt(v: float) -> str:
+    out = f"{round(v, PRECISION):.{PRECISION}f}".rstrip("0").rstrip(".")
+    if out in ("", "-0", "-"):
+        return "0"
+    if out.startswith("0."):
+        return out[1:]
+    if out.startswith("-0."):
+        return "-" + out[2:]
+    return out
+
+
+def write_path(segs: list[tuple[str, list[float]]]) -> str:
+    """Kompakte, eindeutige Ausgabe: Trenner nur, wo die nächste Zahl sonst mit der vorigen verschmelzen würde."""
+    parts: list[str] = []
+    prev: str | None = None  # letzte ausgegebene Zahl, None direkt nach einem Befehl
+    implicit: str | None = None  # Befehl, der ohne Buchstaben weitergilt (M → L, m → l, sonst derselbe)
+    for cmd, vals in segs:
+        if cmd != implicit or not vals:
+            parts.append(cmd)
+            prev = None
+        implicit = {"M": "L", "m": "l"}.get(cmd, cmd)
+        for k, v in enumerate(vals):
+            tok = str(int(v)) if cmd.upper() == "A" and k in (3, 4) else _fmt(v)
+            if prev is not None and (tok[0].isdigit() or (tok[0] == "." and "." not in prev)):
+                parts.append(" ")
+            parts.append(tok)
+            prev = tok
+    return "".join(parts)
 
 
 def shrink(svg: bytes) -> bytes:
-    """Rundet Dezimalzahlen in `d="…"` auf PRECISION Stellen und entfernt Nullen; Struktur bleibt identisch."""
+    """Rundet die Zahlen in `d="…"` auf PRECISION Stellen; prüft, dass die Ausgabe wieder dieselben Befehle ergibt."""
     def fix_d(m: re.Match) -> str:
-        def num(n: re.Match) -> str:
-            v = round(float(n.group(0)), PRECISION)
-            out = f"{v:.{PRECISION}f}".rstrip("0").rstrip(".")
-            if out in ("", "-0", "-"):
-                out = "0"
-            if out.startswith("0."):
-                out = out[1:]
-            elif out.startswith("-0."):
-                out = "-" + out[2:]
-            return out
-        return 'd="' + _NUM.sub(num, m.group(1)) + '"'
-    return re.sub(r'd="([^"]*)"', fix_d, svg.decode("utf-8")).encode("utf-8")
+        segs = parse_path(m.group(1))
+        d = write_path(segs)
+        back = parse_path(d)
+        assert [c for c, _ in back] == [c for c, _ in segs], "Befehlsfolge nach Rundung verändert"
+        for (_, a), (_, b) in zip(segs, back):
+            assert len(a) == len(b) and all(abs(x - y) <= 0.5 * 10 ** -PRECISION + 1e-9 for x, y in zip(a, b)), \
+                "Zahlen nach Rundung verändert"
+        return 'd="' + d + '"'
+    return re.sub(r'\bd="([^"]*)"', fix_d, svg.decode("utf-8")).encode("utf-8")
 
 
 def fetch(url: str, cache_name: str) -> bytes:
