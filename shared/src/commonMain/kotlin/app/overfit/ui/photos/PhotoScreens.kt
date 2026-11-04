@@ -382,7 +382,7 @@ fun PhotoViewerScreen(
                     scope.launch { loadJpeg(id)?.let { platform.shareBytes("overfit-$id.jpg", it, "image/jpeg") } }
                 }, color = white)
                 Spacer(Modifier.width(Space.xs))
-                HeaderDeleteButton(p.deletePhoto, p.deletePhotoConfirm, onConfirm = { onDelete(id) }, color = white)
+                HeaderDeleteButton(p.deletePhoto, onConfirm = { onDelete(id) }, color = white)
             }
         }
         if (startDay < 0) {

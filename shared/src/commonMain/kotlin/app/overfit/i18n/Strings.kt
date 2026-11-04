@@ -70,7 +70,6 @@ data class Strings(
     val runningNow: String,
     /** Name of a workout started empty, e.g. "Workout vom 3. Nov.". */
     val newWorkoutName: (LocalDate) -> String,
-    val deletedKeepsHistory: String,
     val workoutPlanEmpty: String,
 
     // Other tabs
@@ -104,13 +103,10 @@ data class Strings(
     val save: String,
     val edit: String,
     val delete: String,
-    /** Delete questions that name the object (popup titles). */
-    val deleteWorkoutConfirm: String,
-    val deleteTrainingConfirm: String,
-    val deleteExerciseConfirm: String,
-    /** Closes a popup without doing anything. */
+    /** Cancels an action (e.g. editing) without doing anything. */
     val cancel: String,
-    val deleteConfirm: String,
+    /** Screen-reader state of an armed two-tap button (first tap done). */
+    val tapAgainToConfirm: String,
     val exerciseDeleted: (String) -> String,
     val exerciseArchived: (String) -> String,
     val newTemplate: String,
@@ -169,7 +165,6 @@ data class Strings(
     val chooseTemplate: String,
     val workoutNamePlaceholder: String,
     val finishWorkout: String,
-    val finishConfirm: String,
     val logNextSet: String,
     val allSetsDone: String,
     val setsDone: (Int, Int) -> String,
@@ -179,9 +174,6 @@ data class Strings(
     val reopenSet: (Int) -> String,
     val reorder: String,
     val discardWorkout: String,
-    /** Short action in the discard popup. */
-    val discard: String,
-    val discardConfirm: String,
     val workoutEmpty: String,
     val workoutSaved: String,
 
@@ -242,7 +234,6 @@ data class Strings(
     val coachMemory: String,
     val data: String,
     val reset: String,
-    val resetConfirm: String,
     val app: String,
     val about: String,
 
@@ -313,7 +304,6 @@ val German = Strings(
     otherWorkoutRunning = "Gerade läuft ein anderes Training. Beende es zuerst.",
     runningNow = "Läuft gerade",
     newWorkoutName = { "Workout vom ${it.day}. ${GERMAN_MONTHS[it.month.ordinal]}" },
-    deletedKeepsHistory = "Deine bisherigen Trainings bleiben im Kalender.",
     workoutPlanEmpty = "Noch keine Übungen. Tippe auf Bearbeiten, um welche hinzuzufügen.",
 
     exercisesTitle = "Übungen",
@@ -352,11 +342,8 @@ val German = Strings(
     save = "Speichern",
     edit = "Bearbeiten",
     delete = "Löschen",
-    deleteWorkoutConfirm = "Workout löschen?",
-    deleteTrainingConfirm = "Training löschen?",
-    deleteExerciseConfirm = "Übung löschen?",
     cancel = "Abbrechen",
-    deleteConfirm = "Wirklich löschen?",
+    tapAgainToConfirm = "zum Bestätigen erneut tippen",
     exerciseDeleted = { "„$it“ gelöscht" },
     exerciseArchived = { "„$it“ ausgeblendet, weil ein Workout sie noch nutzt" },
     newTemplate = "Neues Workout",
@@ -411,7 +398,6 @@ val German = Strings(
     chooseTemplate = "Oder ein gespeichertes Workout",
     workoutNamePlaceholder = "Name des Workouts",
     finishWorkout = "Beenden",
-    finishConfirm = "Training beenden?",
     logNextSet = "Nächsten Satz loggen",
     allSetsDone = "Alle Sätze erledigt",
     setsDone = { done, total -> "$done/$total erledigt" },
@@ -421,8 +407,6 @@ val German = Strings(
     reopenSet = { "Satz $it wieder öffnen" },
     reorder = "Halten und ziehen zum Verschieben",
     discardWorkout = "Training abbrechen",
-    discardConfirm = "Training verwerfen?",
-    discard = "Verwerfen",
     workoutEmpty = "Noch keine Übungen. Füge die erste hinzu.",
     workoutSaved = "Training gespeichert",
 
@@ -477,7 +461,6 @@ val German = Strings(
     coachMemory = "Coach-Gedächtnis",
     data = "Daten",
     reset = "Alle Daten löschen",
-    resetConfirm = "Wirklich alles löschen?",
     app = "App",
     about = "Über Overfit",
 
@@ -544,7 +527,6 @@ val English = Strings(
     otherWorkoutRunning = "Another workout is running. Finish it first.",
     runningNow = "Running now",
     newWorkoutName = { "Workout, ${ENGLISH_MONTHS[it.month.ordinal]} ${it.day}" },
-    deletedKeepsHistory = "Your past sessions with it stay in the calendar.",
     workoutPlanEmpty = "No exercises yet. Tap Edit to add some.",
 
     exercisesTitle = "Exercises",
@@ -583,11 +565,8 @@ val English = Strings(
     save = "Save",
     edit = "Edit",
     delete = "Delete",
-    deleteWorkoutConfirm = "Delete workout?",
-    deleteTrainingConfirm = "Delete this session?",
-    deleteExerciseConfirm = "Delete exercise?",
     cancel = "Cancel",
-    deleteConfirm = "Really delete?",
+    tapAgainToConfirm = "tap again to confirm",
     exerciseDeleted = { "“$it” deleted" },
     exerciseArchived = { "“$it” hidden because a workout still uses it" },
     newTemplate = "New workout",
@@ -642,7 +621,6 @@ val English = Strings(
     chooseTemplate = "Or a saved workout",
     workoutNamePlaceholder = "Workout name",
     finishWorkout = "Finish",
-    finishConfirm = "Finish workout?",
     logNextSet = "Log next set",
     allSetsDone = "All sets done",
     setsDone = { done, total -> "$done/$total done" },
@@ -652,8 +630,6 @@ val English = Strings(
     reopenSet = { "Reopen set $it" },
     reorder = "Hold and drag to reorder",
     discardWorkout = "Discard workout",
-    discardConfirm = "Discard workout?",
-    discard = "Discard",
     workoutEmpty = "No exercises yet. Add the first one.",
     workoutSaved = "Workout saved",
 
@@ -708,7 +684,6 @@ val English = Strings(
     coachMemory = "Coach memory",
     data = "Data",
     reset = "Delete all data",
-    resetConfirm = "Really delete everything?",
     app = "App",
     about = "About Overfit",
 

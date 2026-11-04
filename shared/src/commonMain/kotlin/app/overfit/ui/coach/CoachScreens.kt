@@ -581,7 +581,7 @@ fun CoachMemoryScreen(coach: CoachService, onBack: () -> Unit) {
         }
         if (current != null) {
             Spacer(Modifier.height(Space.l))
-            ConfirmButton(c.memoryDelete, c.memoryDeleteConfirm, onConfirm = { coach.launch { coach.clearMemory() }; text = "" })
+            ConfirmButton(c.memoryDelete, onConfirm = { coach.launch { coach.clearMemory() }; text = "" })
         }
     }
 }

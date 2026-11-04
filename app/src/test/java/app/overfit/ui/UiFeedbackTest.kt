@@ -30,7 +30,18 @@ import app.overfit.domain.Language
 import app.overfit.domain.WeightUnit
 import app.overfit.ui.components.ConfirmArea
 import app.overfit.ui.components.ConfirmButton
-import app.overfit.ui.components.Confirm
+import app.overfit.ui.components.CONFIRM_ARMED_MILLIS
+import app.overfit.ui.components.ConfirmTags
+import app.overfit.ui.components.HeaderDeleteButton
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
 import app.overfit.ui.components.SetRowSurface
 import app.overfit.ui.components.Text
 import app.overfit.ui.theme.OverfitTheme
@@ -65,34 +76,75 @@ class UiFeedbackTest {
     val compose = createComposeRule()
 
     @Test
-    fun confirmButton_asksInAPopup_cancelKeeps_confirmRuns() {
+    fun confirmButton_firstTapArms_secondTapRuns_tapElsewhereDisarms() {
         var deleted = 0
+        var finished = 0
         compose.setContent {
             OverfitTheme(app.overfit.domain.ThemeMode.DARK) {
                 ConfirmArea(Modifier.fillMaxSize()) {
                     Column {
                         Text("Irgendwo", Modifier.testTag("elsewhere"))
-                        ConfirmButton("Löschen", "Wirklich löschen?", onConfirm = { deleted++ })
-                        ConfirmButton("Beenden", "Wirklich beenden?", onConfirm = {}, kind = Confirm.Positive)
+                        ConfirmButton("Löschen", onConfirm = { deleted++ })
+                        ConfirmButton("Beenden", onConfirm = { finished++ })
+                        HeaderDeleteButton("Workout löschen", onConfirm = { deleted += 10 })
                     }
                 }
             }
         }
-        // The tap opens a popup with the question; "Abbrechen" closes it without deleting.
+        // First tap: armed (tag + screen-reader state), the label stays the same, nothing runs yet, no popup.
         compose.onNodeWithText("Löschen").performClick()
-        compose.onNodeWithText("Wirklich löschen?").assertExists()
-        compose.onNodeWithTag("dialog:cancel").performClick()
-        compose.onAllNodesWithText("Wirklich löschen?").assertCountEquals(0)
+        compose.onNodeWithTag(ConfirmTags.armed).assertTextEquals("Löschen")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "zum Bestätigen erneut tippen"))
         assertEquals(0, deleted)
-        // The other button asks its own question; its action runs only from the popup.
+        // Tap elsewhere disarms; the next tap only arms again.
+        compose.onNodeWithTag("elsewhere").performClick()
+        compose.onAllNodesWithTag(ConfirmTags.armed).assertCountEquals(0)
+        compose.onNodeWithText("Löschen").performClick()
+        assertEquals(0, deleted)
+        // Arming another button disarms the first one.
         compose.onNodeWithText("Beenden").performClick()
-        compose.onNodeWithText("Wirklich beenden?").assertExists()
-        compose.onNodeWithTag("dialog:cancel").performClick()
-        // Confirm in the popup runs the action once and closes it.
-        compose.onAllNodesWithText("Löschen")[0].performClick()
-        compose.onNodeWithTag("dialog:confirm").performClick()
-        assertEquals(1, deleted)
-        compose.onAllNodesWithText("Wirklich löschen?").assertCountEquals(0)
+        compose.onNodeWithTag(ConfirmTags.armed).assertTextEquals("Beenden")
+        compose.onAllNodesWithTag(ConfirmTags.armed).assertCountEquals(1)
+        // Second tap runs the action once and disarms.
+        compose.onNodeWithText("Beenden").performClick()
+        assertEquals(1, finished)
+        compose.onAllNodesWithTag(ConfirmTags.armed).assertCountEquals(0)
+        // Icon button: the bin's description announces the armed state; second tap deletes.
+        compose.onNodeWithContentDescription("Workout löschen").performClick()
+        compose.onNodeWithContentDescription("Workout löschen – zum Bestätigen erneut tippen").assertExists()
+        compose.onNodeWithTag(ConfirmTags.armed).performClick()
+        assertEquals(10, deleted)
+    }
+
+    @Test
+    fun confirmButton_disarmsAfterTimeout_andOnScroll() {
+        var deleted = 0
+        compose.setContent {
+            OverfitTheme(app.overfit.domain.ThemeMode.DARK) {
+                ConfirmArea(Modifier.fillMaxSize()) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("scroll")) {
+                        ConfirmButton("Löschen", onConfirm = { deleted++ })
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(2000.dp))
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("Löschen").performClick()
+        compose.onNodeWithTag(ConfirmTags.armed).assertExists()
+        // Just before the timeout it is still armed, after it it falls back.
+        compose.mainClock.advanceTimeBy(CONFIRM_ARMED_MILLIS - 500)
+        compose.onNodeWithTag(ConfirmTags.armed).assertExists()
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        compose.onAllNodesWithTag(ConfirmTags.armed).assertCountEquals(0)
+        compose.onNodeWithText("Löschen").performClick()
+        assertEquals(0, deleted)
+        // Scrolling disarms as well.
+        compose.onNodeWithTag(ConfirmTags.armed).assertExists()
+        compose.onNodeWithTag("scroll").performTouchInput { swipeUp() }
+        compose.waitForIdle()
+        compose.onAllNodesWithTag(ConfirmTags.armed).assertCountEquals(0)
+        assertEquals(0, deleted)
     }
 
     @Test
@@ -167,8 +219,8 @@ class UiFeedbackTest {
         compose.onNodeWithText("Push").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Workout löschen").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Workout löschen?", substring = true).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithContentDescription("Workout löschen – zum Bestätigen erneut tippen").assertExists()
+        compose.onNodeWithTag("confirm:armed").performClick()
         // Back on the training tab (list with Pull and Legs), not on an empty screen.
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Pull").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("Legs").assertCountEquals(1)

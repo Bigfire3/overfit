@@ -177,7 +177,7 @@ fun SettingsScreen(
 
         SectionTitle(t.data)
         Spacer(Modifier.height(Space.s))
-        ConfirmButton(t.reset, t.resetConfirm, onConfirm = onReset)
+        ConfirmButton(t.reset, onConfirm = onReset)
     }
 }
 

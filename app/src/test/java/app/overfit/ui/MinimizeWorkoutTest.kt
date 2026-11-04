@@ -140,9 +140,9 @@ class MinimizeWorkoutTest {
 
         // Second workout: choice instead of a start; "end running" needs a second tap
         compose.onNodeWithText("Laufendes beenden").performClick()
-        compose.onNodeWithText("Training beenden?").assertIsDisplayed()
+        compose.onNodeWithTag("confirm:armed").assertIsDisplayed()
         assertNotNull(deps.workout.state.value.workout)
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Wie war das Training?")
         assertNull(deps.workout.state.value.workout)
     }

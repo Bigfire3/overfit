@@ -282,7 +282,7 @@ class DayWithOverfitTest {
 
         // --- Finish: summary, feeling, note, photo (fake: no camera in Robolectric), save ----
         click("Beenden")
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Training beendet")
         // Wait via the UI first (the name field appears once the finished workout is stored): the saved
         // workout is updated in a DB transaction at the same time, which a blocking query polled on the
@@ -437,7 +437,7 @@ class DayWithOverfitTest {
         val beforeTemplates = templates().map { it.name }
         val backupBytes = runBlocking { deps.backup.export() }
         click("Alle Daten löschen")
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Dein Name")
         // Fresh start: only the Push/Pull/Legs examples are left (no restart needed).
         compose.waitUntilState(10_000) { templates().map { it.name } == listOf("Push", "Pull", "Legs") }
