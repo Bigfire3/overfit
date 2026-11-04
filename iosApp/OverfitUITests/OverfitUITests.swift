@@ -66,17 +66,21 @@ class OverfitUITestCase: XCTestCase {
         XCTFail("Nicht antippbar: \"\(label)\"", file: file, line: line)
     }
 
-    /** Confirm buttons change their label and reset after 4 s: tap twice on the same spot, screenshot in between. */
-    func confirm(_ label: String, shotName: String? = nil) {
-        guard let button = find(label) else { waitFor(label); return }
-        // Absolute screen point: after the first tap the button has a new label, an element-relative
-        // coordinate would be resolved again and not find it.
-        let frame = button.frame
-        let spot = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX, dy: frame.midY))
-        spot.tap()
+    /**
+     * Confirm buttons open a popup (question, "Abbrechen", action): tap the button, screenshot the popup,
+     * then tap the popup's action (test tag `dialog:confirm`, accessibility identifier on iOS).
+     */
+    func confirm(_ label: String, shotName: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        tap(label, file: file, line: line)
+        let action = app.descendants(matching: .any).matching(identifier: "dialog:confirm").firstMatch
+        if !action.waitForExistence(timeout: 5) {
+            failShot("dialog-\(label)")
+            XCTFail("Popup für \"\(label)\" fehlt\n\(app.debugDescription)", file: file, line: line)
+            return
+        }
         usleep(400_000)
         if let shotName { save(XCUIScreen.main.screenshot(), name: shotName) }
-        spot.tap()
+        action.tap()
     }
 
     /** Confirms the system notification prompt that appears on the first workout start. */
