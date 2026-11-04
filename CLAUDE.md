@@ -11,6 +11,7 @@
 ## Architektur (Kurzfassung)
 - Kotlin Multiplatform: `:shared` enthält UI (Compose Multiplatform) und Logik für Android und iOS. `:app` ist die Android-Hülle (Signatur, CI-APK), `iosApp/` die iOS-Hülle (XcodeGen-Spec + SwiftUI-Host).
 - Designsystem in `shared/.../ui/theme` und `ui/components`: schwarz-weiß, keine Akzentfarbe, nur Compose Foundation (kein Material), Schrift Inter, Haarlinien statt Cards, ein `PrimaryButton` pro Screen, `LineIcon` für Icons.
+- Plugin „impeccable“ (Design-Skill mit Hooks, aktiviert in `.claude/settings.json`): Seine Hinweise sind Anregungen. Bei Widerspruch gilt das Overfit-Designsystem oben (schwarz-weiß, keine Akzentfarbe, Foundation, Haarlinien). Für Compose gelten seine CSS-Regeln sinngemäß.
 - Alle Texte in `shared/.../i18n/Strings.kt` (Deutsch + Englisch, fehlende Übersetzung = Compile-Fehler). Keine Android-`strings.xml` für UI-Texte.
 - Plattformcode nur über `expect`/`actual` bzw. Interfaces (`KeyValueStore`, `SecretStore`) in `androidMain`/`iosMain`.
 
