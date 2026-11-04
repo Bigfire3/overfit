@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -53,6 +55,7 @@ fun Chip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifi
 /** Underlined search field with a leading search icon and a clear button. */
 @Composable
 fun SearchInput(value: String, onValueChange: (String) -> Unit, placeholder: String, clearLabel: String) {
+    val focusManager = LocalFocusManager.current
     val style = Theme.type.body.copy(color = Theme.colors.foreground)
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -65,6 +68,7 @@ fun SearchInput(value: String, onValueChange: (String) -> Unit, placeholder: Str
                 textStyle = style,
                 cursorBrush = SolidColor(Theme.colors.foreground),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, autoCorrectEnabled = false),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 modifier = Modifier.weight(1f).padding(vertical = Space.m),
                 decorationBox = { inner ->
                     Box {
@@ -103,6 +107,7 @@ fun SmallInput(
     description: String? = null,
 ) {
     val style = Theme.type.label.copy(color = Theme.colors.foreground, textAlign = align)
+    val focusManager = LocalFocusManager.current
     Column(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BasicTextField(
@@ -111,7 +116,8 @@ fun SmallInput(
                 singleLine = true,
                 textStyle = style,
                 cursorBrush = SolidColor(Theme.colors.foreground),
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Next),
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier
                     .weight(1f)
                     .padding(vertical = 10.dp)

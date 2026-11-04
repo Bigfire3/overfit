@@ -978,3 +978,14 @@ Offen / Hinweise:
 7. Übung (z. B. Bankdrücken) → Fortschritt/Bestwerte zeigen die geänderten Werte; eine vorher erstellte Coach-Auswertung ist unverändert
 8. Detail: Teilen, Als Workout speichern, Coach-Auswertung, Löschen funktionieren wie früher im Verlauf; nach dem Löschen eines Trainings mit Foto bleibt das Foto am Kalendertag
 9. Backup exportieren und wieder einspielen → Fotos ohne Training bleiben erhalten
+
+## Session AM – UI-Audit, Teil 1: Zahlenfelder im Training (4.11.)
+- Plugin „impeccable“ war in der Session nicht geladen (kein Skill, keine Hooks); Audit nach denselben Kriterien selbst.
+- Erledigt: Satz-Felder neu (20 sp, tabellarische Ziffern, 48 dp hoch, Einheit als Spaltenkopf), Ursache und Belege in docs/DECISIONS.md und `docs/screenshots/audit/vorher|nachher/satz-*.png`. Tastatur „Weiter“/„Fertig“ mit Fokuskette, Cursor weg nach „Fertig“ und beim Abhaken; gilt auch im Workout-Editor und beim Bearbeiten eines Trainings.
+
+### Bitte auf dem Handy testen (Zahlenfelder)
+1. Training starten → Übung aufklappen: über den Sätzen „SATZ · KG · WDH.“, in den Feldern große, gut lesbare Zahlen; 1, 11, 102,5 und 1000 eintippen → alles vollständig sichtbar (auch mit größerer Systemschrift)
+2. Gewicht eintippen → Tastatur-Taste „Weiter“ → Cursor springt zu Wdh. → „Weiter“ → nächster Satz; im letzten Satz zeigt die Taste „Fertig“ → Tastatur zu, kein Cursor mehr
+3. In ein Feld tippen und dann den Haken des Satzes antippen → Tastatur zu, kein Cursor
+4. Dasselbe im Workout-Editor (Workout → Bearbeiten) und unter Kalender → Training → Stift
+5. Notizfeld / Suche: „Fertig“ bzw. Suchen-Taste schließt Tastatur und Cursor

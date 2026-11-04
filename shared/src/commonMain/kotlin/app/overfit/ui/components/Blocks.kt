@@ -26,6 +26,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.border
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -170,48 +180,73 @@ fun SetRowSurface(
     }
 }
 
-/** Number field of a set row: its own rounded area, large value, small uppercase unit ("KG", "WDH") next to it. */
+/**
+ * Column labels above the set rows ("SATZ  KG  WDH."), so the fields themselves only hold the number.
+ * Same paddings and weights as [SetRowSurface] with [SetField]s; [trailing] = width of the check button.
+ */
+@Composable
+fun SetColumnsHeader(numberLabel: String, labels: List<String>, trailing: Dp = 0.dp) {
+    val style = Theme.type.caption.copy(color = Theme.colors.muted, textAlign = TextAlign.Center)
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = Space.s).padding(top = Space.xs).clearAndSetSemantics {},
+        horizontalArrangement = Arrangement.spacedBy(Space.s),
+    ) {
+        BasicText(numberLabel.uppercase(), Modifier.width(24.dp), style = style, maxLines = 1, overflow = TextOverflow.Visible, softWrap = false)
+        labels.forEach { BasicText(it.uppercase(), Modifier.weight(1f), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        if (trailing > 0.dp) Spacer(Modifier.width(trailing))
+    }
+}
+
+/**
+ * Number field of a set row: a plain rounded box (48 dp high, 1 dp outline) with large tabular digits,
+ * centred. The unit stands once in [SetColumnsHeader] above the rows, so even "1000" at 1.3x font fits on a
+ * 360 dp phone. [imeAction] Next moves to [next] (or the next field), Done (and checking off a set) closes
+ * the keyboard and removes the cursor.
+ */
 @Composable
 fun SetField(
     value: String,
     onValueChange: (String) -> Unit,
-    unit: String,
     description: String,
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Number,
     placeholder: String = "–",
+    focusRequester: FocusRequester? = null,
+    next: FocusRequester? = null,
 ) {
     val c = Theme.colors
-    val style = Theme.type.title.copy(color = c.foreground, textAlign = TextAlign.End)
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            maxLines = 1,
-            textStyle = style,
-            cursorBrush = SolidColor(c.foreground),
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier
-                // Never narrower than "102.5" needs: the row stays one line, the value fully readable.
-                .weight(1f)
-                .widthIn(min = 52.dp)
-                .clip(BlockShape.field)
-                .background(c.background)
-                .semantics { contentDescription = description }
-                .padding(horizontal = Space.xs, vertical = 6.dp),
-            decorationBox = { inner ->
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                    if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = c.faint), maxLines = 1, softWrap = false)
-                    inner()
-                }
-            },
-        )
-        if (unit.isNotEmpty()) {
-            Spacer(Modifier.width(Space.xs))
-            BasicText(unit.uppercase(), style = Theme.type.caption.copy(color = c.muted), maxLines = 1, softWrap = false)
-        }
-    }
+    val focusManager = LocalFocusManager.current
+    var focused by remember { mutableStateOf(false) }
+    val style = Theme.type.number.copy(color = c.foreground, textAlign = TextAlign.Center)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        maxLines = 1,
+        textStyle = style,
+        cursorBrush = SolidColor(c.foreground),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = if (next != null) ImeAction.Next else ImeAction.Done),
+        keyboardActions = KeyboardActions(
+            onNext = { if (next != null) next.requestFocus() else focusManager.clearFocus() },
+            onDone = { focusManager.clearFocus() },
+        ),
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .clip(BlockShape.field)
+            .background(c.background)
+            .border(if (focused) 1.5.dp else 1.dp, if (focused) c.foreground else c.hairline, BlockShape.field)
+            .semantics { contentDescription = description },
+        decorationBox = { inner ->
+            Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = Space.xs), contentAlignment = Alignment.Center) {
+                // Placeholder = target value: readable grey, regular weight, so it differs from an entered value.
+                val hint = style.copy(color = c.muted, fontWeight = androidx.compose.ui.text.font.FontWeight.Normal)
+                if (value.isEmpty()) BasicText(placeholder, style = hint, maxLines = 1, softWrap = false)
+                inner()
+            }
+        },
+    )
 }
 
 class MenuItem(val label: String, val destructive: Boolean = false, val onClick: () -> Unit)

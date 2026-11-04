@@ -1,5 +1,8 @@
 package app.overfit.ui.workout
 
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import app.overfit.ui.components.SetColumnsHeader
 import app.overfit.ui.components.Block
 import app.overfit.ui.components.BlockButton
 import app.overfit.ui.components.BlockShape
@@ -320,9 +323,14 @@ private fun ExerciseSection(
         }
         if (expanded) {
             Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                SetColumnsHeader(t.setColumn, setColumnLabels(type, unit, t), trailing = 48.dp)
+                val focus = remember { mutableMapOf<String, FocusRequester>() }
+                fun focusOf(id: String) = focus.getOrPut(id) { FocusRequester() }
                 entry.sets.forEachIndexed { i, set ->
                     key(set.id) {
                         WorkoutSetRow(
+                            focusRequester = focusOf(set.id),
+                            next = entry.sets.getOrNull(i + 1)?.let { focusOf(it.id) },
                             number = i + 1,
                             type = type,
                             unit = unit,
@@ -361,12 +369,19 @@ private fun NoteField(id: String, note: String, onChange: (String) -> Unit) {
     )
 }
 
+/** Column labels for [SetColumnsHeader]: unit per used field ("KG", "WDH.", "SEK."). */
+fun setColumnLabels(type: app.overfit.domain.TrackingType, unit: WeightUnit, t: app.overfit.i18n.Strings): List<String> = buildList {
+    if (type.usesWeight) add(unit.symbol)
+    if (type.usesReps) add(t.repsUnit)
+    if (type.usesTime) add(t.timeColumn)
+}
+
 /**
  * One set: weight / reps / time inputs and the check button, swipe left removes it. Shared by the
  * running workout and the edit screen of a finished training (same inputs, weights are never negative).
  */
 @Composable
-internal fun WorkoutSetRow(
+fun WorkoutSetRow(
     number: Int,
     type: app.overfit.domain.TrackingType,
     unit: WeightUnit,
@@ -375,29 +390,39 @@ internal fun WorkoutSetRow(
     onValues: (SetValues) -> Unit,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
+    focusRequester: FocusRequester = remember { FocusRequester() },
+    next: FocusRequester? = null,
 ) {
     val t = LocalStrings.current
+    val focusManager = LocalFocusManager.current
     val done = set.completed
+    // Keyboard order: weight -> reps/time -> first field of the next set; the last field says "Done".
+    val fieldCount = listOf(type.usesWeight, type.usesReps, type.usesTime).count { it }
+    val more = remember(fieldCount) { List((fieldCount - 1).coerceAtLeast(0)) { FocusRequester() } }
+    val requesters = listOf(focusRequester) + more
+    var field = 0
+    fun req(): FocusRequester = requesters[field]
+    fun nextOf(): FocusRequester? = requesters.getOrNull(field + 1) ?: next
     val actual = set.actual
     val target = set.target
     SetRowSurface(t.removeSet(number), onRemove, Modifier.testTag("set-row:$number")) {
         Text("$number", Modifier.width(24.dp), style = Theme.type.label, tone = if (done) Tone.Default else Tone.Muted, align = TextAlign.Center)
         if (type.usesWeight) {
-            Row(Modifier.weight(1.3f), verticalAlignment = Alignment.CenterVertically) {
-                NumberInput(
-                    description = t.weightOfSet(number),
-                    value = actual.weightKg,
-                    resetKey = set.id,
-                    format = { Numbers.formatWeight(it, unit, language) },
-                    parse = { Numbers.parseWeight(it, unit) },
-                    onCommit = { onValues(actual.copy(weightKg = it)) },
-                    filter = { s -> s.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(8) },
-                    unit = unit.symbol,
-                    keyboardType = KeyboardType.Decimal,
-                    placeholder = target.weightKg?.let { Numbers.formatWeight(it, unit, language) } ?: "–",
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            NumberInput(
+                description = t.weightOfSet(number),
+                value = actual.weightKg,
+                resetKey = set.id,
+                format = { Numbers.formatWeight(it, unit, language) },
+                parse = { Numbers.parseWeight(it, unit) },
+                onCommit = { onValues(actual.copy(weightKg = it)) },
+                filter = { s -> s.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(8) },
+                keyboardType = KeyboardType.Decimal,
+                placeholder = target.weightKg?.let { Numbers.formatWeight(it, unit, language) } ?: "–",
+                focusRequester = req(),
+                next = nextOf(),
+                modifier = Modifier.weight(1f),
+            )
+            field++
         }
         if (type.usesReps) {
             NumberInput(
@@ -408,11 +433,13 @@ internal fun WorkoutSetRow(
                 parse = { Numbers.parseCount(it) },
                 onCommit = { onValues(actual.copy(reps = it)) },
                 filter = { s -> s.filter(Char::isDigit).take(4) },
-                unit = t.repsUnit,
                 keyboardType = KeyboardType.Number,
+                focusRequester = req(),
+                next = nextOf(),
                 placeholder = target.reps?.toString() ?: "–",
                 modifier = Modifier.weight(1f),
             )
+            field++
         }
         if (type.usesTime) {
             NumberInput(
@@ -423,13 +450,14 @@ internal fun WorkoutSetRow(
                 parse = { Numbers.parseDuration(it) },
                 onCommit = { onValues(actual.copy(durationSec = it)) },
                 filter = { s -> s.filter { c -> c.isDigit() || c == ':' }.take(6) },
-                unit = t.secondsUnit,
                 keyboardType = KeyboardType.Number,
+                focusRequester = req(),
+                next = nextOf(),
                 placeholder = target.durationSec?.toString() ?: "–",
                 modifier = Modifier.weight(1f),
             )
         }
-        CheckButton(done, if (done) t.reopenSet(number) else t.completeSet(number), onToggle)
+        CheckButton(done, if (done) t.reopenSet(number) else t.completeSet(number)) { focusManager.clearFocus(); onToggle() }
     }
 }
 
@@ -470,9 +498,10 @@ private fun <N : Any> NumberInput(
     parse: (String) -> N?,
     onCommit: (N?) -> Unit,
     filter: (String) -> String,
-    unit: String,
     keyboardType: KeyboardType,
     placeholder: String,
+    focusRequester: FocusRequester,
+    next: FocusRequester?,
     modifier: Modifier = Modifier,
 ) {
     var text by remember(resetKey) { mutableStateOf(value?.let(format).orEmpty()) }
@@ -486,10 +515,11 @@ private fun <N : Any> NumberInput(
             text = filtered
             if (filtered.isBlank()) onCommit(null) else parse(filtered)?.let(onCommit)
         },
-        unit = unit,
         description = description,
         modifier = modifier,
         keyboardType = keyboardType,
         placeholder = placeholder,
+        focusRequester = focusRequester,
+        next = next,
     )
 }
