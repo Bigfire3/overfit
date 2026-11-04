@@ -74,7 +74,7 @@ class DayWithOverfitTest {
     val compose = createComposeRule()
 
     private val secrets = InMemorySecretStore()
-    private val kv = InMemoryKeyValueStore()
+    private val kv = InMemoryKeyValueStore().apply { put(app.overfit.data.AppStore.KEY_COACH_STORY_SEEN, "1") }
     private val store = AppStore(kv, secrets, DeviceDefaults(Language.DE, WeightUnit.KG))
     private val database = Room.inMemoryDatabaseBuilder<OverfitDatabase>(ApplicationProvider.getApplicationContext()).build()
     private val data = AppData(

@@ -97,6 +97,10 @@ class AppStore(
     fun setRestTicks(on: Boolean) = edit { it.copy(settings = it.settings.copy(restTicks = on)) }
     fun completeOnboarding() = edit { it.copy(onboardingDone = true) }
 
+    /** The Coach story opens by itself on the first visit of the Coach tab, afterwards only on tap. */
+    fun coachStorySeen(): Boolean = kv.get(KEY_COACH_STORY_SEEN) != null
+    fun markCoachStorySeen() = kv.put(KEY_COACH_STORY_SEEN, "1")
+
     fun apiKey(): String? = secrets.load()
 
     fun connectAi(providerId: ProviderId, apiKey: String) {
@@ -124,6 +128,7 @@ class AppStore(
 
     companion object {
         private const val KEY = "overfit.state.v1"
+        const val KEY_COACH_STORY_SEEN = "overfit.coachStorySeen"
         const val MAX_REST_SEC = 3_600
     }
 }

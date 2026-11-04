@@ -220,6 +220,12 @@ final class ScreenshotTests: OverfitUITestCase {
         tap("Zurück")
         tap("Zurück")
         tab("COACH")
+        // First visit of the Coach tab: the story opens by itself (full screen, no tab bar). Show it, then close it.
+        let storyClose = app.buttons["story:close"]
+        if storyClose.waitForExistence(timeout: 10) {
+            shot("10a-coach-story")
+            storyClose.tap()
+        }
         sleep(1)
         shot("10b-coach")
         waitFor("Nachricht an den Coach").tap()

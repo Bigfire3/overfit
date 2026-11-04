@@ -146,7 +146,9 @@ class UiFeedbackTest {
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
         compose.onAllNodesWithTag("nav-transition").assertCountEquals(0)
-        compose.onNodeWithText("Starten").assertExists()
+        // The workout page reloads its plan from Room (background thread, not covered by waitForIdle): wait for its
+        // content instead of asserting at once, which failed now and then under load in the full suite.
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Bearbeiten").assertExists()
     }
 
