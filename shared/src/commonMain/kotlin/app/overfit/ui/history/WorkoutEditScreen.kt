@@ -62,6 +62,8 @@ fun WorkoutEditScreen(
     language: Language,
     appScope: CoroutineScope,
     onClose: () -> Unit,
+    /** Tap on an exercise's image: its details (read only), like in the running workout. */
+    onExerciseDetails: (String) -> Unit = {},
 ) {
     val t = LocalStrings.current
     val h = t.history
@@ -133,7 +135,7 @@ fun WorkoutEditScreen(
                 Spacer(Modifier.height(Space.l))
                 Block {
                     // Same card head as in the running workout (48 dp image, name, sets).
-                    app.overfit.ui.components.ExerciseCardHeader(e.exercise, listOf(t.setsDone(e.completedSets, e.sets.size)), onDetails = null)
+                    app.overfit.ui.components.ExerciseCardHeader(e.exercise, listOf(t.setsDone(e.completedSets, e.sets.size)), onDetails = { onExerciseDetails(e.exercise.id) })
                     Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
                         SetColumnsHeader(t.setColumn, setColumnLabels(e.exercise.trackingType, unit, t), trailing = 48.dp)
                         val focus = remember(e.id) { mutableMapOf<String, FocusRequester>() }

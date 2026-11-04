@@ -647,6 +647,7 @@ fun OverfitApp(deps: AppDependencies) {
                             language = state.language,
                             appScope = deps.data.scope,
                             onClose = nav::popBackStack,
+                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
                         )
                     }
                     composable<WorkoutShareRoute> { entry ->
