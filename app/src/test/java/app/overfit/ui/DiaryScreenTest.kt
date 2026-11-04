@@ -146,6 +146,15 @@ class DiaryScreenTest {
         assertEquals(listOf(LocalDate(2026, 11, 2), LocalDate(2026, 10, 20)), days)
     }
 
+    @Test fun listShowsPhotoOnlyDaysAndSumsTwoWorkoutsOfOneDay() {
+        val two = listOf(session("a", LocalDate(2026, 11, 2), "Push"), session("b", LocalDate(2026, 11, 2), "Core"))
+        show { PhotosScreen(listOf(photo("p9", LocalDate(2026, 10, 5), "x", "x")), two, Language.DE, today, {}, { _, _ -> }, listView = true) }
+        compose.onAllNodesWithTag("diary-list-row").assertCountEquals(2)
+        compose.onNodeWithText("Push, Core").assertIsDisplayed()
+        compose.onNodeWithText("2:00:00 · 18 Sätze · 8.400 kg", substring = true).assertIsDisplayed()
+        compose.onAllNodesWithText("1 Foto").assertCountEquals(2)
+    }
+
     @Test fun emptyListIsFriendly() {
         show { PhotosScreen(emptyList(), emptyList(), Language.DE, today, {}, { _, _ -> }, listView = true) }
         compose.onNodeWithText("Noch nichts in deiner Liste.").assertIsDisplayed()

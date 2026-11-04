@@ -60,6 +60,7 @@ import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.Panel
 import app.overfit.ui.components.panelRow
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
@@ -544,9 +545,9 @@ private fun DiaryListRow(day: DiaryDay, unit: WeightUnit, language: Language, on
             .panelRow(onClick).heightIn(min = 72.dp).padding(vertical = Space.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.width(36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.widthIn(min = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(day.date.dayOfMonth.toString(), style = Theme.type.label, maxLines = 1)
-            Text(weekday, style = Theme.type.caption, tone = Tone.Muted)
+            Text(weekday, style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
         }
         Spacer(Modifier.width(Space.m))
         Column(Modifier.weight(1f)) {

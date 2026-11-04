@@ -146,7 +146,6 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 line(3.5f, 10f, 20.5f, 10f)
                 drawCircle(color, 1.1f * u, p(16.5f, 14.25f))
             }
-            // Two linked rings: connect a chat.
             // List view: three rows, each with a dot and a line.
             Icon.List -> {
                 for (y in listOf(6.5f, 12f, 17.5f)) {
@@ -154,6 +153,7 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                     line(9.5f, y, 20f, y)
                 }
             }
+            // Two linked rings: connect a chat.
             Icon.Link -> {
                 drawRoundRect(color, p(3.5f, 8.5f), Size(10f * u, 7f * u), androidx.compose.ui.geometry.CornerRadius(3.5f * u), style = stroke)
                 drawRoundRect(color, p(10.5f, 8.5f), Size(10f * u, 7f * u), androidx.compose.ui.geometry.CornerRadius(3.5f * u), style = stroke)
