@@ -348,15 +348,19 @@ private fun ExerciseBlock(
                     }
                 }
                 BlockButton(t.addSet, { onEdit { it.addSet(key) } }, inBlock = true)
-                Row(Modifier.fillMaxWidth().padding(top = Space.xs), horizontalArrangement = Arrangement.spacedBy(Space.m), verticalAlignment = Alignment.Bottom) {
-                    SmallInput(
-                        entry.rest,
-                        { v -> onEdit { it.setRest(key, v) } },
-                        unit = t.secondsUnit,
-                        placeholder = t.restDefault,
-                        description = t.restTime,
-                        modifier = Modifier.width(96.dp),
-                    )
+                // Rest time and note each on their own line: the note gets the full width (3 lines) instead of a narrow column.
+                Column(Modifier.fillMaxWidth().padding(top = Space.xs)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(t.restTime, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
+                        SmallInput(
+                            entry.rest,
+                            { v -> onEdit { it.setRest(key, v) } },
+                            unit = t.secondsUnit,
+                            placeholder = t.restDefault,
+                            description = t.restTime,
+                            modifier = Modifier.width(96.dp),
+                        )
+                    }
                     SmallInput(
                         entry.note,
                         { v -> onEdit { it.setNote(key, v.take(300)) } },
@@ -365,7 +369,7 @@ private fun ExerciseBlock(
                         keyboardType = KeyboardType.Text,
                         align = TextAlign.Start,
                         maxLines = 3,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }

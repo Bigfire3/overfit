@@ -154,7 +154,7 @@ class WorkoutFlowTest {
         assertEquals("Stark heute", runBlocking { data.workouts.getFinished(id)?.note })
 
         // Back on the detail (it reloads): 3 sets; back to the calendar: the day lost its sauna ring
-        waitFor("3 von 3 Sätzen")
+        waitFor("3 von 3")
         compose.onNodeWithContentDescription("Zurück").performClick()
         waitFor("Trainings")
         compose.onNodeWithContentDescription("Zurück").performClick()

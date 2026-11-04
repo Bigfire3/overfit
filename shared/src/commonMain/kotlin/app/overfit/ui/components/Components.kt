@@ -484,12 +484,14 @@ fun RowInput(
     onValueChange: (String) -> Unit,
     onCommit: () -> Unit,
     keyboardType: KeyboardType = KeyboardType.Text,
+    /** Shown while empty, so an empty row still reads as editable. */
+    placeholder: String = "–",
 ) {
     // Done removes the cursor; losing focus commits the value.
     val focusManager = LocalFocusManager.current
     val style = Theme.type.body.copy(color = Theme.colors.muted, textAlign = TextAlign.End)
     // As wide as the value (at least a comfortable tap target), so a label and its value share one line.
-    val width = (IntrinsicTextWidth(value, style) + 8.dp).coerceIn(64.dp, 200.dp)
+    val width = (IntrinsicTextWidth(value.ifEmpty { placeholder }, style) + 8.dp).coerceIn(64.dp, 200.dp)
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -500,7 +502,12 @@ fun RowInput(
         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
         modifier = Modifier.width(width).onFocusLost(onCommit),
         // 48 dp high tap area, text vertically centred.
-        decorationBox = { inner -> Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) { inner() } },
+        decorationBox = { inner ->
+            Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+                if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
+                inner()
+            }
+        },
     )
 }
 
@@ -549,8 +556,8 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
         modifier
             .fillMaxWidth()
             .clip(PanelShape)
+            // The outline colour shows through the 1 dp padding and the gaps between rows: border and dividers in one.
             .background(c.hairline)
-            .border(1.dp, c.hairline, PanelShape)
             .padding(1.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {

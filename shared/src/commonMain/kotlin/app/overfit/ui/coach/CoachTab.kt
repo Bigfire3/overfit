@@ -158,7 +158,6 @@ fun CoachTabScreen(
 
         // Prompts & templates
         SectionTitle(h.promptsTitle)
-        Hairline()
         val list by produceState<List<PromptEntry>?>(null, state.language, state.profile, state.weights) { value = prompts() }
         if (list == null) Text(h.promptLoading, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
         list?.forEach { p ->

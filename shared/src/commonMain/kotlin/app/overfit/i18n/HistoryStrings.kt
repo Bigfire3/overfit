@@ -71,7 +71,7 @@ val HistoryGerman = HistoryStrings(
     setsLabel = "Sätze",
     volume = "Volumen",
     exercisesLabel = "Übungen",
-    setsOf = { done, total -> "$done von $total Sätzen" },
+    setsOf = { done, total -> "$done von $total" },
     exerciseCount = { if (it == 1) "1 Übung" else "$it Übungen" },
     deviations = { skipped, added, replaced ->
         listOfNotNull(
@@ -135,7 +135,7 @@ val HistoryEnglish = HistoryStrings(
     setsLabel = "Sets",
     volume = "Volume",
     exercisesLabel = "Exercises",
-    setsOf = { done, total -> "$done of $total sets" },
+    setsOf = { done, total -> "$done of $total" },
     exerciseCount = { if (it == 1) "1 exercise" else "$it exercises" },
     deviations = { skipped, added, replaced ->
         listOfNotNull(
