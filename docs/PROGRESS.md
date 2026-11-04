@@ -1040,3 +1040,14 @@ Offen / Hinweise:
 3. Profil → Vibration und „Ticken vor Pausenende“: Schalter ohne Text; aus = Knopf links, dunkle Spur mit Rand; an = Knopf rechts, weiße Spur; Tippen auf die ganze Zeile schaltet um
 4. Coach → Einstellungen „Fotos senden“ und KI-Chat → Fotos: gleiche Schalter
 5. TalkBack an: Schalter wird als „Schalter, an/aus“ mit Namen angesagt
+
+## Session AQ – Doppeltipp statt Popups (4.11.)
+- Erledigt: Alle Bestätigungs-Popups sind wieder ein Doppeltipp: erster Tipp färbt den Mülleimer bzw. das „×“ rot, bei Text-Knöpfen Text und Rahmen; zweiter Tipp innerhalb von 3 s führt aus. Tippen woanders, Scrollen oder Warten setzt zurück. Kein Zusatztext. Belege `docs/screenshots/doppeltipp/`, Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (Doppeltipp)
+1. Workout öffnen → Mülleimer oben rechts antippen → nur das Icon wird rot → nochmal tippen → Workout gelöscht
+2. Mülleimer antippen und 3 s warten → wieder weiß, nichts gelöscht; antippen und dann woanders tippen oder scrollen → ebenfalls zurück
+3. Training → „Beenden“ → Text und Rahmen rot → nochmal → Abschluss; „Training abbrechen“ ganz unten genauso
+4. Kalender → Tag → Foto „×“ → rot → nochmal → entfernt
+5. Profil → „Alle Daten löschen“ und Backup einspielen („Alle Daten ersetzen“) ebenso mit zwei Tipps; Coach: Chat löschen, Gedächtnis löschen
+6. TalkBack an: nach dem ersten Tipp wird „zum Bestätigen erneut tippen“ angesagt
