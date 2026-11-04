@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -567,6 +568,29 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
     ) {
         CompositionLocalProvider(LocalInPanel provides true) { content() }
     }
+}
+
+/**
+ * One standalone item that floats above the background (a workout in the list): own [Colors.surface] fill,
+ * 1 dp [Colors.hairline] outline, rounded corners and a soft shadow (light mode; in dark mode the shadow is
+ * invisible on black, so the outline and the lighter fill carry the lift). Pressable when [onClick] is set;
+ * put cards in a Column with [Space.m] gaps. Black and white only.
+ */
+@Composable
+fun FloatingCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    val c = Theme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Column(
+        modifier
+            .fillMaxWidth()
+            .shadow(if (c.isDark) 0.dp else 6.dp, PanelShape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
+            .clip(PanelShape)
+            .background(if (pressed) c.surfacePressed else c.surface)
+            .border(1.dp, if (c.isDark) c.faint else c.hairline, PanelShape)
+            .then(if (onClick != null) Modifier.clickable(interaction, indication = null, role = Role.Button, onClick = onClick) else Modifier),
+        content = content,
+    )
 }
 
 /** Free content inside a [Panel] (text, chart, buttons): panel fill and inner padding. */

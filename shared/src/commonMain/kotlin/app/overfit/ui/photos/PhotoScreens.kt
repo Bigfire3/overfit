@@ -57,6 +57,9 @@ import app.overfit.share.PlatformShare
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.HeaderDeleteButton
 import app.overfit.ui.components.HeaderIconButton
+import app.overfit.ui.components.Panel
+import app.overfit.ui.components.panelRow
+import androidx.compose.foundation.layout.heightIn
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
@@ -92,9 +95,14 @@ fun PhotosScreen(
     today: LocalDate,
     onDay: (LocalDate) -> Unit,
     onCompare: (olderId: String, newerId: String) -> Unit,
+    unit: WeightUnit = WeightUnit.KG,
+    /** Start in the list view (remembered choice); [onListViewChange] stores each switch. */
+    listView: Boolean = false,
+    onListViewChange: (Boolean) -> Unit = {},
 ) {
     val t = LocalStrings.current
     val p = t.photos
+    var asList by remember { mutableStateOf(listView) }
     var selecting by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(listOf<String>()) }
     val photoList = photos.orEmpty()
@@ -124,24 +132,46 @@ fun PhotosScreen(
             Title(t.photosTitle)
             if (selecting) {
                 SmallButton(p.cancel, onClick = { selecting = false; selected = emptyList() })
-            } else if (photoList.size >= 2) {
-                SmallButton(p.compare, onClick = { selecting = true })
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!asList && photoList.size >= 2) SmallButton(p.compare, onClick = { selecting = true })
+                    // The icon shows the other view: list while the calendar is up, calendar while the list is up.
+                    HeaderIconButton(
+                        if (asList) Icon.Calendar else Icon.List,
+                        if (asList) p.showCalendar else p.showList,
+                        { asList = !asList; onListViewChange(asList) },
+                    )
+                }
             }
         }
         Spacer(Modifier.height(Space.s))
         if (empty) {
             // The calendar stays visible even without a single photo or workout.
-            Text(t.photosEmpty, tone = Tone.Muted)
+            Text(if (asList) p.listEmpty else t.photosEmpty, tone = Tone.Muted)
             Spacer(Modifier.height(Space.xs))
-            Text(p.emptyHint, style = Theme.type.caption, tone = Tone.Muted)
+            Text(if (asList) p.listEmptyHint else p.emptyHint, style = Theme.type.caption, tone = Tone.Muted)
             Spacer(Modifier.height(Space.s))
         }
         if (loaded) {
             DiaryStats(historyList.size, photoList.size, streak)
             if (days.values.any { it.sauna }) DiaryLegend()
             Spacer(Modifier.height(Space.s))
-            WeekdayRow(weekStart)
-            Hairline()
+            if (!asList) {
+                WeekdayRow(weekStart)
+                Hairline()
+            }
+        }
+        if (asList) {
+            val listMonths = remember(days) { diaryListMonths(days) }
+            LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("diary-list")) {
+                if (loaded) items(listMonths, key = { "${it.first.first}-${it.first.second}" }) { (ym, monthDays) ->
+                    Text(p.monthHeader(ym.second, ym.first), Modifier.padding(top = Space.l, bottom = Space.s), style = Theme.type.title)
+                    Panel {
+                        monthDays.forEach { DiaryListRow(it, unit, language) { onDay(it.date) } }
+                    }
+                }
+            }
+            return@Screen
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             if (loaded) items(months, key = { "${it.first}-${it.second}" }) { (year, month) ->
@@ -488,5 +518,46 @@ private fun ComparePane(item: DiaryPhoto, modifier: Modifier) {
         )
         Spacer(Modifier.height(Space.s))
         Text(date, style = Theme.type.caption, tone = Tone.Muted)
+    }
+}
+
+/** One day in the list view: date, workout names, short numbers, photo thumbnail. A tap opens the day view. */
+@Composable
+private fun DiaryListRow(day: DiaryDay, unit: WeightUnit, language: Language, onClick: () -> Unit) {
+    val p = LocalStrings.current.photos
+    val h = LocalStrings.current.history
+    val weekday = p.weekdaysShort[day.date.dayOfWeek.ordinal]
+    val title = if (day.workouts.isEmpty()) p.statPhotos(day.photos.size) else day.workouts.joinToString(", ") { it.name }
+    val ms = day.workouts.sumOf { w -> w.endedAt?.let { it - w.startedAt } ?: 0L }
+    val sets = day.workouts.sumOf { it.completedSets }
+    val volume = day.workouts.sumOf { it.volumeKg }
+    val meta = if (day.workouts.isEmpty()) null else listOfNotNull(
+        app.overfit.workout.WorkoutFormat.elapsed(ms).takeIf { ms > 0 },
+        h.setCount(sets),
+        formatVolume(volume, unit, language).takeIf { volume > 0 },
+        h.sauna.takeIf { day.sauna },
+    ).joinToString(" · ")
+    val desc = p.dayDescription(day.date.dayOfMonth, day.photos.size, day.workouts.isNotEmpty(), day.sauna)
+    val photo = day.photos.lastOrNull()
+    Row(
+        Modifier.fillMaxWidth().testTag("diary-list-row").semantics(mergeDescendants = true) { contentDescription = "$desc, $title" }
+            .panelRow(onClick).heightIn(min = 72.dp).padding(vertical = Space.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.width(36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(day.date.dayOfMonth.toString(), style = Theme.type.label, maxLines = 1)
+            Text(weekday, style = Theme.type.caption, tone = Tone.Muted)
+        }
+        Spacer(Modifier.width(Space.m))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = Theme.type.label, maxLines = 2)
+            if (meta != null) Text(meta, style = Theme.type.caption, tone = Tone.Muted, maxLines = 2)
+        }
+        if (photo != null) {
+            Spacer(Modifier.width(Space.m))
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Theme.colors.surface)) {
+                AsyncImage(photo.photo.path, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+        }
     }
 }

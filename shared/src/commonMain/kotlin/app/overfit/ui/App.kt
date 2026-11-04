@@ -192,7 +192,7 @@ class AppDependencies(
     /** credit/invite backend (URL from the build, developer override); defaults to "not configured". */
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
     /** Small key-value storage for the chat sync state (not secret). */
-    kv: KeyValueStore = InMemoryKeyValueStore(),
+    val kv: KeyValueStore = InMemoryKeyValueStore(),
     /** Body photos for the coach; null = the workout photos, downscaled (tests replace it). */
     coachPhotos: CoachPhotoLoader? = null,
     /** Replaces the real providers (tests). */
@@ -747,6 +747,7 @@ fun OverfitApp(deps: AppDependencies) {
                     composable<PhotosRoute> {
                         val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
                         val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
+                        val viewPref = remember { app.overfit.ui.photos.DiaryViewPref(deps.kv) }
                         PhotosScreen(
                             photos = photos,
                             history = history,
@@ -754,6 +755,9 @@ fun OverfitApp(deps: AppDependencies) {
                             today = deps.today(),
                             onDay = { nav.navigate(DayRoute(it.toString())) },
                             onCompare = { a, b -> nav.navigate(PhotoCompareRoute(a, b)) },
+                            unit = state.profile.unit,
+                            listView = viewPref.list,
+                            onListViewChange = { viewPref.list = it },
                         )
                     }
                     composable<PhotoViewerRoute> { entry ->
