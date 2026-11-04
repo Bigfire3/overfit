@@ -60,20 +60,66 @@ class ExerciseImageTapTest {
         compose.onAllNodes(hasContentDescription(text)).fetchSemanticsNodes().isNotEmpty()
     }
 
-    private fun launch() {
+    private var pushTemplate: Template? = null
+
+    private fun launch(show: Boolean = true) {
         store.setName("Fabi")
         store.completeOnboarding()
         runBlocking {
             data.seedCatalog()
             val bench = requireNotNull(data.exercises.get("wg:bench-press"))
-            data.templates.save(Template(0, "Push", null, listOf(TemplateExercise(bench, restSec = 90, note = null, sets = List(2) { PlannedSet(60.0, 8) }))))
+            val id = data.templates.save(Template(0, "Push", null, listOf(TemplateExercise(bench, restSec = 90, note = null, sets = List(2) { PlannedSet(60.0, 8) }))))
+            pushTemplate = data.templates.get(id)
         }
         deps = AppDependencies(
             store, Providers(HttpClient(MockEngine { respond("{}") })), data, versionName = "0.1.test",
             today = { LocalDate(2026, 11, 3) }, haptics = RecordingHaptics(), restAlerts = RecordingRestAlerts(),
         )
+        if (!show) return
         compose.setContent { OverfitApp(deps) }
         waitFor("Push")
+    }
+
+    @Test
+    fun workoutDetail_exerciseCardImageOpensReadOnlyDetails() {
+        launch()
+        compose.onNodeWithText("Push").performClick()
+        waitFor("Starten")
+        // The exercise is a card with its image, as in the running workout.
+        waitFor("2 Sätze · 60 kg × 8")
+        compose.onNodeWithContentDescription("Details zu Bench Press").performClick()
+        waitFor("FORTSCHRITT")
+        assertEquals(false, shown("Speichern"))
+        assertEquals(false, shown("ERFASSUNG"))
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        waitFor("Starten")
+    }
+
+    @Test
+    fun trainingDetail_exerciseCardImageOpensDetails() {
+        launch(show = false)
+        // Straight into the repository (the controller's finish joins a Main-thread job, which a blocked test thread would deadlock).
+        val id = runBlocking {
+            val start = 1_793_700_000_000L
+            val w0 = app.overfit.domain.Workout.fromTemplate(requireNotNull(pushTemplate), start)
+            val w = w0.completeSet(w0.exercises[0].sets[0].id, start + 60_000)
+            data.workouts.save(w)
+            data.workouts.finish(w, start + 3_600_000)
+            w.id
+        }
+        var opened: String? = null
+        compose.setContent {
+            app.overfit.ui.theme.OverfitTheme {
+                app.overfit.ui.history.WorkoutDetailScreen(
+                    id, data.workouts, data.templates, WeightUnit.KG, Language.DE, kotlinx.coroutines.MainScope(),
+                    onBack = {}, onOpenPhoto = {}, onTemplateCreated = {}, onShare = {},
+                    onExerciseDetails = { opened = it },
+                )
+            }
+        }
+        waitFor("1/2 erledigt")
+        compose.onNodeWithContentDescription("Details zu Bench Press").performClick()
+        assertEquals("wg:bench-press", opened)
     }
 
     @Test

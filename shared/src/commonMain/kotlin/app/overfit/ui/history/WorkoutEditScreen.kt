@@ -132,14 +132,8 @@ fun WorkoutEditScreen(
             key(e.id) {
                 Spacer(Modifier.height(Space.l))
                 Block {
-                    Row(Modifier.fillMaxWidth().padding(Space.xs), verticalAlignment = Alignment.CenterVertically) {
-                        ExerciseImage(e.exercise, size = 40.dp)
-                        Spacer(Modifier.width(Space.m))
-                        Column(Modifier.weight(1f)) {
-                            Text(e.exercise.name, style = Theme.type.label, maxLines = 2)
-                            Text(t.setsDone(e.completedSets, e.sets.size), style = Theme.type.caption, tone = Tone.Muted)
-                        }
-                    }
+                    // Same card head as in the running workout (48 dp image, name, sets).
+                    app.overfit.ui.components.ExerciseCardHeader(e.exercise, listOf(t.setsDone(e.completedSets, e.sets.size)), onDetails = null)
                     Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
                         SetColumnsHeader(t.setColumn, setColumnLabels(e.exercise.trackingType, unit, t), trailing = 48.dp)
                         val focus = remember(e.id) { mutableMapOf<String, FocusRequester>() }

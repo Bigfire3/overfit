@@ -1051,3 +1051,14 @@ Offen / Hinweise:
 4. Kalender → Tag → Foto „×“ → rot → nochmal → entfernt
 5. Profil → „Alle Daten löschen“ und Backup einspielen („Alle Daten ersetzen“) ebenso mit zwei Tipps; Coach: Chat löschen, Gedächtnis löschen
 6. TalkBack an: nach dem ersten Tipp wird „zum Bestätigen erneut tippen“ angesagt
+
+## Session AQ – Karten in Listen (4.11.)
+- Erledigt: Workout ansehen und Training ansehen zeigen jede Übung als eigene Karte mit Übungsbild links (wie im laufenden Training); Tipp aufs Bild öffnet die Übung. Kalender-Liste: jeder Tag eine Karte; Tagesansicht: jedes Training eine Karte. Übungsblöcke im Training/Editor haben jetzt ebenfalls den feinen Rand. Belege `docs/screenshots/karten/`, Details in docs/DECISIONS.md.
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Karten)
+1. Workout öffnen (z. B. Push): jede Übung eine Karte mit Bild links, Name, „4 Sätze · 60 kg × 8“; Bild antippen → Übungsdetails ohne Speichern-Knopf → Zurück
+2. Kalender → Tag → Training: jede Übung eine Karte mit Bild, „x/y erledigt“ und den Sätzen darunter; Bild antippen → Übungsdetails
+3. Kalender → Listen-Symbol: jeder Tag eine eigene Karte mit Abstand; Tipp öffnet den Tag
+4. Tagesansicht: jedes Training eine Karte mit Pfeil
+5. Laufendes Training: Übungen sehen aus wie vorher, nur mit feinem Rand; Ansehen und Trainieren wirken gleich

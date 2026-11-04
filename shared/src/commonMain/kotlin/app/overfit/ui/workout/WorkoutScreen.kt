@@ -1,5 +1,6 @@
 package app.overfit.ui.workout
 
+import app.overfit.ui.components.ExerciseCardHeader
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import app.overfit.ui.components.SetColumnsHeader
@@ -282,27 +283,20 @@ private fun ExerciseSection(
     val t = LocalStrings.current
     val type = entry.exercise.trackingType
     Block(modifier) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(BlockShape.row).pressableRow(onToggle)
+        ExerciseCardHeader(
+            entry.exercise,
+            listOfNotNull(
+                t.setsDone(entry.completedSets, entry.sets.size),
+                lastTime.takeIf { it.isNotEmpty() }?.let { t.lastTime(WorkoutFormat.lastTime(it, type, unit, language, t)) },
+            ),
+            onDetails = onDetails,
+            modifier = Modifier.clip(BlockShape.row).pressableRow(onToggle)
                 .dragHandle(reorder, entry.id).semantics { contentDescription = t.reorder },
-            verticalAlignment = Alignment.CenterVertically,
+            leading = {
+                LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+                Spacer(Modifier.width(Space.s))
+            },
         ) {
-            LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
-            Spacer(Modifier.width(Space.s))
-            ExerciseImage(entry.exercise, size = 48.dp, onClick = onDetails)
-            Spacer(Modifier.width(Space.m))
-            Column(Modifier.weight(1f)) {
-                Text(entry.exercise.name, style = Theme.type.label, maxLines = 2)
-                Text(t.setsDone(entry.completedSets, entry.sets.size), style = Theme.type.caption, tone = Tone.Muted)
-                if (lastTime.isNotEmpty()) {
-                    Text(
-                        t.lastTime(WorkoutFormat.lastTime(lastTime, type, unit, language, t)),
-                        style = Theme.type.caption,
-                        tone = Tone.Muted,
-                        maxLines = 2,
-                    )
-                }
-            }
             MoreMenu(
                 t.moreActions(entry.exercise.name),
                 listOf(

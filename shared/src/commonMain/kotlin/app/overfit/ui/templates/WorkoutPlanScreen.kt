@@ -1,5 +1,7 @@
 package app.overfit.ui.templates
 
+import app.overfit.ui.components.ExerciseCardHeader
+import app.overfit.ui.components.Block
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,6 +65,8 @@ fun WorkoutPlanScreen(
     onShare: () -> Unit,
     /** Deletes the saved workout (in the app scope); the screen closes itself once it is gone. */
     onDelete: () -> Unit,
+    /** Tap on an exercise's image: its details (read only), like in the running workout. */
+    onExerciseDetails: (String) -> Unit = {},
 ) {
     val t = LocalStrings.current
     var template by remember(templateId) { mutableStateOf<Template?>(null) }
@@ -104,17 +108,16 @@ fun WorkoutPlanScreen(
         Text(lastDone, style = Theme.type.caption, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
         if (w.exercises.isEmpty()) Text(t.workoutPlanEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
-        else Panel { w.exercises.forEach { PlanExerciseRow(it, unit, language) } }
+        // One card per exercise, as in the running workout (image left, name, sets), only without input.
+        else Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            w.exercises.forEach { PlanExerciseCard(it, unit, language) { onExerciseDetails(it.exercise.id) } }
+        }
     }
 }
 
 @Composable
-private fun PlanExerciseRow(e: TemplateExercise, unit: WeightUnit, language: Language) {
+private fun PlanExerciseCard(e: TemplateExercise, unit: WeightUnit, language: Language, onDetails: () -> Unit) {
     val t = LocalStrings.current
     val values = e.sets.map { WorkoutFormat.values(it, e.exercise.trackingType, unit, language, t) }.filter { it.isNotEmpty() }.distinct()
-    Column(Modifier.fillMaxWidth().panelRow().heightIn(min = 56.dp).padding(vertical = Space.m)) {
-        Text(e.exercise.name, style = Theme.type.label)
-        Text(listOf(t.setCount(e.sets.size)).plus(values).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
-    }
-    RowDivider()
+    Block { ExerciseCardHeader(e.exercise, listOf(listOf(t.setCount(e.sets.size)).plus(values).joinToString(" · ")), onDetails) }
 }
