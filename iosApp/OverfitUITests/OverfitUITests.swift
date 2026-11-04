@@ -232,7 +232,7 @@ final class ScreenshotTests: OverfitUITestCase {
         launch(theme: theme, keepData: true)
         waitFor("Legs")
         tab("PHOTOS")
-        waitFor("Kalender")
+        waitFor("1 Training") // calendar content, not the always visible tab label
         shot("11-kalender")
         tab("PROFILE")
         shot("12-profil")
