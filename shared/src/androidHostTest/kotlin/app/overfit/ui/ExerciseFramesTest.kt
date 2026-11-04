@@ -44,23 +44,23 @@ class ExerciseFramesTest {
 
     @Test fun holdsStretchesAndCustomShowOneImage() {
         for (slug in listOf("plank", "dead-hang", "wall-sit", "hamstring-stretch", "butterfly-stretch")) {
-            assertNull(ExerciseImages.poses(exercise("catalog/wg/$slug.svg"), pairs), slug)
+            assertEquals(listOf("catalog/wg/$slug.svg"), ExerciseImages.poses(exercise("catalog/wg/$slug.svg"), pairs)!!.map { it.ref }, slug)
             assertTrue(!File(wg, "$slug-3.svg").exists(), "unused frame $slug-3.svg")
         }
         assertNull(ExerciseImages.poses(exercise(null), pairs))
         assertNull(ExerciseImages.poses(exercise("catalog/wg/squat.svg"), null))
     }
 
-    /** Every pair: two different frames, both files bundled, crops the same size and inside the 512 x 512 canvas. */
+    /** Every entry: frame 1 alone or frames 1 and 3, files bundled, crops the same size and inside the 512 x 512 canvas. */
     @Test fun everyPairIsBundledAndCropsFit() {
         val refs = catalogRefs()
         assertTrue(refs.size > 300, "catalog images: ${refs.size}")
-        assertTrue(pairs.size > 250, "pairs: ${pairs.size}")
+        assertTrue(pairs.count { it.value.frames.size == 2 } > 250, "pairs: ${pairs.size}")
         val slugs = refs.mapNotNull(ExerciseImages::slug).toSet()
-        assertEquals(emptySet(), pairs.keys - slugs, "pairs without catalog exercise")
+        assertEquals(slugs, pairs.keys, "every catalog exercise has exactly one entry")
         for ((slug, p) in pairs) {
-            assertEquals(setOf(1, 3), p.frames.toSet(), slug)
-            assertEquals(2, p.origin.size, slug)
+            assertTrue(p.frames == listOf(1) || p.frames.toSet() == setOf(1, 3), "$slug frames ${p.frames}")
+            assertEquals(p.frames.size, p.origin.size, slug)
             val (w, h) = p.size
             assertTrue(w > 0 && h > 0 && w <= 512f && h <= 512f, "$slug size $w x $h")
             for ((x, y) in p.origin) assertTrue(x >= 0 && y >= 0 && x + w <= 512.01f && y + h <= 512.01f, "$slug crop $x,$y outside")

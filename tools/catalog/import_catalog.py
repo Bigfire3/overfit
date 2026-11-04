@@ -17,7 +17,7 @@ Ergebnis:
   shared/src/commonMain/composeResources/files/catalog/LICENSE-ASSETS-workout-guide.txt
 (Compose Resources: gemeinsam für Android und iOS.)
 
-Paare (poses.json): je Übung Reihenfolge [Start-Frame, End-Frame], gemeinsame Ausschnittgröße `size` (SVG-Einheiten)
+Posen (poses.json): je Übung Reihenfolge [Start-Frame, End-Frame] (bei SINGLE_POSE nur [1]), gemeinsame Ausschnittgröße `size` (SVG-Einheiten)
 und je Pose die linke obere Ecke `origin` des Ausschnitts. Beide Ausschnitte sind gleich groß (gleiche Skalierung), die
 Figur steht horizontal mittig und unten auf derselben Linie. Grundlage sind die gemessenen Bounding-Boxen und
 Linienstärken in tools/catalog/frame_metrics.json (erzeugt von tools/catalog/measure_frames.js in Chromium aus den
@@ -192,6 +192,14 @@ def shrink(svg: bytes) -> bytes:
 
 def pose_pair(slug: str, m: dict) -> dict:
     """Reihenfolge, gemeinsamer Ausschnitt (gleiche Größe, Figur mittig, gleiche Bodenlinie) und Ausgleichskontur."""
+    if slug in SINGLE_POSE:
+        # Nur Frame 1, aber ebenso auf die Figur zugeschnitten (sonst bleibt z. B. bei Plank das halbe Feld leer).
+        x0, y0, x1, y1 = m["1"]["bbox"]
+        pad = PAD + m["1"]["t"] / 2
+        w, h = min(CANVAS, x1 - x0 + 2 * pad), min(CANVAS, y1 - y0 + 2 * pad)
+        x = min(max((x0 + x1) / 2 - w / 2, 0), CANVAS - w)
+        y = min(max(y1 + pad - h, 0), CANVAS - h)
+        return {"frames": [1], "size": [round(w, 1), round(h, 1)], "origin": [[round(x, 1), round(y, 1)]], "stroke": {}}
     order = [1, 3] if slug in START_AT_FRAME_1 else [3, 1]
     t = {i: m[str(i)]["t"] for i in (1, 3)}
     thick = max(t.values())
@@ -260,7 +268,8 @@ def main() -> None:
         raise SystemExit(f"Dehnübungen ohne Einordnung: {sorted(stretches - SINGLE_POSE - DYNAMIC_STRETCHES)}")
     if set(metrics) != set(by_slug):
         raise SystemExit("frame_metrics.json passt nicht zum Manifest: node tools/catalog/measure_frames.js")
-    pairs = {slug: pose_pair(slug, metrics[slug]) for slug in sorted(by_slug) if slug not in SINGLE_POSE}
+    poses_all = {slug: pose_pair(slug, metrics[slug]) for slug in sorted(by_slug)}
+    pairs = {slug: p for slug, p in poses_all.items() if len(p["frames"]) == 2}
 
     def frames(e: dict) -> list[tuple[str, bytes]]:
         out = []
@@ -318,7 +327,7 @@ def main() -> None:
     for name, data in svgs.items():
         (svg_dir / name).write_bytes(data)
     (OUT / "LICENSE-ASSETS-workout-guide.txt").write_bytes(license_text)
-    poses = {slug: {k: p[k] for k in ("frames", "size", "origin")} for slug, p in pairs.items()}
+    poses = {slug: {k: p[k] for k in ("frames", "size", "origin")} for slug, p in poses_all.items()}
     (OUT / "poses.json").write_text(
         "{\n" + ",\n".join(f'"{k}":' + json.dumps(v, separators=(",", ":")) for k, v in poses.items()) + "\n}\n",
         encoding="utf-8",

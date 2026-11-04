@@ -4,10 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
@@ -69,8 +67,8 @@ object ExerciseImages {
         if (frame == 1) imageRef else imageRef.removeSuffix(".svg") + "-$frame.svg"
 
     /**
-     * Start and end pose of [exercise] for the detail view, in that order (frame files and crop), or null when it
-     * shows a single image (holds, static stretches, custom exercises, not loaded yet).
+     * Poses of [exercise] for the detail view (frame files and crop): start and end in that order, or just frame 1 for
+     * holds and static stretches. Null without an entry (custom exercises, not loaded yet).
      */
     fun poses(exercise: Exercise, pairs: Map<String, PosePair>?): List<Pose>? {
         val ref = exercise.imageRef ?: return null
@@ -160,8 +158,8 @@ private fun ExerciseImageContent(exercise: Exercise, model: String?, vector: Boo
 /**
  * Large image for the detail screen, in a [Panel]: start and end pose next to each other (stacked for wide, lying
  * poses), both crops the same size and scale with the figure standing on the same line (data from poses.json), small
- * "Start"/"End" captions. Holds, static stretches and anything without a pose pair show frame 1 as one still image;
- * custom exercises without an image get the large initials tile. Theme colour, no animation.
+ * "Start"/"End" captions. Holds and static stretches show frame 1 alone, cropped the same way; a bundled image
+ * without an entry shows the whole frame; custom exercises without an image get the large initials tile. Theme colour, no animation.
  */
 @Composable
 fun ExerciseHero(exercise: Exercise, modifier: Modifier = Modifier) {
@@ -180,6 +178,10 @@ fun ExerciseHero(exercise: Exercise, modifier: Modifier = Modifier) {
     }
     val poses = remember(exercise.id, exercise.imageRef, pairs) { ExerciseImages.poses(exercise, pairs) }
     Panel(modifier) {
+        if (poses?.size == 1) {
+            PoseCell(poses[0], null, Modifier.fillMaxWidth())
+            return@Panel
+        }
         if (poses == null) {
             PanelItem {
                 AsyncImage(
@@ -197,8 +199,9 @@ fun ExerciseHero(exercise: Exercise, modifier: Modifier = Modifier) {
         if (wide) {
             poses.forEachIndexed { i, pose -> PoseCell(pose, labels[i], Modifier.fillMaxWidth()) }
         } else {
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                poses.forEachIndexed { i, pose -> PoseCell(pose, labels[i], Modifier.weight(1f).fillMaxHeight()) }
+            // Both crops have the same aspect ratio, so the two cells come out equally tall.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                poses.forEachIndexed { i, pose -> PoseCell(pose, labels[i], Modifier.weight(1f)) }
             }
         }
     }
@@ -208,7 +211,7 @@ fun ExerciseHero(exercise: Exercise, modifier: Modifier = Modifier) {
 private const val WIDE_POSE = 1.4f
 
 @Composable
-private fun PoseCell(pose: Pose, label: String, modifier: Modifier) {
+private fun PoseCell(pose: Pose, label: String?, modifier: Modifier) {
     Column(
         modifier.background(Theme.colors.surface).padding(Space.m),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -227,7 +230,9 @@ private fun PoseCell(pose: Pose, label: String, modifier: Modifier) {
                     .requiredSize(scale * ExerciseImages.CANVAS),
             )
         }
-        Spacer(Modifier.height(Space.s))
-        Text(label, style = Theme.type.caption, tone = Tone.Muted)
+        if (label != null) {
+            Spacer(Modifier.height(Space.s))
+            Text(label, style = Theme.type.caption, tone = Tone.Muted)
+        }
     }
 }
