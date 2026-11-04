@@ -43,9 +43,9 @@ class SetRowLayoutTest {
                     Box(Modifier.modWidth(360.dp)) {
                         SetRowSurface("x", {}, Modifier.testTag("row")) {
                             Text("1", Modifier.modWidth(24.dp))
-                            SetField(weight, {}, "kg", "w", Modifier.weight(1f), placeholder = "–")
-                            if (time == null) SetField(reps, {}, t.repsUnit, "r", Modifier.weight(1f), placeholder = "–")
-                            else SetField(time, {}, t.secondsUnit, "s", Modifier.weight(1f), placeholder = "–")
+                            SetField(weight, {}, "w", Modifier.weight(1f), placeholder = "–")
+                            if (time == null) SetField(reps, {}, "r", Modifier.weight(1f), placeholder = "–")
+                            else SetField(time, {}, "s", Modifier.weight(1f), placeholder = "–")
                             Box(Modifier.size(48.dp))
                         }
                     }

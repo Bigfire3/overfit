@@ -1,5 +1,7 @@
 package app.overfit.ui.templates
 
+import app.overfit.ui.components.SetColumnsHeader
+import app.overfit.ui.workout.setColumnLabels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -330,9 +332,17 @@ private fun ExerciseBlock(
         }
         if (expanded) {
             Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                SetColumnsHeader(t.setColumn, setColumnLabels(type, unit, t))
+                val focus = remember { mutableMapOf<Any, FocusRequester>() }
+                fun focusOf(id: Any) = focus.getOrPut(id) { FocusRequester() }
                 entry.sets.forEachIndexed { i, set ->
                     androidx.compose.runtime.key(set.key) {
-                        SetRow(i + 1, type, unit, set, onChange = { transform -> onEdit { it.updateSet(key, set.key, transform) } }) {
+                        SetRow(
+                            i + 1, type, unit, set,
+                            onChange = { transform -> onEdit { it.updateSet(key, set.key, transform) } },
+                            focusRequester = focusOf(set.key),
+                            next = entry.sets.getOrNull(i + 1)?.let { focusOf(it.key) },
+                        ) {
                             onRemoveSet(set.key)
                         }
                     }
@@ -383,34 +393,50 @@ private fun SetRow(
     unit: WeightUnit,
     set: TemplateDraft.DraftSet,
     onChange: ((TemplateDraft.DraftSet) -> TemplateDraft.DraftSet) -> Unit,
+    focusRequester: FocusRequester,
+    next: FocusRequester?,
     onRemove: () -> Unit,
 ) {
     val t = LocalStrings.current
+    // Keyboard order: weight -> reps/time -> next set; the last field says "Done".
+    val fieldCount = listOf(type.usesWeight, type.usesReps, type.usesTime).count { it }
+    val more = remember(fieldCount) { List((fieldCount - 1).coerceAtLeast(0)) { FocusRequester() } }
+    val requesters = listOf(focusRequester) + more
+    var field = 0
+    fun req(): FocusRequester = requesters[field]
+    fun nextOf(): FocusRequester? = requesters.getOrNull(field + 1) ?: next
     SetRowSurface(t.removeSet(number), onRemove, Modifier.testTag("set-row:$number")) {
         Text("$number", Modifier.width(24.dp), style = Theme.type.label, tone = Tone.Muted, align = TextAlign.Center)
         if (type.usesWeight) {
             SetField(
                 set.weight,
                 { v -> onChange { it.copy(weight = v.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(8)) } },
-                unit = unit.symbol,
                 description = t.weightOfSet(number),
                 keyboardType = KeyboardType.Decimal,
-                modifier = Modifier.weight(1.2f),
+                focusRequester = req(),
+                next = nextOf(),
+                modifier = Modifier.weight(1f),
             )
+            field++
         }
         if (type.usesReps) {
             SetField(
                 set.reps, { v -> onChange { it.copy(reps = v.filter(Char::isDigit).take(4)) } },
-                unit = t.repsUnit, description = t.repsOfSet(number), modifier = Modifier.weight(1f),
+                description = t.repsOfSet(number),
+                focusRequester = req(),
+                next = nextOf(),
+                modifier = Modifier.weight(1f),
             )
+            field++
         }
         if (type.usesTime) {
             SetField(
                 set.duration,
                 { v -> onChange { it.copy(duration = v.filter { c -> c.isDigit() || c == ':' }.take(6)) } },
-                unit = t.secondsUnit,
                 description = t.durationOfSet(number),
                 keyboardType = KeyboardType.Number,
+                focusRequester = req(),
+                next = nextOf(),
                 modifier = Modifier.weight(1f),
             )
         }

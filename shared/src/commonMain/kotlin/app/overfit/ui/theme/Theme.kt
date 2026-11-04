@@ -1,7 +1,11 @@
 package app.overfit.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -95,6 +99,8 @@ data class Typography(
     val body: TextStyle,
     val label: TextStyle,
     val caption: TextStyle,
+    /** Numbers in input fields (set rows): large, tabular digits. */
+    val number: TextStyle,
 )
 
 object Space {
@@ -138,10 +144,18 @@ fun OverfitTheme(mode: ThemeMode, content: @Composable () -> Unit) {
         body = TextStyle(fontFamily = family, fontWeight = FontWeight.Normal, fontSize = 17.sp, lineHeight = 24.sp),
         label = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 24.sp),
         caption = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 18.sp),
+        number = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp, fontFeatureSettings = "tnum"),
     )
     CompositionLocalProvider(
         LocalColors provides if (dark) DarkColors else LightColors,
         LocalTypography provides typography,
-        content = content,
-    )
+    ) {
+        Box {
+            // Focus sink: after "Done" a text field clears its focus; Android then hands focus back to the
+            // root, which would put it on the first text field again (cursor + keyboard return). This
+            // invisible first focus target takes it instead, so the cursor really goes away.
+            Box(Modifier.size(1.dp).focusTarget())
+            content()
+        }
+    }
 }

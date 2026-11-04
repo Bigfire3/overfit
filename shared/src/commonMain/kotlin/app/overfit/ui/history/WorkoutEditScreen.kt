@@ -38,6 +38,9 @@ import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import app.overfit.ui.workout.WorkoutSetRow
+import app.overfit.ui.workout.setColumnLabels
+import app.overfit.ui.components.SetColumnsHeader
+import androidx.compose.ui.focus.FocusRequester
 import app.overfit.workout.FinishedEdit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -138,9 +141,14 @@ fun WorkoutEditScreen(
                         }
                     }
                     Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                        SetColumnsHeader(t.setColumn, setColumnLabels(e.exercise.trackingType, unit, t), trailing = 48.dp)
+                        val focus = remember(e.id) { mutableMapOf<String, FocusRequester>() }
+                        fun focusOf(id: String) = focus.getOrPut(id) { FocusRequester() }
                         e.sets.forEachIndexed { i, set ->
                             key(set.id) {
                                 WorkoutSetRow(
+                                    focusRequester = focusOf(set.id),
+                                    next = e.sets.getOrNull(i + 1)?.let { focusOf(it.id) },
                                     number = i + 1,
                                     type = e.exercise.trackingType,
                                     unit = unit,

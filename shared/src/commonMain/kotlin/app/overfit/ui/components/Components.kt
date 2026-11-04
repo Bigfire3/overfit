@@ -31,6 +31,8 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -388,6 +390,7 @@ fun BigInput(
     textStyle: TextStyle = Theme.type.title,
 ) {
     val style = textStyle.copy(color = Theme.colors.foreground)
+    val focusManager = LocalFocusManager.current
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         BasicTextField(
             value = value,
@@ -395,8 +398,8 @@ fun BigInput(
             singleLine = true,
             textStyle = style,
             cursorBrush = SolidColor(Theme.colors.foreground),
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            keyboardActions = KeyboardActions(onDone = { onDone() }, onNext = { onDone() }),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); onDone() }),
             modifier = if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth(),
             decorationBox = { inner ->
                 Box {
@@ -433,6 +436,7 @@ private fun UnderlinedInput(
     onDone: () -> Unit,
 ) {
     val style = Theme.type.body.copy(color = Theme.colors.foreground)
+    val focusManager = LocalFocusManager.current
     Column(modifier.fillMaxWidth()) {
         BasicTextField(
             value = value,
@@ -441,8 +445,10 @@ private fun UnderlinedInput(
             textStyle = style,
             cursorBrush = SolidColor(Theme.colors.foreground),
             visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text, autoCorrectEnabled = false),
-            keyboardActions = KeyboardActions(onDone = { onDone() }),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text, autoCorrectEnabled = false, imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); onDone() }),
             modifier = Modifier.fillMaxWidth().padding(vertical = Space.m),
             decorationBox = { inner ->
                 Box {
@@ -463,14 +469,16 @@ fun RowInput(
     onCommit: () -> Unit,
     keyboardType: KeyboardType = KeyboardType.Text,
 ) {
+    // Done removes the cursor; losing focus commits the value.
+    val focusManager = LocalFocusManager.current
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
         textStyle = Theme.type.body.copy(color = Theme.colors.muted, textAlign = TextAlign.End),
         cursorBrush = SolidColor(Theme.colors.foreground),
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        keyboardActions = KeyboardActions(onDone = { onCommit() }),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
         modifier = Modifier.widthIn(min = 120.dp).onFocusLost(onCommit),
     )
 }
