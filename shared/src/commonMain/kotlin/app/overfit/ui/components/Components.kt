@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import app.overfit.i18n.LocalStrings
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.TextAutoSize
@@ -165,14 +166,14 @@ fun BackHeader(label: String, onBack: () -> Unit, actions: @Composable RowScope.
 @Composable
 fun HeaderIconButton(icon: Icon, label: String, onClick: () -> Unit, color: Color = Theme.colors.foreground) {
     Box(
-        Modifier.size(44.dp).semantics { contentDescription = label }.pressable(onClick = onClick),
+        Modifier.size(48.dp).semantics { contentDescription = label }.pressable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { LineIcon(icon, color = color) }
 }
 
 /**
- * Delete in a [BackHeader]: a bin icon; the first tap turns it into a red "Delete?" pill
- * ([confirmLabel]), the second tap deletes. Same arming rules as [ConfirmButton].
+ * Delete in a [BackHeader]: a bin icon that opens a [ConfirmDialog] with the question [confirmLabel]
+ * ("Wirklich löschen?") and an optional [message]; "Löschen" there runs [onConfirm].
  */
 @Composable
 fun HeaderDeleteButton(
@@ -181,17 +182,13 @@ fun HeaderDeleteButton(
     onConfirm: () -> Unit,
     onConfirmingChange: (Boolean) -> Unit = {},
     color: Color = Theme.colors.foreground,
+    message: String? = null,
 ) {
-    val arm = rememberConfirmArm(onConfirmingChange)
-    if (arm.armed) {
-        val c = Theme.colors
-        PillButton(
-            confirmLabel, { arm.disarm(); onConfirm() }, arm.modifier, enabled = true, compact = true, haptic = true,
-            fill = c.negativeSubtle, pressedFill = c.negativeSubtle.copy(alpha = 0.6f), contentTone = c.negative,
-        )
-    } else {
-        HeaderIconButton(Icon.Delete, label, { arm.arm() }, color)
-    }
+    var open by remember { mutableStateOf(false) }
+    val callback by androidx.compose.runtime.rememberUpdatedState(onConfirmingChange)
+    LaunchedEffect(open) { callback(open) }
+    HeaderIconButton(Icon.Delete, label, { open = true }, color)
+    if (open) ConfirmDialog(confirmLabel, LocalStrings.current.delete, onConfirm, onDismiss = { open = false }, message = message)
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +223,7 @@ fun Modifier.pressableRow(onClick: () -> Unit): Modifier {
         .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
 }
 
-/** Standard button height; [ButtonHeight.compact] for inline actions. Touch targets stay >= 44 dp. */
+/** Standard button height; [ButtonHeight.compact] for inline actions (40 dp visible, 48 dp touch area via padding). */
 object ButtonHeight {
     val standard = 48.dp
     val compact = 40.dp
@@ -259,13 +256,15 @@ private fun PillButton(
     val pressedFill = if (inPanel && pressedFill == c.surfacePressed) c.hairline else pressedFill
     Row(
         modifier
-            .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
-            .alpha(if (enabled) 1f else 0.3f)
-            .background(if (pressed) pressedFill else fill, shape)
+            // Touch area first: compact pills are 40 dp visible, the extra 4 dp above and below keep 48 dp to tap.
             .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) {
                 if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             }
+            .padding(vertical = if (compact) 4.dp else 0.dp)
+            .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
+            .alpha(if (enabled) 1f else 0.3f)
+            .background(if (pressed) pressedFill else fill, shape)
             .padding(horizontal = Space.l),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -323,9 +322,9 @@ fun DestructiveButton(
 }
 
 /**
- * Confirm pattern: first tap changes the text ([confirmLabel]) and the colours, the second tap runs
- * [onConfirm]. The armed state ends after 4 s, when another confirm button is armed, or on a tap
- * anywhere else ([ConfirmArea]). [kind] picks red (destructive) or green (positive), without a border.
+ * Button for actions that need a confirmation (finish, discard, reset): a tap opens a [ConfirmDialog] with
+ * the question [confirmLabel] and [label] as the action; tapping beside it or "Abbrechen" closes it.
+ * [kind] picks a red (destructive) or black (positive) action in the popup.
  */
 @Composable
 fun ConfirmButton(
@@ -336,20 +335,17 @@ fun ConfirmButton(
     kind: Confirm = Confirm.Destructive,
     compact: Boolean = false,
     enabled: Boolean = true,
-    /** Lets a crowded parent make room while the longer confirm text shows. */
+    /** Called with true while the popup is open. */
     onConfirmingChange: (Boolean) -> Unit = {},
+    message: String? = null,
+    /** Short action text in the popup when [label] is long ("Verwerfen" for "Training abbrechen und verwerfen"). */
+    actionLabel: String = label,
 ) {
-    val arm = rememberConfirmArm(onConfirmingChange)
-    val c = Theme.colors
-    if (arm.armed) {
-        val (fill, tone) = if (kind == Confirm.Destructive) c.negativeSubtle to c.negative else c.positiveSubtle to c.positive
-        PillButton(
-            confirmLabel, { arm.disarm(); onConfirm() }, modifier.then(arm.modifier), enabled, compact, haptic = true,
-            fill = fill, pressedFill = fill.copy(alpha = 0.6f), contentTone = tone,
-        )
-    } else {
-        SecondaryButton(label, { arm.arm() }, modifier, enabled, compact)
-    }
+    var open by remember { mutableStateOf(false) }
+    val callback by androidx.compose.runtime.rememberUpdatedState(onConfirmingChange)
+    LaunchedEffect(open) { callback(open) }
+    SecondaryButton(label, { open = true }, modifier, enabled, compact)
+    if (open) ConfirmDialog(confirmLabel, actionLabel, onConfirm, onDismiss = { open = false }, message = message, kind = kind)
 }
 
 /**
@@ -367,15 +363,23 @@ fun SmallButton(
     val shape = RoundedCornerShape(50)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val inPanel = LocalInPanel.current
+    val fill = if (inPanel) c.surfacePressed else c.surface
+    val pressedFill = if (inPanel) c.hairline else c.surfacePressed
     Box(
         modifier
-            .heightIn(min = ButtonHeight.compact)
-            .background(if (pressed) c.surfacePressed else c.surface, shape)
+            // 40 dp visible, 48 dp to tap (like the compact pills).
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(vertical = 4.dp)
+            .heightIn(min = ButtonHeight.compact)
+            .background(if (pressed) pressedFill else fill, shape)
             .padding(horizontal = Space.m),
         contentAlignment = Alignment.Center,
     ) {
-        BasicText(label, style = Theme.type.label.copy(color = tone.color()), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        BasicText(
+            label, style = Theme.type.label.copy(color = tone.color()), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = Theme.type.label.fontSize),
+        )
     }
 }
 
@@ -383,7 +387,7 @@ fun SmallButton(
 fun IconButton(icon: Icon, label: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(44.dp)
+            .size(48.dp)
             .semantics { contentDescription = label }
             .pressable(onClick = onClick),
         contentAlignment = Alignment.CenterStart,

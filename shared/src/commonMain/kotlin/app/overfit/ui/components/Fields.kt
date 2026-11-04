@@ -42,10 +42,12 @@ import app.overfit.ui.theme.Theme
 fun Chip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier
+            // 48 dp touch area around the 40 dp chip.
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Checkbox, onClick = onClick)
+            .padding(vertical = 4.dp)
             .heightIn(min = 40.dp)
             .background(if (selected) Theme.colors.inverseBackground else if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface, RoundedCornerShape(50))
             .semantics { this.selected = selected }
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Checkbox, onClick = onClick)
             .padding(horizontal = Space.m, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -81,7 +83,7 @@ fun SearchInput(value: String, onValueChange: (String) -> Unit, placeholder: Str
             if (value.isNotEmpty()) {
                 Box(
                     Modifier
-                        .size(32.dp)
+                        .size(48.dp)
                         .semantics { contentDescription = clearLabel }
                         .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onValueChange("") },
                     contentAlignment = Alignment.Center,

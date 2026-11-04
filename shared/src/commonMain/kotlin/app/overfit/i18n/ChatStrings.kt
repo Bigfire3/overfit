@@ -81,6 +81,7 @@ class ChatStrings(
     val photosToggleHint: String,
     val disableChat: String,
     val disableConfirm: String,
+    val disableConfirmDetail: String,
     val disableHint: String,
 
     // Copy context (works without server)
@@ -223,7 +224,8 @@ val ChatGerman = ChatStrings(
     photosToggle = "Körperfotos teilen",
     photosToggleHint = "Aus = Fotos werden auf dem Server gelöscht.",
     disableChat = "KI-Chat trennen",
-    disableConfirm = "Wirklich trennen? Alles auf dem Server wird gelöscht und alle Chats verlieren den Zugriff.",
+    disableConfirm = "KI-Chat wirklich trennen?",
+    disableConfirmDetail = "Alles auf dem Server wird gelöscht und alle Chats verlieren den Zugriff.",
     disableHint = "Löscht alle Daten auf dem Server und trennt alle Chats.",
     contextCopy = "Kontext kopieren",
     contextCopied = "Kopiert. Füge den Text in deinen Chat ein.",
@@ -375,7 +377,8 @@ val ChatEnglish = ChatStrings(
     photosToggle = "Share body photos",
     photosToggleHint = "Off = photos are deleted from the server.",
     disableChat = "Disconnect AI chat",
-    disableConfirm = "Really disconnect? Everything on the server is deleted and all chats lose access.",
+    disableConfirm = "Really disconnect the AI chat?",
+    disableConfirmDetail = "Everything on the server is deleted and all chats lose access.",
     disableHint = "Deletes all data on the server and disconnects all chats.",
     contextCopy = "Copy context",
     contextCopied = "Copied. Paste the text into your chat.",

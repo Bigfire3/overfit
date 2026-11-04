@@ -998,3 +998,13 @@ Offen / Hinweise:
 2. Profil: „Darstellung“ steht ganz, die Auswahl System/Dunkel/Hell darunter; Standard-Pause und Wert in einer Zeile; Name/Alter antippen, ändern, „Fertig“ → gespeichert, Cursor weg
 3. Training: „+ Satz hinzufügen“, „Überspringen“ in der Pause und „Beenden? Nochmal tippen“ sind ganz lesbar (ggf. etwas kleiner); lange Übungsnotiz bricht um statt abgeschnitten zu werden
 4. Guthaben, Einladungen, KI-Chat und Übungsdetail: Flächen sichtbar, Knöpfe in Flächen gut erkennbar
+
+## Session AM – UI-Audit, Teil 3: Popups (4.11.)
+- Erledigt: Alle Bestätigungen („Nochmal tippen“) sind jetzt ein einheitliches Popup mit Frage, „Abbrechen“ und Aktion; Tippen daneben schließt. Belege `docs/screenshots/audit/popups/`. Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (Popups)
+1. Training → „Beenden“ → Popup „Training beenden?“ → daneben tippen: Popup zu, Training läuft weiter → nochmal → „Beenden“ → Abschluss
+2. Training → ganz unten „Training abbrechen“ → „Training verwerfen?“ → „Verwerfen“
+3. Workout öffnen → Mülleimer → „Wirklich löschen?“ mit Hinweis, dass Trainings im Kalender bleiben → „Löschen“
+4. Kalender → Tag → Foto „×“ → „Foto vom Tag entfernen?“ → „Abbrechen“ behält es, „Entfernen“ entfernt es
+5. Profil → ganz unten „Alle Daten löschen“ und Backup einspielen fragen ebenfalls per Popup; Zurück-Taste schließt jedes Popup

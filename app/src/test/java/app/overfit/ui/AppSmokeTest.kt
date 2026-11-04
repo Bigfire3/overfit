@@ -159,7 +159,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Kein KI-Zugang").assertIsDisplayed()
         compose.onNode(androidx.compose.ui.test.hasText("Profil") and androidx.compose.ui.test.hasClickAction()).performClick()
         compose.onNodeWithText("Alle Daten löschen").performScrollTo().performClick()
-        compose.onNodeWithText("Wirklich alles löschen?").performClick()
+        compose.onNodeWithTag("dialog:confirm").performClick()
 
         compose.onNodeWithText("Dein Name").assertIsDisplayed()
         assertEquals("", store.state.value.profile.name)

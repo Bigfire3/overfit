@@ -58,10 +58,11 @@ fun RestBar(
 
     @Composable
     fun Actions(modifier: Modifier = Modifier) {
-        Row(modifier, horizontalArrangement = Arrangement.spacedBy(Space.l), verticalAlignment = Alignment.CenterVertically) {
+        // Tight spacing, "skip" takes the rest of the row: on a 360 dp phone it stays readable next to the countdown.
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(Space.s), verticalAlignment = Alignment.CenterVertically) {
             SmallButton(t.restMinus, { onAdjust(-15) })
             SmallButton(t.restPlus, { onAdjust(15) })
-            SmallButton(t.restSkip, onSkip, tone = Tone.Default)
+            SmallButton(t.restSkip, onSkip, Modifier.weight(1f, fill = false), tone = Tone.Default)
         }
     }
 
@@ -90,7 +91,8 @@ fun RestBar(
                     Modifier.pressableRow { expanded = true }.padding(vertical = Space.xs).semantics { contentDescription = toggleLabel },
                     style = Theme.type.label,
                 )
-                Actions()
+                Spacer(Modifier.width(Space.s))
+                Actions(Modifier.weight(1f, fill = false))
             }
             NextLine(Theme.type.caption, Modifier.fillMaxWidth().padding(vertical = Space.xs))
         } else {

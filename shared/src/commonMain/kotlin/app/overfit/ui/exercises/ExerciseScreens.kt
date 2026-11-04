@@ -201,7 +201,7 @@ fun ExerciseDetailScreen(
             BackHeader(t.back, onBack) {
                 if (e.isCustom && !readOnly) {
                     HeaderIconButton(Icon.Edit, t.edit, { onEditCustom(e.id) })
-                    HeaderDeleteButton(t.delete, t.deleteConfirm, onConfirm = { viewModel.delete { onBack() } })
+                    HeaderDeleteButton(t.delete, t.deleteExerciseConfirm, onConfirm = { viewModel.delete { onBack() } })
                 }
             }
         },

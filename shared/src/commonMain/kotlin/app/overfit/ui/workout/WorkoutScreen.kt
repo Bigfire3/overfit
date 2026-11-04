@@ -127,7 +127,6 @@ fun WorkoutScreen(
     val now = produceState(clock()) { while (true) { value = clock(); delay(250) } }
     var collapsed by rememberSaveable { mutableStateOf(listOf<String>()) }
 
-    var confirmingFinish by remember { mutableStateOf(false) }
     // Last swiped-away set: "Undo" restores the workout as it was, as long as nothing else changed since.
     var undo by remember { mutableStateOf<Pair<Workout, Workout>?>(null) }
     LaunchedEffect(undo) { if (undo != null) { delay(5000); undo = null } }
@@ -173,15 +172,12 @@ fun WorkoutScreen(
         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.s)) {
             IconButton(Icon.ChevronDown, t.minimizeWorkout, onMinimize)
             Column(Modifier.weight(1f)) {
-                if (!confirmingFinish) {
-                    NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.fillMaxWidth())
-                    ProgressCaption(workout, now)
-                }
+                NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.fillMaxWidth())
+                ProgressCaption(workout, now)
             }
             ConfirmButton(
                 label = t.finishWorkout,
                 confirmLabel = t.finishConfirm,
-                onConfirmingChange = { confirmingFinish = it },
                 onConfirm = { scope.launch { controller.finish() } },
                 modifier = Modifier, compact = true, kind = Confirm.Positive,
             )
@@ -217,7 +213,7 @@ fun WorkoutScreen(
             item(key = "actions") {
                 BlockButton(t.addExercise, onAddExercises)
                 Spacer(Modifier.height(Space.l))
-                ConfirmButton(t.discardWorkout, t.discardConfirm, onConfirm = { scope.launch { controller.discard() } })
+                ConfirmButton(t.discardWorkout, t.discardConfirm, onConfirm = { scope.launch { controller.discard() } }, actionLabel = t.discard)
             }
         }
     }

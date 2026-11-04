@@ -2,6 +2,7 @@ package app.overfit.ui
 
 import kotlinx.coroutines.runBlocking
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -151,9 +152,8 @@ open class ScreenshotTest {
         shot("training-pause")
         click("Überspringen")
         // Finish flow
-        click("Beenden")
-        shot("beenden-bestaetigen")
-        click("Beenden? Nochmal tippen")
+        click("Beenden") // popup: its own screenshot in DialogShotTest (Robolectric does not draw dialog windows)
+        compose.onNodeWithTag("dialog:confirm").performClick()
         waitFor("Training beendet")
         compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
         shot("beenden")

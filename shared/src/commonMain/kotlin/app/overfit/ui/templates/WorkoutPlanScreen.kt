@@ -65,7 +65,6 @@ fun WorkoutPlanScreen(
     onDelete: () -> Unit,
 ) {
     val t = LocalStrings.current
-    var deleteArmed by remember { mutableStateOf(false) }
     var template by remember(templateId) { mutableStateOf<Template?>(null) }
     LaunchedEffect(templateId) {
         // The list flow emits more than once after a delete (names and workouts are separate queries). Closing once only:
@@ -84,7 +83,7 @@ fun WorkoutPlanScreen(
             BackHeader(t.back, onBack) {
                 if (w != null) {
                     HeaderIconButton(Icon.Share, t.share.shareTemplate, onShare)
-                    HeaderDeleteButton(t.deleteTemplate, t.deleteConfirm, onDelete, onConfirmingChange = { deleteArmed = it })
+                    HeaderDeleteButton(t.deleteTemplate, t.deleteWorkoutConfirm, onDelete, message = t.deletedKeepsHistory)
                 }
             }
         },
@@ -102,7 +101,7 @@ fun WorkoutPlanScreen(
         if (w == null) return@Screen
         Title(w.name)
         Spacer(Modifier.height(Space.s))
-        Text(if (deleteArmed) t.deletedKeepsHistory else lastDone, style = Theme.type.caption, tone = Tone.Muted)
+        Text(lastDone, style = Theme.type.caption, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
         if (w.exercises.isEmpty()) Text(t.workoutPlanEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
         else Panel { w.exercises.forEach { PlanExerciseRow(it, unit, language) } }

@@ -65,7 +65,7 @@ class UiFeedbackTest {
     val compose = createComposeRule()
 
     @Test
-    fun confirmButtons_disarmEachOther_andOnTapElsewhere() {
+    fun confirmButton_asksInAPopup_cancelKeeps_confirmRuns() {
         var deleted = 0
         compose.setContent {
             OverfitTheme(app.overfit.domain.ThemeMode.DARK) {
@@ -78,20 +78,21 @@ class UiFeedbackTest {
                 }
             }
         }
+        // The tap opens a popup with the question; "Abbrechen" closes it without deleting.
         compose.onNodeWithText("Löschen").performClick()
         compose.onNodeWithText("Wirklich löschen?").assertExists()
-        // Arming the other one disarms the first: at most one armed button.
+        compose.onNodeWithTag("dialog:cancel").performClick()
+        compose.onAllNodesWithText("Wirklich löschen?").assertCountEquals(0)
+        assertEquals(0, deleted)
+        // The other button asks its own question; its action runs only from the popup.
         compose.onNodeWithText("Beenden").performClick()
         compose.onNodeWithText("Wirklich beenden?").assertExists()
-        compose.onAllNodesWithText("Wirklich löschen?").assertCountEquals(0)
-        compose.onNodeWithText("Löschen").assertExists()
-        // A tap anywhere else disarms.
-        compose.onNodeWithTag("elsewhere").performClick()
-        compose.onAllNodesWithText("Wirklich beenden?").assertCountEquals(0)
-        // Armed button: the second tap on it confirms (the tap inside it does not count as "elsewhere").
-        compose.onNodeWithText("Löschen").performClick()
-        compose.onNodeWithText("Wirklich löschen?").performClick()
+        compose.onNodeWithTag("dialog:cancel").performClick()
+        // Confirm in the popup runs the action once and closes it.
+        compose.onAllNodesWithText("Löschen")[0].performClick()
+        compose.onNodeWithTag("dialog:confirm").performClick()
         assertEquals(1, deleted)
+        compose.onAllNodesWithText("Wirklich löschen?").assertCountEquals(0)
     }
 
     @Test
@@ -166,8 +167,8 @@ class UiFeedbackTest {
         compose.onNodeWithText("Push").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Workout löschen").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Wirklich löschen?", substring = true).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Wirklich löschen?", substring = true).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Workout löschen?", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("dialog:confirm").performClick()
         // Back on the training tab (list with Pull and Legs), not on an empty screen.
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Pull").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("Legs").assertCountEquals(1)
