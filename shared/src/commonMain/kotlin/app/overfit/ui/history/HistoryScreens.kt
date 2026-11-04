@@ -140,7 +140,7 @@ fun WorkoutDetailScreen(
             if (data != null) {
                 if (onEdit != null) HeaderIconButton(Icon.Edit, h.editWorkout, onEdit)
                 HeaderIconButton(Icon.Share, h.shareWorkout, onShare)
-                HeaderDeleteButton(t.delete, t.deleteTrainingConfirm, onConfirm = {
+                HeaderDeleteButton(t.delete, onConfirm = {
                     appScope.launch { workouts.deleteWorkout(workoutId) }
                     onBack()
                 })

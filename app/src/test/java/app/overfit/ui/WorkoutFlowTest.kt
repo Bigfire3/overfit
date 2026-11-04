@@ -115,7 +115,7 @@ class WorkoutFlowTest {
         // Finish (two taps) → finish flow (summary, note) → save → start; stored as finished
         val id = requireNotNull(deps.workout.state.value.workout).id
         compose.onNodeWithText("Beenden").performClick()
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Wie war das Training?")
         compose.waitUntilState(5_000) { runBlocking { data.workouts.status(id) } == SessionStatus.FINISHED }
         // The name field comes first, the note field second.

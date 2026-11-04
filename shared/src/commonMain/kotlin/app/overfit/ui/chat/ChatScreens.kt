@@ -117,7 +117,7 @@ fun AiCoachScreen(
         Hint(c.wayInAppHint)
         if (onDisconnect != null && state.hasApiKey) {
             Spacer(Modifier.height(Space.m))
-            app.overfit.ui.components.ConfirmButton(t.disconnect, app.overfit.i18n.LocalCoachStrings.current.hub.disconnectConfirm, onDisconnect)
+            app.overfit.ui.components.ConfirmButton(t.disconnect, onDisconnect)
         }
 
         val value = when {
@@ -264,7 +264,7 @@ fun ChatProviderScreen(
 
         if (chat.configured && sync.enabled) {
             Spacer(Modifier.height(Space.l))
-            ConfirmButton(c.disableChat, c.disableConfirm, onConfirm = { viewModel.disable() }, message = c.disableConfirmDetail, actionLabel = c.disconnect)
+            ConfirmButton(c.disableChat, onConfirm = { viewModel.disable() })
             Text(c.disableHint, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
         }
     }

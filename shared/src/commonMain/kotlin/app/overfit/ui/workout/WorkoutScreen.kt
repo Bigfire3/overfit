@@ -61,7 +61,6 @@ import app.overfit.domain.WorkoutExercise
 import app.overfit.domain.WorkoutSet
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BigInput
-import app.overfit.ui.components.Confirm
 import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.SecondaryButton
 import app.overfit.ui.components.ExerciseImage
@@ -175,12 +174,7 @@ fun WorkoutScreen(
                 NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.fillMaxWidth())
                 ProgressCaption(workout, now)
             }
-            ConfirmButton(
-                label = t.finishWorkout,
-                confirmLabel = t.finishConfirm,
-                onConfirm = { scope.launch { controller.finish() } },
-                modifier = Modifier, compact = true, kind = Confirm.Positive,
-            )
+            ConfirmButton(t.finishWorkout, onConfirm = { scope.launch { controller.finish() } }, modifier = Modifier, compact = true)
         }
         Spacer(Modifier.height(Space.xs))
         Hairline()
@@ -213,7 +207,7 @@ fun WorkoutScreen(
             item(key = "actions") {
                 BlockButton(t.addExercise, onAddExercises)
                 Spacer(Modifier.height(Space.l))
-                ConfirmButton(t.discardWorkout, t.discardConfirm, onConfirm = { scope.launch { controller.discard() } }, actionLabel = t.discard)
+                ConfirmButton(t.discardWorkout, onConfirm = { scope.launch { controller.discard() } })
             }
         }
     }

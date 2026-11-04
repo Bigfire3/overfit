@@ -1,6 +1,6 @@
 package app.overfit.ui.settings
 
-import app.overfit.ui.components.ConfirmDialog
+import app.overfit.ui.components.ConfirmButton
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -64,7 +64,6 @@ fun BackupImportScreen(
     }
     DisposableEffect(Unit) { onDispose { pending.value = null } }
 
-    var confirm by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
     var failure by remember { mutableStateOf<String?>(null) }
 
@@ -89,15 +88,11 @@ fun BackupImportScreen(
                         }
                         withContext(Dispatchers.Main) {
                             running = false
-                            confirm = false
                             if (error == null) onRestored() else failure = error
                         }
                     }
                 }
-                PrimaryButton(p.importReplace, loading = running, onClick = { confirm = true })
-                if (confirm) {
-                    ConfirmDialog(p.importReplaceConfirm, p.importReplace, onConfirm = { restore() }, onDismiss = { confirm = false })
-                }
+                ConfirmButton(p.importReplace, onConfirm = { restore() }, primary = true, loading = running)
             }
         },
     ) {

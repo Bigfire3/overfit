@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
-import app.overfit.ui.components.Confirm
 import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.SmallButton
 import kotlinx.coroutines.delay
@@ -152,5 +151,5 @@ fun ColumnScope.RunningWorkoutChoice(onOpenRunning: () -> Unit, onEndRunning: ()
     val t = LocalStrings.current
     Text(t.runningWorkoutTitle, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
     PrimaryButton(t.toRunningWorkout, onClick = onOpenRunning)
-    ConfirmButton(t.endRunningWorkout, t.finishConfirm, onConfirm = onEndRunning, kind = Confirm.Positive, actionLabel = t.finishWorkout, modifier = Modifier.align(Alignment.CenterHorizontally))
+    ConfirmButton(t.endRunningWorkout, onConfirm = onEndRunning, modifier = Modifier.align(Alignment.CenterHorizontally))
 }

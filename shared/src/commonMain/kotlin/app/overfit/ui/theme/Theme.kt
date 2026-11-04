@@ -31,6 +31,8 @@ import org.jetbrains.compose.resources.Font
  * - Signal colours, ONLY for meaning in data, never decoration: [positive] (better than
  *   before, new record, completed) and [negative] (worse, missed, destructive confirmation).
  *   The *Subtle variants are low-contrast fills behind such values (e.g. a delta badge).
+ * - [armed]: the one deliberate colour exception in the UI chrome: red icon/label/border of a destructive
+ *   two-tap button after the first tap ("tap again to confirm"). Nowhere else.
  */
 @Immutable
 data class Colors(
@@ -52,6 +54,8 @@ data class Colors(
     /** Red: decline, missed, destructive. Only for data and confirmations. */
     val negative: Color,
     val negativeSubtle: Color,
+    /** Red of an armed two-tap confirm button (first tap done). The only accent in the chrome. */
+    val armed: Color,
 )
 
 val DarkColors = Colors(
@@ -68,6 +72,7 @@ val DarkColors = Colors(
     positiveSubtle = Color(0xFF0F2A17),
     negative = Color(0xFFFF453A),
     negativeSubtle = Color(0xFF331311),
+    armed = Color(0xFFFF453A),
 )
 
 /** Only a handful of sizes on purpose. */

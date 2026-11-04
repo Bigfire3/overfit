@@ -64,6 +64,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -176,23 +178,35 @@ fun HeaderIconButton(icon: Icon, label: String, onClick: () -> Unit, color: Colo
 }
 
 /**
- * Delete in a [BackHeader]: a bin icon that opens a [ConfirmDialog] with the question [confirmLabel]
- * ("Wirklich löschen?") and an optional [message]; "Löschen" there runs [onConfirm].
+ * Delete in a [BackHeader], two-tap pattern: the first tap turns the bin red (armed, screen readers hear
+ * "Löschen – zum Bestätigen erneut tippen"), a second tap within 3 s runs [onConfirm]. A tap elsewhere,
+ * scrolling or the timeout disarm it ([ConfirmArea]). No popup, no extra text.
  */
 @Composable
 fun HeaderDeleteButton(
     label: String,
-    confirmLabel: String,
     onConfirm: () -> Unit,
-    onConfirmingChange: (Boolean) -> Unit = {},
     color: Color = Theme.colors.foreground,
-    message: String? = null,
 ) {
-    var open by remember { mutableStateOf(false) }
-    val callback by androidx.compose.runtime.rememberUpdatedState(onConfirmingChange)
-    LaunchedEffect(open) { callback(open) }
-    HeaderIconButton(Icon.Delete, label, { open = true }, color)
-    if (open) ConfirmDialog(confirmLabel, LocalStrings.current.delete, onConfirm, onDismiss = { open = false }, message = message)
+    val arm = rememberConfirmArm()
+    val haptics = LocalHapticFeedback.current
+    val again = LocalStrings.current.tapAgainToConfirm
+    val armed = arm.armed
+    Box(
+        Modifier
+            .then(arm.modifier)
+            .size(48.dp)
+            .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
+            .semantics {
+                contentDescription = if (armed) "$label – $again" else label
+                if (armed) stateDescription = again
+            }
+            .pressable {
+                if (armed) { arm.disarm(); onConfirm() }
+                else { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); arm.arm() }
+            },
+        contentAlignment = Alignment.Center,
+    ) { LineIcon(Icon.Delete, color = if (armed) Theme.colors.armed else color) }
 }
 
 // ---------------------------------------------------------------------------
@@ -233,9 +247,6 @@ object ButtonHeight {
     val compact = 40.dp
 }
 
-/** Meaning of a button in its confirm state: red = destructive, green = positive (done, saved). */
-enum class Confirm { Destructive, Positive }
-
 @Composable
 private fun PillButton(
     label: String,
@@ -248,6 +259,7 @@ private fun PillButton(
     pressedFill: Color,
     contentTone: Color,
     trailing: (@Composable () -> Unit)? = null,
+    border: Color? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -269,6 +281,7 @@ private fun PillButton(
             .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
             .alpha(if (enabled) 1f else 0.3f)
             .background(if (pressed) pressedFill else fill, shape)
+            .then(if (border != null) Modifier.border(1.5.dp, border, shape) else Modifier)
             .padding(horizontal = Space.l),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -326,30 +339,47 @@ fun DestructiveButton(
 }
 
 /**
- * Button for actions that need a confirmation (finish, discard, reset): a tap opens a [ConfirmDialog] with
- * the question [confirmLabel] and [label] as the action; tapping beside it or "Abbrechen" closes it.
- * [kind] picks a red (destructive) or black (positive) action in the popup.
+ * Two-tap button for actions that need a confirmation (finish, discard, reset, delete all): the first tap
+ * arms it (label and border turn [Colors.armed] red, the text stays the same; screen readers hear
+ * "zum Bestätigen erneut tippen"), a second tap within 3 s runs [onConfirm]. A tap elsewhere, scrolling
+ * or the timeout disarm it ([ConfirmArea]). [primary] = black main action of a screen (backup restore).
  */
 @Composable
 fun ConfirmButton(
     label: String,
-    confirmLabel: String,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier.fillMaxWidth(),
-    kind: Confirm = Confirm.Destructive,
     compact: Boolean = false,
     enabled: Boolean = true,
-    /** Called with true while the popup is open. */
-    onConfirmingChange: (Boolean) -> Unit = {},
-    message: String? = null,
-    /** Short action text in the popup when [label] is long ("Verwerfen" for "Training abbrechen und verwerfen"). */
-    actionLabel: String = label,
+    primary: Boolean = false,
+    loading: Boolean = false,
 ) {
-    var open by remember { mutableStateOf(false) }
-    val callback by androidx.compose.runtime.rememberUpdatedState(onConfirmingChange)
-    LaunchedEffect(open) { callback(open) }
-    SecondaryButton(label, { open = true }, modifier, enabled, compact)
-    if (open) ConfirmDialog(confirmLabel, actionLabel, onConfirm, onDismiss = { open = false }, message = message, kind = kind)
+    val arm = rememberConfirmArm()
+    val haptics = LocalHapticFeedback.current
+    val again = LocalStrings.current.tapAgainToConfirm
+    val armed = arm.armed
+    val c = Theme.colors
+    val inPanel = LocalInPanel.current
+    val surface = if (inPanel) c.surfacePressed else c.surface
+    val (fill, pressedFill, tone) = when {
+        armed -> Triple(if (primary) c.background else surface, if (primary) c.surface else c.hairline, c.armed)
+        primary -> Triple(c.inverseBackground, c.inverseBackground.copy(alpha = 0.75f), c.inverseForeground)
+        else -> Triple(c.surface, c.surfacePressed, c.foreground)
+    }
+    PillButton(
+        if (loading) "…" else label,
+        onClick = {
+            if (armed) { arm.disarm(); onConfirm() }
+            else { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); arm.arm() }
+        },
+        modifier = modifier
+            .then(arm.modifier)
+            .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
+            .semantics { if (armed) stateDescription = again },
+        enabled = enabled && !loading, compact = compact, haptic = false,
+        fill = fill, pressedFill = pressedFill, contentTone = tone,
+        border = if (armed) c.armed else null,
+    )
 }
 
 /**

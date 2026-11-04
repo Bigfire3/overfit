@@ -150,7 +150,7 @@ open class ScreenshotTest {
         click("Überspringen")
         // Finish flow
         click("Beenden") // popup: its own screenshot in DialogShotTest (Robolectric does not draw dialog windows)
-        compose.onNodeWithTag("dialog:confirm").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Training beendet")
         compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
         shot("beenden")
