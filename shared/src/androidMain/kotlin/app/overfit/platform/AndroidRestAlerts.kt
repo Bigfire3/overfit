@@ -28,16 +28,21 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 /**
- * Rest timer on Android (see docs/DECISIONS.md, phase 2):
- * - While the rest runs: a silent, ongoing notification with a system-drawn countdown
- *   (chronometer) and the actions +15 s / Skip. The countdown needs no wakeups.
- * - At the end: an alarm via [AlarmManager.setExactAndAllowWhileIdle] (exact when the user allows
- *   exact alarms, otherwise the closest inexact variant) wakes [RestAlarmReceiver], which posts
- *   the "rest is over" notification – unless the app is visible, then the app itself vibrates.
+ * Workout notification and rest timer on Android (see docs/DECISIONS.md, phase 2 and
+ * "Trainings-Benachrichtigung"):
+ * - During the whole workout one ongoing notification, held by [TrainingService] (foreground
+ *   service): green with the set to do now and "Set done", red during a rest with a system-drawn
+ *   countdown (chronometer) and +15 s / Skip. The countdown needs no wakeups. Swiped away
+ *   (possible since Android 14), its delete intent posts it again right away.
+ * - Transitions set → rest and rest → set announce themselves once (heads-up, vibration by
+ *   setting), all other updates are silent. Not while the app is visible (it vibrates itself).
+ * - At the end of a rest: an alarm via [AlarmManager.setExactAndAllowWhileIdle] (exact when the
+ *   user allows exact alarms, otherwise the closest inexact variant) wakes [RestAlarmReceiver],
+ *   which switches the notification to the next set.
  * - Ticks (setting "Countdown ticks"): a second exact alarm at end − 3 s wakes [RestTickReceiver],
  *   which plays one short sound with all three ticks on the media stream and ducks other audio
  *   for that moment. It plays in the foreground too, so the app never plays them a second time.
- * No foreground service and no wakelock of our own (the alarm's wakelock covers the 2 s sound).
+ * No wakelock of our own (the alarm's wakelock covers the 2 s sound).
  *
  * [iconRes] is a monochrome drawable from the app module.
  */
@@ -60,17 +65,24 @@ class AndroidRestAlerts(
     }
 
     override fun schedule(alert: RestAlert) {
-        ensureChannels(context, alert.channelRunning, alert.channelOver)
-        val manager = NotificationManagerCompat.from(context)
-        manager.cancel(ID_OVER)
-
         setAlarm(alert.endsAt, endIntent(context, alert))
         // ±15 s while the ticks play: they no longer fit the new end.
         if (RestTickPlayer.playingFor.let { it != null && it != alert.endsAt }) RestTickPlayer.stop()
         val ticksAt = RestTicks.startAt(alert, System.currentTimeMillis())
         if (ticksAt != null) setAlarm(ticksAt, ticksIntent(context, ticksAt)) else alarms.cancel(ticksIntent(context, null))
 
-        postRunning(context, runningExtras(alert, iconRes))
+        post(context, Shown(iconRes, rest = alert), announce = alert.announce)
+    }
+
+    override fun showWorkout(notice: WorkoutNotice, announce: Boolean) {
+        post(context, Shown(iconRes, notice = notice), announce)
+    }
+
+    override val workoutNotification: Boolean get() = true
+
+    override fun endWorkout() {
+        cancel()
+        end(context)
     }
 
     private fun setAlarm(at: Long, intent: PendingIntent) {
@@ -85,10 +97,6 @@ class AndroidRestAlerts(
         alarms.cancel(endIntent(context, null))
         alarms.cancel(ticksIntent(context, null))
         RestTickPlayer.stop()
-        NotificationManagerCompat.from(context).run {
-            cancel(ID_RUNNING)
-            cancel(ID_OVER)
-        }
     }
 
     override suspend fun notificationsAllowed(): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()
@@ -139,129 +147,214 @@ class AndroidRestAlerts(
         runCatching { context.startActivity(intent) }
     }
 
-    internal companion object {
-        const val CHANNEL_RUNNING = "rest_running"
-        const val CHANNEL_OVER = "rest_over"
-        const val CHANNEL_OVER_SILENT = "rest_over_silent"
+    /** What the workout notification shows: a rest ([rest]) or a set ([notice]). */
+    data class Shown(val icon: Int, val rest: RestAlert? = null, val notice: WorkoutNotice? = null)
+
+    companion object {
+        const val CHANNEL_WORKOUT = "workout"
+        const val CHANNEL_WORKOUT_SILENT = "workout_silent"
+        /** Channels before the workout notification (one for the countdown, two for the end). */
+        private val OLD_CHANNELS = listOf("rest_running", "rest_over", "rest_over_silent")
         /** A "denied" faster than this came without a dialog. */
         private const val NO_DIALOG_MS = 400L
-        const val ID_RUNNING = 1001
-        const val ID_OVER = 1002
+        const val ID_TRAINING = 1001
         const val ACTION_PLUS = "app.overfit.REST_PLUS"
         const val ACTION_SKIP = "app.overfit.REST_SKIP"
-        const val EXTRA_TITLE = "title"
-        const val EXTRA_BODY = "body"
-        const val EXTRA_VIBRATE = "vibrate"
+        const val ACTION_DONE = "app.overfit.SET_DONE"
         const val EXTRA_ICON = "icon"
         const val EXTRA_TICKS_AT = "ticksAt"
+        const val EXTRA_ENDS_AT = "endsAt"
         private const val REQUEST_END = 1
         private const val REQUEST_PLUS = 2
         private const val REQUEST_SKIP = 3
         private const val REQUEST_OPEN = 4
         private const val REQUEST_TICKS = 5
+        private const val REQUEST_DISMISSED = 6
+        private const val REQUEST_DONE = 7
+        /** A rest this close to its end is not shown again after a swipe; the next set is. */
+        private const val REPOST_MIN_LEFT_MS = 1_000L
+        private const val GROUP = "app.overfit.workout"
 
-        fun ensureChannels(context: Context, runningName: String, overName: String) {
+        /** Rest red and set green (filled background: colorized foreground-service notification). */
+        const val COLOR_REST = 0xFFD32F2F.toInt() // = Colors.armedFill
+        const val COLOR_SET = 0xFF2E7D32.toInt()
+
+        /** What the notification shows now; null without a workout (or not known yet in this process). */
+        @Volatile
+        var current: Shown? = null
+            private set
+
+        /** Whether this process has shown or ended the workout notification (else [current] says nothing). */
+        @Volatile
+        var known = false
+            private set
+
+        /** The notification last built, for [TrainingService.startForeground]. */
+        @Volatile
+        var notification: android.app.Notification? = null
+            private set
+
+        /** Tests: forget the state of earlier tests in the same process. */
+        fun resetForTest() {
+            current = null
+            known = false
+            notification = null
+            channelNames = null
+            TrainingService.resetForTest()
+        }
+
+        /** Channel names created in this process (language switch: names are updated). */
+        private var channelNames: Pair<String, String>? = null
+
+        fun ensureChannels(context: Context, name: String, silentName: String) {
+            if (channelNames == name to silentName) return
+            channelNames = name to silentName
             val nm = context.getSystemService(NotificationManager::class.java)
+            OLD_CHANNELS.forEach { nm.deleteNotificationChannel(it) }
+            // High importance so transitions can pop up; quiet updates are silenced per post. No
+            // sound (the ticks and the music stay in charge). Channel settings cannot change
+            // later, so "vibration off" gets its own channel.
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_RUNNING, runningName, NotificationManager.IMPORTANCE_LOW).apply {
+                NotificationChannel(CHANNEL_WORKOUT, name, NotificationManager.IMPORTANCE_HIGH).apply {
                     setShowBadge(false)
-                    enableVibration(false)
-                    setSound(null, null)
-                },
-            )
-            // Channel settings cannot change later, so "vibration off" gets its own channel.
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_OVER, overName, NotificationManager.IMPORTANCE_HIGH).apply {
                     enableVibration(true)
                     vibrationPattern = AndroidHaptics.REST_END_TIMINGS
                     setSound(null, null)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 },
             )
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_OVER_SILENT, overName, NotificationManager.IMPORTANCE_HIGH).apply {
+                NotificationChannel(CHANNEL_WORKOUT_SILENT, silentName, NotificationManager.IMPORTANCE_HIGH).apply {
+                    setShowBadge(false)
                     enableVibration(false)
                     setSound(null, null)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 },
             )
+        }
+
+        /**
+         * Shows [shown] in the workout notification and makes sure [TrainingService] holds it.
+         * [announce] alerts once (heads-up, vibration by channel) unless the app is visible.
+         */
+        fun post(context: Context, shown: Shown, announce: Boolean) {
+            current = shown
+            known = true
+            val alert = announce && !AppVisibility.visible
+            val n = build(context, shown, alert)
+            // The service re-posts it with startForeground: silently, or a transition alerts twice.
+            notification = if (alert) build(context, shown, alert = false) else n
+            notify(context, ID_TRAINING, n)
+            // Notifications blocked: no service either (it would run without anything to show).
+            if (NotificationManagerCompat.from(context).areNotificationsEnabled()) TrainingService.ensureRunning(context)
+        }
+
+        /** Workout over: the service stops and the notification goes. */
+        fun end(context: Context) {
+            current = null
+            known = true
+            notification = null
+            TrainingService.stop(context)
+            TrainingService.resetFailure()
+            NotificationManagerCompat.from(context).cancel(ID_TRAINING)
+        }
+
+        private fun build(context: Context, shown: Shown, alert: Boolean): android.app.Notification {
+            val rest = shown.rest
+            val notice = shown.notice
+            val vibrate = rest?.vibrate ?: notice?.vibrate ?: true
+            ensureChannels(
+                context,
+                rest?.channel ?: notice?.channel.orEmpty(),
+                rest?.channelSilent ?: notice?.channelSilent.orEmpty(),
+            )
+            val dismissed = PendingIntent.getBroadcast(
+                context,
+                REQUEST_DISMISSED,
+                Intent(context, RestDismissedReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val b = NotificationCompat.Builder(context, if (vibrate) CHANNEL_WORKOUT else CHANNEL_WORKOUT_SILENT)
+                .setSmallIcon(shown.icon.takeIf { it != 0 } ?: context.applicationInfo.icon)
+                .setOngoing(true)
+                .setColorized(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .setContentIntent(openApp(context))
+                .setDeleteIntent(dismissed)
+                // Quiet updates: in a group without summary, GROUP_ALERT_SUMMARY silences this
+                // notification (no heads-up, no vibration). Transitions alert again.
+                .setGroup(GROUP)
+                .setGroupAlertBehavior(if (alert) NotificationCompat.GROUP_ALERT_ALL else NotificationCompat.GROUP_ALERT_SUMMARY)
+                .setOnlyAlertOnce(!alert)
+            if (alert && vibrate) b.setVibrate(AndroidHaptics.REST_END_TIMINGS)
+            if (rest != null) {
+                b.setColor(COLOR_REST)
+                    .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
+                    .setContentTitle(rest.title)
+                    .setContentText(rest.body)
+                    .setWhen(rest.endsAt)
+                    .setChronometerCountDown(true)
+                    .addAction(0, rest.plusLabel, action(context, ACTION_PLUS))
+                    .addAction(0, rest.skipLabel, action(context, ACTION_SKIP))
+            } else if (notice != null) {
+                b.setColor(COLOR_SET)
+                    .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+                    .setContentTitle(notice.title)
+                    .setContentText(notice.body)
+                    .setWhen(notice.startedAt)
+                    .setChronometerCountDown(false)
+                notice.note?.let { b.setSubText(it) }
+                notice.doneLabel?.let { b.addAction(0, it, action(context, ACTION_DONE)) }
+            }
+            return b.build()
         }
 
         /** The alarm; [alert] = null only to cancel (extras do not matter for matching). */
         private fun endIntent(context: Context, alert: RestAlert?): PendingIntent {
             val intent = Intent(context, RestAlarmReceiver::class.java)
             if (alert != null) {
-                intent.putExtra(EXTRA_TITLE, alert.overTitle)
-                intent.putExtra(EXTRA_BODY, alert.body)
-                intent.putExtra(EXTRA_VIBRATE, alert.vibrate)
+                intent.putExtra(EXTRA_ENDS_AT, alert.endsAt)
+                alert.after?.let { intent.putExtras(it.toBundle()) }
             }
             return PendingIntent.getBroadcast(
                 context, REQUEST_END, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
 
-        private const val EXTRA_RUN_TITLE = "runTitle"
-        private const val EXTRA_RUN_BODY = "runBody"
-        private const val EXTRA_ENDS_AT = "endsAt"
-        private const val EXTRA_PLUS = "plus"
-        private const val EXTRA_SKIP = "skip"
-        private const val REQUEST_DISMISSED = 6
-        /** A swipe this close to the end is left alone (the rest is over anyway). */
-        private const val REPOST_MIN_LEFT_MS = 1_000L
-
-        /** Everything needed to (re)build the countdown notification, also after a process kill. */
-        fun runningExtras(alert: RestAlert, iconRes: Int) = android.os.Bundle().apply {
-            putString(EXTRA_RUN_TITLE, alert.title)
-            putString(EXTRA_RUN_BODY, alert.body)
-            putLong(EXTRA_ENDS_AT, alert.endsAt)
-            putString(EXTRA_PLUS, alert.plusLabel)
-            putString(EXTRA_SKIP, alert.skipLabel)
-            putInt(EXTRA_ICON, iconRes)
+        /**
+         * The rest whose alarm fired is over: switch to the next set and announce it. A stale
+         * alarm (workout ended, a newer rest) changes nothing. Did the app already switch to the
+         * set (rest over in the running process, values changed since), its notice is the fresh
+         * one. In a fresh process (killed during the rest) the notice comes from the alarm's extras.
+         */
+        fun onRestEnded(context: Context, endsAt: Long, after: WorkoutNotice?, icon: Int) {
+            val shown = current
+            if (known && (shown == null || (shown.rest != null && shown.rest.endsAt != endsAt))) return
+            val notice = shown?.notice?.let { it.copy(note = after?.note ?: it.note) } ?: after ?: shown?.rest?.after ?: return
+            post(context, Shown(shown?.icon ?: icon, notice = notice), announce = true)
         }
 
         /**
-         * Posts the countdown. Ongoing, and since Android 14 lets users swipe even ongoing
-         * notifications away, its delete intent ([RestDismissedReceiver]) posts it again while
-         * the rest runs. Programmatic cancels (skip, end, finish) and the timeout at the end do
-         * not repost (checked via the end time).
+         * Swiped away: shown again right away while the workout runs. A rest about to end comes
+         * back as the next set. In a fresh process the workout itself says what to show.
          */
-        fun postRunning(context: Context, extras: android.os.Bundle) {
-            val endsAt = extras.getLong(EXTRA_ENDS_AT)
-            val dismissed = PendingIntent.getBroadcast(
-                context,
-                REQUEST_DISMISSED,
-                Intent(context, RestDismissedReceiver::class.java).putExtras(extras),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-            val running = NotificationCompat.Builder(context, CHANNEL_RUNNING)
-                .setSmallIcon(extras.getInt(EXTRA_ICON).takeIf { it != 0 } ?: context.applicationInfo.icon)
-                .setContentTitle(extras.getString(EXTRA_RUN_TITLE))
-                .setContentText(extras.getString(EXTRA_RUN_BODY))
-                .setOngoing(true)
-                .setSilent(true)
-                .setOnlyAlertOnce(true)
-                .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setShowWhen(true)
-                .setWhen(endsAt)
-                .setUsesChronometer(true)
-                .setChronometerCountDown(true)
-                .setTimeoutAfter((endsAt - System.currentTimeMillis()).coerceAtLeast(1_000))
-                .setContentIntent(openApp(context))
-                .setDeleteIntent(dismissed)
-                .addAction(0, extras.getString(EXTRA_PLUS), action(context, ACTION_PLUS))
-                .addAction(0, extras.getString(EXTRA_SKIP), action(context, ACTION_SKIP))
-                .build()
-            notify(context, ID_RUNNING, running)
-        }
-
-        /** Swiped away: back while the rest still runs. */
-        fun onRunningDismissed(context: Context, extras: android.os.Bundle?) {
-            val endsAt = extras?.getLong(EXTRA_ENDS_AT) ?: return
-            if (endsAt - System.currentTimeMillis() < REPOST_MIN_LEFT_MS) return
-            postRunning(context, extras)
+        fun onDismissed(context: Context, fromWorkout: () -> Unit) {
+            if (!known) return fromWorkout()
+            val shown = current ?: return
+            val rest = shown.rest
+            if (rest != null && rest.endsAt - System.currentTimeMillis() < REPOST_MIN_LEFT_MS) {
+                rest.after?.let { post(context, Shown(shown.icon, notice = it), announce = false) }
+                return
+            }
+            post(context, shown, announce = false)
         }
 
         /** The tick alarm; [at] = null only to cancel. */
-        internal fun ticksIntent(context: Context, at: Long?): PendingIntent {
+        fun ticksIntent(context: Context, at: Long?): PendingIntent {
             val intent = Intent(context, RestTickReceiver::class.java)
             if (at != null) intent.putExtra(EXTRA_TICKS_AT, at)
             return PendingIntent.getBroadcast(
@@ -271,7 +364,11 @@ class AndroidRestAlerts(
 
         private fun action(context: Context, action: String): PendingIntent = PendingIntent.getBroadcast(
             context,
-            if (action == ACTION_PLUS) REQUEST_PLUS else REQUEST_SKIP,
+            when (action) {
+                ACTION_PLUS -> REQUEST_PLUS
+                ACTION_SKIP -> REQUEST_SKIP
+                else -> REQUEST_DONE
+            },
             Intent(context, RestActionReceiver::class.java).setAction(action),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -292,6 +389,41 @@ class AndroidRestAlerts(
     }
 }
 
+private const val N_TITLE = "notice.title"
+private const val N_BODY = "notice.body"
+private const val N_STARTED = "notice.startedAt"
+private const val N_DONE = "notice.done"
+private const val N_VIBRATE = "notice.vibrate"
+private const val N_CHANNEL = "notice.channel"
+private const val N_CHANNEL_SILENT = "notice.channelSilent"
+private const val N_NOTE = "notice.note"
+
+/** For alarm extras: the notice survives a process kill. */
+internal fun WorkoutNotice.toBundle() = android.os.Bundle().apply {
+    putString(N_TITLE, title)
+    putString(N_BODY, body)
+    putLong(N_STARTED, startedAt)
+    putString(N_DONE, doneLabel)
+    putBoolean(N_VIBRATE, vibrate)
+    putString(N_CHANNEL, channel)
+    putString(N_CHANNEL_SILENT, channelSilent)
+    putString(N_NOTE, note)
+}
+
+internal fun workoutNotice(extras: android.os.Bundle?): WorkoutNotice? {
+    val title = extras?.getString(N_TITLE) ?: return null
+    return WorkoutNotice(
+        title = title,
+        body = extras.getString(N_BODY).orEmpty(),
+        startedAt = extras.getLong(N_STARTED),
+        doneLabel = extras.getString(N_DONE),
+        vibrate = extras.getBoolean(N_VIBRATE, true),
+        channel = extras.getString(N_CHANNEL).orEmpty(),
+        channelSilent = extras.getString(N_CHANNEL_SILENT).orEmpty(),
+        note = extras.getString(N_NOTE),
+    )
+}
+
 /** Whether an activity of the app is in the foreground (then the app signals the rest end itself). */
 object AppVisibility {
     @Volatile
@@ -303,37 +435,40 @@ interface HasAppDependencies {
     val dependencies: AppDependencies
 }
 
-/** End of a rest: replaces the countdown with the "rest is over" notification. */
+/** End of a rest: the workout notification switches to the next set and announces it. */
 class RestAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val manager = NotificationManagerCompat.from(context)
-        manager.cancel(AndroidRestAlerts.ID_RUNNING)
-        if (AppVisibility.visible) return
-        val vibrate = intent.getBooleanExtra(AndroidRestAlerts.EXTRA_VIBRATE, true)
-        val smallIcon = ((context.applicationContext as? HasAppDependencies)?.dependencies?.restAlerts as? AndroidRestAlerts)
+        val icon = ((context.applicationContext as? HasAppDependencies)?.dependencies?.restAlerts as? AndroidRestAlerts)
             ?.iconRes ?: context.applicationInfo.icon
-        val notification = NotificationCompat.Builder(
-            context,
-            if (vibrate) AndroidRestAlerts.CHANNEL_OVER else AndroidRestAlerts.CHANNEL_OVER_SILENT,
+        AndroidRestAlerts.onRestEnded(
+            context.applicationContext,
+            intent.getLongExtra(AndroidRestAlerts.EXTRA_ENDS_AT, 0L),
+            workoutNotice(intent.extras),
+            icon,
         )
-            .setSmallIcon(smallIcon)
-            .setContentTitle(intent.getStringExtra(AndroidRestAlerts.EXTRA_TITLE))
-            .setContentText(intent.getStringExtra(AndroidRestAlerts.EXTRA_BODY))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
-            .setContentIntent(AndroidRestAlerts.openApp(context))
-            .apply { if (vibrate) setVibrate(AndroidHaptics.REST_END_TIMINGS) }
-            .build()
-        AndroidRestAlerts.notify(context, AndroidRestAlerts.ID_OVER, notification)
     }
 }
 
-/** Delete intent of the countdown notification (user swiped it away), see [AndroidRestAlerts.postRunning]. */
+/**
+ * Delete intent of the workout notification (user swiped it away, possible since Android 14 even
+ * for foreground-service notifications): posts it again, see [AndroidRestAlerts.onDismissed].
+ */
 class RestDismissedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        AndroidRestAlerts.onRunningDismissed(context.applicationContext, intent.extras)
+        val app = context.applicationContext
+        AndroidRestAlerts.onDismissed(app) {
+            // Fresh process: the stored workout decides (nothing if it has ended meanwhile).
+            val controller = (app as? HasAppDependencies)?.dependencies?.workout ?: return@onDismissed
+            val pending = goAsync()
+            MainScope().launch {
+                try {
+                    controller.awaitLoaded()
+                    controller.repostNotice()
+                } finally {
+                    pending.finish()
+                }
+            }
+        }
     }
 }
 
@@ -416,7 +551,7 @@ internal object RestTickPlayer {
     }
 }
 
-/** +15 s / Skip from the countdown notification. Works even if the process had been killed. */
+/** +15 s / Skip / Set done from the workout notification. Works even if the process had been killed. */
 class RestActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val controller = (context.applicationContext as? HasAppDependencies)?.dependencies?.workout ?: return
@@ -427,6 +562,7 @@ class RestActionReceiver : BroadcastReceiver() {
                 when (intent.action) {
                     AndroidRestAlerts.ACTION_PLUS -> controller.adjustRest(15)
                     AndroidRestAlerts.ACTION_SKIP -> controller.skipRest()
+                    AndroidRestAlerts.ACTION_DONE -> controller.logNextSet()
                 }
                 controller.flush()
             } finally {

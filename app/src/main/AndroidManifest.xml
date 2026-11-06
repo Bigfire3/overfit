@@ -3,9 +3,12 @@
 
     <!-- KI-Anbieter (Ktor) und Übungsbilder der free-exercise-db (Coil). -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Pausentimer: Benachrichtigung (ab Android 13 mit Abfrage), Vibration, exakter Alarm zum Pausenende
-         (vom Nutzer erlaubt; ohne Erlaubnis inexakt). Kein Foreground-Service, kein Wakelock. -->
+    <!-- Training/Pausentimer: Benachrichtigung (ab Android 13 mit Abfrage), Vibration, exakter Alarm zum Pausenende
+         (vom Nutzer erlaubt; ohne Erlaubnis inexakt). Foreground-Service (specialUse) nur während eines Trainings,
+         er hält die Trainings-Benachrichtigung. Kein Wakelock. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- QR-Scan beim Vorlagen-Import; ohne Kamera bleibt die App voll nutzbar. -->
@@ -71,6 +74,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Läuft nur von „Training starten“ bis „Training beenden/verwerfen“. Begründung für Play: siehe
+             docs/DECISIONS.md „Trainings-Benachrichtigung“. -->
+        <service
+            android:name="app.overfit.platform.TrainingService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Running workout session: an ongoing notification shows the current set or the rest countdown with actions (set done, +15 s, skip) from the moment the user starts a workout until they finish it." />
+        </service>
         <receiver
             android:name="app.overfit.platform.RestAlarmReceiver"
             android:exported="false" />

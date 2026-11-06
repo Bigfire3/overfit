@@ -39,6 +39,12 @@ object WorkoutFormat {
         return listOf(ref.exercise.exercise.name, t.setNumber(ref.number), values).filter { it.isNotEmpty() }.joinToString(" · ")
     }
 
+    /** "Set 2/4 · 30 kg × 6": the set to do now (workout notification, the exercise is its title). */
+    fun current(ref: Workout.SetRef, unit: WeightUnit, language: Language, t: Strings): String {
+        val values = values(ref.set.actual.takeUnless { it == SetValues() } ?: ref.set.target, ref.exercise.exercise.trackingType, unit, language, t)
+        return listOf(t.setOfTotal(ref.number, ref.exercise.sets.size), values).filter { it.isNotEmpty() }.joinToString(" · ")
+    }
+
     /** Elapsed time "12:05" or "1:02:05". */
     fun elapsed(ms: Long): String {
         val total = (ms / 1000).coerceAtLeast(0)
