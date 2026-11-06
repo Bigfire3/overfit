@@ -75,7 +75,7 @@ private fun Question(
 ) {
     Screen(
         header = { OnboardingHeader(step, onBack) },
-        footer = { PrimaryButton(LocalStrings.current.next, onNext, enabled = canContinue) },
+        footer = { PrimaryButton(LocalStrings.current.next, onNext, enabled = canContinue, icon = app.overfit.ui.components.Icon.ChevronRight) },
     ) {
         Title(title)
         Spacer(Modifier.height(Space.xl))

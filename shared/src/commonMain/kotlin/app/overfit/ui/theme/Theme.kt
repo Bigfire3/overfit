@@ -56,6 +56,8 @@ data class Colors(
     val negativeSubtle: Color,
     /** Red of an armed two-tap confirm button (first tap done). The only accent in the chrome. */
     val armed: Color,
+    /** Fill of an armed text button: darker red so white text on it reaches 4.5:1. */
+    val armedFill: Color,
 )
 
 val DarkColors = Colors(
@@ -73,6 +75,7 @@ val DarkColors = Colors(
     negative = Color(0xFFFF453A),
     negativeSubtle = Color(0xFF331311),
     armed = Color(0xFFFF453A),
+    armedFill = Color(0xFFD32F2F),
 )
 
 /** Only a handful of sizes on purpose. */

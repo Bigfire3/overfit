@@ -1062,3 +1062,13 @@ Offen / Hinweise:
 3. Kalender → Listen-Symbol: jeder Tag eine eigene Karte mit Abstand; Tipp öffnet den Tag
 4. Tagesansicht: jedes Training eine Karte mit Pfeil
 5. Laufendes Training: Übungen sehen aus wie vorher, nur mit feinem Rand; Ansehen und Trainieren wirken gleich
+
+## Session AR – Knöpfe wie in der Banking-App (6.11.)
+- Erledigt: Alle Knöpfe ohne Rand, großer Radius; Hauptknopf weiß mit schwarzem fettem Text links (64 dp), sekundäre dunkelgrau; beim Tippen kurz kleiner (0,96) und zurückfedern; Karten ebenso, ohne Rand. Doppeltipp: Text-Knopf scharf = rot gefüllt, weißer Text. Belege `docs/screenshots/buttons/`, Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (Knöpfe)
+1. Workouts → Workout öffnen: „Training starten“ weiß, schwarzer Text links, kein Rand
+2. Knopf gedrückt halten: wird etwas kleiner, loslassen: federt zurück, kein Ripple; Workout-Karten ebenso
+3. Training: Pausenleiste (−15 s, +15 s, Überspringen) dunkelgrau, „Beenden“ antippen → rot gefüllt mit weißem Text → nochmal → Abschluss
+4. Mülleimer im Workout: erster Tipp rotes Icon, zweiter löscht
+5. Onboarding „Weiter“ mit Pfeil rechts; Profil/Coach/Guthaben: keine Rahmen um Knöpfe

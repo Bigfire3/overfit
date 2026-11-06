@@ -1216,3 +1216,11 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - **Bewusst Panels geblieben:** Einstellungen/Profil, Zusammenfassungen (Dauer, Sätze …), Notizen und der Übungskatalog. Der Katalog ist eine Auswahl-Liste mit 300 Einträgen und Suche; Karten mit Abständen würden die Hälfte weniger Einträge pro Bildschirm zeigen, ohne dass ein Eintrag „eigenständig“ angesehen wird.
 - Foto-Vorschau in der Kalender-Liste: Platzhalter `surfacePressed`, weil er sonst auf der Kartenfläche verschwindet.
 - **Tests:** `ExerciseImageTapTest.workoutDetail_exerciseCardImageOpensReadOnlyDetails` (Karte mit Satz-Zusammenfassung, Bild → Details ohne Speichern), `trainingDetail_exerciseCardImageOpensDetails`. Belege `docs/screenshots/karten/vorher|nachher` (360 dp, dunkel).
+
+## Knöpfe wie in der Banking-App-Vorlage (6.11.)
+- Fabian: „So sollen die Buttons aussehen und etwas kleiner animiert werden wenn man sie tapped. Keinen Rahmen haben wie aktuell.“
+- `PrimaryButton`: weiß, ohne Rand, 64 dp, Radius 24 dp, Text schwarz, fett (18 sp), linksbündig, optional `icon` rechts. `SecondaryButton`/`SmallButton`/`Chip`: dunkelgrau (`surface`), Text weiß; kompakte Knöpfe 44 dp sichtbar + 2 dp Rand = 48 dp Tippfläche.
+- `Modifier.pressScale()` (Scale 0,96 in 100 ms, Feder beim Loslassen, kein Ripple, keine Farbänderung) auf allen Knöpfen, Chips, Icon-Knöpfen (0,88) und klickbaren `FloatingCard` (0,98). Eine eigene Einstellung „reduzierte Bewegung“ gibt es im Projekt nicht; Compose überspringt die Animation aber selbst, wenn die System-Animationsskala 0 ist.
+- Scharf geschaltet (Doppeltipp): Text-Knopf voll rot (`Colors.armedFill` #D32F2F) mit weißem Text, kein Rahmen. Eigenes Token, weil Weiß auf dem Icon-Rot #FF453A nur 3,4:1 hat, auf #D32F2F 5:1. Icon-Knöpfe (Mülleimer, Foto-×) bleiben rotes Icon.
+- Karten: `FloatingCard` ohne Rand, Radius 24 dp; die Fläche #1C1C1E hebt sich wie in der Vorlage vom Schwarz ab. `Panel` (Gruppen mit Trennlinien) behält Rand und 16 dp, weil der Rand dort die Trennlinien liefert und sie keine Knöpfe sind.
+- Kontrast (`ButtonContrastTest`): Schwarz auf Weiß, Weiß auf Dunkelgrau (auch im Panel), Weiß auf `armedFill` je ≥ 4,5:1. Belege `docs/screenshots/buttons/vorher|nachher/`.
