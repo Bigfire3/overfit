@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -191,8 +192,8 @@ class UiFeedbackTest {
     fun screenChange_isShort_andSwallowsADoubleTapOnBack() {
         launchApp()
         compose.onNodeWithText("Push").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Bearbeiten").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Bearbeiten").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeitungsmodus").fetchSemanticsNodes().isNotEmpty() }
 
         compose.mainClock.autoAdvance = false
@@ -210,14 +211,14 @@ class UiFeedbackTest {
         // The workout page reloads its plan from Room (background thread, not covered by waitForIdle): wait for its
         // content instead of asserting at once, which failed now and then under load in the full suite.
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Bearbeiten").assertExists()
+        compose.onNodeWithContentDescription("Bearbeiten").assertExists()
     }
 
     @Test
     fun deletingAWorkout_landsInTheWorkoutList_notOnABlackScreen() {
         launchApp()
         compose.onNodeWithText("Push").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Workout löschen").performClick()
         compose.onNodeWithContentDescription("Workout löschen – zum Bestätigen erneut tippen").assertExists()
         compose.onNodeWithTag("confirm:armed").performClick()
@@ -244,11 +245,11 @@ class UiFeedbackTest {
     fun editor_swipeDeletesSet_undoBringsItBack_noShareOrDeleteInEditMode() {
         launchApp()
         compose.onNodeWithText("Push").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
         // Workout screen: share and delete as icons top right.
         compose.onNodeWithContentDescription("Teilen").assertExists()
         compose.onNodeWithContentDescription("Workout löschen").assertExists()
-        compose.onNodeWithText("Bearbeiten").performClick()
+        compose.onNodeWithContentDescription("Bearbeiten").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeitungsmodus").fetchSemanticsNodes().isNotEmpty() }
         // Edit mode: neither share nor delete.
         compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Teilen")).assertCountEquals(0)

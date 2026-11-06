@@ -1095,3 +1095,12 @@ Offen / Hinweise:
 3. Training: Pausenleiste (−15 s, +15 s, Überspringen) dunkelgrau, „Beenden“ antippen → rot gefüllt mit weißem Text → nochmal → Abschluss
 4. Mülleimer im Workout: erster Tipp rotes Icon, zweiter löscht
 5. Onboarding „Weiter“ mit Pfeil rechts; Profil/Coach/Guthaben: keine Rahmen um Knöpfe
+
+## Session AU – Cursor, Stift-Icon, Rot/Grün, Story-Balken (6.11.)
+- Erledigt: Tipp außerhalb eines Textfelds, Scrollen oder Zurück bei offener Tastatur nimmt den Fokus (kein Cursor mehr, zentral im Theme). Workout bearbeiten über Stift-Icon oben rechts, großer „Bearbeiten“-Knopf entfällt. Rot nur noch für Löschen/Abbrechen; „Beenden“ scharf grün. Story-Balken füllen sich über 6 s. Belege `docs/screenshots/fokus-farben-story/vorher|nachher/`, Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (Cursor, Stift, Farben, Story)
+1. Training: in ein Gewichtsfeld tippen, dann auf leere Fläche/Übungsname tippen → Cursor und Tastatur weg; ebenso beim Scrollen und beim Zurück-Wischen mit offener Tastatur
+2. Workout öffnen → Stift oben rechts → Bearbeiten-Modus; unten nur „Starten“
+3. Training → „Beenden“ antippen → grün; „Training abbrechen“ und Mülleimer → rot
+4. Coach → Story: aktueller Balken läuft von links nach rechts, nächste Seite nach ca. 6 s; Tipp startet den Balken neu
