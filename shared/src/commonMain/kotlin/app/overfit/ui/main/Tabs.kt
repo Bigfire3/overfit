@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
 import app.overfit.ui.components.ConfirmButton
+import app.overfit.ui.components.ConfirmKind
 import app.overfit.ui.components.SmallButton
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.height
@@ -151,5 +152,5 @@ fun ColumnScope.RunningWorkoutChoice(onOpenRunning: () -> Unit, onEndRunning: ()
     val t = LocalStrings.current
     Text(t.runningWorkoutTitle, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
     PrimaryButton(t.toRunningWorkout, onClick = onOpenRunning)
-    ConfirmButton(t.endRunningWorkout, onConfirm = onEndRunning, modifier = Modifier.align(Alignment.CenterHorizontally))
+    ConfirmButton(t.endRunningWorkout, onConfirm = onEndRunning, modifier = Modifier.align(Alignment.CenterHorizontally), kind = ConfirmKind.Complete)
 }

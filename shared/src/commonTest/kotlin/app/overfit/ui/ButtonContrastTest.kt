@@ -21,5 +21,6 @@ class ButtonContrastTest {
     @Test fun whiteOnDarkGreyInPanel() = assertTrue(ratio(c.foreground, c.surfacePressed) >= 4.5f)
     @Test fun mutedOnDarkGrey() = assertTrue(ratio(c.muted, c.surface) >= 4.5f)
     @Test fun whiteOnArmedFill() = assertTrue(ratio(c.foreground, c.armedFill) >= 4.5f)
+    @Test fun whiteOnConfirmFill() = assertTrue(ratio(c.foreground, c.confirmFill) >= 4.5f)
     @Test fun redOnSubtleRed() = assertTrue(ratio(c.negative, c.negativeSubtle) >= 4.5f)
 }

@@ -259,7 +259,7 @@ fun SetField(
             onNext = { if (next != null) next.requestFocus() else focusManager.clearFocus() },
             onDone = { focusManager.clearFocus() },
         ),
-        modifier = modifier
+        modifier = modifier.textInputArea()
             .heightIn(min = 48.dp)
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }

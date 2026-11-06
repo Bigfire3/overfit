@@ -35,7 +35,6 @@ import app.overfit.ui.components.Icon
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.SecondaryButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.main.RunningWorkoutChoice
@@ -86,20 +85,20 @@ fun WorkoutPlanScreen(
         header = {
             BackHeader(t.back, onBack) {
                 if (w != null) {
+                    HeaderIconButton(Icon.Edit, t.edit, onEdit)
                     HeaderIconButton(Icon.Share, t.share.shareTemplate, onShare)
                     HeaderDeleteButton(t.deleteTemplate, onDelete)
                 }
             }
         },
         // No footer until the workout is loaded: a visible but still disabled "Start" swallows early taps.
-        // Bottom: big "Start", below it an equally big "Edit".
+        // Bottom: only the main action; edit is the pencil top right.
         footer = if (w == null) null else ({
             if (workoutRunning) {
                 RunningWorkoutChoice(onToRunning, onEndRunning)
             } else {
                 PrimaryButton(t.startThisWorkout, { onStart(w) })
             }
-            SecondaryButton(t.edit, onEdit)
         }),
     ) {
         if (w == null) return@Screen

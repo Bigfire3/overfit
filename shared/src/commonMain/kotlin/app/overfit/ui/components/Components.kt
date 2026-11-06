@@ -370,9 +370,12 @@ fun DestructiveButton(
     PillButton(label, onClick, modifier, enabled, compact, haptic = false, fill = c.negativeSubtle, contentTone = c.negative)
 }
 
+/** What a two-tap button does: delete/remove/reset (red when armed) or finish/complete (green when armed). */
+enum class ConfirmKind { Destructive, Complete }
+
 /**
  * Two-tap button for actions that need a confirmation (finish, discard, reset, delete all): the first tap
- * arms it (the button fills solid [Colors.armedFill] red with a white label, the text stays the same; screen readers hear
+ * arms it (the button fills solid red ([Colors.armedFill]; green [Colors.confirmFill] for [ConfirmKind.Complete]) with a white label, the text stays the same; screen readers hear
  * "zum Bestätigen erneut tippen"), a second tap within 3 s runs [onConfirm]. A tap elsewhere, scrolling
  * or the timeout disarm it ([ConfirmArea]). [primary] = black main action of a screen (backup restore).
  */
@@ -385,6 +388,8 @@ fun ConfirmButton(
     enabled: Boolean = true,
     primary: Boolean = false,
     loading: Boolean = false,
+    /** [ConfirmKind.Destructive] (default) arms red, [ConfirmKind.Complete] green. */
+    kind: ConfirmKind = ConfirmKind.Destructive,
 ) {
     val arm = rememberConfirmArm()
     val haptics = LocalHapticFeedback.current
@@ -393,7 +398,7 @@ fun ConfirmButton(
     val c = Theme.colors
     // Armed: solid red fill, white label (no border), whatever the button looked like before.
     val (fill, tone) = when {
-        armed -> c.armedFill to c.foreground
+        armed -> (if (kind == ConfirmKind.Complete) c.confirmFill else c.armedFill) to c.foreground
         primary -> c.inverseBackground to c.inverseForeground
         else -> c.surface to c.foreground
     }
@@ -481,7 +486,7 @@ fun BigInput(
             cursorBrush = SolidColor(Theme.colors.foreground),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); onDone() }),
-            modifier = if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth(),
+            modifier = (if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth()).textInputArea(),
             decorationBox = { inner ->
                 Box {
                     if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
@@ -530,7 +535,7 @@ private fun UnderlinedInput(
                 keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text, autoCorrectEnabled = false, imeAction = ImeAction.Done,
             ),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); onDone() }),
-            modifier = Modifier.fillMaxWidth().padding(vertical = Space.m),
+            modifier = Modifier.fillMaxWidth().textInputArea().padding(vertical = Space.m),
             decorationBox = { inner ->
                 Box {
                     if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
@@ -565,7 +570,7 @@ fun RowInput(
         cursorBrush = SolidColor(Theme.colors.foreground),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-        modifier = Modifier.width(width).onFocusLost(onCommit),
+        modifier = Modifier.width(width).textInputArea().onFocusLost(onCommit),
         // 48 dp high tap area, text vertically centred.
         decorationBox = { inner ->
             Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {

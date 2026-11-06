@@ -1,6 +1,10 @@
 package app.overfit.ui.coach
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -53,7 +57,6 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
-import kotlinx.coroutines.delay
 
 /** Where a story page can lead: the matching place of the app (null = no shortcut on that page). */
 enum class StoryTarget { OwnKey, Credit, ChatConnections }
@@ -81,11 +84,16 @@ fun CoachStoryScreen(
     var page by rememberSaveable { mutableIntStateOf(0) }
     val last = pages.lastIndex
 
-    // Restarts on every page change (also after a tap), so a tap gives the new page its full time.
+    // Fill of the current page's bar, 0..1 over STORY_AUTO_MS. Restarts on every page change (also after a tap), so a
+    // tap gives the new page its full time. On the last page (or without auto advance) the bar stays full.
+    val progress = remember { Animatable(0f) }
     LaunchedEffect(page, autoAdvance) {
         if (autoAdvance && page < last) {
-            delay(STORY_AUTO_MS)
+            progress.snapTo(0f)
+            progress.animateTo(1f, tween(STORY_AUTO_MS.toInt(), easing = LinearEasing))
             page += 1
+        } else {
+            progress.snapTo(1f)
         }
     }
 
@@ -124,10 +132,8 @@ fun CoachStoryScreen(
             Spacer(Modifier.height(Space.m))
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                 repeat(pages.size) { i ->
-                    Box(
-                        Modifier.weight(1f).height(2.dp)
-                            .background(if (i <= page) Theme.colors.foreground else Theme.colors.hairline),
-                    )
+                    // Past bars full, coming ones empty, the current one runs from left to right.
+                    StoryBar(i, Modifier.weight(1f)) { if (i < page) 1f else if (i == page) progress.value else 0f }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(top = Space.s), horizontalArrangement = Arrangement.End) {
@@ -162,6 +168,14 @@ fun CoachStoryScreen(
                 style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center,
             )
         }
+    }
+}
+
+/** One progress bar of the story: [fill] 0..1 is read here only, so just the bars redraw while it runs. */
+@Composable
+private fun StoryBar(index: Int, modifier: Modifier, fill: () -> Float) {
+    Box(modifier.height(3.dp).background(Theme.colors.hairline).testTag("story:bar:$index")) {
+        Box(Modifier.fillMaxHeight().fillMaxWidth(fill().coerceIn(0f, 1f)).background(Theme.colors.foreground).testTag("story:fill:$index"))
     }
 }
 
