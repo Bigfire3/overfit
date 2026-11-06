@@ -24,7 +24,7 @@ Server-Fehler verständlich. Details in DECISIONS.md. Tests: `tiers.test.ts`, `C
 `AI_GATEWAY_TOKEN` (Gateway-Protokolle). Repo-Variable `BACKEND_DEPLOY_MODE=test` für Auto-Deploy nach jedem Backend-Merge.
 
 ### Bitte auf dem Handy testen (Hotfix KI)
-1. Training beenden → Coach-Auswertung mit Guthaben: Auswertung kommt (zurzeit von Claude Sonnet 5.5, Hinweis „Ersatzmodell“), Guthaben sinkt um wenige Cent.
+1. Training beenden → Coach-Auswertung mit Guthaben: Auswertung kommt (zurzeit von Claude Sonnet 5.5, weil Gemini Flash fehlt), Guthaben sinkt um wenige Cent (ca. 3–10 ct).
 2. Profil → Guthaben → Modell: Gemini 3.6 Flash erscheint erst, wenn `GEMINI_API_KEY` gesetzt und der Server neu deployt ist.
 
 ## Hotfix: kaputte Übungsbilder (Hotfix-Session Bilder, 3.11.)
