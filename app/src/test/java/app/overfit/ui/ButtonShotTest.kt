@@ -21,6 +21,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
+import app.overfit.ui.components.ConfirmTags
 import androidx.compose.ui.unit.dp
 import app.overfit.domain.Language
 import app.overfit.i18n.LocalStrings
@@ -90,8 +94,8 @@ class ButtonShotTest {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
             SmallButton("Satz hinzufügen", {})
             SmallButton("Abbrechen", {})
-            IconButton(Icon.Plus, "Plus", {})
         }
+        IconButton(Icon.Plus, "Plus", {})
         Spacer(Modifier.height(Space.m))
         FloatingCard(onClick = {}) {
             Column(Modifier.padding(Space.m)) {
@@ -118,7 +122,26 @@ class ButtonShotTest {
 
     @Test fun touchTargetsAtLeast48dp() {
         gallery()
-        compose.onNodeWithText("Training starten").assertHeightIsAtLeast(64.dp)
-        compose.onNodeWithText("Satz hinzufügen").assertHeightIsAtLeast(40.dp)
+        // The clickable node (not the text) is what the finger hits.
+        val clickable = compose.onAllNodes(hasClickAction())
+        val n = clickable.fetchSemanticsNodes().size
+        for (i in 0 until n) {
+            val node = clickable[i]
+            try { node.assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp) } catch (e: AssertionError) { throw AssertionError(node.fetchSemanticsNode().config.toString() + " " + e.message) }
+        }
+        compose.onNode(hasClickAction() and hasText("Training starten")).assertHeightIsAtLeast(64.dp)
+    }
+
+    @Test fun armedConfirmShowsTagAndSecondTapConfirms() {
+        var confirmed = 0
+        show { ConfirmButton("Alle Daten löschen", { confirmed++ }) }
+        compose.onNodeWithTag(ConfirmTags.armed).assertDoesNotExist()
+        compose.onNodeWithText("Alle Daten löschen").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag(ConfirmTags.armed).assertExists()
+        assert(confirmed == 0)
+        compose.onNodeWithText("Alle Daten löschen").performClick()
+        compose.waitForIdle()
+        assert(confirmed == 1)
     }
 }
