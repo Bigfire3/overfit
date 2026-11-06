@@ -15,6 +15,29 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Trainings-Benachrichtigung rot/grün (6.11.)
+**Erledigt:** Während des ganzen Trainings gibt es jetzt eine Benachrichtigung (Foreground-Service): grün im Satz (Übung,
+„Satz 2/4 · 80 kg × 5“, Trainingszeit, „Satz fertig“), rot in der Pause (Countdown, „Nächste: …“, +15 s, Überspringen).
+Beim Wechsel Satz → Pause und Pause → Satz meldet sie sich neu (aufpoppen, Vibration nach Einstellung, kein Ton), sonst still.
+Wegwischen: auf dem Sperrbildschirm gar nicht, entsperrt (ab Android 14 erlaubt Android das) kommt sie sofort zurück, jetzt oben
+statt im Abschnitt „Lautlos“. Ursache des alten Verhaltens und Typ-Begründung in DECISIONS.md. Tests: `WorkoutNotificationTest`,
+`WorkoutControllerTest`.
+**Offen:** iOS hat keine dauerhafte, farbige Benachrichtigung (bräuchte eine Live Activity, eigenes Feature); dort wie bisher nur
+die Meldung zum Pausenende. Play: `specialUse`-Begründung in der Play Console angeben (Text in DECISIONS.md).
+
+### Bitte auf dem Handy testen (Trainings-Benachrichtigung)
+1. Training starten, App verlassen: Benachrichtigung „Laufendes Training“ ist da, grün, mit Übung, „Satz 1/x · Gewicht × Wdh.“,
+   laufender Trainingszeit und „Satz fertig“. Beim Start poppt nichts auf.
+2. In der Benachrichtigung „Satz fertig“ tippen: Sie wird rot, poppt kurz auf und vibriert (falls Vibration an), Countdown läuft,
+   „Nächste: …“, +15 s und Überspringen funktionieren (+15 s: still, kein erneutes Aufpoppen).
+3. Pause auslaufen lassen (App im Hintergrund, Spotify läuft): Ticken wie bisher, dann wird sie grün mit „Pause vorbei“, poppt auf
+   und vibriert. Eine separate „Pause vorbei“-Meldung gibt es nicht mehr.
+4. In der App Satz abhaken / Pause endet: nichts poppt über der App auf, die App vibriert selbst; Benachrichtigung wechselt trotzdem die Farbe.
+5. Wegwischen (im Satz und in der Pause, mehrmals): Sie ist sofort wieder da, oben in der Liste. Auf dem Sperrbildschirm lässt sie sich nicht wegwischen.
+6. Training beenden oder verwerfen: Benachrichtigung verschwindet und kommt nicht wieder.
+7. Profil → Vibration aus: Übergänge poppen still auf (ohne Vibration).
+8. Overfit aus den „Letzten Apps“ wischen während eines Trainings: Benachrichtigung bleibt, Aktionen funktionieren.
+
 ## Hotfix: kaputte Übungsbilder (Hotfix-Session Bilder, 3.11.)
 **Erledigt:** Seit 0.1.257 waren fast alle Workout-Guide-Bilder (Standbilder und Animation) verzerrt. Ursache: Das Runden der
 Pfaddaten im Import hat kompakte Zahlen wie `8.002.392` zu `8.4` verschmolzen. Import jetzt mit echtem Pfad-Parser, 2 Nachkommastellen,
