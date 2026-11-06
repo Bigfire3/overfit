@@ -35,7 +35,7 @@ describe('GET /v1/config: echte Modellnamen', () => {
     const r = await rawFetch('/v1/config', baseEnv());
     expect(r.body.tiers.standard).toMatchObject({ model: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', vendor: 'Google', label: 'Gemini 3.6 Flash (Google)', available: true });
     expect(r.body.tiers.pro).toMatchObject({ displayName: 'Claude Sonnet 5.5', vendor: 'Anthropic', label: 'Claude Sonnet 5.5 (Anthropic)' });
-    expect(r.body.tiers.lite).toMatchObject({ displayName: 'Llama 3.1 8B', vendor: 'Cloudflare', label: 'Llama 3.1 8B (Cloudflare)' });
+    expect(r.body.tiers.lite).toMatchObject({ displayName: 'Llama 3.3 70B', vendor: 'Cloudflare', label: 'Llama 3.3 70B (Cloudflare)' });
     expect(r.body.tiers.standard.price.in).toBe(currentPrices()['gemini-3.6-flash'].in);
     expect(r.body.usageProfiles.coach.inputTokens).toBeGreaterThan(0);
     expect(r.body.usageProfiles.autofill.outputTokens).toBeGreaterThan(0);

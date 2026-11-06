@@ -352,7 +352,34 @@ class CoachTransportTest {
         assertEquals(CoachErrorKind.SERVER, kind(FuelException("x", 502)))
         assertEquals(CoachErrorKind.AUTH, kind(FuelException("x", 401)))
         assertEquals(CoachErrorKind.BAD_REQUEST, kind(FuelException("x", 400)))
-        assertEquals(CoachErrorKind.NO_ACCESS, kind(FuelException("tier_unavailable", 503)))
+        // Server setup problems are not the user's access: "provider not reachable", retry possible.
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("tier_unavailable", 503)))
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("not_configured", 503)))
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("upstream_rejected", 400, mapOf("upstreamStatus" to 401L))))
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("upstream_unavailable", 502, mapOf("upstreamStatus" to 401L))))
+        assertEquals(CoachErrorKind.BAD_REQUEST, kind(FuelException("upstream_rejected", 400, mapOf("upstreamStatus" to 400L))))
+    }
+
+    @Test
+    fun fuelReloadsTheConfigWhenTheServerLacksTheTier() = runTest {
+        // Cached config still lists Gemini Flash, the server has lost its key since then (pro and lite remain).
+        var config = tiers("standard", "pro", "lite")
+        val sent = mutableListOf<String>()
+        val service = object : FuelService by FakeFuel(onMessages = { error("unused") }) {
+            override suspend fun config(): FuelConfig = config
+            override suspend fun messages(bodyJson: String): FuelMessageResult {
+                val model = Json.parseToJsonElement(bodyJson).jsonObject["model"]!!.jsonPrimitive.content
+                sent += model
+                if (model == "standard") throw FuelException("tier_unavailable", 503)
+                return FuelMessageResult(fuelAnswer, 30_000, 970_000, servedModel = "claude-sonnet-5-5")
+            }
+        }
+        val provider = FuelProvider { service }
+        provider.config() // cached with standard available
+        config = tiers("pro", "lite")
+        val reply = FuelCoach(provider).send(prompt, "standard")
+        assertEquals(listOf("standard", "pro"), sent)
+        assertEquals("claude-sonnet-5-5", reply.servedModel)
     }
 
     @Test

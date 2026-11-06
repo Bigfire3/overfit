@@ -113,15 +113,15 @@ describe('Stufe lite (Workers AI)', () => {
     await fund(c);
     const r = await c.call('POST', '/v1/messages', body('lite'));
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ model: '@cf/meta/llama-3.1-8b-instruct', content: [{ type: 'text', text: '{"ok":true}' }], stop_reason: 'end_turn' });
+    expect(r.body).toMatchObject({ model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', content: [{ type: 'text', text: '{"ok":true}' }], stop_reason: 'end_turn' });
     const expected = costMicro({ input_tokens: 400, output_tokens: 100 }, price('lite'), MARKUP);
     expect(r.body.overfit).toMatchObject({ tier: 'lite', costMicro: expected });
     const [model, inputs] = ai.run.mock.calls[0];
-    expect(model).toBe('@cf/meta/llama-3.1-8b-instruct');
+    expect(model).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
     expect(inputs.messages).toEqual([{ role: 'system', content: 'Regeln\n\nProfil' }, { role: 'user', content: 'Hallo' }]);
     expect(inputs.response_format).toEqual({ type: 'json_schema', json_schema: { type: 'object', properties: { ok: { type: 'boolean' } } } });
     expect(inputs.max_tokens).toBe(1000);
-    expect(await lastUsage(c)).toMatchObject({ tier: 'lite', model: '@cf/meta/llama-3.1-8b-instruct' });
+    expect(await lastUsage(c)).toMatchObject({ tier: 'lite', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' });
   });
 
   it('JSON als Objekt wird zu Text; ohne usage wird der reservierte Betrag berechnet', async () => {
@@ -132,6 +132,15 @@ describe('Stufe lite (Workers AI)', () => {
     expect(r.body.content[0].text).toBe('{"ok":true}');
     expect(r.body.overfit.costMicro).toBeGreaterThan(0);
     expect(await balance(c)).toBe(f.balanceMicro - r.body.overfit.costMicro);
+  });
+
+  it('versteht auch das OpenAI-Format neuerer Workers-AI-Modelle (choices)', async () => {
+    const c = await Client.create(env());
+    await fund(c);
+    ai.run.mockResolvedValueOnce({ choices: [{ message: { content: '{"ok":true}' } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+    const r = await c.call('POST', '/v1/messages', body('lite'));
+    expect(r.body.content[0].text).toBe('{"ok":true}');
+    expect(r.body.usage).toMatchObject({ input_tokens: 10, output_tokens: 5 });
   });
 
   it('weist Bilder ab, ohne zu reservieren oder anzufragen', async () => {
@@ -234,7 +243,7 @@ describe('Ausweichen bei Ausfall', () => {
 
 describe('AI Gateway', () => {
   it('leitet alle Anbieter über das Gateway; bei Fotos nur Metadaten, keine Inhalte', async () => {
-    const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit' }));
+    const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit', AI_GATEWAY_TOKEN: 'gw-token' }));
     await fund(c);
     await c.call('POST', '/v1/messages', body('standard', { messages: [{ role: 'user', content: [IMG] }] }));
     const [gUrl, gInit] = gemini.mock.calls[0];
@@ -243,6 +252,7 @@ describe('AI Gateway', () => {
     expect(gInit.headers['cf-aig-collect-log']).toBeUndefined();
     expect(gInit.headers['cf-aig-collect-log-payload']).toBe('false');
     expect(JSON.parse(gInit.headers['cf-aig-metadata'])).toEqual({ tier: 'standard', photo: true, fallback: false });
+    expect(gInit.headers['cf-aig-authorization']).toBe('Bearer gw-token');
     await c.call('POST', '/v1/messages', body('pro'));
     const [aUrl, aInit] = anthropic.mock.calls[0];
     expect(aUrl).toBe('https://gateway.test/overfit/anthropic/v1/messages');
@@ -251,6 +261,56 @@ describe('AI Gateway', () => {
     expect(JSON.parse(aInit.headers['cf-aig-metadata'])).toEqual({ tier: 'pro', photo: false, fallback: false });
     await c.call('POST', '/v1/messages', body('lite'));
     expect(ai.run.mock.calls[0][2]).toEqual({ gateway: { id: 'overfit', metadata: { tier: 'lite', photo: false, fallback: false } } });
+  });
+
+  it('ohne Gateway-Token gehen Gemini und Anthropic direkt (neue Gateways verlangen Authentifizierung), Workers AI übers Binding', async () => {
+    const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit' }));
+    await fund(c);
+    expect((await c.call('POST', '/v1/messages', body('standard'))).status).toBe(200);
+    const [gUrl, gInit] = gemini.mock.calls[0];
+    expect(gUrl).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent');
+    expect(gInit.headers['cf-aig-authorization']).toBeUndefined();
+    expect(gInit.headers['cf-aig-metadata']).toBeUndefined();
+    expect((await c.call('POST', '/v1/messages', body('pro'))).status).toBe(200);
+    expect(anthropic.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages');
+    await c.call('POST', '/v1/messages', body('lite'));
+    expect(ai.run.mock.calls[0][2]).toEqual({ gateway: { id: 'overfit', metadata: { tier: 'lite', photo: false, fallback: false } } });
+  });
+
+  it('lehnt das Gateway ab (401, Cloudflare-Fehlerformat), geht dieselbe Anfrage direkt an den Anbieter', async () => {
+    anthropic.mockImplementation(async (url: string) =>
+      url.startsWith('https://gateway.test/')
+        ? new Response(JSON.stringify({ success: false, result: [], messages: [], error: [{ code: 2009, message: 'Unauthorized' }] }), { status: 401 })
+        : anthropicReply(),
+    );
+    const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit', AI_GATEWAY_TOKEN: 'falsch' }));
+    await fund(c);
+    const r = await c.call('POST', '/v1/messages', body('pro'));
+    expect(r.status).toBe(200);
+    expect(r.body.overfit).toMatchObject({ servedTier: 'pro', fallback: false });
+    expect(anthropic.mock.calls.map((x: any[]) => x[0])).toEqual(['https://gateway.test/overfit/anthropic/v1/messages', 'https://api.anthropic.com/v1/messages']);
+    expect(anthropic.mock.calls[1][1].headers['cf-aig-authorization']).toBeUndefined();
+  });
+});
+
+describe('Schlüssel des Betreibers abgelehnt (401/403)', () => {
+  it('weicht auf die andere Stufe aus und bucht nur dort ab', async () => {
+    anthropic.mockResolvedValue(new Response(JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }), { status: 401 }));
+    const c = await Client.create(env());
+    await fund(c);
+    const r = await c.call('POST', '/v1/messages', body('pro'));
+    expect(r.status).toBe(200);
+    expect(r.body.overfit).toMatchObject({ tier: 'pro', servedTier: 'standard', fallback: true });
+  });
+
+  it('ohne Ausweich-Stufe: 502 upstream_unavailable mit Fehlertext, nichts abgebucht', async () => {
+    anthropic.mockResolvedValue(new Response(JSON.stringify({ success: false, error: [{ code: 2009, message: 'Unauthorized' }] }), { status: 401 }));
+    const c = await Client.create(env({ GEMINI_API_KEY: undefined }));
+    const f = await fund(c);
+    const r = await c.call('POST', '/v1/messages', body('pro'));
+    expect(r.status).toBe(502);
+    expect(r.body.error).toMatchObject({ code: 'upstream_unavailable', message: 'Unauthorized', details: { upstreamStatus: 401 } });
+    expect(await balance(c)).toBe(f.balanceMicro);
   });
 });
 
@@ -280,7 +340,9 @@ describe('Preistabelle', () => {
     expect(currentPrices(Date.parse('2026-12-31T23:00:00Z'))['gemini-3.6-flash']).toEqual({ in: 690_000, cacheRead: 69_000, cacheWrite: 690_000, out: 3_450_000 });
     expect(currentPrices(Date.parse('2027-01-01T00:00:00Z'))['gemini-3.6-flash']).toEqual({ in: 1_380_000, cacheRead: 138_000, cacheWrite: 1_380_000, out: 6_900_000 });
     expect(currentPrices()['claude-sonnet-5-5']).toEqual({ in: 1_840_000, cacheRead: 184_000, cacheWrite: 2_300_000, out: 9_200_000 });
-    // 25 608 / 75 147 Neurons je MTok × 0,011 $/1000 Neurons × 0,92 €/$
+    // 0,293 $ / 2,253 $ je MTok × 0,92 €/$
+    expect(currentPrices()['@cf/meta/llama-3.3-70b-instruct-fp8-fast']).toMatchObject({ in: 269_560, out: 2_072_760 });
+    // Abgekündigtes Modell bleibt für alte Buchungen: 25 608 / 75 147 Neurons je MTok × 0,011 $/1000 Neurons × 0,92 €/$
     expect(currentPrices()['@cf/meta/llama-3.1-8b-instruct']).toMatchObject({ in: 259_153, out: 760_488 });
   });
 });

@@ -1225,3 +1225,21 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - Karten: `FloatingCard` ohne Rand, Radius 24 dp; die Fläche #1C1C1E hebt sich wie in der Vorlage vom Schwarz ab. `Panel` (Gruppen mit Trennlinien) behält Rand und 16 dp, weil der Rand dort die Trennlinien liefert und sie keine Knöpfe sind.
 - Kontrast (`ButtonContrastTest`): Schwarz auf Weiß, Weiß auf Dunkelgrau (auch im Panel), Weiß auf `armedFill` je ≥ 4,5:1. Belege `docs/screenshots/buttons/vorher|nachher/`.
 - Gegencheck-Befunde: Karten 0,98 und Icons 0,88 sind bewusst (große Fläche wirkt bei 0,96 zu wuchtig, kleines Icon sieht bei 0,96 nicht gedrückt aus). Zeilen in Panels (`pressableRow`) behalten die graue Druckfläche ohne Scale, weil sich eine Zeile innerhalb der Trennlinien nicht verkleinern soll. Tippflächen aller Galerie-Knöpfe ≥ 48 dp sind per Test abgesichert (`ButtonShotTest`).
+
+## KI-Auswertung auf dem Testserver repariert (Hotfix KI, 6.11.2026)
+Befund (Ende-zu-Ende gegen `overfit-backend-test`, frisches Gerät, 1 € Test-Guthaben): `standard` → `503 tier_unavailable` (kein
+`GEMINI_API_KEY`), `pro` → `400 upstream_rejected` mit HTTP 401, `lite` → `502` (Workers AI: `llama-3.1-8b-instruct` am 30.5.2026
+abgekündigt). Die App wich korrekt von `standard` auf `pro` aus und zeigte dann „Der Anbieter hat die Anfrage abgelehnt. Prüfe das
+Modell in den Coach-Einstellungen.“ – für Guthaben-Nutzer nicht lösbar.
+- Ursache des 401: Cloudflare legt neue AI Gateways seit 2026 immer mit Pflicht-Authentifizierung an (nicht abschaltbar). Der Worker
+  schickte Anthropic-/Gemini-Anfragen über `getUrl` ohne `cf-aig-authorization`. Lösung: Gateway nur mit optionalem Secret
+  `AI_GATEWAY_TOKEN`, sonst direkt zum Anbieter; lehnt das Gateway trotz Token ab (401/403), einmal direkt. Workers AI bleibt über
+  das Binding im Gateway (braucht kein Token). Verworfen: Deploy-Token im Worker wiederverwenden (zu viele Rechte).
+- 401/403 vom Anbieter oder Gateway ist ein Betreiberfehler, kein Fehler der Anfrage: gilt als Ausfall (Ausweich-Stufe, sonst
+  `502 upstream_unavailable`, nichts abgebucht). Cloudflare-Fehler (`error: [{ message }]`) landen jetzt im Fehlertext.
+- `lite` = `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (laut Cloudflare mit JSON-Modus, keine Abkündigung angekündigt; die kleinen
+  Llama-3.1/3.2-Modelle werden am 15.11.2026 abgekündigt). Teurer als vorher (0,293 $ / 2,253 $), aber weiter billiger als Gemini Flash.
+  Der Parser versteht zusätzlich das OpenAI-Format (`choices`) neuerer Workers-AI-Modelle.
+- App: `tier_unavailable` (veraltete Config im Cache) → Config neu laden, einmal mit verfügbarer Stufe wiederholen. Server-Einrichtungs-
+  fehler (`not_configured`, `tier_unavailable`, Anbieter-401/403) zeigen „Der Anbieter ist gerade nicht erreichbar.“ mit „Erneut
+  versuchen“ statt „Kein KI-Zugang“ bzw. „Prüfe das Modell“.

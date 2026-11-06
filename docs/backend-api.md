@@ -116,12 +116,12 @@ Jeder Fehler: passender HTTP-Status und
 {
   "mode": "production",
   "currency": "EUR", "unit": "micro-euro", "markupBp": 2800, "maxTokensCap": 8192,
-  "models": { "gemini-3.6-flash": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 }, "claude-sonnet-5-5": { … }, "@cf/meta/llama-3.1-8b-instruct": { … } },
+  "models": { "gemini-3.6-flash": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 }, "claude-sonnet-5-5": { … }, "@cf/meta/llama-3.3-70b-instruct-fp8-fast": { … } },
   "defaultTier": "standard",
   "tiers": {
     "standard": { "available": true, "model": "gemini-3.6-flash", "displayName": "Gemini 3.6 Flash", "vendor": "Google", "label": "Gemini 3.6 Flash (Google)", "thinkingTokens": 1000, "images": true, "fallback": "pro", "price": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 } },
     "pro": { "available": false, "model": "claude-sonnet-5-5", "images": true, "fallback": "standard", "price": { … } },
-    "lite": { "available": true, "model": "@cf/meta/llama-3.1-8b-instruct", "images": false, "fallback": "standard", "price": { … } }
+    "lite": { "available": true, "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "images": false, "fallback": "standard", "price": { … } }
   },
   "usageProfiles": { "coach": { "inputTokens": 8200, "outputTokens": 1400 }, "chat": { "inputTokens": 6700, "outputTokens": 500 }, "autofill": { "inputTokens": 900, "outputTokens": 120 } },
   "packages": [ { "productId": "overfit.fuel.10", "priceMicro": 10000000, "creditMicro": 7870370 } ],
@@ -223,7 +223,8 @@ Reservierung wird freigegeben. Ohne Nutzungsangabe wird die Reservierung berechn
 **Ausweichen:** Fällt der Anbieter aus (5xx, 429, Zeitüberschreitung, Netzwerk), geht die Anfrage einmal an die Ausweich-Stufe
 (`standard` → `pro`, `pro` → `standard`, `lite` → `standard`), sofern sie konfiguriert ist und Bilder kann. Berechnet wird
 `min(Kosten zum Preis des genutzten Modells, Kosten zum Preis der angefragten Stufe)` für die tatsächlich verbrauchten Token: nie mehr
-als die angefragte Stufe. Ablehnungen (4xx außer 408/429) weichen nicht aus (`400 upstream_rejected`). Bei jedem endgültigen Fehler
+als die angefragte Stufe. 401/403 des Anbieters oder des AI Gateways (Schlüssel/Token des Betreibers) gilt als Ausfall: Ausweichen,
+sonst `502 upstream_unavailable` mit `details.upstreamStatus`. Andere Ablehnungen (4xx außer 408/429) weichen nicht aus (`400 upstream_rejected`). Bei jedem endgültigen Fehler
 wird die Reservierung vollständig freigegeben. Verbrauch → zuerst verfallende Posten (Startguthaben), dann Kauf-Guthaben.
 
 **Geschenkte Auswertungen:** Mit `overfit.purpose = "review"` auf der Stufe `standard` (Gemini Flash) wird zuerst eine geschenkte Coach-Auswertung

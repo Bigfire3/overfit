@@ -308,22 +308,19 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
     override suspend fun send(prompt: CoachPrompt, model: String, structured: Boolean): CoachReply {
         if (!fuel.available) throw CoachException(CoachErrorKind.NO_ACCESS)
         val result = try {
-            fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured).toString())
+            try {
+                fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured).toString())
+            } catch (e: FuelException) {
+                // The cached config (or none, when it could not be loaded) promised a tier the server does not offer
+                // (e.g. its key was removed): reload the config once and send to a tier that is there.
+                if (e.code != "tier_unavailable") throw e
+                fuel.invalidateConfig()
+                fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured).toString())
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: FuelException) {
-            throw CoachException(
-                when {
-                    e.code == "network" -> CoachErrorKind.NETWORK
-                    e.code == "insufficient_funds" -> CoachErrorKind.NO_FUEL
-                    e.code == "not_configured" || e.code == "tier_unavailable" -> CoachErrorKind.NO_ACCESS
-                    e.code == "rate_limited" || e.status == 429 -> CoachErrorKind.RATE_LIMIT
-                    e.status >= 500 || e.code == "upstream_unavailable" -> CoachErrorKind.SERVER
-                    e.status == 401 || e.status == 403 -> CoachErrorKind.AUTH
-                    else -> CoachErrorKind.BAD_REQUEST
-                },
-                e.message,
-            )
+            throw CoachException(fuelErrorKind(e), e.message)
         } catch (e: Exception) {
             throw CoachException(CoachErrorKind.NETWORK, e.message)
         }
@@ -335,6 +332,25 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
             servedModel = result.servedModel,
             fallbackFrom = result.chosenModel?.takeIf { result.servedModel != null && it != result.servedModel },
         )
+    }
+
+    /**
+     * Credit errors. Server-side setup problems (no model configured, the operator's provider key or AI gateway rejected)
+     * are [CoachErrorKind.SERVER]: the user can't fix them under "Connect AI", and a retry later may work.
+     */
+    private fun fuelErrorKind(e: FuelException): CoachErrorKind = when {
+        e.code == "network" -> CoachErrorKind.NETWORK
+        e.code == "insufficient_funds" -> CoachErrorKind.NO_FUEL
+        e.code == "not_configured" || e.code == "tier_unavailable" -> CoachErrorKind.SERVER
+        e.code == "upstream_rejected" && e.details["upstreamStatus"] in AUTH_STATUSES -> CoachErrorKind.SERVER
+        e.code == "rate_limited" || e.status == 429 -> CoachErrorKind.RATE_LIMIT
+        e.status >= 500 || e.code == "upstream_unavailable" -> CoachErrorKind.SERVER
+        e.status == 401 || e.status == 403 -> CoachErrorKind.AUTH
+        else -> CoachErrorKind.BAD_REQUEST
+    }
+
+    private companion object {
+        val AUTH_STATUSES = setOf(401L, 403L)
     }
 }
 

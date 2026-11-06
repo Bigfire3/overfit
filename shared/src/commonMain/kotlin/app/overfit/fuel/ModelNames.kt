@@ -8,6 +8,7 @@ package app.overfit.fuel
 private val KNOWN = mapOf(
     "gemini-3.6-flash" to "Gemini 3.6 Flash (Google)",
     "claude-sonnet-5-5" to "Claude Sonnet 5.5 (Anthropic)",
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast" to "Llama 3.3 70B (Cloudflare)",
     "@cf/meta/llama-3.1-8b-instruct" to "Llama 3.1 8B (Cloudflare)",
 )
 

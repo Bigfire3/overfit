@@ -26,7 +26,7 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
         tiers = mapOf(
             "standard" to FuelTierInfo(true, "gemini-3.6-flash", true, TierPrice(690_000, 3_450_000), "Gemini 3.6 Flash", "Google", 1_000),
             "pro" to FuelTierInfo(true, "claude-sonnet-5-5", true, TierPrice(1_840_000, 9_200_000), "Claude Sonnet 5.5", "Anthropic"),
-            "lite" to FuelTierInfo(true, "@cf/meta/llama-3.1-8b-instruct", false, TierPrice(259_153, 760_488), "Llama 3.1 8B", "Cloudflare"),
+            "lite" to FuelTierInfo(true, "@cf/meta/llama-3.3-70b-instruct-fp8-fast", false, TierPrice(269_560, 2_072_760), "Llama 3.3 70B", "Cloudflare"),
         ),
         packages = listOf(
             FuelPackage("overfit.fuel.5", 6_990_000, 5_000_000),
