@@ -188,8 +188,13 @@ data class Strings(
     val restExpand: String,
     val restCollapse: String,
     val restOverBody: String,
-    val channelRest: String,
-    val channelRestOver: String,
+    /** Notification channel of the running workout (set and rest). */
+    val channelWorkout: String,
+    val channelWorkoutSilent: String,
+    /** Workout notification: "Set 2/4". */
+    val setOfTotal: (Int, Int) -> String,
+    /** Workout notification action: checks off the set shown. */
+    val setDoneAction: String,
 
     // Settings: workout
     val workoutSettings: String,
@@ -414,8 +419,10 @@ val German = Strings(
     restExpand = "Pause groß anzeigen",
     restCollapse = "Pause klein anzeigen",
     restOverBody = "Zeit für den nächsten Satz",
-    channelRest = "Pausentimer",
-    channelRestOver = "Pausenende",
+    channelWorkout = "Laufendes Training",
+    channelWorkoutSilent = "Laufendes Training (ohne Vibration)",
+    setOfTotal = { n, total -> "Satz $n/$total" },
+    setDoneAction = "Satz fertig",
 
     workoutSettings = "Training",
     defaultRest = "Standard-Pause (s)",
@@ -424,7 +431,7 @@ val German = Strings(
     notificationsPermission = "Benachrichtigungen erlauben",
     notificationsAllowed = "Erlaubt",
     notificationsDeniedHint = "Ohne diese Erlaubnis meldet sich der Pausentimer nicht, wenn eine andere App offen oder der Bildschirm aus ist.",
-    notificationsInfo = "Während einer Pause zeigt eine Benachrichtigung den Countdown mit +15 s und Überspringen. Sie bleibt, bis die Pause vorbei ist, auch wenn du sie wegwischst.",
+    notificationsInfo = "Während des Trainings zeigt eine Benachrichtigung den aktuellen Satz (grün, mit „Satz fertig“) und in der Pause den Countdown (rot, mit +15 s und Überspringen). Beim Wechsel meldet sie sich neu. Sie bleibt bis zum Trainingsende, auch wenn du sie wegwischst.",
     restTicks = "Ticken vor Pausenende",
     restTicksHint = "In den letzten 3 Sekunden der Pause tickt es, auch wenn eine andere App offen ist. Musik wird dabei nur kurz leiser.",
     restTicksBody = "Noch 3 Sekunden",
@@ -631,8 +638,10 @@ val English = Strings(
     restExpand = "Show rest larger",
     restCollapse = "Show rest smaller",
     restOverBody = "Time for the next set",
-    channelRest = "Rest timer",
-    channelRestOver = "Rest over",
+    channelWorkout = "Running workout",
+    channelWorkoutSilent = "Running workout (no vibration)",
+    setOfTotal = { n, total -> "Set $n/$total" },
+    setDoneAction = "Set done",
 
     workoutSettings = "Workout",
     defaultRest = "Default rest (s)",
@@ -641,7 +650,7 @@ val English = Strings(
     notificationsPermission = "Allow notifications",
     notificationsAllowed = "Allowed",
     notificationsDeniedHint = "Without this permission the rest timer cannot reach you while another app is open or the screen is off.",
-    notificationsInfo = "During a rest a notification shows the countdown with +15 s and Skip. It stays until the rest is over, even if you swipe it away.",
+    notificationsInfo = "During a workout a notification shows the current set (green, with “Set done”) and during a rest the countdown (red, with +15 s and Skip). It alerts again at each switch. It stays until the workout ends, even if you swipe it away.",
     restTicks = "Countdown ticks",
     restTicksHint = "Ticks in the last 3 seconds of a rest, even while another app is open. Music only gets quieter for a moment.",
     restTicksBody = "3 seconds left",

@@ -16,12 +16,38 @@ data class RestAlert(
     val vibrate: Boolean,
     val plusLabel: String,
     val skipLabel: String,
-    val channelRunning: String,
-    val channelOver: String,
+    /** Name of the notification channel of the running workout (Android). */
+    val channel: String,
+    /** Same, without vibration (setting "Vibration" off). */
+    val channelSilent: String,
     /** Ticks at 3, 2 and 1 s before [endsAt] (setting "Countdown ticks"). */
     val ticks: Boolean = false,
     /** "3 seconds left" – text of the tick notification where the platform needs one (iOS). */
     val ticksBody: String = "",
+    /** The rest just started after a set (transition set → rest): announce it once (heads-up, vibration). */
+    val announce: Boolean = false,
+    /** What the workout notification shows when this rest is over (posted by the end alarm). */
+    val after: WorkoutNotice? = null,
+)
+
+/**
+ * The running workout outside a rest: the set to do now (Android: the ongoing, green workout
+ * notification; during a rest it turns red and shows the [RestAlert]).
+ */
+data class WorkoutNotice(
+    /** "Lateral raise", or the workout name when all sets are done. */
+    val title: String,
+    /** "Set 2/4 · 30 kg × 6" or "All sets done". */
+    val body: String,
+    /** Start of the workout (epoch ms): the notification counts the training time from here. */
+    val startedAt: Long,
+    /** Label of the "Set done" action; null when no set is open. */
+    val doneLabel: String? = null,
+    val vibrate: Boolean = true,
+    val channel: String = "",
+    val channelSilent: String = "",
+    /** Small extra line, e.g. "Rest is over" when the end alarm switches to this notice. */
+    val note: String? = null,
 )
 
 /**
@@ -36,7 +62,18 @@ interface RestAlerts {
 
     fun schedule(alert: RestAlert)
 
+    /** Stops the rest alarms (rest skipped or ended early). The workout notification stays. */
     fun cancel()
+
+    /**
+     * The workout runs and no rest: shows [notice] (Android: replaces the rest countdown in the
+     * same ongoing notification). [announce] = transition rest → set, alert once; otherwise a
+     * silent update.
+     */
+    fun showWorkout(notice: WorkoutNotice, announce: Boolean = false) = Unit
+
+    /** Workout finished or discarded: rest alarms and the workout notification go away. */
+    fun endWorkout() = cancel()
 
     /** Whether alerts arrive to the second; null where the platform needs no extra permission. */
     fun exactAlarmsAllowed(): Boolean? = null
@@ -95,4 +132,9 @@ class RecordingRestAlerts : RestAlerts {
     override fun playTicks() { ticksPlayed++ }
     override fun schedule(alert: RestAlert) { scheduled += alert; pending = alert }
     override fun cancel() { cancels++; pending = null }
+
+    val notices = mutableListOf<Pair<WorkoutNotice, Boolean>>()
+    var ends = 0
+    override fun showWorkout(notice: WorkoutNotice, announce: Boolean) { notices += notice to announce }
+    override fun endWorkout() { ends++; cancel() }
 }

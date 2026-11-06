@@ -97,6 +97,75 @@ class WorkoutControllerTest {
         assertEquals(mapOf("squat" to listOf(planned(100.0, 3))), e.c.state.value.lastTime)
     }
 
+    // --- workout notification ------------------------------------------------------------------
+
+    @Test
+    fun notice_duringTheWholeWorkout_setAndRestTransitionsAnnounced() = runTest {
+        val e = env()
+        e.started()
+        // Start: the first set, silently.
+        val (first, firstAnnounce) = e.alerts.notices.last()
+        assertEquals("Bench", first.title)
+        assertEquals("Satz 1/2 · 50 kg × 10", first.body)
+        assertEquals("Satz fertig", first.doneLabel)
+        assertFalse(firstAnnounce)
+        // Set → rest: announced, and it knows what comes after.
+        e.c.toggleSet(e.setId(0, 0))
+        val rest = assertNotNull(e.alerts.pending)
+        assertTrue(rest.announce)
+        assertEquals("Satz 2/2 · 50 kg × 8", rest.after?.body)
+        assertEquals("Pause vorbei", rest.after?.note)
+        // +15 s: no transition.
+        e.c.adjustRest(15)
+        assertFalse(e.alerts.pending!!.announce)
+        // Rest over in the app: back to the set (the alarm announces it, the app updates silently).
+        advanceTimeBy(80_000)
+        val (next, nextAnnounce) = e.alerts.notices.last()
+        assertEquals("Satz 2/2 · 50 kg × 8", next.body)
+        assertFalse(nextAnnounce)
+        // Finished: everything goes.
+        e.c.finish()
+        assertEquals(1, e.alerts.ends)
+    }
+
+    @Test
+    fun notice_onlyChangesRepost_skipAndAllDone() = runTest {
+        val e = env()
+        e.started()
+        val count = e.alerts.notices.size
+        e.c.edit { it.withName("Push B") } // the notice does not show the name while sets are open
+        assertEquals(count, e.alerts.notices.size)
+        e.c.setValues(e.setId(0, 0), SetValues(weightKg = 52.5, reps = 10))
+        assertEquals("Satz 1/2 · 52,5 kg × 10", e.alerts.notices.last().first.body)
+        e.c.toggleSet(e.setId(0, 0))
+        e.c.skipRest()
+        assertEquals("Satz 2/2 · 50 kg × 8", e.alerts.notices.last().first.body)
+        e.c.toggleSet(e.setId(0, 1))
+        e.c.skipRest()
+        e.c.toggleSet(e.setId(1, 0)) // last set: no rest
+        val done = e.alerts.notices.last().first
+        assertEquals("Push B", done.title)
+        assertEquals("Alle Sätze erledigt", done.body)
+        assertNull(done.doneLabel)
+    }
+
+    @Test
+    fun repostNotice_showsTheCurrentStateAgain() = runTest {
+        val e = env()
+        e.c.awaitLoaded()
+        e.c.repostNotice() // no workout: nothing
+        assertTrue(e.alerts.notices.isEmpty())
+        e.started()
+        val count = e.alerts.notices.size
+        e.c.repostNotice()
+        assertEquals(count + 1, e.alerts.notices.size)
+        e.c.toggleSet(e.setId(0, 0))
+        val scheduled = e.alerts.scheduled.size
+        e.c.repostNotice()
+        assertEquals(scheduled + 1, e.alerts.scheduled.size)
+        assertFalse(e.alerts.pending!!.announce)
+    }
+
     // --- toggle / rest -------------------------------------------------------------------------
 
     @Test
