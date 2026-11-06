@@ -39,6 +39,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import app.overfit.i18n.LocalStrings
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.unit.sp
@@ -220,10 +225,9 @@ private fun Modifier.pressable(
     onClick: () -> Unit,
 ): Modifier {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
     return this
-        .alpha(if (pressed) 0.7f else 1f)
+        .pressScale(interaction, PressScale.icon)
         .clickable(interaction, indication = null, enabled = enabled, role = role) {
             if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
@@ -241,10 +245,36 @@ fun Modifier.pressableRow(onClick: () -> Unit): Modifier {
         .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
 }
 
-/** Standard button height; [ButtonHeight.compact] for inline actions (40 dp visible, 48 dp touch area via padding). */
+/** Scale factors of [pressScale]: big buttons and cards shrink a little, small icons a bit more. */
+object PressScale {
+    const val button = 0.96f
+    const val card = 0.98f
+    const val icon = 0.88f
+}
+
+/**
+ * Tap feedback of every tappable button and card (no ripple, no colour change): while the finger is down
+ * the element shrinks to [scale] in ~100 ms and springs back on release. The system animation scale (0 =
+ * "remove animations") is respected by Compose itself: the animation then jumps instead of running.
+ */
+@Composable
+fun Modifier.pressScale(interaction: InteractionSource, scale: Float = PressScale.button): Modifier {
+    val pressed by interaction.collectIsPressedAsState()
+    val value by animateFloatAsState(
+        if (pressed) scale else 1f,
+        animationSpec = if (pressed) tween(durationMillis = 100) else spring(dampingRatio = 0.55f, stiffness = 600f),
+        label = "pressScale",
+    )
+    return graphicsLayer { scaleX = value; scaleY = value }
+}
+
+/** Big rounded corner of all filled buttons (nearly a pill, fully round on compact ones). */
+val ButtonShape = RoundedCornerShape(24.dp)
+
+/** Standard button height (64 dp, like the banking-app template); [ButtonHeight.compact] for inline actions (44 dp visible, 48 dp touch area via padding). */
 object ButtonHeight {
-    val standard = 48.dp
-    val compact = 40.dp
+    val standard = 64.dp
+    val compact = 44.dp
 }
 
 @Composable
@@ -256,46 +286,46 @@ private fun PillButton(
     compact: Boolean,
     haptic: Boolean,
     fill: Color,
-    pressedFill: Color,
     contentTone: Color,
-    trailing: (@Composable () -> Unit)? = null,
-    border: Color? = null,
+    icon: Icon? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
-    val shape = RoundedCornerShape(50)
-    // A grey button inside a grey panel gets one shade darker, so it still reads as a button.
+    // A grey button inside a grey panel gets one shade lighter, so it still reads as a button.
     val c = Theme.colors
-    val inPanel = LocalInPanel.current
-    val fill = if (inPanel && fill == c.surface) c.surfacePressed else fill
-    val pressedFill = if (inPanel && pressedFill == c.surfacePressed) c.hairline else pressedFill
+    val fill = if (LocalInPanel.current && fill == c.surface) c.surfacePressed else fill
+    val textStyle = Theme.type.label.copy(
+        color = contentTone,
+        fontWeight = if (compact) FontWeight.SemiBold else FontWeight.Bold,
+        fontSize = if (compact) 16.sp else 18.sp,
+    )
     Row(
         modifier
-            // Touch area first: compact pills are 40 dp visible, the extra 4 dp above and below keep 48 dp to tap.
+            .pressScale(interaction)
+            // Touch area first: compact buttons are 44 dp visible, the extra 2 dp above and below keep 48 dp to tap.
             .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) {
                 if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             }
-            .padding(vertical = if (compact) 4.dp else 0.dp)
+            .padding(vertical = if (compact) 2.dp else 0.dp)
             .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
             .alpha(if (enabled) 1f else 0.3f)
-            .background(if (pressed) pressedFill else fill, shape)
-            .then(if (border != null) Modifier.border(1.5.dp, border, shape) else Modifier)
-            .padding(horizontal = Space.l),
+            .background(fill, ButtonShape)
+            .padding(horizontal = if (compact) Space.m else Space.l),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.Start,
     ) {
-        // Long labels on narrow phones shrink a little before they would be cut off.
+        // Left-aligned, bold; long labels on narrow phones shrink a little before they would be cut off.
         BasicText(
-            label, style = Theme.type.label.copy(color = contentTone), maxLines = 1, overflow = TextOverflow.Ellipsis,
-            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = Theme.type.label.fontSize),
+            label, modifier = if (icon != null) Modifier.weight(1f) else Modifier.weight(1f, fill = false),
+            style = textStyle, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = textStyle.fontSize),
         )
-        if (trailing != null) { Spacer(Modifier.width(Space.s)); trailing() }
+        if (icon != null) { Spacer(Modifier.width(Space.s)); LineIcon(icon, color = contentTone) }
     }
 }
 
-/** The one primary action on a screen: inverted, full width, pill, 48 dp. */
+/** The one primary action on a screen: white fill without border, black bold label left, optional [icon] right, 64 dp, large corners. */
 @Composable
 fun PrimaryButton(
     label: String,
@@ -304,11 +334,12 @@ fun PrimaryButton(
     loading: Boolean = false,
     modifier: Modifier = Modifier.fillMaxWidth(),
     compact: Boolean = false,
+    icon: Icon? = null,
 ) {
     val c = Theme.colors
     PillButton(
         if (loading) "…" else label, onClick, modifier, enabled && !loading, compact, haptic = true,
-        fill = c.inverseBackground, pressedFill = c.inverseBackground.copy(alpha = 0.75f), contentTone = c.inverseForeground,
+        fill = c.inverseBackground, contentTone = c.inverseForeground, icon = icon,
     )
 }
 
@@ -320,9 +351,10 @@ fun SecondaryButton(
     modifier: Modifier = Modifier.fillMaxWidth(),
     enabled: Boolean = true,
     compact: Boolean = false,
+    icon: Icon? = null,
 ) {
     val c = Theme.colors
-    PillButton(label, onClick, modifier, enabled, compact, haptic = false, fill = c.surface, pressedFill = c.surfacePressed, contentTone = c.foreground)
+    PillButton(label, onClick, modifier, enabled, compact, haptic = false, fill = c.surface, contentTone = c.foreground, icon = icon)
 }
 
 /** Destructive action (delete, discard): [negativeSubtle] fill, red label. */
@@ -335,12 +367,12 @@ fun DestructiveButton(
     compact: Boolean = false,
 ) {
     val c = Theme.colors
-    PillButton(label, onClick, modifier, enabled, compact, haptic = false, fill = c.negativeSubtle, pressedFill = c.negativeSubtle.copy(alpha = 0.6f), contentTone = c.negative)
+    PillButton(label, onClick, modifier, enabled, compact, haptic = false, fill = c.negativeSubtle, contentTone = c.negative)
 }
 
 /**
  * Two-tap button for actions that need a confirmation (finish, discard, reset, delete all): the first tap
- * arms it (label and border turn [Colors.armed] red, the text stays the same; screen readers hear
+ * arms it (the button fills solid [Colors.armedFill] red with a white label, the text stays the same; screen readers hear
  * "zum Bestätigen erneut tippen"), a second tap within 3 s runs [onConfirm]. A tap elsewhere, scrolling
  * or the timeout disarm it ([ConfirmArea]). [primary] = black main action of a screen (backup restore).
  */
@@ -359,12 +391,11 @@ fun ConfirmButton(
     val again = LocalStrings.current.tapAgainToConfirm
     val armed = arm.armed
     val c = Theme.colors
-    val inPanel = LocalInPanel.current
-    val surface = if (inPanel) c.surfacePressed else c.surface
-    val (fill, pressedFill, tone) = when {
-        armed -> Triple(if (primary) c.background else surface, if (primary) c.surface else c.hairline, c.armed)
-        primary -> Triple(c.inverseBackground, c.inverseBackground.copy(alpha = 0.75f), c.inverseForeground)
-        else -> Triple(c.surface, c.surfacePressed, c.foreground)
+    // Armed: solid red fill, white label (no border), whatever the button looked like before.
+    val (fill, tone) = when {
+        armed -> c.armedFill to c.foreground
+        primary -> c.inverseBackground to c.inverseForeground
+        else -> c.surface to c.foreground
     }
     PillButton(
         if (loading) "…" else label,
@@ -377,8 +408,7 @@ fun ConfirmButton(
             .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
             .semantics { if (armed) stateDescription = again },
         enabled = enabled && !loading, compact = compact, haptic = false,
-        fill = fill, pressedFill = pressedFill, contentTone = tone,
-        border = if (armed) c.armed else null,
+        fill = fill, contentTone = tone,
     )
 }
 
@@ -394,25 +424,22 @@ fun SmallButton(
     tone: Tone = Tone.Default,
 ) {
     val c = Theme.colors
-    val shape = RoundedCornerShape(50)
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val inPanel = LocalInPanel.current
-    val fill = if (inPanel) c.surfacePressed else c.surface
-    val pressedFill = if (inPanel) c.hairline else c.surfacePressed
+    val fill = if (LocalInPanel.current) c.surfacePressed else c.surface
     Box(
         modifier
-            // 40 dp visible, 48 dp to tap (like the compact pills).
+            .pressScale(interaction)
+            // 44 dp visible, 48 dp to tap (like the compact buttons).
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
             .heightIn(min = ButtonHeight.compact)
-            .background(if (pressed) pressedFill else fill, shape)
+            .background(fill, ButtonShape)
             .padding(horizontal = Space.m),
         contentAlignment = Alignment.Center,
     ) {
         BasicText(
-            label, style = Theme.type.label.copy(color = tone.color()), maxLines = 1, overflow = TextOverflow.Ellipsis,
-            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = Theme.type.label.fontSize),
+            label, style = Theme.type.label.copy(color = tone.color(), fontWeight = FontWeight.SemiBold, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 16.sp),
         )
     }
 }
@@ -582,6 +609,9 @@ val LocalInPanel = staticCompositionLocalOf { false }
 
 val PanelShape = RoundedCornerShape(16.dp)
 
+/** Corners of a [FloatingCard]: as large as the buttons, like the cards of the banking-app template. */
+val CardShape = RoundedCornerShape(24.dp)
+
 /**
  * Grouped area that stands out from the background: grey [Colors.surface] fill, 1 dp [Colors.hairline] outline,
  * rounded corners, 1 dp dividers between its children (the outline colour shows through the gaps). Rows
@@ -605,21 +635,20 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
 
 /**
  * One standalone item that floats above the background (a workout in the list): own [Colors.surface] fill,
- * 1 dp [Colors.faint] outline and rounded corners (no shadow: it would be invisible on black, the outline and
- * the lighter fill carry the lift). Pressable when [onClick] is set;
+ * no outline and large rounded corners (no shadow: it would be invisible on black, the lighter fill carries
+ * the lift). Pressable when [onClick] is set (shrinks slightly while pressed, [pressScale]);
  * put cards in a Column with [Space.m] gaps. Black and white only.
  */
 @Composable
 fun FloatingCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val c = Theme.colors
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     Column(
         modifier
             .fillMaxWidth()
-            .clip(PanelShape)
-            .background(if (pressed) c.surfacePressed else c.surface)
-            .border(1.dp, c.faint, PanelShape)
+            .then(if (onClick != null) Modifier.pressScale(interaction, PressScale.card) else Modifier)
+            .clip(CardShape)
+            .background(c.surface)
             .then(if (onClick != null) Modifier.clickable(interaction, indication = null, role = Role.Button, onClick = onClick) else Modifier),
         content = content,
     )

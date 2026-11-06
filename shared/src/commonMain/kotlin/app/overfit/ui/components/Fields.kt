@@ -40,10 +40,12 @@ import app.overfit.ui.theme.Theme
 /** Pill-shaped toggle for filters and single choices. Selected = inverted. */
 @Composable
 fun Chip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
+            .pressScale(interaction)
             // 48 dp touch area around the 40 dp chip.
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Checkbox, onClick = onClick)
+            .clickable(interaction, indication = null, role = Role.Checkbox, onClick = onClick)
             .padding(vertical = 4.dp)
             .heightIn(min = 40.dp)
             .background(if (selected) Theme.colors.inverseBackground else if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface, RoundedCornerShape(50))

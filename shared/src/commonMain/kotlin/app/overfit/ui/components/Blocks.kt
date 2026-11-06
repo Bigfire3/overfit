@@ -120,14 +120,11 @@ fun ExerciseCardHeader(
 fun BlockButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: Icon? = Icon.Plus, inBlock: Boolean = false) {
     val c = Theme.colors
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val fill = when {
-        inBlock -> if (pressed) c.surface else c.surfacePressed
-        else -> if (pressed) c.surfacePressed else c.surface
-    }
+    val fill = if (inBlock) c.surfacePressed else c.surface
     Row(
         modifier
             .fillMaxWidth()
+            .pressScale(interaction)
             .heightIn(min = 52.dp)
             .clip(if (inBlock) BlockShape.row else BlockShape.block)
             .background(fill)

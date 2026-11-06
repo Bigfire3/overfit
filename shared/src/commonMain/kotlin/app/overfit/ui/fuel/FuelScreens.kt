@@ -105,7 +105,7 @@ fun FuelScreen(
     if (service == null) {
         Screen(
             header = { BackHeader(LocalStrings.current.back, onBack) },
-            footer = { PrimaryButton(t.demoView, onClick = { session.startDemo() }) },
+            footer = { PrimaryButton(t.demoView, onClick = { session.startDemo() }, icon = app.overfit.ui.components.Icon.ChevronRight) },
         ) {
             Title(t.fuel)
             Spacer(Modifier.height(Space.m))
