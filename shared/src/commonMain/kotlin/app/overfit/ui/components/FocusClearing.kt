@@ -21,6 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalViewConfiguration
+import app.overfit.platform.clearFocusWhenKeyboardCloses
 
 /** Remembers whether the touch that is just being handled began on a text field (see [textInputArea]). */
 @Stable
@@ -60,7 +61,7 @@ fun Modifier.clearFocusOutsideTextInput(focus: FocusManager = LocalFocusManager.
     var wasVisible by remember { mutableStateOf(false) }
     LaunchedEffect(imeVisible) {
         // Keyboard closed by Back (or by hand): the field would otherwise keep a blinking cursor.
-        if (wasVisible && !imeVisible) focus.clearFocus()
+        if (clearFocusWhenKeyboardCloses && wasVisible && !imeVisible) focus.clearFocus()
         wasVisible = imeVisible
     }
     return this.pointerInput(touch, focus) {

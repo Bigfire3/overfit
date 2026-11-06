@@ -12,3 +12,5 @@ actual fun deviceDefaults(): DeviceDefaults =
     defaultsFor(NSLocale.preferredLanguages.firstOrNull() as? String, NSLocale.currentLocale.countryCode)
 
 actual fun createHttpClient(): HttpClient = HttpClient(Darwin)
+
+actual val clearFocusWhenKeyboardCloses: Boolean = false

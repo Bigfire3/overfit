@@ -9,3 +9,5 @@ actual fun deviceDefaults(): DeviceDefaults =
     Locale.getDefault().let { defaultsFor(it.language, it.country) }
 
 actual fun createHttpClient(): HttpClient = HttpClient(OkHttp)
+
+actual val clearFocusWhenKeyboardCloses: Boolean = true

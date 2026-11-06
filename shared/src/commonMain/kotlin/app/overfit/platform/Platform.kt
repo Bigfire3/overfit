@@ -16,3 +16,6 @@ internal fun defaultsFor(languageCode: String?, regionCode: String?) = DeviceDef
 expect fun deviceDefaults(): DeviceDefaults
 
 expect fun createHttpClient(): HttpClient
+
+/** Android: closing the keyboard with Back leaves the field focused (blinking cursor), so focus is cleared then. iOS has no such Back. */
+expect val clearFocusWhenKeyboardCloses: Boolean
