@@ -86,14 +86,12 @@ fun CoachStoryScreen(
 
     // Fill of the current page's bar, 0..1 over STORY_AUTO_MS. Restarts on every page change (also after a tap), so a
     // tap gives the new page its full time. On the last page (or without auto advance) the bar stays full.
-    val progress = remember { Animatable(0f) }
+    // Keyed by page: a fresh bar starts empty in the very first frame of the new page (no flash of a full bar).
+    val progress = remember(page, autoAdvance) { Animatable(if (autoAdvance && page < last) 0f else 1f) }
     LaunchedEffect(page, autoAdvance) {
         if (autoAdvance && page < last) {
-            progress.snapTo(0f)
             progress.animateTo(1f, tween(STORY_AUTO_MS.toInt(), easing = LinearEasing))
             page += 1
-        } else {
-            progress.snapTo(1f)
         }
     }
 

@@ -69,13 +69,17 @@ fun Modifier.clearFocusOutsideTextInput(focus: FocusManager = LocalFocusManager.
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
             val onField = touch.onField
             touch.onField = false
-            if (!onField) { focus.clearFocus(); return@awaitEachGesture }
             val slop = config.touchSlop
-            val start = down.uptimeMillis
             while (true) {
                 val change = awaitPointerEvent(PointerEventPass.Final).changes.firstOrNull { it.id == down.id } ?: break
-                if (!change.pressed) break
-                if (change.uptimeMillis - start >= config.longPressTimeoutMillis) break
+                if (!change.pressed) {
+                    // Cleared on release, not on touch: closing the keyboard moves the layout (imePadding) and would
+                    // make a tap on a button miss. The button's click has already run in the main pass.
+                    if (!onField) focus.clearFocus()
+                    break
+                }
+                // A field touch may become a text selection after a long press, so only an early drag counts there.
+                if (onField && change.uptimeMillis - down.uptimeMillis >= config.longPressTimeoutMillis) continue
                 if ((change.position - down.position).getDistance() > slop) { focus.clearFocus(); break }
             }
         }
