@@ -13,6 +13,7 @@ import app.overfit.platform.Haptics
 import app.overfit.platform.RestAlert
 import app.overfit.platform.RestAlerts
 import app.overfit.platform.RestTicks
+import app.overfit.platform.WorkoutNotice
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -122,8 +123,10 @@ class WorkoutController(
         if (rest != stored.rest) persist(w)
         if (rest != null) {
             // Idempotent: replaces the alert if the system still has it, recreates it otherwise.
-            alerts.schedule(alertFor(w, rest))
+            scheduleRest(w, rest)
             watchRest(rest)
+        } else {
+            showNotice(w)
         }
         scope.launch { loadLastTime(w.exercises.map { it.exercise.id }) }
     }
@@ -212,7 +215,8 @@ class WorkoutController(
     private fun clear(finishedId: String? = null) {
         restJob?.cancel()
         restJob = null
-        alerts.cancel()
+        lastNotice = null
+        alerts.endWorkout()
         // "Last time" changes with this workout; reload it for the next one.
         _state.value = State(loaded = true, finishedId = finishedId)
     }
@@ -228,7 +232,7 @@ class WorkoutController(
         val updated = transform(w)
         if (updated != w) set(updated)
         // The "next" line of a running rest may have changed.
-        updated.rest?.let { if (it == w.rest && nextLine(updated, it) != nextLine(w, it)) alerts.schedule(alertFor(updated, it)) }
+        updated.rest?.let { if (it == w.rest && alertFor(updated, it) != alertFor(w, it)) scheduleRest(updated, it) }
     }
 
     fun setValues(setId: String, values: SetValues) = edit { it.setValues(setId, values) }
@@ -240,7 +244,8 @@ class WorkoutController(
         val set = w.exercises[ei].sets[si]
         if (set.completed) {
             val reopened = w.uncompleteSet(setId)
-            if (w.rest?.afterSetId == setId) setRest(reopened, null) else set(reopened)
+            // Via [edit] otherwise: a running rest's "next" line may change.
+            if (w.rest?.afterSetId == setId) setRest(reopened, null) else edit { reopened }
         } else {
             complete(w, setId)
         }
@@ -265,7 +270,7 @@ class WorkoutController(
         val restSec = done.exercises[ei].restSec(prefs().defaultRestSec)
         // Nothing left to rest for after the very last set.
         val rest = if (restSec > 0 && done.nextOpenSet(setId) != null) RestTimer.start(now, restSec, setId) else null
-        setRest(done, rest)
+        setRest(done, rest, announce = true)
     }
 
     /** Adds exercises at the end; sets are prefilled from last time. */
@@ -307,7 +312,8 @@ class WorkoutController(
         if (w.rest != null) setRest(w, null)
     }
 
-    private fun setRest(w: Workout, rest: RestTimer?) {
+    /** [announce]: a set was just checked off (transition set → rest). */
+    private fun setRest(w: Workout, rest: RestTimer?, announce: Boolean = false) {
         val updated = w.copy(rest = rest)
         set(updated)
         restJob?.cancel()
@@ -315,7 +321,7 @@ class WorkoutController(
         if (rest == null) {
             alerts.cancel()
         } else {
-            alerts.schedule(alertFor(updated, rest))
+            scheduleRest(updated, rest, announce)
             watchRest(rest)
         }
     }
@@ -350,6 +356,50 @@ class WorkoutController(
         return w.nextOpenSet(rest.afterSetId)?.let { WorkoutFormat.next(it, p.unit, p.language, stringsFor(p.language)) }
     }
 
+    private fun scheduleRest(w: Workout, rest: RestTimer, announce: Boolean = false) {
+        lastNotice = null
+        alerts.schedule(alertFor(w, rest).copy(announce = announce))
+    }
+
+    /** The notice last shown (set mode), so unrelated changes do not repost it; null during a rest. */
+    private var lastNotice: WorkoutNotice? = null
+
+    private fun showNotice(w: Workout) {
+        val notice = noticeFor(w)
+        if (notice == lastNotice) return
+        lastNotice = notice
+        alerts.showWorkout(notice)
+    }
+
+    /**
+     * Shows the workout notification again as it is now (swiped away while the process was gone,
+     * see the Android delete intent). Nothing without a running workout.
+     */
+    fun repostNotice() {
+        val w = workout ?: return
+        lastNotice = null
+        val rest = w.rest
+        if (rest != null) scheduleRest(w, rest) else showNotice(w)
+    }
+
+    /** The set to do now: the same one "Log next set" (and the notification's "Set done") checks off. */
+    private fun noticeFor(w: Workout, note: String? = null): WorkoutNotice {
+        val p = prefs()
+        val t = stringsFor(p.language)
+        val next = w.nextOpenSet(lastCompletedSetId(w))
+        return WorkoutNotice(
+            title = next?.exercise?.exercise?.name ?: w.name,
+            // Empty workout (no exercise yet): just its name.
+            body = next?.let { WorkoutFormat.current(it, p.unit, p.language, t) } ?: if (w.totalSets == 0) "" else t.allSetsDone,
+            startedAt = w.startedAt,
+            doneLabel = next?.let { t.setDoneAction },
+            vibrate = p.vibration,
+            channel = t.channelWorkout,
+            channelSilent = t.channelWorkoutSilent,
+            note = note,
+        )
+    }
+
     private fun alertFor(w: Workout, rest: RestTimer): RestAlert {
         val p = prefs()
         val t = stringsFor(p.language)
@@ -362,10 +412,11 @@ class WorkoutController(
             vibrate = p.vibration,
             plusLabel = t.restPlus,
             skipLabel = t.restSkip,
-            channelRunning = t.channelRest,
-            channelOver = t.channelRestOver,
+            channel = t.channelWorkout,
+            channelSilent = t.channelWorkoutSilent,
             ticks = p.ticks,
             ticksBody = t.restTicksBody,
+            after = noticeFor(w.copy(rest = null), note = t.restOver),
         )
     }
 
@@ -374,6 +425,7 @@ class WorkoutController(
     private fun set(w: Workout) {
         _state.value = _state.value.copy(workout = w)
         persist(w)
+        if (w.rest == null) showNotice(w)
     }
 
     private fun persist(w: Workout) {

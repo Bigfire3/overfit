@@ -25,7 +25,7 @@ class RestTickAlarmTest {
     private fun alert(endsAt: Long, ticks: Boolean) = RestAlert(
         startedAt = System.currentTimeMillis(), endsAt = endsAt, title = "Pause", overTitle = "Pause vorbei",
         body = "Nächste: Bankdrücken", vibrate = true, plusLabel = "+15 s", skipLabel = "Überspringen",
-        channelRunning = "Pausentimer", channelOver = "Pause vorbei", ticks = ticks, ticksBody = "Noch 3 Sekunden",
+        channel = "Laufendes Training", channelSilent = "Laufendes Training (ohne Vibration)", ticks = ticks, ticksBody = "Noch 3 Sekunden",
     )
 
     /** Trigger time per receiver class. */
