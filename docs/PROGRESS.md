@@ -15,6 +15,18 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Hotfix: KI-Auswertung mit Guthaben (6.11.)
+**Erledigt:** Auswertungen über Guthaben scheiterten auf dem Testserver: Gemini Flash ohne Schlüssel, Claude über das (seit 2026 immer
+authentifizierte) Cloudflare AI Gateway mit 401, Lite-Modell bei Cloudflare abgekündigt. Backend geht ohne Gateway-Token direkt zum
+Anbieter, 401/403 weicht auf die andere Stufe aus, Lite = Llama 3.3 70B. App lädt bei `tier_unavailable` die Config neu und zeigt
+Server-Fehler verständlich. Details in DECISIONS.md. Tests: `tiers.test.ts`, `CoachTransportTest`.
+**Offen (Fabian):** GitHub-Secret `GEMINI_API_KEY` (Gemini Flash = Standard, nur dafür gilt der Einladungsbonus); optional
+`AI_GATEWAY_TOKEN` (Gateway-Protokolle). Repo-Variable `BACKEND_DEPLOY_MODE=test` für Auto-Deploy nach jedem Backend-Merge.
+
+### Bitte auf dem Handy testen (Hotfix KI)
+1. Training beenden → Coach-Auswertung mit Guthaben: Auswertung kommt (zurzeit von Claude Sonnet 5.5, weil Gemini Flash fehlt), Guthaben sinkt um wenige Cent (ca. 3–10 ct).
+2. Profil → Guthaben → Modell: Gemini 3.6 Flash erscheint erst, wenn `GEMINI_API_KEY` gesetzt und der Server neu deployt ist.
+
 ## Trainings-Benachrichtigung rot/grün (6.11.)
 **Erledigt:** Während des ganzen Trainings gibt es jetzt eine Benachrichtigung (Foreground-Service): grün im Satz (Übung,
 „Satz 2/4 · 80 kg × 5“, Trainingszeit, „Satz fertig“), rot in der Pause (Countdown, „Nächste: …“, +15 s, Überspringen).

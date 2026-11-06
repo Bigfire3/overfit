@@ -13,6 +13,7 @@
 //   In Produktion haben STRIPE_LIVE_SECRET_KEY / STRIPE_LIVE_WEBHOOK_SECRET Vorrang (Test- und Live-Werte parallel in GitHub).
 //   Optional; fehlt einer (weder in GitHub noch im Worker) oder passt der Schlüssel nicht zum Modus, bleibt der Web-Kauf aus,
 //   mit Hinweis in der Zusammenfassung (kein Abbruch).
+// - AI_GATEWAY_TOKEN (optional): Token für das authentifizierte AI Gateway; ohne gehen Gemini/Anthropic direkt.
 // - Optional (Play/Apple-Prüfer): nur gesetzt, wenn vorhanden; sonst Hinweis in der Zusammenfassung.
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -91,6 +92,11 @@ export function plan(mode, env, existing) {
     notes.push(`Web-Kauf bleibt **aus**: \`STRIPE_SECRET_KEY\` muss im Modus ${mode} mit \`${wantLive ? 'sk_live_' : 'sk_test_'}\` beginnen ` +
       '(Testbetrieb nur Testmodus-Schlüssel, Produktion nur Live-Schlüssel).');
   } else notes.push(`Web-Kauf (Stripe${wantLive ? '' : ', Testmodus'}): beide Secrets vorhanden.`);
+  // AI Gateway (Protokolle, Kosten): neue Gateways verlangen immer ein Token. Ohne Token gehen Gemini/Anthropic direkt.
+  if (given('AI_GATEWAY_TOKEN')) secrets.AI_GATEWAY_TOKEN = given('AI_GATEWAY_TOKEN');
+  else if (have.has('AI_GATEWAY_TOKEN')) notes.push('`AI_GATEWAY_TOKEN`: bleibt wie im Worker gesetzt.');
+  else notes.push('`AI_GATEWAY_TOKEN` fehlt (optional): Gemini und Anthropic laufen direkt, nicht über das AI Gateway ' +
+    '(keine Gateway-Protokolle für diese Stufen, Auswertungen funktionieren). Anleitung: backend/README.md → „AI Gateway“.');
   const skipped = [];
   for (const n of OPTIONAL) {
     if (given(n)) secrets[n] = given(n);

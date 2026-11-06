@@ -26,7 +26,7 @@ export interface TierDef {
 export const TIERS: Record<Tier, TierDef> = {
   standard: { provider: 'gemini', model: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', vendor: 'Google', thinkingTokens: 1000, images: true, fallback: 'pro' },
   pro: { provider: 'anthropic', model: 'claude-sonnet-5-5', displayName: 'Claude Sonnet 5.5', vendor: 'Anthropic', thinkingTokens: 0, images: true, fallback: 'standard' },
-  lite: { provider: 'workers-ai', model: '@cf/meta/llama-3.1-8b-instruct', displayName: 'Llama 3.1 8B', vendor: 'Cloudflare', thinkingTokens: 0, images: false, fallback: 'standard' },
+  lite: { provider: 'workers-ai', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', displayName: 'Llama 3.3 70B', vendor: 'Cloudflare', thinkingTokens: 0, images: false, fallback: 'standard' },
 };
 export const TIER_NAMES = Object.keys(TIERS) as Tier[];
 export const DEFAULT_TIER: Tier = 'standard';
@@ -58,7 +58,9 @@ interface PricePeriod extends Price {
  * - gemini-3.6-flash: 0,75 $ ein / 3,75 $ aus (inkl. Thinking) / 0,075 $ Cache; ab 2027-01-01 doppelt so teuer.
  *   Kein Cache-Write-Preis (implizites Caching) → cacheWrite = Eingabepreis.
  * - claude-sonnet-5-5: 2 $ / 10 $, Cache-Read 0,20 $, Cache-Write 2,50 $.
- * - @cf/meta/llama-3.1-8b-instruct: 25 608 Neurons ein / 75 147 Neurons aus je MTok (0,282 $ / 0,827 $).
+ * - @cf/meta/llama-3.3-70b-instruct-fp8-fast: 0,293 $ / 2,253 $ (Workers AI, JSON-Modus; Stufe lite seit 6.11.2026).
+ * - @cf/meta/llama-3.1-8b-instruct: 25 608 Neurons ein / 75 147 Neurons aus je MTok (0,282 $ / 0,827 $). Bei Workers AI am
+ *   30.5.2026 abgekündigt, bleibt nur für die Kostenrechnung alter Buchungen.
  */
 export const MODEL_PRICES: Record<string, PricePeriod[]> = {
   'gemini-3.6-flash': [
@@ -66,6 +68,7 @@ export const MODEL_PRICES: Record<string, PricePeriod[]> = {
     { since: '2027-01-01', in: usd(1.5), cacheRead: usd(0.15), cacheWrite: usd(1.5), out: usd(7.5) },
   ],
   'claude-sonnet-5-5': [{ in: usd(2), cacheRead: usd(0.2), cacheWrite: usd(2.5), out: usd(10) }],
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': [{ in: usd(0.293), cacheRead: usd(0.293), cacheWrite: usd(0.293), out: usd(2.253) }],
   '@cf/meta/llama-3.1-8b-instruct': [{ in: neurons(25_608), cacheRead: neurons(25_608), cacheWrite: neurons(25_608), out: neurons(75_147) }],
 };
 
@@ -154,12 +157,49 @@ function schemaOf(body: Record<string, unknown>): unknown | null {
   return fmt?.type === 'json_schema' && fmt.schema ? fmt.schema : null;
 }
 
-/** Basis-URL eines Anbieters: ausdrücklicher Override (Tests, Dev) → AI Gateway → direkt. */
-async function baseUrl(env: Env, cfg: Config, provider: 'anthropic' | 'google-ai-studio'): Promise<string> {
+/**
+ * Basis-URL eines Anbieters: ausdrücklicher Override (Tests, Dev) → AI Gateway → direkt.
+ * Das Gateway nur mit `AI_GATEWAY_TOKEN`: Cloudflare legt neue Gateways seit 2026 immer mit Pflicht-Authentifizierung an
+ * (nicht abschaltbar), ohne `cf-aig-authorization` antwortet es mit 401. Ohne Token gehen Gemini und Anthropic deshalb
+ * direkt an den Anbieter; Workers AI läuft über das Binding und braucht keinen Token.
+ */
+async function route(env: Env, cfg: Config, provider: 'anthropic' | 'google-ai-studio'): Promise<{ url: string; gateway: boolean }> {
   const override = provider === 'anthropic' ? env.ANTHROPIC_BASE_URL : env.GEMINI_BASE_URL;
-  if (override) return override.replace(/\/+$/, '');
-  if (cfg.aiGatewayId && env.AI) return (await env.AI.gateway(cfg.aiGatewayId).getUrl(provider)).replace(/\/+$/, '');
+  if (override) return { url: override.replace(/\/+$/, ''), gateway: false };
+  if (cfg.aiGatewayId && env.AI && env.AI_GATEWAY_TOKEN) {
+    return { url: (await env.AI.gateway(cfg.aiGatewayId).getUrl(provider)).replace(/\/+$/, ''), gateway: true };
+  }
+  return { url: directUrl(provider), gateway: false };
+}
+
+function directUrl(provider: 'anthropic' | 'google-ai-studio'): string {
   return provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://generativelanguage.googleapis.com';
+}
+
+/**
+ * Anfrage an einen Anbieter, über das Gateway, falls eingerichtet. Lehnt das Gateway selbst ab (401/403, z. B. Token
+ * falsch oder abgelaufen), geht dieselbe Anfrage einmal direkt an den Anbieter: Ein Gateway-Problem darf die
+ * Auswertung nicht verhindern.
+ */
+async function providerPost(
+  env: Env,
+  cfg: Config,
+  provider: 'anthropic' | 'google-ai-studio',
+  path: string,
+  headers: Record<string, string>,
+  body: unknown,
+  o: CallOptions,
+): Promise<Record<string, unknown>> {
+  const r = await route(env, cfg, provider);
+  if (!r.gateway) return post(`${r.url}${path}`, headers, body, o.timeoutMs);
+  const started = Date.now();
+  try {
+    return await post(`${r.url}${path}`, { ...headers, ...gatewayHeaders(cfg, o), 'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}` }, body, o.timeoutMs);
+  } catch (e) {
+    if (!(e instanceof UpstreamError) || (e.status !== 401 && e.status !== 403)) throw e;
+    console.warn('AI Gateway lehnt ab, direkt an den Anbieter', provider, e.status, e.message);
+    return post(`${directUrl(provider)}${path}`, headers, body, Math.max(o.timeoutMs - (Date.now() - started), 1_000));
+  }
 }
 
 /**
@@ -196,8 +236,12 @@ async function post(url: string, headers: Record<string, string>, body: unknown,
     /* bleibt null */
   }
   if (!res.ok || !parsed || typeof parsed !== 'object') {
-    const msg = (parsed?.error as { message?: string } | undefined)?.message ?? `KI-Anbieter antwortet mit HTTP ${res.status}`;
-    const unavailable = res.ok || res.status >= 500 || res.status === 429 || res.status === 408;
+    const err = parsed?.error as { message?: string } | { message?: string }[] | undefined;
+    // Anbieter: { error: { message } }; Cloudflare (AI Gateway): { error: [{ code, message }] }.
+    const detail = Array.isArray(err) ? err.map((x) => x?.message).filter(Boolean).join('; ') : err?.message;
+    const msg = detail || `KI-Anbieter antwortet mit HTTP ${res.status}`;
+    // 401/403: Schlüssel oder Gateway des Betreibers kaputt, nicht die Anfrage → wie ein Ausfall (Ausweich-Stufe, nichts abgebucht).
+    const unavailable = res.ok || res.status >= 500 || res.status === 429 || res.status === 408 || res.status === 401 || res.status === 403;
     throw new UpstreamError(unavailable, res.status, msg);
   }
   return parsed;
@@ -208,12 +252,7 @@ async function callAnthropic(env: Env, cfg: Config, body: Record<string, unknown
   const outputConfig = { ...((body.output_config as object | undefined) ?? {}) } as Record<string, unknown>;
   if (outputConfig.effort === undefined) outputConfig.effort = 'medium';
   const req = { ...body, model, max_tokens: maxTokens, output_config: outputConfig };
-  const res = await post(
-    `${await baseUrl(env, cfg, 'anthropic')}/v1/messages`,
-    { 'x-api-key': env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', ...gatewayHeaders(cfg, o) },
-    req,
-    o.timeoutMs,
-  );
+  const res = await providerPost(env, cfg, 'anthropic', '/v1/messages', { 'x-api-key': env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' }, req, o);
   const u = res.usage as Record<string, number> | undefined;
   const usage = u && typeof u.input_tokens === 'number' && typeof u.output_tokens === 'number' ? (u as Usage) : null;
   return { body: res, usage };
@@ -276,11 +315,8 @@ export function geminiToAnthropic(res: Record<string, unknown>, model: string): 
 }
 
 async function callGemini(env: Env, cfg: Config, body: Record<string, unknown>, model: string, maxOutput: number, o: CallOptions): Promise<Normalized> {
-  const res = await post(
-    `${await baseUrl(env, cfg, 'google-ai-studio')}/v1beta/models/${model}:generateContent`,
-    { 'x-goog-api-key': env.GEMINI_API_KEY!, ...gatewayHeaders(cfg, o) },
-    geminiRequest(body, maxOutput),
-    o.timeoutMs,
+  const res = await providerPost(
+    env, cfg, 'google-ai-studio', `/v1beta/models/${model}:generateContent`, { 'x-goog-api-key': env.GEMINI_API_KEY! }, geminiRequest(body, maxOutput), o,
   );
   if (!res.candidates && !res.promptFeedback) throw new UpstreamError(true, 200, 'Gemini-Antwort ohne Inhalt');
   return geminiToAnthropic(res, model);
@@ -307,7 +343,11 @@ export function workersAiRequest(body: Record<string, unknown>, maxOutput: numbe
 async function callWorkersAi(env: Env, cfg: Config, body: Record<string, unknown>, model: string, maxOutput: number, o: CallOptions): Promise<Normalized> {
   const ai = env.AI!;
   const opts = cfg.aiGatewayId ? { gateway: { id: cfg.aiGatewayId, metadata: { tier: o.tier, photo: o.hasImages, fallback: !!o.fallback } } } : {};
-  let res: { response?: unknown; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+  let res: {
+    response?: unknown;
+    choices?: { message?: { content?: unknown } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
   try {
     res = (await Promise.race([
       ai.run(model, workersAiRequest(body, maxOutput), opts),
@@ -318,7 +358,8 @@ async function callWorkersAi(env: Env, cfg: Config, body: Record<string, unknown
     // Ausfall oder nicht erfüllbarer JSON-Modus: Ausweichen auf die nächste Stufe ist in beiden Fällen sinnvoll.
     throw new UpstreamError(true, 502, `Workers AI: ${e instanceof Error ? e.message : String(e)}`);
   }
-  const r = res?.response;
+  // Ältere Modelle: { response }, neuere: OpenAI-Format { choices: [{ message: { content } }] }.
+  const r = res?.response ?? res?.choices?.[0]?.message?.content;
   const text = typeof r === 'string' ? r : r && typeof r === 'object' ? JSON.stringify(r) : '';
   const u = res?.usage;
   const usage: Usage | null =
