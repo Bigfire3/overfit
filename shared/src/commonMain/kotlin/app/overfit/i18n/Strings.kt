@@ -206,6 +206,8 @@ data class Strings(
     val notificationsAllowed: String,
     val notificationsDeniedHint: String,
     val notificationsInfo: String,
+    /** Same where only the rest end is notified (iOS). */
+    val notificationsInfoRestEnd: String,
     /** Settings row: ticks in the last 3 s of a rest. */
     val restTicks: String,
     val restTicksHint: String,
@@ -432,6 +434,7 @@ val German = Strings(
     notificationsAllowed = "Erlaubt",
     notificationsDeniedHint = "Ohne diese Erlaubnis meldet sich der Pausentimer nicht, wenn eine andere App offen oder der Bildschirm aus ist.",
     notificationsInfo = "Während des Trainings zeigt eine Benachrichtigung den aktuellen Satz (grün, mit „Satz fertig“) und in der Pause den Countdown (rot, mit +15 s und Überspringen). Beim Wechsel meldet sie sich neu. Sie bleibt bis zum Trainingsende, auch wenn du sie wegwischst.",
+    notificationsInfoRestEnd = "Ist Overfit im Hintergrund oder das Handy gesperrt, meldet sich eine Benachrichtigung, sobald die Pause vorbei ist.",
     restTicks = "Ticken vor Pausenende",
     restTicksHint = "In den letzten 3 Sekunden der Pause tickt es, auch wenn eine andere App offen ist. Musik wird dabei nur kurz leiser.",
     restTicksBody = "Noch 3 Sekunden",
@@ -651,6 +654,7 @@ val English = Strings(
     notificationsAllowed = "Allowed",
     notificationsDeniedHint = "Without this permission the rest timer cannot reach you while another app is open or the screen is off.",
     notificationsInfo = "During a workout a notification shows the current set (green, with “Set done”) and during a rest the countdown (red, with +15 s and Skip). It alerts again at each switch. It stays until the workout ends, even if you swipe it away.",
+    notificationsInfoRestEnd = "When Overfit is in the background or the phone is locked, a notification tells you when the rest is over.",
     restTicks = "Countdown ticks",
     restTicksHint = "Ticks in the last 3 seconds of a rest, even while another app is open. Music only gets quieter for a moment.",
     restTicksBody = "3 seconds left",

@@ -150,6 +150,17 @@ class WorkoutControllerTest {
     }
 
     @Test
+    fun notice_emptyWorkout_onlyItsName() = runTest {
+        val e = env()
+        e.c.awaitLoaded()
+        assertTrue(e.c.startEmpty("Leer"))
+        val n = e.alerts.notices.last().first
+        assertEquals("Leer", n.title)
+        assertEquals("", n.body)
+        assertNull(n.doneLabel)
+    }
+
+    @Test
     fun repostNotice_showsTheCurrentStateAgain() = runTest {
         val e = env()
         e.c.awaitLoaded()

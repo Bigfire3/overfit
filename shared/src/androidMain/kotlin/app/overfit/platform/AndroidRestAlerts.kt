@@ -78,6 +78,8 @@ class AndroidRestAlerts(
         post(context, Shown(iconRes, notice = notice), announce)
     }
 
+    override val workoutNotification: Boolean get() = true
+
     override fun endWorkout() {
         cancel()
         end(context)
@@ -238,10 +240,13 @@ class AndroidRestAlerts(
         fun post(context: Context, shown: Shown, announce: Boolean) {
             current = shown
             known = true
-            val n = build(context, shown, announce && !AppVisibility.visible)
-            notification = n
+            val alert = announce && !AppVisibility.visible
+            val n = build(context, shown, alert)
+            // The service re-posts it with startForeground: silently, or a transition alerts twice.
+            notification = if (alert) build(context, shown, alert = false) else n
             notify(context, ID_TRAINING, n)
-            TrainingService.ensureRunning(context)
+            // Notifications blocked: no service either (it would run without anything to show).
+            if (NotificationManagerCompat.from(context).areNotificationsEnabled()) TrainingService.ensureRunning(context)
         }
 
         /** Workout over: the service stops and the notification goes. */
@@ -250,6 +255,7 @@ class AndroidRestAlerts(
             known = true
             notification = null
             TrainingService.stop(context)
+            TrainingService.resetFailure()
             NotificationManagerCompat.from(context).cancel(ID_TRAINING)
         }
 
@@ -321,13 +327,14 @@ class AndroidRestAlerts(
 
         /**
          * The rest whose alarm fired is over: switch to the next set and announce it. A stale
-         * alarm (workout ended, a newer rest) changes nothing. In a fresh process (killed during
-         * the rest) the notice comes from the alarm's extras.
+         * alarm (workout ended, a newer rest) changes nothing. Did the app already switch to the
+         * set (rest over in the running process, values changed since), its notice is the fresh
+         * one. In a fresh process (killed during the rest) the notice comes from the alarm's extras.
          */
         fun onRestEnded(context: Context, endsAt: Long, after: WorkoutNotice?, icon: Int) {
             val shown = current
             if (known && (shown == null || (shown.rest != null && shown.rest.endsAt != endsAt))) return
-            val notice = after ?: shown?.rest?.after ?: return
+            val notice = shown?.notice?.let { it.copy(note = after?.note ?: it.note) } ?: after ?: shown?.rest?.after ?: return
             post(context, Shown(shown?.icon ?: icon, notice = notice), announce = true)
         }
 

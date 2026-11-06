@@ -389,7 +389,8 @@ class WorkoutController(
         val next = w.nextOpenSet(lastCompletedSetId(w))
         return WorkoutNotice(
             title = next?.exercise?.exercise?.name ?: w.name,
-            body = next?.let { WorkoutFormat.current(it, p.unit, p.language, t) } ?: t.allSetsDone,
+            // Empty workout (no exercise yet): just its name.
+            body = next?.let { WorkoutFormat.current(it, p.unit, p.language, t) } ?: if (w.totalSets == 0) "" else t.allSetsDone,
             startedAt = w.startedAt,
             doneLabel = next?.let { t.setDoneAction },
             vibrate = p.vibration,

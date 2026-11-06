@@ -240,6 +240,35 @@ class WorkoutNotificationTest {
         assertFalse(TrainingService.running)
     }
 
+    @Test
+    fun announcedTransition_serviceTakesItOverSilently_noDoubleAlert() {
+        alerts.schedule(rest(System.currentTimeMillis() + 60_000, announce = true))
+        assertTrue(announced(shown()!!))
+        val service = startServiceAsAndroidWould()
+        assertTrue(silent(shadowOf(service).lastForegroundNotification))
+    }
+
+    @Test
+    fun restAlarm_afterTheAppAlreadySwitched_keepsTheFreshValues() {
+        val end = System.currentTimeMillis() + 60_000
+        alerts.schedule(rest(end))
+        val intent = alarmIntent()
+        // The running app ended the rest itself and the user changed the weight since.
+        alerts.showWorkout(notice(body = "Satz 3/4 · 82,5 kg × 5"))
+        RestAlarmReceiver().onReceive(context, intent)
+        val n = shown()!!
+        assertEquals("Satz 3/4 · 82,5 kg × 5", text(n))
+        assertEquals("Pause vorbei", n.extras.getString(Notification.EXTRA_SUB_TEXT))
+        assertTrue(announced(n))
+    }
+
+    @Test
+    fun notificationsBlocked_noService() {
+        shadowOf(nm).setNotificationsEnabled(false)
+        alerts.showWorkout(notice())
+        assertNull(shadowOf(context).nextStartedService)
+    }
+
     /** The service start [AndroidRestAlerts] asked for, as Android would run it. */
     private fun startServiceAsAndroidWould(): TrainingService {
         val intent = shadowOf(context).nextStartedService

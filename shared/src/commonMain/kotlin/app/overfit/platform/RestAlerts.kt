@@ -72,6 +72,9 @@ interface RestAlerts {
      */
     fun showWorkout(notice: WorkoutNotice, announce: Boolean = false) = Unit
 
+    /** Whether [showWorkout] shows a notification for the whole workout (Android), else only the rest end (iOS). */
+    val workoutNotification: Boolean get() = false
+
     /** Workout finished or discarded: rest alarms and the workout notification go away. */
     fun endWorkout() = cancel()
 

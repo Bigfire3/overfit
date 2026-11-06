@@ -37,6 +37,8 @@ class TrainingService : Service() {
             return START_NOT_STICKY
         }
         if (runCatching { startForeground(n) }.isFailure) {
+            // Not again for this workout (every update would retry); the notification stays a normal one.
+            failed = true
             stopSelf()
             return START_NOT_STICKY
         }
@@ -72,14 +74,22 @@ class TrainingService : Service() {
         var starting = false
             private set
 
+        /** startForeground was refused during this workout. */
+        @Volatile
+        var failed = false
+            private set
+
+        fun resetFailure() { failed = false }
+
         fun resetForTest() {
             running = false
             starting = false
+            failed = false
         }
 
         /** Starts the service unless it runs or is starting. Refused (background start): stays a normal notification. */
         fun ensureRunning(context: Context) {
-            if (running || starting) return
+            if (running || starting || failed) return
             starting = true
             runCatching { ContextCompat.startForegroundService(context, Intent(context, TrainingService::class.java)) }
                 .onFailure { starting = false }

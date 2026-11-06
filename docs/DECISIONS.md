@@ -1240,3 +1240,11 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - **Unverändert:** Exakter Pausenalarm, Ticken (`RestTickReceiver`, `RestTicks`), iOS-Benachrichtigungen.
 - **iOS:** Wie bisher lokale Benachrichtigung zum Pausenende (Übergang Pause → Satz) und Ticken. iOS kennt keine dauerhafte, farbige Benachrichtigung mit laufendem Countdown; das ginge nur als Live Activity (Widget-Extension in Swift mit ActivityKit, eigenes Xcode-Target) – eigenes, größeres Feature. Satz → Pause passiert auf iOS ohnehin in der App (keine Benachrichtigungs-Aktionen), braucht also keine Meldung.
 - **Tests:** `WorkoutNotificationTest` (Robolectric: grün/rot mit Inhalt und Aktionen, eine Benachrichtigung fürs ganze Training, Übergang angekündigt vs. still, App sichtbar still, Kanal ohne Vibration, Wegwischen im Satz und in der Pause, Wegwischen kurz vor Pausenende → Satz, Pausenalarm → Satz mit „Pause vorbei“, Alarm nach Prozess-Tod aus den Extras, veralteter Alarm, Service hält die Benachrichtigung, stoppt beim Trainingsende und beendet sich, wenn das Training vor dem Start endet), `WorkoutControllerTest` (Notices über das ganze Training, Ankündigung nur bei Satz → Pause, Dedupe, Überspringen, alle Sätze erledigt, `repostNotice`). `RestTickAlarmTest` unverändert grün.
+- **Sonnet-Gegencheck (Befunde und Umgang):**
+  - Behoben: Ein angekündigter Übergang hätte beim Service-Start doppelt alarmiert. Der Service bekommt jetzt die stille Variante.
+  - Behoben: Kommt der Pausenalarm erst, nachdem die App schon auf den Satz gewechselt hat (z. B. inexakt und Werte inzwischen geändert), kündigt er den aktuellen Satz an statt des alten aus den Alarm-Extras.
+  - Behoben: Verweigert Android `startForeground`, wird es bis zum nächsten Training nicht erneut versucht.
+  - Behoben: Bei gesperrten Benachrichtigungen startet kein Service mehr.
+  - Behoben: Ein leeres Training zeigt nur seinen Namen statt „Alle Sätze erledigt“.
+  - Behoben: Der Einstellungs-Hinweis hat auf iOS einen eigenen Text, denn dort gibt es nur die Meldung zum Pausenende.
+  - Bewusst offen: Ändert man mitten im Training Sprache, Einheit oder Vibration, wird die Benachrichtigung erst bei der nächsten Änderung neu gezeichnet. Das ist selten, und wer die Einstellung ändert, hat die App ohnehin offen.
