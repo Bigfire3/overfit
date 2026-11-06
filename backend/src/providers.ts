@@ -198,7 +198,7 @@ async function providerPost(
   } catch (e) {
     if (!(e instanceof UpstreamError) || (e.status !== 401 && e.status !== 403)) throw e;
     console.warn('AI Gateway lehnt ab, direkt an den Anbieter', provider, e.status, e.message);
-    return post(`${directUrl(provider)}${path}`, headers, body, Math.max(o.timeoutMs - (Date.now() - started), 5_000));
+    return post(`${directUrl(provider)}${path}`, headers, body, Math.max(o.timeoutMs - (Date.now() - started), 1_000));
   }
 }
 

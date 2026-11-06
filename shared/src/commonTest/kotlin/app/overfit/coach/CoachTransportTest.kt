@@ -383,6 +383,20 @@ class CoachTransportTest {
     }
 
     @Test
+    fun fuelTierStillMissingAfterReloadIsAServerError() = runTest {
+        var calls = 0
+        val service = object : FuelService by FakeFuel(onMessages = { error("unused") }) {
+            override suspend fun config(): FuelConfig = tiers("standard")
+            override suspend fun messages(bodyJson: String): FuelMessageResult {
+                calls++
+                throw FuelException("tier_unavailable", 503)
+            }
+        }
+        assertEquals(CoachErrorKind.SERVER, errorKind { FuelCoach(FuelProvider { service }).send(prompt, "standard") })
+        assertEquals(2, calls)
+    }
+
+    @Test
     fun fuelWithoutServiceIsNoAccess() = runTest {
         assertEquals(CoachErrorKind.NO_ACCESS, errorKind { FuelCoach(FuelProvider { null }).send(prompt, "m") })
     }

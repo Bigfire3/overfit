@@ -17,7 +17,10 @@ fun modelLabel(modelId: String): String = KNOWN[modelId] ?: modelId
 /** Model name without the provider in brackets ("Gemini 3.6 Flash"). */
 fun modelShortName(modelId: String): String = modelLabel(modelId).substringBefore(" (")
 
-/** Model of an internal tier ID (standard | pro | lite), for old bookings that only store the tier. */
+/**
+ * Model of an internal tier ID (standard | pro | lite), for old bookings that only store the tier. Those bookings are from
+ * before the lite switch to Llama 3.3 70B (new bookings store the model), so lite stays Llama 3.1 8B here.
+ */
 fun modelOfTier(tier: String): String? = when (tier) {
     "standard" -> "gemini-3.6-flash"
     "pro" -> "claude-sonnet-5-5"

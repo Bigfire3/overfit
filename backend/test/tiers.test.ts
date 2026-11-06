@@ -342,6 +342,8 @@ describe('Preistabelle', () => {
     expect(currentPrices()['claude-sonnet-5-5']).toEqual({ in: 1_840_000, cacheRead: 184_000, cacheWrite: 2_300_000, out: 9_200_000 });
     // 0,293 $ / 2,253 $ je MTok × 0,92 €/$
     expect(currentPrices()['@cf/meta/llama-3.3-70b-instruct-fp8-fast']).toMatchObject({ in: 269_560, out: 2_072_760 });
+    // Jede Stufe hat einen Preis für ihr Modell
+    for (const t of Object.values(TIERS)) expect(currentPrices()[t.model]).toBeDefined();
     // Abgekündigtes Modell bleibt für alte Buchungen: 25 608 / 75 147 Neurons je MTok × 0,011 $/1000 Neurons × 0,92 €/$
     expect(currentPrices()['@cf/meta/llama-3.1-8b-instruct']).toMatchObject({ in: 259_153, out: 760_488 });
   });
