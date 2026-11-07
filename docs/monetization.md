@@ -20,7 +20,7 @@ Der Nutzer wählt das Modell (Coach-Einstellungen → „Modell für deinen Coac
 |---|---|---|---|---|
 | Gemini 3.6 Flash (Google), Voreinstellung | 0,75 $ / 3,75 $ (ab 1.1.2027: 1,50 $ / 7,50 $) | ≈ 1,8 ct (ab 2027 ≈ 3,6 ct) | ≈ 1,3 ct | – |
 | Claude Sonnet 5.5 (Anthropic) | 2 $ / 10 $ | ≈ 3,6 ct | ≈ 2,2 ct | – |
-| Llama 3.1 8B (Cloudflare Workers AI) | 0,28 $ / 0,83 $ | – | – | ≈ 0,04 ct (nur dieses Modell) |
+| Llama 3.3 70B (Cloudflare Workers AI; bis 6.11.2026 Llama 3.1 8B, abgekündigt) | 0,293 $ / 2,253 $ | – | – | ≈ 0,06 ct (nur dieses Modell) |
 
 \* berechnet, nicht geraten: Listenpreis × typische Token-Menge × 1,28, bei 0,92 €/$ (z. B. Gemini-Auswertung 13 938 µ€ × 1,28 = 17 841 µ€). Typische Mengen aus den echten Prompts
 (Coach 8 200 ein / 1 400 aus, Chat 6 700 / 500, Ausfüllen 900 / 120; Gemini zählt ca. 1 000 Thinking-Token als Ausgabe dazu),

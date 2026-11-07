@@ -152,6 +152,11 @@ class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
         }
     }
 
+    /** Forgets the cached config, e.g. after the backend said a tier is not available (keys changed on the server). */
+    fun invalidateConfig() {
+        cached = null
+    }
+
     /** Current credit in µ€ (null = unknown). */
     suspend fun balance(): Long? {
         val s = service() ?: return null

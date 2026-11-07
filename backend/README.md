@@ -265,14 +265,21 @@ Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `displayName`, `vendo
 |---|---|---|---|---|
 | `standard` (Voreinstellung) | Google Gemini `gemini-3.6-flash` (native API, `responseJsonSchema`) | ja | → `pro` | 0,75 $ / 3,75 $ (ab 2027-01-01: 1,50 $ / 7,50 $) |
 | `pro` | Anthropic `claude-sonnet-5-5` | ja | → `standard` | 2 $ / 10 $ |
-| `lite` | Workers AI `@cf/meta/llama-3.1-8b-instruct` (JSON-Modus) | nein (400 `images_not_supported`) | → `standard` | 25 608 / 75 147 Neurons (0,282 $ / 0,827 $) |
+| `lite` | Workers AI `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (JSON-Modus; bis 6.11.2026 `llama-3.1-8b-instruct`, bei Cloudflare abgekündigt) | nein (400 `images_not_supported`) | → `standard` | 0,293 $ / 2,253 $ |
 
 - Die App schickt das Anthropic-Format mit `model` = Stufe; das Backend bildet es auf den Anbieter ab und antwortet im Anthropic-Format.
 - Preise stehen in `src/providers.ts` (`MODEL_PRICES`, mit Gültig-ab-Datum, Wechselkurs `EUR_PER_USD`). Ändern: Tabelle anpassen
   und deployen, oder kurzfristig `PRICE_TABLE` setzen.
 - Ausweichen (5xx, 429, Zeitüberschreitung, Netzwerk): berechnet wird höchstens der Preis der angefragten Stufe für die tatsächlich
-  verbrauchten Token; die Differenz trägt die Marge. Ablehnungen (4xx) weichen nicht aus.
-- AI Gateway: alle Aufrufe (Gemini, Anthropic über `getUrl`, Workers AI über die `gateway`-Option) laufen über `AI_GATEWAY_ID`.
+  verbrauchten Token; die Differenz trägt die Marge. 401/403 des Anbieters (Schlüssel des Betreibers ungültig) zählt wie ein Ausfall
+  (`502 upstream_unavailable`, Fehlertext in `message`). Andere Ablehnungen (4xx) weichen nicht aus.
+- AI Gateway: Workers AI läuft immer über die `gateway`-Option des Bindings. Gemini und Anthropic laufen nur dann über das Gateway
+  (`getUrl`), wenn zusätzlich das Secret `AI_GATEWAY_TOKEN` gesetzt ist: Cloudflare legt neue Gateways seit 2026 immer mit
+  Pflicht-Authentifizierung an (lässt sich nicht abschalten), ohne `cf-aig-authorization` antwortet das Gateway mit 401. Ohne Token
+  gehen diese beiden Stufen direkt an den Anbieter (funktioniert, nur ohne Gateway-Protokoll). Lehnt das Gateway trotz Token ab
+  (401/403), geht dieselbe Anfrage einmal direkt an den Anbieter. **Token anlegen (optional):** dash.cloudflare.com → AI → AI Gateway
+  → `overfit-test` bzw. `overfit` → Settings → Authentication → „Create authentication token“ (Recht *AI Gateway · Run*), als
+  GitHub-Secret `AI_GATEWAY_TOKEN` speichern und den Workflow erneut starten.
   Protokolle und Kosten: dash.cloudflare.com → AI → AI Gateway → `overfit` bzw. `overfit-test`. Der Workflow legt es mit
   Protokollen an, Rate-Limit 600 Anfragen/Minute (gleitend, Notbremse) und Cache aus. Anfragen mit Körperfotos werden nicht
   inhaltlich protokolliert: Sie bekommen `cf-aig-collect-log-payload: false`, das Gateway speichert dann weder Anfrage noch Antwort,

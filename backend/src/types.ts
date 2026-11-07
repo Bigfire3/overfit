@@ -44,6 +44,8 @@ export interface Env {
   GEMINI_BASE_URL?: string;
   /** Name des Cloudflare AI Gateways; leer = Anbieter direkt (lokal). Setzt der Deploy-Workflow. */
   AI_GATEWAY_ID?: string;
+  /** Token für ein authentifiziertes AI Gateway (`cf-aig-authorization`); ohne Token gehen Gemini/Anthropic direkt. */
+  AI_GATEWAY_TOKEN?: string;
   /** Zeitlimit je Anbieter-Versuch (ms) und für die ganze Anfrage inklusive Ausweichen. */
   UPSTREAM_TIMEOUT_MS?: string;
   UPSTREAM_BUDGET_MS?: string;
