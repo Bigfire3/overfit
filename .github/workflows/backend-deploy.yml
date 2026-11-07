@@ -45,6 +45,8 @@ jobs:
       # Worker-Secrets (mindestens GEMINI_API_KEY oder ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Optional: Token fürs AI Gateway (neue Gateways verlangen eins); ohne gehen Gemini/Anthropic direkt.
+      AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
       INVITE_SIGNING_KEY: ${{ secrets.INVITE_SIGNING_KEY }}
       # Früherer Name (vor Session AD); wird übernommen, falls INVITE_SIGNING_KEY fehlt.
       LEGACY_INVITE_SIGNING_KEY: ${{ secrets.SPOT_SIGNING_KEY }}

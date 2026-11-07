@@ -125,6 +125,7 @@ class AppStore(
     fun resetAll() {
         runCatching { secrets.delete() }
         kv.remove(KEY)
+        kv.remove(KEY_COACH_STORY_SEEN) // after "delete all data" the story comes again on the first Coach visit
         _state.value = AppState(initial(), hasApiKey = false)
     }
 
