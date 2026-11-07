@@ -31,17 +31,19 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
     // Model chip and cost follow the access and the chosen model live. The cost needs the backend's price table: it is
     // only asked while credit is the chosen access (own key: no backend request, OwnKeyPrivacyTest).
     val access = kotlinx.coroutines.flow.combine(store.state, deps.coach.settings.state) { s, settings -> s to settings }
-    val modelLabel = access
-        .map { (s, settings) ->
-            app.overfit.ui.coach.modelChipLabel(s, settings, deps.providers.fuel.available, app.overfit.i18n.coachSettingsStringsFor(s.language))
-        }
-        .stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "")
-    val cost = access
+    // Credit: the model name comes from the backend's /v1/config (tiers can point to any vendor); the built-in name of
+    // the tier is only the fallback while the config is unknown.
+    val chip = access
         .map { (s, settings) ->
             val config = if (s.providerId == app.overfit.ai.ProviderId.FUEL) deps.providers.fuel.config() else null
-            app.overfit.ui.coach.chatCostEstimate(s, settings, config, s.language)
+            val fallback = app.overfit.ui.coach.modelChipLabel(s, settings, deps.providers.fuel.available, app.overfit.i18n.coachSettingsStringsFor(s.language))
+            val tier = config?.tiers?.get(settings.model(app.overfit.ai.ProviderId.FUEL))
+            val name = tier?.let { it.displayName.ifEmpty { app.overfit.fuel.modelShortName(it.model) } }?.takeIf { it.isNotBlank() }
+            (name ?: fallback) to app.overfit.ui.coach.chatCostEstimate(s, settings, config, s.language)
         }
-        .stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
+        .stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "" to null)
+    val modelLabel = chip.map { it.first }.stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "")
+    val cost = chip.map { it.second }.stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
     return CoachChatEnv(
         chat = deps.coachChat,
         prefs = deps.data.coachChatPrefs,
