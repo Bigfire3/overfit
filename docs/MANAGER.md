@@ -42,11 +42,12 @@ Für die Claude-Session, die Fabians Feedback koordiniert. Stand: 7.11.2026. Kei
 - Offene Fragen ohne Antwort:
   - Fotos pro Tag und pro Training oder nur pro Training?
   - Claude-Connector (MCP) auf dem Testserver prüfen und Einrichtung aufschreiben?
+- Offene Idee: Overfit-Skill bzw. MCP-Plugin für KI-Apps (Schritt 1 ohne Backend: Skill + `.overfit`-Export). Wartet auf Fabians Go.
 - Verworfen (7.11.): Geräte-Umrechner für Maschinen verschiedener Marken.
 
 ## KI im Backend (Stand 7.11.)
 - Guthaben-Anfragen laufen über eine Anbieter-Schicht im Worker (Anthropic, OpenAI, Gemini, Workers AI, OpenRouter). Die Routing-Tabelle steht in `backend/llm-routing.jsonc`: Stufe lite/standard/pro → Modell + Ausweich-Modell + Preis.
-- Umschalten: Actions → „Backend deployen“ → Feld „KI-Anbieter“ (claude, openai, gemini, gratis, gemischt, openrouter) oder Repo-Variable `LLM_PRESET`. Anleitung: `docs/anbieter-umstellen.md`.
+- Umschalten: Actions → „Backend deployen“ → Feld „KI-Anbieter“ (claude, openai, gemini, gratis, gemischt, openrouter) oder Repo-Variable `LLM_PRESET`. Die Wahl wird im Worker gespeichert und gilt, bis neu gewählt wird. Anleitung: `docs/anbieter-umstellen.md`.
 - Abrechnung: echte Tokens × Preis des antwortenden Modells + Aufschlag. Beim Ausweichen zahlt der Nutzer das günstigere der beiden Modelle. Das Anfrage-Protokoll ist in der App unter Profil → Guthaben → Abrechnung.
 - Guthaben läuft nie ab. Kein Startguthaben, keine Einladungen.
 - App-DB: v10 body_weight, v11 ai_request, v12 Coach-Chat.
