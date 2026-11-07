@@ -37,7 +37,7 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
         plans = deps.data.templates.templates.map { list -> list.map { ChatAttachment.Plan(it.id, it.name) } },
         exercises = {
             val s = store.state.value
-            data class Best(val id: String, val name: String, val text: String, val score: Double, val last: Long)
+            data class Best(val id: String, val name: String, val text: String, val score: Double)
             val bests = LinkedHashMap<String, Best>()
             deps.data.workouts.allRecords().filter { it.endedAt != null }.sortedByDescending { it.workout.startedAt }.forEach { r ->
                 r.workout.exercises.forEach { e ->
@@ -47,9 +47,7 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
                     val old = bests[e.exercise.id]
                     if (old == null || score > old.score) {
                         bests[e.exercise.id] = Best(
-                            e.exercise.id, e.exercise.name, ChatContext.setText(best, type, s.profile.unit, s.language), score,
-                            old?.last ?: r.workout.startedAt,
-                        )
+                            e.exercise.id, e.exercise.name, ChatContext.setText(best, type, s.profile.unit, s.language), score)
                     }
                 }
             }

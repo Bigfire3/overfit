@@ -162,7 +162,7 @@ private fun RequestCard(e: AiRequestEntity, r: RequestLogStrings, language: Lang
     }
 }
 
-private fun purposeLabel(purpose: String, r: RequestLogStrings): String = when (AiPurpose.of(purpose)) {
+internal fun purposeLabel(purpose: String, r: RequestLogStrings): String = when (AiPurpose.of(purpose)) {
     AiPurpose.REVIEW -> r.purposeReview
     AiPurpose.CHAT -> r.purposeChat
     AiPurpose.AUTOFILL -> r.purposeAutofill

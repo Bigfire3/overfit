@@ -62,7 +62,8 @@ class FuelDemoTest {
             )
         }
         compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("startet bald").performScrollTo().performClick()
+        // "startet bald" is also the state of the AI chat connections in the coach settings: open the credit row by its label.
+        compose.onNodeWithText("Guthaben", useUnmergedTree = true).performScrollTo().performClick()
 
         // Not configured: explanation + demo
         compose.onNodeWithText("Guthaben startet bald").assertExists()

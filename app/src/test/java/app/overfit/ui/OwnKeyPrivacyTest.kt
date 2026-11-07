@@ -117,7 +117,7 @@ class OwnKeyPrivacyTest {
         store.connectAi(ProviderId.ANTHROPIC, "sk-test")
         val fuel = FuelAccess(kv, "https://$backendHost") { url -> FuelApi(HttpClient(engine), url, RequestSigner(PrivacyKey())) }
         val deps = AppDependencies(
-            store, Providers(HttpClient(engine)), data, versionName = "0.1.test", share = NoopPlatformShare(),
+            store, Providers(HttpClient(engine)) { fuel.service() }, data, versionName = "0.1.test", share = NoopPlatformShare(),
             today = { LocalDate(2026, 11, 3) }, fuel = fuel, kv = kv, coachTransport = { fake },
         )
         assertTrue("a backend URL must be configured for this test to mean something", deps.chat.configured)
@@ -136,25 +136,29 @@ class OwnKeyPrivacyTest {
         // (No History tab any more: finished trainings live in the calendar, tab PHOTOS.)
         compose.onNodeWithTag("tab:PHOTOS").performClick()
         compose.onNodeWithTag("tab:COACH").performClick()
-        waitFor("Prompts & Vorlagen")
-        compose.onNodeWithText("Deine Daten gehen direkt an Anthropic, nicht über Overfit-Server.").performScrollTo().assertExists()
-        input("coach:tabInput").performScrollTo().performTextInput("Was soll ich morgen trainieren?")
-        compose.onNodeWithText("Senden").performScrollTo().performClick()
+        waitFor("Wie lief mein Training?")
+        input("coach:input").performTextInput("Was soll ich morgen trainieren?")
+        compose.onNodeWithTag("coach:send").performClick()
         waitFor("Direkt vom Anbieter.")
-        compose.runOnIdle { backDispatcher!!.onBackPressed() } // the chat covers the tab bar
-        waitFor("Prompts & Vorlagen")
-        // Coach settings → "Abrechnung": the chat request is listed from the device, the server log is not asked.
-        compose.onNodeWithText("Coach-Einstellungen").performScrollTo().performClick()
+        // Settings → Coach: the privacy note; "Abrechnung" lists the chat request from the device, the server log is not asked.
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        waitFor("Coach-Anweisungen")
+        compose.onNodeWithTag("coach:access-privacy").performScrollTo().assertExists()
+        compose.onNodeWithText("Deine Daten gehen direkt an Anthropic, nicht über Overfit-Server.").assertExists()
         compose.onNodeWithText("Abrechnung").performScrollTo().performClick()
         waitFor("über deinen Schlüssel · ok")
         compose.onNodeWithText("Chat").assertExists()
         compose.waitForIdle()
         assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)
         compose.runOnIdle { backDispatcher!!.onBackPressed() }
-        waitFor("Coach-Einstellungen")
+        waitFor("Coach-Anweisungen")
+        // Settings → "KI-Zugang" opens the model picker: with an own key it asks the backend nothing either.
+        compose.onNodeWithText("KI-Zugang").performScrollTo().performClick()
+        waitFor("Gespeicherter Schlüssel ••••test")
+        compose.waitForIdle()
+        assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)
         compose.runOnIdle { backDispatcher!!.onBackPressed() }
-        waitFor("Prompts & Vorlagen")
-        compose.onNodeWithTag("tab:PROFILE").performClick()
+        waitFor("Coach-Anweisungen")
         waitFor("Guthaben")
         compose.waitForIdle()
         assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)

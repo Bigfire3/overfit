@@ -370,28 +370,21 @@ class DayWithOverfitTest {
         back()
         waitFor("4,20 € Guthaben")
 
-        // Coach tab → prompts show their text → copy context: contains the profile and the finished workout
+        // Coach tab = chat: ask (profile and the last training go along), the answer proposes a workout,
+        // "Übernehmen" opens the import preview. (The prompts with "Copy context" moved to the coach settings.)
         tab("Coach")
-        waitFor("Prompts & Vorlagen", substring = true)
-        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasTestTag("prompt:Kontext kopieren")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("prompt:Kontext kopieren").performScrollTo().assertExists()
-        compose.onNodeWithTag("prompt-copy:Kontext kopieren").performScrollTo().performClick()
-        val ctx = share.clipboard.orEmpty()
-        assertTrue(ctx, ctx.contains("Fabi"))
-        assertTrue(ctx, ctx.contains("Push"))
-        assertTrue(ctx, ctx.contains("Bench Press"))
-
-        // Coach chat: ask, the answer proposes a workout, "Use workout" opens the import preview
-        compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:tabInput"))).performScrollTo().performTextInput("Was soll ich morgen trainieren?")
-        click("Senden")
+        waitFor("Wie lief mein Training?")
+        compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:input"))).performTextInput("Was soll ich morgen trainieren?")
+        compose.onNodeWithTag("coach:send").performClick()
         waitFor("Hier ist ein Vorschlag für morgen.")
         waitFor("Workout-Vorschlag: Coach Push")
         val chatPrompt = coachTransport.prompts.last()
         assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Fabi"))
         assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Bench Press"))
-        click("Workout übernehmen")
+        compose.onNodeWithTag("chat:apply").performClick()
         waitFor("Coach Push")
-        click("Übernehmen")
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Übernehmen") and !androidx.compose.ui.test.hasTestTag("chat:apply")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Übernehmen") and !androidx.compose.ui.test.hasTestTag("chat:apply")).performClick()
         compose.waitUntilState(10_000) { templates().any { it.name == "Coach Push" } }
         tab("Coach")
 

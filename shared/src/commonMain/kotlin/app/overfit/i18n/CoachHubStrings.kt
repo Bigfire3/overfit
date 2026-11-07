@@ -143,7 +143,7 @@ val GermanCoachHub = CoachHubStrings(
     connectionsTitle = "KI-Chat-Verbindungen",
     profileLink = "Coach & KI",
     profileLinkHint = "Chat, Auswertungen, Prompts und KI-Zugang findest du im Tab Coach.",
-    demoReply = "Das ist eine Demo-Antwort, weil noch keine KI verbunden ist. Mit eigenem Key oder Guthaben beantwortet der Coach deine Frage mit deinen echten Trainingsdaten.\n\nSo sieht ein Workout-Vorschlag aus: drei Grundübungen, je drei Sätze. Tippe auf „Workout übernehmen“, um die Import-Vorschau zu sehen.",
+    demoReply = "Das ist eine Demo-Antwort, weil noch keine KI verbunden ist. Mit eigenem Key oder Guthaben beantwortet der Coach deine Frage mit deinen echten Trainingsdaten.\n\nSo sieht ein Workout-Vorschlag aus: drei Grundübungen, je drei Sätze. Tippe auf „Übernehmen“, um die Import-Vorschau zu sehen.",
     demoWorkoutName = "Ganzkörper (Demo)",
     story = GermanCoachStory,
 )
@@ -211,7 +211,7 @@ val EnglishCoachHub = CoachHubStrings(
     connectionsTitle = "AI chat connections",
     profileLink = "Coach & AI",
     profileLinkHint = "Chat, reviews, prompts and AI access are in the Coach tab.",
-    demoReply = "This is a demo answer because no AI is connected yet. With your own key or credit the coach answers your question with your real training data.\n\nThis is what a workout proposal looks like: three basic exercises, three sets each. Tap “Use workout” to see the import preview.",
+    demoReply = "This is a demo answer because no AI is connected yet. With your own key or credit the coach answers your question with your real training data.\n\nThis is what a workout proposal looks like: three basic exercises, three sets each. Tap “Apply” to see the import preview.",
     demoWorkoutName = "Full body (demo)",
     story = EnglishCoachStory,
 )

@@ -142,16 +142,21 @@ import app.overfit.ui.coach.CoachBackup
 import app.overfit.ui.coach.CoachFinishChoice
 import app.overfit.ui.coach.CoachFinishSection
 import app.overfit.ui.coach.CoachHomeScreen
-import app.overfit.ui.coach.CoachChatScreen
 import app.overfit.ui.coach.CoachStoryScreen
 import app.overfit.ui.coach.StoryTarget
-import app.overfit.ui.coach.CoachTabNav
-import app.overfit.ui.coach.CoachTabScreen
+import app.overfit.ui.coach.chat.ChatOpenRequest
+import app.overfit.ui.coach.chat.CoachChatRequests
+import app.overfit.ui.coach.chat.CoachChatTabScreen
+import app.overfit.ui.coach.chat.CoachHistoryScreen
+import app.overfit.ui.coach.chat.createCoachChatEnv
 import app.overfit.ui.coach.CoachMemoryScreen
 import app.overfit.ui.coach.CoachNav
 import app.overfit.ui.coach.CoachReviewScreen
 import app.overfit.ui.coach.CoachSessionScreen
-import app.overfit.ui.coach.CoachSettingsScreen
+import app.overfit.ui.coach.CoachAccessScreen
+import app.overfit.ui.coach.CoachInstructionsScreen
+import app.overfit.ui.coach.CoachProfileScreen
+import app.overfit.ui.coach.CoachPromptsScreen
 import app.overfit.ui.coach.createCoach
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.overfit.ui.settings.SettingsScreen
@@ -207,6 +212,8 @@ class AppDependencies(
     val chat: ChatFeature = ChatFeature(fuel, data, store, kv, data.scope, clock, memory = { coach.memoryText })
     /** Coach chat in the Coach tab (own key or Fuel, demo without access). */
     val coachChat: app.overfit.coach.CoachChatService = app.overfit.ui.coach.createCoachChat(store, data, coach, chat, today, clock)
+    /** Next chat the Coach tab opens (CoachChatRoute, automatic review after a training). */
+    val coachChatRequests = CoachChatRequests()
 
     init {
         // Every change of the coach memory (coach review, edit, delete) is synced to the connected chats.
@@ -292,8 +299,14 @@ class AppDependencies(
 @Serializable data object CoachStoryRoute
 /** Coach chat; [chatId] empty = new chat, [draft] prefills the input ("Use in chat"). */
 @Serializable data class CoachChatRoute(val chatId: String = "", val draft: String = "")
+/** Earlier coach chats (from the Coach tab header). */
+@Serializable data object CoachHistoryRoute
 @Serializable data object CoachReviewsRoute
-@Serializable data object CoachSettingsRoute
+/** Settings → Coach → AI access / default model (model picker as a page). */
+@Serializable data object CoachAccessRoute
+@Serializable data object CoachProfileRoute
+@Serializable data object CoachInstructionsRoute
+@Serializable data object CoachPromptsRoute
 @Serializable data class CoachSessionRoute(val sessionId: String)
 @Serializable data class CoachReviewRoute(val reviewId: String)
 @Serializable data class CoachDemoRoute(val sessionId: String)
@@ -391,7 +404,7 @@ fun OverfitApp(deps: AppDependencies) {
                     openSession = { nav.navigate(CoachSessionRoute(it)) },
                     demo = { nav.navigate(CoachDemoRoute(it)) },
                     memory = { nav.navigate(CoachMemoryRoute) },
-                    settings = { nav.navigate(CoachSettingsRoute) },
+                    settings = { nav.navigate(CoachInstructionsRoute) },
                     openTemplate = { nav.navigate(WorkoutPlanRoute(it)) },
                 )
             }
@@ -802,14 +815,24 @@ fun OverfitApp(deps: AppDependencies) {
                             store = deps.store,
                             providers = deps.providers,
                             today = deps.today(),
-                            onConnect = { nav.navigate(ConnectRoute) },
-                            onCoachMemory = { nav.navigate(CoachMemoryRoute) },
-                            onCoach = { nav.selectTab(Tab.COACH) },
                             onAbout = { nav.navigate(AboutRoute) },
                             fuelSession = deps.fuelSession,
-                            onFuel = { nav.navigate(FuelRoute) },
-                            onAiCoach = { nav.navigate(AiCoachRoute) },
-                            onChatNotes = { nav.navigate(ChatNotesRoute) },
+                            coach = deps.coach,
+                            coachPrefs = deps.data.coachChatPrefs,
+                            chatFeature = deps.chat,
+                            coachNav = app.overfit.ui.settings.CoachSettingsNav(
+                                access = { nav.navigate(CoachAccessRoute) },
+                                fuel = { nav.navigate(FuelRoute) },
+                                profile = { nav.navigate(CoachProfileRoute) },
+                                instructions = { nav.navigate(CoachInstructionsRoute) },
+                                memory = { nav.navigate(CoachMemoryRoute) },
+                                reviews = { nav.navigate(CoachReviewsRoute) },
+                                requestLog = { nav.navigate(RequestLogRoute) },
+                                prompts = { nav.navigate(CoachPromptsRoute) },
+                                chatProvider = { nav.navigate(ChatProviderRoute(it.name)) },
+                                chatNotes = { nav.navigate(ChatNotesRoute) },
+                                story = { nav.navigate(CoachStoryRoute) },
+                            ),
                             restAlerts = deps.restAlerts,
                             share = share,
                             exportingBackup = exportingBackup,
@@ -849,7 +872,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onOwnKey = { nav.navigate(ConnectRoute) },
                             onFuel = { nav.navigate(FuelRoute) },
                             onProvider = { nav.navigate(ChatProviderRoute(it.name)) },
-                            onCoachSettings = { nav.navigate(CoachSettingsRoute) },
+                            onCoachSettings = { nav.navigate(CoachInstructionsRoute) },
                             onDisconnect = deps.store::disconnectAi,
                         )
                     }
@@ -922,41 +945,53 @@ fun OverfitApp(deps: AppDependencies) {
                                 nav.navigate(CoachStoryRoute)
                             }
                         }
-                        CoachTabScreen(
-                            coach = deps.coach,
+                        val coachEnv = remember(deps, state.providerId, state.hasApiKey) { createCoachChatEnv(deps) }
+                        val openRequest by deps.coachChatRequests.pending.collectAsStateWithLifecycle()
+                        CoachChatTabScreen(
+                            env = coachEnv,
+                            openRequest = openRequest,
+                            onOpenRequestConsumed = deps.coachChatRequests::consumed,
+                            onHistory = { nav.navigate(CoachHistoryRoute) },
+                            onStory = { nav.navigate(CoachStoryRoute) },
+                            onModelChip = {},
+                            // Same import preview as a link: the import screen picks it up from the inbox.
+                            onApplyWorkout = { deps.inbox.offer(it) },
+                            creditChip = {},
+                        )
+                    }
+                    composable<CoachHistoryRoute> {
+                        CoachHistoryScreen(
                             chat = deps.coachChat,
-                            chatFeature = deps.chat,
-                            state = state,
-                            providers = deps.providers,
-                            fuelSession = deps.fuelSession,
-                            prompts = { coachPrompts(deps, share) },
-                            copy = deps.share::copyText,
-                            nav = CoachTabNav(
-                                coach = coachNav,
-                                openChat = { id, draft -> nav.navigate(CoachChatRoute(id, draft)) },
-                                allReviews = { nav.navigate(CoachReviewsRoute) },
-                                access = { nav.navigate(AiCoachRoute) },
-                                chatProvider = { nav.navigate(ChatProviderRoute(it.name)) },
-                                chatNotes = { nav.navigate(ChatNotesRoute) },
-                                story = { nav.navigate(CoachStoryRoute) },
-                            ),
+                            onOpen = { id ->
+                                deps.coachChatRequests.open(ChatOpenRequest(chatId = id))
+                                nav.popBackStack()
+                            },
+                            onBack = nav::popBackStack,
                         )
                     }
                     composable<CoachReviewsRoute> { CoachHomeScreen(deps.coach, coachNav) }
                     composable<CoachChatRoute> { entry ->
+                        // No screen of its own any more: hands the chat to the Coach tab and switches there.
                         val route = entry.toRoute<CoachChatRoute>()
-                        CoachChatScreen(
-                            chat = deps.coachChat,
-                            chatId = route.chatId,
-                            draft = route.draft,
-                            photos = deps.data.workouts.photos,
-                            // Same import preview as a link: the import screen picks it up from the inbox.
-                            onImportWorkout = { deps.inbox.offer(it) },
-                            onAccess = { nav.navigate(AiCoachRoute) },
+                        LaunchedEffect(route) {
+                            deps.coachChatRequests.open(ChatOpenRequest(chatId = route.chatId, draft = route.draft))
+                            nav.popBackStack()
+                            nav.selectTab(Tab.COACH)
+                        }
+                    }
+                    composable<CoachAccessRoute> {
+                        CoachAccessScreen(state, deps.store, deps.providers, deps.coach, onBack = nav::popBackStack)
+                    }
+                    composable<CoachProfileRoute> { CoachProfileScreen(state, deps.data.coachChatPrefs, onBack = nav::popBackStack) }
+                    composable<CoachInstructionsRoute> { CoachInstructionsScreen(deps.coach, deps.data.coachChatPrefs, onBack = nav::popBackStack) }
+                    composable<CoachPromptsRoute> {
+                        CoachPromptsScreen(
+                            prompts = { coachPrompts(deps, share) },
+                            copy = deps.share::copyText,
+                            onUseInChat = { nav.navigate(CoachChatRoute("", it)) },
                             onBack = nav::popBackStack,
                         )
                     }
-                    composable<CoachSettingsRoute> { CoachSettingsScreen(deps.coach, onBack = nav::popBackStack, onRequestLog = { nav.navigate(RequestLogRoute) }) }
                     composable<CoachSessionRoute> { entry ->
                         CoachSessionScreen(deps.coach, entry.toRoute<CoachSessionRoute>().sessionId, state.profile.unit, state.language, coachNav)
                     }
