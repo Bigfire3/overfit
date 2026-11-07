@@ -109,7 +109,7 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     const code = !(e instanceof UpstreamError) ? 'internal_error' : e.timeout || e.status === 0 || e.unavailable ? 'upstream_unavailable' : 'upstream_rejected';
     const requestId = await logRequest(env, {
       ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: code,
-      fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: firstFailure?.message ?? (e instanceof Error ? e.message : null),
+      fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: failureLabel(firstFailure),
     });
     if (!(e instanceof UpstreamError)) throw e;
     if (e.timeout || e.status === 0) {
@@ -145,15 +145,26 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
   const charged = await settle(env, device.accountId, holdId, hold, cost, entry);
   const requestId = await logRequest(env, {
     ...log, durationMs: Date.now() - t0, status: 'ok', model: servedModel,
-    fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: firstFailure?.message ?? null,
+    fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: failureLabel(firstFailure),
     input: entry.input, cacheRead: entry.cacheRead, cacheWrite: entry.cacheWrite, output: entry.output, chargedMicro: charged,
   });
   const balance = await availableMicro(env, device.accountId);
   return Response.json(
     {
       ...result.body,
-      overfit: { costMicro: charged, balanceMicro: balance, currency: 'EUR', tier, servedTier: served, model: servedModel, modelName: TIERS[served].displayName, vendor: TIERS[served].vendor, requestedModel: TIERS[tier].model, requestedModelName: TIERS[tier].displayName, requestedVendor: TIERS[tier].vendor, fallback: served !== tier, fallbackReason: firstFailure ? `HTTP ${firstFailure.status}: ${firstFailure.message}`.slice(0, 200) : null, purpose, requestId },
+      overfit: { costMicro: charged, balanceMicro: balance, currency: 'EUR', tier, servedTier: served, model: servedModel, modelName: TIERS[served].displayName, vendor: TIERS[served].vendor, requestedModel: TIERS[tier].model, requestedModelName: TIERS[tier].displayName, requestedVendor: TIERS[tier].vendor, fallback: served !== tier, fallbackReason: failureLabel(firstFailure), purpose, requestId },
     },
     { headers: { 'x-overfit-cost-micro': String(charged), 'x-overfit-balance-micro': String(balance) } },
   );
+}
+
+/**
+ * Kurzer, inhaltsfreier Grund, warum das zuerst versuchte Modell nicht antwortete. Bewusst ohne den Fehlertext des Anbieters:
+ * der könnte Teile der Anfrage wiederholen, und das Protokoll speichert nie Inhalte.
+ */
+function failureLabel(e: UpstreamError | null): string | null {
+  if (!e) return null;
+  if (e.timeout) return 'Zeitüberschreitung';
+  if (e.status === 0) return 'nicht erreichbar';
+  return `HTTP ${e.status}`;
 }

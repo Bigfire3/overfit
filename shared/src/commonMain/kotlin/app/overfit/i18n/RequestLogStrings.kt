@@ -47,7 +47,7 @@ class RequestLogStrings(
     val tokens: (input: String, output: String) -> String,
     val cache: (read: String, write: String) -> String,
     val duration: (seconds: String) -> String,
-    /** Fallback: first model did not answer (free), a replacement answered, charged at most the first model's price. */
+    /** Fallback: first model did not answer (free), a replacement answered, charged at the cheaper of the two prices. */
     val fallback: (requested: String, reason: String?, served: String) -> String,
     val sourceDevice: String,
     val sourceServer: (id: Long) -> String,
@@ -94,7 +94,7 @@ val GermanRequestLog = RequestLogStrings(
     duration = { "Dauer: $it s" },
     fallback = { requested, reason, served ->
         "Zuerst $requested: nicht verfügbar${reason?.let { " ($it)" } ?: ""}, nicht berechnet · " +
-            "Geantwortet hat $served, berechnet höchstens zum Preis von $requested"
+            "Geantwortet hat $served, berechnet zum Preis des günstigeren der beiden Modelle"
     },
     sourceDevice = "Auf diesem Gerät protokolliert",
     sourceServer = { "Server-Protokoll Nr. $it" },
@@ -140,7 +140,7 @@ val EnglishRequestLog = RequestLogStrings(
     duration = { "Duration: $it s" },
     fallback = { requested, reason, served ->
         "First $requested: not available${reason?.let { " ($it)" } ?: ""}, not charged · " +
-            "$served answered, charged at most the price of $requested"
+            "$served answered, charged at the price of the cheaper of the two models"
     },
     sourceDevice = "Logged on this device",
     sourceServer = { "Server log no. $it" },

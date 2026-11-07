@@ -60,7 +60,7 @@ describe('Antwort nennt das tatsächlich antwortende Modell', () => {
     const price = currentPrices()['claude-sonnet-5-5'];
     expect(r.body.overfit).toMatchObject({
       fallback: true,
-      fallbackReason: 'HTTP 503: down',
+      fallbackReason: 'HTTP 503',
       model: 'claude-sonnet-5-5',
       modelName: 'Claude Sonnet 5.5',
       vendor: 'Anthropic',

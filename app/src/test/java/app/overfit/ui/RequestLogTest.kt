@@ -171,7 +171,7 @@ class RequestLogTest {
         compose.onNodeWithTag("request:r2").performScrollTo().performClick()
         waitFor(
             "Zuerst Claude Opus 5.5: nicht verfügbar (HTTP 529: Overloaded), nicht berechnet · " +
-                "Geantwortet hat Claude Sonnet 5.5, berechnet höchstens zum Preis von Claude Opus 5.5",
+                "Geantwortet hat Claude Sonnet 5.5, berechnet zum Preis des günstigeren der beiden Modelle",
         )
         assertTrue(shown("Tokens: 2.000 ein · 300 aus"))
         assertTrue(shown("Dauer: 5,1 s"))

@@ -1358,3 +1358,9 @@ Heckmeck. Entferne das mal komplett aus der App. Da soll nichts mehr zu finden s
 - Ursache Ruckeln: Story-Route ist kein Tab, die Tab-Leiste kam erst nach dem Fade zurück. `ScreenMotion`: Wechsel Story → Tab ist instant (keine Animation), Leiste und Coach-Seite im selben Frame.
 - Ursache Story fehlte: `resetAll()` (Alle Daten löschen) ließ `overfit.coachStorySeen` stehen. Jetzt entfernt, Story kommt beim nächsten ersten Coach-Besuch wieder.
 - Nachtrag: Tab- und Mini-Workout-Leiste bleiben versteckt, solange die Story noch in `visibleEntries` ist (ca. 3 Frames nach dem Schließen), damit sie nicht zuerst unter der Story auftauchen.
+- **Gegencheck (Sonnet, effort high) zu PR #91:** behoben: Protokoll und Antwort speichern als Ausfallgrund nur noch „HTTP 529“ /
+  „Zeitüberschreitung“, nie den Fehlertext des Anbieters (könnte Teile der Anfrage wiederholen; Test mit geheimem Prompt);
+  Ausweich-Text „berechnet zum Preis des günstigeren der beiden Modelle“; README-Rest. Bewusst so gelassen: alte App-Versionen mit
+  gespeichertem `pro` bekommen jetzt Opus (abgerechnet wird, was angezeigt wird; die einzige installierte App ist Fabians, die per
+  Update migriert). Migration 0009 macht auch schon abgelaufene Restposten alter Testkonten wieder nutzbar (gewollt: „Guthaben läuft nie
+  ab“). Haiku über 100 000 Eingabe-Token (0,50 $/2,50 $) kommt bei Overfit nicht vor.

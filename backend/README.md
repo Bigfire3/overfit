@@ -250,7 +250,7 @@ Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `displayName`, `vendo
 
 | Stufe | Anbieter, Modell | Bilder | Ausweichen bei Ausfall | Listenpreis je MTok (ein / aus) |
 |---|---|---|---|---|
-| `lite` | Anthropic `claude-haiku-5-5` (kurze Anfragen: „Mit KI ausfüllen“, geschenkte Auswertungen) | ja | → `standard` | 0,10 $ / 0,50 $ |
+| `lite` | Anthropic `claude-haiku-5-5` (kurze Anfragen, z. B. „Mit KI ausfüllen“) | ja | → `standard` | 0,10 $ / 0,50 $ |
 | `standard` (Voreinstellung) | Anthropic `claude-sonnet-5-5` (Coach-Auswertung, Chat) | ja | → `lite` | 2 $ / 10 $ |
 | `pro` | Anthropic `claude-opus-5-5` | ja | → `standard` | 4 $ / 20 $ |
 

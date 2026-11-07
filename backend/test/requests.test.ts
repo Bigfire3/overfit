@@ -99,22 +99,29 @@ describe('Anfrage-Protokoll GET /v1/account/requests', () => {
     await fund(c);
     const r = await c.call('POST', '/v1/messages', req('pro', 'plan'));
     expect(r.status).toBe(200);
-    expect(r.body.overfit).toMatchObject({ fallback: true, fallbackReason: 'HTTP 529: Overloaded', purpose: 'plan' });
+    expect(r.body.overfit).toMatchObject({ fallback: true, fallbackReason: 'HTTP 529', purpose: 'plan' });
     const [e] = (await log(c)).entries;
     expect(e).toMatchObject({
       id: r.body.overfit.requestId, status: 'ok', tier: 'pro', requestedModel: OPUS, model: SONNET, fallback: true,
-      fallbackFromStatus: 529, fallbackReason: 'Overloaded', chargedMicro: at('standard'), purpose: 'plan',
+      fallbackFromStatus: 529, fallbackReason: 'HTTP 529', chargedMicro: at('standard'), purpose: 'plan',
     });
   });
 
-  it('langer Ausfallgrund wird auf 200 Zeichen gekürzt', async () => {
+  it('Ausfallgrund ohne Fehlertext des Anbieters (der könnte Teile der Anfrage wiederholen)', async () => {
     anthropic.mockImplementation(async (_u: string, init: any) =>
-      sentModel(init) === HAIKU ? Response.json({ error: { message: 'x'.repeat(500) } }, { status: 503 }) : reply(sentModel(init)),
+      sentModel(init) === HAIKU ? Response.json({ error: { message: `Bad input: ${SECRET_PROMPT}` } }, { status: 503 }) : reply(sentModel(init)),
     );
     const c = await Client.create();
     await fund(c);
+    const r = await c.call('POST', '/v1/messages', req('lite'));
+    expect(r.body.overfit.fallbackReason).toBe('HTTP 503');
+    expect((await log(c)).entries[0].fallbackReason).toBe('HTTP 503');
+    // Fehlschlag ohne Ausweichen: kein Grund gespeichert, nur der Fehlercode.
+    anthropic.mockImplementation(async () => Response.json({ error: { message: `rejected: ${SECRET_PROMPT}` } }, { status: 400 }));
     await c.call('POST', '/v1/messages', req('lite'));
-    expect((await log(c)).entries[0].fallbackReason).toHaveLength(200);
+    expect((await log(c)).entries[0]).toMatchObject({ errorCode: 'upstream_rejected', fallbackReason: null });
+    const raw = JSON.stringify((await c.env.DB.prepare('SELECT * FROM requests').all()).results);
+    expect(raw).not.toContain(SECRET_PROMPT);
   });
 
   it('Fehlschlag: status failed, errorCode, kein Modell, nichts abgebucht; requestId in details', async () => {
