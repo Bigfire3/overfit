@@ -90,7 +90,10 @@ class CoachFlowTest {
     fun reviewLastWorkoutAndAcceptPlan() {
         setUp(withKey = true)
         compose.waitForTrainingTab()
-        compose.onNodeWithTag("tab:COACH").performClick()
+        // Reviews moved into the settings: Profile → Coach → "Auswertungen".
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        waitFor("Auswertungen")
+        compose.onNodeWithText("Auswertungen").performScrollTo().performClick()
         waitFor("Letztes Training auswerten")
         compose.onNodeWithText("Letztes Training auswerten").performClick()
         waitFor("An Coach senden")
@@ -113,7 +116,10 @@ class CoachFlowTest {
     fun withoutAccessTheDemoReviewIsOffered() {
         setUp(withKey = false)
         compose.waitForTrainingTab()
-        compose.onNodeWithTag("tab:COACH").performClick()
+        // Reviews moved into the settings: Profile → Coach → "Auswertungen".
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        waitFor("Auswertungen")
+        compose.onNodeWithText("Auswertungen").performScrollTo().performClick()
         waitFor("Letztes Training auswerten")
         compose.onNodeWithText("Letztes Training auswerten").performClick()
         waitFor("Kein KI-Zugang")
@@ -126,7 +132,7 @@ class CoachFlowTest {
     fun editingTheCoachMemory() {
         setUp(withKey = true, seedWorkout = false)
         compose.waitForTrainingTab()
-        compose.onNodeWithTag("tab:COACH").performClick()
+        compose.onNodeWithTag("tab:PROFILE").performClick()
         waitFor("Coach-Gedächtnis")
         compose.onNodeWithText("Coach-Gedächtnis").performScrollTo().performClick()
         waitFor("Was der Coach über dich weiß", substring = true)

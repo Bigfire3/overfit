@@ -360,7 +360,8 @@ class DayWithOverfitTest {
 
         // --- Profile: Fuel demo (balance, ledger), KI-Coach context ------------------
         tab("Profil")
-        click("startet bald")
+        // "startet bald" is also the state of the AI chat connections in the settings: open credit by its label.
+        click("Guthaben")
         waitFor("Guthaben startet bald")
         click("Demo ansehen")
         waitFor("4,20 € Guthaben")

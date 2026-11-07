@@ -122,9 +122,9 @@ class AppSmokeTest {
         waitFor("Noch keine Trainings oder Fotos.")
         compose.onNodeWithText("Noch keine Trainings oder Fotos.").assertIsDisplayed()
 
-        // Coach tab: AI access with provider, memory
-        compose.onNodeWithTag("tab:COACH").performClick()
-        compose.onNodeWithText("Eigener Key · OpenRouter").assertIsDisplayed()
+        // Settings → Coach: AI access with provider, memory
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        compose.onNodeWithText("Eigener Schlüssel · OpenRouter").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Coach-Gedächtnis").performScrollTo().performClick()
         compose.onNodeWithText("Was der Coach über dich weiß", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Zurück").performClick()

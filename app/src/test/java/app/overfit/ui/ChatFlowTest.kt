@@ -80,8 +80,9 @@ class ChatFlowTest {
     @Test
     fun withoutBackendContextAndGemInstructionsStillWork() {
         compose.setContent { OverfitApp(deps()) }
-        compose.onNodeWithTag("tab:COACH").performClick()
-        compose.onNodeWithText("KI-Chat-Verbindungen".uppercase()).performScrollTo().assertExists()
+        // The AI chat connections live in the settings: Profile → "Prompts & Verbindungen".
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        compose.onNodeWithText("Prompts & Verbindungen".uppercase()).performScrollTo().assertExists()
         compose.onNodeWithText("Gemini").performScrollTo().performClick()
         await("Startet bald".uppercase())
         compose.onNodeWithText("Ersatzweg für Gemini: eigenes Gem".uppercase()).assertExists()
@@ -113,7 +114,7 @@ class ChatFlowTest {
         }
         val fuel = FuelAccess(kv, "https://backend.test") { url -> FuelApi(HttpClient(engine), url, RequestSigner(TestKey())) }
         compose.setContent { OverfitApp(deps(fuel)) }
-        compose.onNodeWithTag("tab:COACH").performClick()
+        compose.onNodeWithTag("tab:PROFILE").performClick()
         compose.onNodeWithText("Claude").performScrollTo().performClick()
         await("https://backend.test/mcp", substring = true)
         compose.onNodeWithText("KI-Chat verbinden").performClick()
