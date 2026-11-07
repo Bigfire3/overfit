@@ -391,7 +391,9 @@ fun WorkoutSetRow(
     fun nextOf(): FocusRequester? = requesters.getOrNull(field + 1) ?: next
     val actual = set.actual
     val target = set.target
-    SetRowSurface(t.removeSet(number), onRemove, Modifier.testTag("set-row:$number")) {
+    // Checked off = the whole row turns green (owner wish), fields and text stay white on it.
+    val fill = if (done) Theme.colors.confirmFill else Theme.colors.surfacePressed
+    SetRowSurface(t.removeSet(number), onRemove, Modifier.testTag("set-row:$number"), fill = fill) {
         Text("$number", Modifier.width(24.dp), style = Theme.type.label, tone = if (done) Tone.Default else Tone.Muted, align = TextAlign.Center)
         if (type.usesWeight) {
             NumberInput(
@@ -406,6 +408,7 @@ fun WorkoutSetRow(
                 placeholder = target.weightKg?.let { Numbers.formatWeight(it, unit, language) } ?: "–",
                 focusRequester = req(),
                 next = nextOf(),
+                onConfirm = done,
                 modifier = Modifier.weight(1f),
             )
             field++
@@ -423,6 +426,7 @@ fun WorkoutSetRow(
                 focusRequester = req(),
                 next = nextOf(),
                 placeholder = target.reps?.toString() ?: "–",
+                onConfirm = done,
                 modifier = Modifier.weight(1f),
             )
             field++
@@ -440,6 +444,7 @@ fun WorkoutSetRow(
                 focusRequester = req(),
                 next = nextOf(),
                 placeholder = target.durationSec?.toString() ?: "–",
+                onConfirm = done,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -457,11 +462,12 @@ private fun CheckButton(done: Boolean, description: String, onClick: () -> Unit)
             .pressableRow(onClick),
         contentAlignment = Alignment.Center,
     ) {
-        // Done = green (meaning: completed); open = grey fill so it reads as a button.
+        // Done: the row itself is green, the circle a light translucent white with a white tick; open = slightly
+        // lighter fill than the grey row, so it reads as a button.
         Box(
             Modifier
                 .size(36.dp)
-                .background(if (done) Theme.colors.positive else Theme.colors.surfacePressed, CircleShape),
+                .background(Theme.colors.inputFill, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (done) LineIcon(Icon.Check, size = 22.dp, color = Color.White)
@@ -487,6 +493,7 @@ private fun <N : Any> NumberInput(
     placeholder: String,
     focusRequester: FocusRequester,
     next: FocusRequester?,
+    onConfirm: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var text by remember(resetKey) { mutableStateOf(value?.let(format).orEmpty()) }
@@ -506,5 +513,6 @@ private fun <N : Any> NumberInput(
         placeholder = placeholder,
         focusRequester = focusRequester,
         next = next,
+        onConfirm = onConfirm,
     )
 }

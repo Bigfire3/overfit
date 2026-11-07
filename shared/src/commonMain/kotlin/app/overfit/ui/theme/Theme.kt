@@ -35,6 +35,8 @@ import org.jetbrains.compose.resources.Font
  * - [armed]: the one deliberate colour exception in the UI chrome: red icon/label/border of a destructive
  *   two-tap button after the first tap ("tap again to confirm"). Nowhere else.
  * - [confirmFill]: green fill of an armed two-tap button that completes something (finish workout). Red = delete, green = finish.
+ *   Also the fill of a checked-off set row in the running workout (the whole row turns green).
+ * - [inputFill]: translucent white of a number field, so it stands slightly lighter on any row (grey or green).
  */
 @Immutable
 data class Colors(
@@ -62,6 +64,8 @@ data class Colors(
     val armedFill: Color,
     /** Fill of an armed button that finishes something (finish workout): green, white text on it reaches 4.5:1. */
     val confirmFill: Color,
+    /** Fill of a set row's number field: translucent white, slightly lighter than the row below (grey or green). */
+    val inputFill: Color,
 )
 
 val DarkColors = Colors(
@@ -81,6 +85,7 @@ val DarkColors = Colors(
     armed = Color(0xFFFF453A),
     armedFill = Color(0xFFD32F2F),
     confirmFill = Color(0xFF1E7D34),
+    inputFill = Color(0x1FFFFFFF),
 )
 
 /** Only a handful of sizes on purpose. */
