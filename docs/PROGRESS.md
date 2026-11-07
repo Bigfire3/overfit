@@ -1203,3 +1203,13 @@ Offen / Hinweise:
 8. Profil auf lb stellen → Werte in lb; Coach fragen: kennt aktuelles Gewicht und Trend
 9. Backup exportieren und wieder einspielen → Gewichte sind wieder da
 
+## Session BA – Satzzeile grün, Felder hervorgehoben, Cursor rechts (7.11.)
+- Erledigt: Abgehakter Satz im Training = ganze Zeile grün mit weißen Werten; Eingabefelder überall (Training, Workout bearbeiten, Training nachträglich bearbeiten) wieder leicht heller als die Zeile; Tipp in ein Satzfeld setzt den Cursor immer ans Ende. Belege `docs/screenshots/workout-gruen/vorher|nachher/`, Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (grüne Zeile, Felder, Cursor)
+1. Training starten → Satz abhaken: ganze Zeile grün, Haken weiß, Felder hellgrün, Zahlen weiß; erneut tippen → wieder grau
+2. Offene Sätze: Felder heller grau als die Zeile, Vorgabewerte grau
+3. In ein Feld mit „25“ ganz links tippen → Cursor steht hinter der 5, Löschtaste löscht die 5
+4. Weiter-Taste springt wie bisher zum nächsten Feld (Cursor am Ende), Fertig und Tipp daneben schließen die Tastatur
+5. Workout → Stift → Bearbeiten und Kalender → Training → Stift: Felder ebenso leicht hervorgehoben, Cursor am Ende
+

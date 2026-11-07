@@ -38,6 +38,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -153,6 +156,8 @@ fun SetRowSurface(
     deleteLabel: String,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    /** Row fill: grey by default, [app.overfit.ui.theme.Colors.confirmFill] for a checked-off set in the running workout. */
+    fill: Color = Theme.colors.surfacePressed,
     content: @Composable RowScope.() -> Unit,
 ) {
     val c = Theme.colors
@@ -200,7 +205,7 @@ fun SetRowSurface(
                 .offset { IntOffset(dx.roundToInt(), 0) }
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .background(c.surfacePressed)
+                .background(fill)
                 .padding(horizontal = Space.s, vertical = Space.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.s),
@@ -227,10 +232,12 @@ fun SetColumnsHeader(numberLabel: String, labels: List<String>, trailing: Dp = 0
 }
 
 /**
- * Number field of a set row: a plain rounded box (48 dp high, no outline) with large tabular digits,
- * centred. The unit stands once in [SetColumnsHeader] above the rows, so even "1000" at 1.3x font fits on a
+ * Number field of a set row: a rounded box (48 dp high, no outline) with large tabular digits, centred, on a
+ * translucent white fill ([app.overfit.ui.theme.Colors.inputFill]) so it stands slightly lighter on the row (grey
+ * or green). The unit stands once in [SetColumnsHeader] above the rows, so even "1000" at 1.3x font fits on a
  * 360 dp phone. [imeAction] Next moves to [next] (or the next field), Done (and checking off a set) closes
- * the keyboard and removes the cursor.
+ * the keyboard and removes the cursor. Gaining focus (tap, Next) always puts the cursor at the end of the text.
+ * [onConfirm]: the row is green (checked-off set), so the placeholder turns translucent white instead of grey.
  */
 @Composable
 fun SetField(
@@ -242,14 +249,27 @@ fun SetField(
     placeholder: String = "–",
     focusRequester: FocusRequester? = null,
     next: FocusRequester? = null,
+    onConfirm: Boolean = false,
 ) {
     val c = Theme.colors
     val focusManager = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
+    // Own TextFieldValue, so the cursor position is ours: the caller only sees the text.
+    var field by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    // Text changed from outside (filter, checked-off prefilled set): take it over, cursor at the end.
+    val shown = if (field.text == value) field else TextFieldValue(value, TextRange(value.length))
+    LaunchedEffect(focused) {
+        // Runs after the tap that focused the field has placed its cursor: move it to the end, so "25" can be
+        // corrected with backspace right away (owner wish, DECISIONS "Cursor ans Ende").
+        if (focused) field = shown.copy(selection = TextRange(shown.text.length))
+    }
     val style = Theme.type.number.copy(color = c.foreground, textAlign = TextAlign.Center)
     BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = shown,
+        onValueChange = { new ->
+            field = new
+            if (new.text != value) onValueChange(new.text)
+        },
         singleLine = true,
         maxLines = 1,
         textStyle = style,
@@ -264,13 +284,17 @@ fun SetField(
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .clip(BlockShape.field)
-            .background(c.surfacePressed)
+            .background(c.inputFill)
             .semantics { contentDescription = description },
         decorationBox = { inner ->
             Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = Space.xs), contentAlignment = Alignment.Center) {
-                // Placeholder = target value: readable grey, regular weight, so it differs from an entered value.
-                val hint = style.copy(color = c.muted, fontWeight = androidx.compose.ui.text.font.FontWeight.Normal)
-                if (value.isEmpty()) BasicText(placeholder, style = hint, maxLines = 1, softWrap = false)
+                // Placeholder = target value: readable grey (on green: translucent white), regular weight, so it
+                // differs from an entered value.
+                val hint = style.copy(
+                    color = if (onConfirm) Color.White.copy(alpha = 0.7f) else c.muted,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                )
+                if (shown.text.isEmpty()) BasicText(placeholder, style = hint, maxLines = 1, softWrap = false)
                 inner()
             }
         },
