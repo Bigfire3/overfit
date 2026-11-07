@@ -98,7 +98,9 @@ fun WorkoutPlanScreen(
     val exerciseIds = w?.exercises?.map { it.exercise.id }?.distinct()
     var last by remember(templateId) { mutableStateOf<Map<String, LastPerformance?>?>(null) }
     LaunchedEffect(exerciseIds) {
-        if (exerciseIds != null) last = exerciseIds.associateWith { runCatching { loadLast(it) }.getOrNull() }
+        if (exerciseIds != null) last = exerciseIds.associateWith {
+            try { loadLast(it) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { null }
+        }
     }
     Screen(
         scroll = true,
