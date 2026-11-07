@@ -52,13 +52,10 @@ import app.overfit.ui.components.MenuItem
 import app.overfit.ui.components.MoreMenu
 import app.overfit.ui.components.SetField
 import app.overfit.ui.components.SetRowSurface
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.sp
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.ExerciseImage
 import app.overfit.ui.components.Icon
@@ -182,7 +179,7 @@ class TemplateEditorViewModel(
 
 /**
  * Create/edit a saved workout ("Bearbeitungsmodus"): name in the header (pencil = rename), one grey [Block] per
- * exercise (collapsible; image with "?" for details; ⋮ for replace/move/remove), one [SetRowSurface] per set
+ * exercise (collapsible; image opens details; ⋮ for replace/move/remove), one [SetRowSurface] per set
  * (swipe left = delete, with "Undo"), "+ Add set", "+ Add exercise" and "Save" pinned at the bottom.
  * No share or delete here: those live on the workout screen. Leaving with unsaved changes needs a second back press.
  */
@@ -374,17 +371,13 @@ private fun ExerciseBlock(
     }
 }
 
-/** Exercise image with a small "?" in the corner: opens the exercise details. */
+/** Exercise image (tap opens the exercise details); no badge on it. */
 @Composable
 private fun ExerciseThumb(entry: DraftExercise, onDetails: () -> Unit) {
     val t = LocalStrings.current
     Box(Modifier.size(48.dp).clip(BlockShape.field).semantics { contentDescription = t.exerciseDetails(entry.exercise.name) }
         .pressableRow(onDetails)) {
         ExerciseImage(entry.exercise, size = 48.dp)
-        Box(
-            Modifier.align(Alignment.BottomEnd).padding(2.dp).size(16.dp).clip(CircleShape).background(Theme.colors.inverseBackground),
-            contentAlignment = Alignment.Center,
-        ) { Text("?", style = Theme.type.caption.copy(fontSize = 11.sp), tone = Tone.Inverse) }
     }
 }
 

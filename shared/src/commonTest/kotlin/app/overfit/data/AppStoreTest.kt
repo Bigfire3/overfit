@@ -100,9 +100,11 @@ class AppStoreTest {
         store.setName("Fabi")
         store.connectAi(ProviderId.OPENAI, "sk-x")
         store.completeOnboarding()
+        store.markCoachStorySeen()
 
         store.resetAll()
 
+        assertFalse(store.coachStorySeen())
         assertEquals("", store.state.value.profile.name)
         assertFalse(store.state.value.onboardingDone)
         assertNull(secrets.load())

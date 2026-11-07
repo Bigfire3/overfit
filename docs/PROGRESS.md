@@ -35,6 +35,18 @@ Screenshots: `docs/screenshots/muskel-heatmap/`.
 4. Kalender → Tag → Training öffnen: Abschnitt „Trainierte Muskeln“ zeigt nur dieses Training, ohne Zeitraum-Chips.
 5. App auf Englisch: „Muscles trained“, „This week …“, Legende „High / Low“.
 
+## Hotfix: KI-Auswertung mit Guthaben (6.11.)
+**Erledigt:** Auswertungen über Guthaben scheiterten auf dem Testserver: Gemini Flash ohne Schlüssel, Claude über das (seit 2026 immer
+authentifizierte) Cloudflare AI Gateway mit 401, Lite-Modell bei Cloudflare abgekündigt. Backend geht ohne Gateway-Token direkt zum
+Anbieter, 401/403 weicht auf die andere Stufe aus, Lite = Llama 3.3 70B. App lädt bei `tier_unavailable` die Config neu und zeigt
+Server-Fehler verständlich. Details in DECISIONS.md. Tests: `tiers.test.ts`, `CoachTransportTest`.
+**Offen (Fabian):** GitHub-Secret `GEMINI_API_KEY` (Gemini Flash = Standard, nur dafür gilt der Einladungsbonus); optional
+`AI_GATEWAY_TOKEN` (Gateway-Protokolle). Repo-Variable `BACKEND_DEPLOY_MODE=test` für Auto-Deploy nach jedem Backend-Merge.
+
+### Bitte auf dem Handy testen (Hotfix KI)
+1. Training beenden → Coach-Auswertung mit Guthaben: Auswertung kommt (zurzeit von Claude Sonnet 5.5, weil Gemini Flash fehlt), Guthaben sinkt um wenige Cent (ca. 3–10 ct).
+2. Profil → Guthaben → Modell: Gemini 3.6 Flash erscheint erst, wenn `GEMINI_API_KEY` gesetzt und der Server neu deployt ist.
+
 ## Letzte Werte im Workout, Trainings umbenennen (7.11.)
 **Erledigt:** In einem gespeicherten Workout klappt ein Tipp auf eine Übung die Karte auf: „Letztes Mal · Datum“ und jeder Satz
 wie eingetragen (Gewicht × Wdh., Zeit … je Tracking-Typ). Bevorzugt aus diesem Workout, sonst „Letztes Mal in einem anderen
@@ -1151,3 +1163,11 @@ Offen / Hinweise:
 3. „Training starten“/„Speichern“: Text mittig im Knopf
 4. Profil → Benachrichtigungen → „Erlaubt“ antippen → Android-Benachrichtigungseinstellungen der App
 5. Schalter aus (grau gefüllt, kein Rand) noch klar erkennbar; Kalender „heute“ und Foto-Auswahl erkennbar
+
+## Session AY – Story schließt sofort, „?“ weg (7.11.)
+- Erledigt: „?“ am Übungsbild im Workout-Bearbeiten entfernt; Story schließt (Auto, X, Wischen, Zurück) ohne Animation; Story kommt nach „Alle Daten löschen“ beim ersten Coach-Besuch wieder (Flag wurde nicht zurückgesetzt).
+
+### Bitte auf dem Handy testen (Story, „?“)
+1. Workout → Stift → Bearbeiten: am Übungsbild kein „?“ mehr, Tipp aufs Bild öffnet weiter die Details
+2. Coach → Story bis zur letzten Seite: schließt sofort, Tab-Leiste und Coach-Seite sofort da, kein Hochspringen; ebenso X, Wischen nach unten, Zurück
+3. Profil → Alle Daten löschen → Onboarding → Coach-Tab: Story kommt automatisch; danach nur per Tipp auf „Coach ⓘ“
