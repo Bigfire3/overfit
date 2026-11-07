@@ -1171,3 +1171,14 @@ Offen / Hinweise:
 1. Workout → Stift → Bearbeiten: am Übungsbild kein „?“ mehr, Tipp aufs Bild öffnet weiter die Details
 2. Coach → Story bis zur letzten Seite: schließt sofort, Tab-Leiste und Coach-Seite sofort da, kein Hochspringen; ebenso X, Wischen nach unten, Zurück
 3. Profil → Alle Daten löschen → Onboarding → Coach-Tab: Story kommt automatisch; danach nur per Tipp auf „Coach ⓘ“
+
+## Session BA – Satzzeile grün, Felder hervorgehoben, Cursor rechts (7.11.)
+- Erledigt: Abgehakter Satz im Training = ganze Zeile grün mit weißen Werten; Eingabefelder überall (Training, Workout bearbeiten, Training nachträglich bearbeiten) wieder leicht heller als die Zeile; Tipp in ein Satzfeld setzt den Cursor immer ans Ende. Belege `docs/screenshots/workout-gruen/vorher|nachher/`, Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (grüne Zeile, Felder, Cursor)
+1. Training starten → Satz abhaken: ganze Zeile grün, Haken weiß, Felder hellgrün, Zahlen weiß; erneut tippen → wieder grau
+2. Offene Sätze: Felder heller grau als die Zeile, Vorgabewerte grau
+3. In ein Feld mit „25“ ganz links tippen → Cursor steht hinter der 5, Löschtaste löscht die 5
+4. Weiter-Taste springt wie bisher zum nächsten Feld (Cursor am Ende), Fertig und Tipp daneben schließen die Tastatur
+5. Workout → Stift → Bearbeiten und Kalender → Training → Stift: Felder ebenso leicht hervorgehoben, Cursor am Ende
+
