@@ -1,7 +1,7 @@
 ---
 name: kmp-worker
 description: Für klar spezifizierte, einfache Kotlin-Multiplatform-Aufgaben – Compose-Screens nach genauer Vorgabe mit dem vorhandenen Designsystem, Boilerplate, Ressourcen und Strings, kleine Refactorings, Import-Skripte. Nicht für Architektur, Datenbank-Migrationen, Timer/Hintergrund-Logik oder die KI-Schnittstelle.
-model: claude-sonnet-5-5
+model: claude-opus-5-5
 effort: medium
 maxTurns: 40
 ---
