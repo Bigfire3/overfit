@@ -114,11 +114,14 @@ class ServerModelNamesTest {
         compose.setContent { OverfitApp(deps) }
         compose.waitForTrainingTab()
         compose.onNodeWithTag("tab:COACH").performClick()
-        waitFor("Coach-Einstellungen")
-        compose.onNodeWithText("Coach-Einstellungen").performScrollTo().performClick()
+        // Coach tab = chat: the model chip opens the model sheet (credit part: the server's models with prices).
+        compose.waitUntil(10_000) { compose.onAllNodes(androidx.compose.ui.test.hasTestTag("coach:model")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("coach:model").performClick()
 
-        waitFor("GPT-5 (OpenAI)")
-        assertTrue(shown("Llama 4 Scout (Cloudflare)"))
+        compose.waitUntil(10_000) { compose.onAllNodes(androidx.compose.ui.test.hasTestTag("tier:gpt-5")).fetchSemanticsNodes().isNotEmpty() }
+        assertTrue(shown("Llama 4 Scout", substring = true))
+        // Sheet row and the chat's model chip show the server's name.
+        assertTrue(shown("GPT-5"))
         // The unavailable tier is not offered; no built-in Claude name anywhere.
         assertTrue(!shown("GPT-5 Pro", substring = true))
         assertTrue(compose.onRoot().printToString(), !shown("Claude", substring = true))
