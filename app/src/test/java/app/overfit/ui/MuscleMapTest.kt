@@ -50,6 +50,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import kotlinx.datetime.atStartOfDayIn
 
 /**
  * Fabian's wish "Training Frequency" in the real app: calendar title → body icon → sheet with the muscles of this
@@ -103,16 +104,19 @@ class MuscleMapTest {
         store.setName("Fabi")
         store.completeOnboarding()
         val now = System.currentTimeMillis()
+        // "Push" must fall on today (and so this week) even right after midnight.
+        val startOfToday = realToday().atStartOfDayIn(kotlinx.datetime.TimeZone.currentSystemDefault()).toEpochMilliseconds()
+        val pushStart = maxOf(startOfToday, now - 10 * 60_000)
         // "Push" today (first exercise: two sets done), plus a calf workout more than a year ago.
         val pushLoads = runBlocking {
             data.seedCatalog().getOrThrow()
             data.importer.addSamples()
             val push = data.templates.templates.first().first { it.name == "Push" }
-            var w = Workout.fromTemplate(data.templates.get(push.id)!!, now - 10 * 60_000, id = "push")
+            var w = Workout.fromTemplate(data.templates.get(push.id)!!, pushStart, id = "push")
             val sets = w.exercises[0].sets
             w = w.setValues(sets[0].id, SetValues(60.0, 8)).completeSet(sets[0].id, w.startedAt + 60_000)
             w = w.setValues(sets[1].id, SetValues(60.0, 8)).completeSet(sets[1].id, w.startedAt + 120_000)
-            data.workouts.finish(w, endedAt = now - 60_000)
+            data.workouts.finish(w, endedAt = now)
 
             val calf = data.exercises.getActive().first { it.primaryMuscles == listOf(Muscle.CALVES) }
             val old = now - 400L * 24 * 3_600_000

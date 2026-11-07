@@ -16,10 +16,9 @@ data class MuscleStrings(
     val muscle: (Muscle) -> String,
     /** Hint below the figure before anything is tapped. */
     val tapHint: String,
-    /** "Brust · 6 Sätze" plus the assisting part, e.g. "· 4 mittrainiert". */
+    /** "Brust · 6 Sätze" plus the assisting part, e.g. "+ 4 Sätze mittrainiert". */
     val load: (muscle: String, primary: Int, secondary: Int) -> String,
     val emptyPeriod: (MusclePeriod) -> String,
-    val emptyWorkout: String,
     /** Accessibility summary of the figure: the trained muscles, most first. */
     val summary: (List<String>) -> String,
 )
@@ -47,7 +46,7 @@ val MuscleGerman = MuscleStrings(
     tapHint = "Tippe auf einen Muskel für die Satzzahl.",
     load = { m, p, s ->
         when {
-            p > 0 && s > 0 -> "$m · ${setsDe(p)} · $s mittrainiert"
+            p > 0 && s > 0 -> "$m · ${setsDe(p)} + ${setsDe(s)} mittrainiert"
             p > 0 -> "$m · ${setsDe(p)}"
             s > 0 -> "$m · ${setsDe(s)} mittrainiert"
             else -> "$m · nicht trainiert"
@@ -61,7 +60,6 @@ val MuscleGerman = MuscleStrings(
             MusclePeriod.TOTAL -> "Noch kein abgeschlossenes Training."
         }
     },
-    emptyWorkout = "Keine abgeschlossenen Sätze.",
     summary = { if (it.isEmpty()) "Keine Muskeln trainiert" else "Trainiert: " + it.joinToString(", ") },
 )
 
@@ -85,7 +83,7 @@ val MuscleEnglish = MuscleStrings(
     tapHint = "Tap a muscle to see its sets.",
     load = { m, p, s ->
         when {
-            p > 0 && s > 0 -> "$m · ${setsEn(p)} · $s assisting"
+            p > 0 && s > 0 -> "$m · ${setsEn(p)} + ${setsEn(s)} assisting"
             p > 0 -> "$m · ${setsEn(p)}"
             s > 0 -> "$m · ${setsEn(s)} assisting"
             else -> "$m · not trained"
@@ -99,6 +97,5 @@ val MuscleEnglish = MuscleStrings(
             MusclePeriod.TOTAL -> "No finished training yet."
         }
     },
-    emptyWorkout = "No completed sets.",
     summary = { if (it.isEmpty()) "No muscles trained" else "Trained: " + it.joinToString(", ") },
 )

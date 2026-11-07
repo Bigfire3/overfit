@@ -19,7 +19,7 @@
 **Erledigt:** Kalender → neues Körper-Icon in der Titelzeile öffnet ein Bottom-Sheet „Trainierte Muskeln“: eigene, stilisierte
 Figur vorne und hinten, jeder Muskel je nach Sätzen im Zeitraum von Dunkelgrau (untrainiert) bis Weiß (am meisten), Legende
 „Viel ▬ Wenig“. Zeitraum per Chips: Diese Woche, Dieser Monat, Dieses Jahr, Gesamt (wird gemerkt). Gezählt werden abgehakte
-Sätze beendeter Trainings, primäre Muskeln voll, mittrainierte halb. Tipp auf einen Muskel zeigt „Brust · 6 Sätze · 4 mittrainiert“.
+Sätze beendeter Trainings, primäre Muskeln voll, mittrainierte halb. Tipp auf einen Muskel zeigt „Brust · 6 Sätze + 4 Sätze mittrainiert“.
 Die Trainingsdetail-Ansicht zeigt dieselbe Figur klein für genau dieses Training. Grafik selbst gezeichnet (keine fremde Vorlage),
 keine DB-Migration. Details in DECISIONS.md. Tests: `MuscleMapTest` (shared und App), `MuscleMapShotTest`.
 Screenshots: `docs/screenshots/muskel-heatmap/`.

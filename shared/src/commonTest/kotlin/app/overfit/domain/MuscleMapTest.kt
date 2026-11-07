@@ -111,4 +111,16 @@ class MuscleMapTest {
         assertEquals(MuscleLoad(primary = 2), loads[Muscle.CHEST])
         assertEquals(MuscleLoad(secondary = 2), loads[Muscle.TRICEPS])
     }
+
+    @Test fun daysFollowTheLocalZoneNotUtc() {
+        // Berlin (UTC+1 in November): 31 Oct 23:30 is October, 1 Nov 0:30 is November.
+        val berlin = TimeZone.of("Europe/Berlin")
+        val lateOctober = LocalDateTime(LocalDate(2026, 10, 31), LocalTime(23, 30)).toInstant(berlin).toEpochMilliseconds()
+        val earlyNovember = LocalDateTime(LocalDate(2026, 11, 1), LocalTime(0, 30)).toInstant(berlin).toEpochMilliseconds()
+        val rows = listOf(MuscleSetRow(lateOctober, listOf(Muscle.CHEST), emptyList(), 1), MuscleSetRow(earlyNovember, listOf(Muscle.LATS), emptyList(), 1))
+        val today = LocalDate(2026, 11, 4)
+        assertEquals(setOf(Muscle.LATS), MuscleMap.forPeriod(rows, MusclePeriod.MONTH, today, DayOfWeek.MONDAY, berlin).keys)
+        // Same instants, read in UTC: 1 Nov 0:30 Berlin is 31 Oct 23:30 UTC → nothing in November.
+        assertTrue(MuscleMap.forPeriod(rows, MusclePeriod.MONTH, today, DayOfWeek.MONDAY, TimeZone.UTC).isEmpty())
+    }
 }

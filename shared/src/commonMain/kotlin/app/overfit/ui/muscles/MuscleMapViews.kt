@@ -77,7 +77,7 @@ import kotlin.math.roundToInt
 
 /** Shade per level: 0 = untrained (dark grey) … [MuscleMap.LEVELS] = most (white). No accent colour. */
 internal val LevelColors = listOf(
-    Color(0xFF3A3A3C), Color(0xFF6C6C70), Color(0xFF9C9CA0), Color(0xFFCDCDD0), Color(0xFFFFFFFF),
+    Color(0xFF48484A), Color(0xFF707074), Color(0xFF9C9CA0), Color(0xFFCDCDD0), Color(0xFFFFFFFF),
 )
 
 /** Remembers the period of the calendar's muscle sheet. */
@@ -170,11 +170,14 @@ fun BodyMap(
         val density = LocalDensity.current
         val size = with(density) { Size(maxWidth.toPx(), (maxHeight - labelHeight).toPx().coerceAtLeast(1f)) }
         val layout = remember(size) { BodyLayout(size) }
-        val tap = if (onSelect == null) Modifier else Modifier.pointerInput(layout, selected, onSelect) {
+        // Latest selection/callback without restarting the gesture detector on every recomposition.
+        val current by androidx.compose.runtime.rememberUpdatedState(selected)
+        val select by androidx.compose.runtime.rememberUpdatedState(onSelect)
+        val tap = if (onSelect == null) Modifier else Modifier.pointerInput(layout) {
             detectTapGestures { c ->
                 val (back, p) = layout.toFigure(c)
                 val hit = BodyShapes.hit(if (back) BodyShapes.back else BodyShapes.front, p)
-                onSelect(if (hit == selected) null else hit)
+                select?.invoke(if (hit == current) null else hit)
             }
         }
         Canvas(
@@ -186,7 +189,7 @@ fun BodyMap(
                     val muscle = shape.muscle
                     val color = if (muscle == null) base else LevelColors[levels[muscle] ?: 0]
                     val faded = selected != null && muscle != selected
-                    drawPath(shape.path(layout, back), color, alpha = if (faded) 0.35f else 1f)
+                    drawPath(shape.path(layout, back), color, alpha = if (faded) 0.45f else 1f)
                 }
             }
         }
@@ -222,7 +225,7 @@ fun MuscleLegend(modifier: Modifier = Modifier) {
 
 /** Figure, legend and the line for the tapped muscle; shared by the calendar sheet and the training detail. */
 @Composable
-fun MuscleMapBody(loads: Map<Muscle, MuscleLoad>, figureHeight: Dp, modifier: Modifier = Modifier) {
+fun MuscleMapBody(loads: Map<Muscle, MuscleLoad>, figureHeight: Dp, modifier: Modifier = Modifier, emptyText: String? = null) {
     val m = LocalStrings.current.muscles
     var selected by remember { mutableStateOf<Muscle?>(null) }
     val levels = remember(loads) { MuscleMap.levels(loads) }
@@ -241,7 +244,7 @@ fun MuscleMapBody(loads: Map<Muscle, MuscleLoad>, figureHeight: Dp, modifier: Mo
         MuscleLegend()
         Spacer(Modifier.height(Space.s))
         val s = selected
-        val line = if (s == null) m.tapHint else (loads[s] ?: MuscleLoad()).let { m.load(m.muscle(s), it.primary, it.secondary) }
+        val line = if (s == null) (if (loads.isEmpty() && emptyText != null) emptyText else m.tapHint) else (loads[s] ?: MuscleLoad()).let { m.load(m.muscle(s), it.primary, it.secondary) }
         Text(
             line,
             Modifier.fillMaxWidth().testTag("muscle-line"),
@@ -315,11 +318,8 @@ fun MuscleMapSheetContent(
             }
             Spacer(Modifier.height(Space.m))
             if (loads != null) {
-                if (loads.isEmpty()) {
-                    Text(m.emptyPeriod(period), Modifier.fillMaxWidth().padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-                }
-                // A new period starts without a selection.
-                androidx.compose.runtime.key(period) { MuscleMapBody(loads, figureHeight = 320.dp) }
+                // A new period starts without a selection; "nothing yet" replaces the tap hint (no layout jump).
+                androidx.compose.runtime.key(period) { MuscleMapBody(loads, figureHeight = 320.dp, emptyText = m.emptyPeriod(period)) }
             } else {
                 Spacer(Modifier.height(360.dp))
             }

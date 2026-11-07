@@ -146,7 +146,6 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 line(3.5f, 10f, 20.5f, 10f)
                 drawCircle(color, 1.1f * u, p(16.5f, 14.25f))
             }
-            // List view: three rows, each with a dot and a line.
             // Body map (calendar title): small standing figure.
             Icon.Body -> {
                 circle(12f, 5f, 2.25f)
@@ -156,6 +155,7 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 line(10.5f, 14.5f, 9.5f, 20.5f)
                 line(13.5f, 14.5f, 14.5f, 20.5f)
             }
+            // List view: three rows, each with a dot and a line.
             Icon.List -> {
                 for (y in listOf(6.5f, 12f, 17.5f)) {
                     drawCircle(color, 1.1f * u, p(5.5f, y))
