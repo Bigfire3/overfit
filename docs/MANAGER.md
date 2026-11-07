@@ -5,7 +5,7 @@ Für die Claude-Session, die Fabians Feedback koordiniert. Stand: 7.11.2026. Kei
 ## Rolle
 - Fabian (Owner) gibt Feedback, oft per Handy mit Screenshots, auf Deutsch. Der Manager setzt es nicht selbst um, sondern startet je Thema eine Sub-Session (`create_session`, source `https://github.com/Bigfire3/overfit`, Tag `overfit-feedback-3-11`, Titel „<Buchstabe>: <Thema>“) mit einem Briefing per `append_system_prompt`. Kleine Doku- oder Konfig-Änderungen macht der Manager selbst (eigener Branch, PR, nach Sonnet-Gegencheck und grüner CI selbst mergen).
 - Fabian, wörtlich: „Der Entwicklungsprozess soll durch meine fehlende Zustimmung oder Meinung nicht aufgehalten werden.“ Selbst entscheiden. Ausnahmen: Geld und Recht entscheidet Fabian.
-- Modelle: Sonnet für Abgegrenztes, Opus für Architektur, Migrationen, Hintergrund/Timer, KI-Schnittstelle, kniffliges Debugging, große Audits.
+- Modelle (Fabian, 7.11.): Sub-Sessions und Umsetzungs-Subagents laufen auf Opus 5.5 (effort medium), der Gegencheck vor jedem Merge auf Sonnet 5.5 (effort high). Siehe CLAUDE.md.
 - Antworten an Fabian kurz, deutsch, mit konkreten Handy-Testschritten und APK-Version. Push-Benachrichtigung nur bei neuer APK oder Wichtigem, wenn er wahrscheinlich weg ist.
 
 ## Ablauf je Sub-Session
@@ -28,21 +28,30 @@ Für die Claude-Session, die Fabians Feedback koordiniert. Stand: 7.11.2026. Kei
 - Vor jedem Merge ein Sonnet-Gegencheck (CLAUDE.md).
 
 ## Offene To-dos für Fabian (bei Gelegenheit erinnern)
-- Secret `GEMINI_API_KEY` (seit 7.11.2026 nicht mehr nötig: Guthaben nur noch über Claude; Einladungen entfernt). Kostet Geld, seine Entscheidung.
+- Geldfragen (offen seit 7.11.):
+  - Aufschlag `MARKUP_BP` 28 % → 18 % senken? Die 10-%-Rücklage für Geschenke entfällt, weil es keine Einladungen mehr gibt. Empfehlung: ja.
+  - Voreinstellung „gratis“ (Workers AI): Sollen Nutzer den Listenpreis zahlen oder 0? Empfehlung: Listenpreis.
+  - Preise für OpenAI und Workers AI in `backend/llm-routing.jsonc` vor Produktion prüfen.
+- Ausgabenlimit für `ANTHROPIC_API_KEY` in der Anthropic-Konsole setzen.
+- Test-Guthaben (es gibt kein Startguthaben mehr): App öffnen, dann Actions → „Backend deployen“ mit mode=test und credit_eur.
+- Löschbare Secrets: `INVITE_SIGNING_KEY`/`SPOT_SIGNING_KEY`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_APP_ATTEST_TEAM_ID`. `GEMINI_API_KEY` behalten, falls er die Voreinstellung „gemini“ nutzen will.
 - Repo-Variable `BACKEND_DEPLOY_MODE=test` für automatische Backend-Deploys.
 - Stripe-Testkonto + Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (später Live-Varianten).
-- Apple Developer (99 €/Jahr) und TestFlight-Secrets laut README „iPhone: TestFlight“.
+- TestFlight-Secrets laut README „iPhone: TestFlight“ (Apple Developer hat er), danach Workflow „iOS TestFlight“.
 - Rechtsseiten (Impressum, Datenschutz, AGB/Widerruf) – Recht = Fabians Entscheidung.
+- Offene Fragen ohne Antwort:
+  - Fotos pro Tag und pro Training oder nur pro Training?
+  - Claude-Connector (MCP) auf dem Testserver prüfen und Einrichtung aufschreiben?
 - Offene Idee: Overfit-Skill bzw. MCP-Plugin für KI-Apps (Schritt 1 ohne Backend: Skill + `.overfit`-Export). Wartet auf Fabians Go.
+- Verworfen (7.11.): Geräte-Umrechner für Maschinen verschiedener Marken.
+
+## KI im Backend (Stand 7.11.)
+- Guthaben-Anfragen laufen über eine Anbieter-Schicht im Worker (Anthropic, OpenAI, Gemini, Workers AI, OpenRouter). Die Routing-Tabelle steht in `backend/llm-routing.jsonc`: Stufe lite/standard/pro → Modell + Ausweich-Modell + Preis.
+- Umschalten: Actions → „Backend deployen“ → Feld „KI-Anbieter“ (claude, openai, gemini, gratis, gemischt, openrouter) oder Repo-Variable `LLM_PRESET`. Die Wahl wird im Worker gespeichert und gilt, bis neu gewählt wird. Anleitung: `docs/anbieter-umstellen.md`.
+- Abrechnung: echte Tokens × Preis des antwortenden Modells + Aufschlag. Beim Ausweichen zahlt der Nutzer das günstigere der beiden Modelle. Das Anfrage-Protokoll ist in der App unter Profil → Guthaben → Abrechnung.
+- Guthaben läuft nie ab. Kein Startguthaben, keine Einladungen.
+- App-DB: v10 body_weight, v11 ai_request, v12 Coach-Chat.
 
 ## Verlauf seit 3.11. abends (Sessions)
-AF #58 Feedback-Runde 4 · #59 Name „Overfit“ · AG #60 Ticken, nicht wegwischbare Pausen-Benachrichtigung, Settings „Benachrichtigungen“ · AH #61 Übungsbild → Vollbild-Animation · U #43 iOS testbar, TestFlight-Workflow · AI #63 Sauna (DB v8) · AJ #62 Coach-Story · #64 Sonnet-Gegencheck-Regel · AK #65 SVG-Hotfix · #66/#72 impeccable · AL #67 Verlauf-Tab weg, Kalender-Tag, Trainings bearbeiten (DB v9), Tabs Workouts/Coach/Kalender/Profil · AN #68 CI-Stabilität (AppTeardown, Simulator-Boot) · AM #69–#71 UI-Audit (Zahlenfelder, Panels, Popups).
-
-## Geplant, noch nicht beauftragt: Coach-Tab als Chat (Stand 7.11.)
-Fabian will das später umsetzen lassen. Vorschlag des Managers (6.11.) plus Fabians Festlegungen:
-- Coach-Tab = schlichter Chat: oben Modell-Auswahl-Chip, Verlauf (frühere Chats), neuer Chat; Mitte Nachrichten; unten Eingabe mit „+“ für Kontext und Senden. Keine Vorschlagskacheln. Alles andere (KI-Zugang, Guthaben, Standardmodell, automatische Auswertung, Coach-Profil, Story) wandert in die Einstellungen.
-- **Fabian:** Das Profil wird **immer** mitgeschickt (nicht erst hinzufügen müssen). Bilder wählt man selbst aus. Das (aktuelle) Workout/Training ist schon **automatisch angehängt**.
-- „Profil“ = das Coach-Profil (Ziel, Niveau, Einschränkungen, Equipment, Trainingstage). Es geht nur an den gewählten KI-Weg (eigener Schlüssel direkt zum Anbieter, sonst Backend). Die Datenschutzregeln gelten unverändert (eigener Schlüssel ohne Opt-in: null Backend-Anfragen).
-- Entwurf System-Prompt (vom 6.11.):
-  > Du bist ein erfahrener, professioneller Personal Trainer und Kraft- und Athletiktrainer. Du betreust die Person in dieser App individuell. Antworte immer in der Sprache, in der die Frage gestellt wurde. Sei konkret, knapp und ehrlich; nenne Zahlen (Gewicht, Wiederholungen, Sätze, Pausen, Häufigkeit), wo möglich, und begründe kurz. Nutze die mitgeschickten Daten (Profil, Trainings, Workouts, Verlauf, Fotos); erfinde keine Daten, frage gezielt nach, wenn Wichtiges fehlt. Orientiere dich an Ziel, Niveau, Einschränkungen und Ausrüstung. Progressive Überlastung mit Augenmaß, Technik vor Gewicht, Erholung einplanen. Bei Technik-Fotos konkret benennen, was gut ist und was zu korrigieren ist. Keine medizinischen Diagnosen; bei Schmerzen, Verletzungen, Schwindel oder Vorerkrankungen zu ärztlicher/physiotherapeutischer Abklärung raten. Workouts/Änderungen nur mit Übungen aus der mitgeschickten Liste und zusätzlich im Overfit-Format, damit die App sie übernehmen kann. Motivierend, ohne Floskeln.
-- Offen: Chat-Verlauf nur lokal (Vorschlag) oder auch Server.
+AF #58 Feedback-Runde 4 · #59 Name „Overfit“ · AG #60 Ticken, nicht wegwischbare Pausen-Benachrichtigung, Settings „Benachrichtigungen“ · AH #61 Übungsbild → Vollbild-Animation · U #43 iOS testbar, TestFlight-Workflow · AI #63 Sauna (DB v8) · AJ #62 Coach-Story · #64 Sonnet-Gegencheck-Regel · AK #65 SVG-Hotfix · #66/#72 impeccable · AL #67 Verlauf-Tab weg, Kalender-Tag, Trainings bearbeiten (DB v9), Tabs Workouts/Coach/Kalender/Profil · AN #68 CI-Stabilität (AppTeardown, Simulator-Boot) · AM #69–#71 UI-Audit (Zahlenfelder, Panels, Popups) · #87 Modellregel · AU #82/#91 KI repariert, nur Claude, Abrechnung, Einladungen entfernt · AY #88 Import → Editor · AZ #89 Körpergewicht, Zukunftsmonate, Heute · BA #90 Muskel-Heatmap · BB #93 Coach-Tab als Chat · BC #92 grüne Satzzeilen, Eingabefelder, Cursor ans Ende · BD #94/#95 KI-Anbieter umschaltbar.
+Nächster freier Buchstabe: BE.
