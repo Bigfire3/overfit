@@ -146,7 +146,8 @@ class FuelApi(
 
     // --- Endpoints --------------------------------------------------------------------------------------------
 
-    override suspend fun config(): FuelConfig = parse(send(HttpMethod.Get, "/v1/config", signed = false)) { decode(it) }
+    override suspend fun config(): FuelConfig =
+        parse(send(HttpMethod.Get, "/v1/config", signed = false)) { decode<FuelConfig>(it) }.also { ModelNames.register(it) }
 
     override suspend fun account(): FuelAccount = parse(call(HttpMethod.Get, "/v1/account")) { decode(it) }
 
@@ -188,7 +189,12 @@ class FuelApi(
             chosenModel = meta?.get("requestedModel")?.jsonPrimitive?.contentOrNull,
             requestId = meta?.get("requestId")?.jsonPrimitive?.longOrNull,
             fallbackReason = meta?.get("fallbackReason")?.jsonPrimitive?.contentOrNull,
-        )
+            servedModelName = meta?.get("modelName")?.jsonPrimitive?.contentOrNull,
+            servedVendor = meta?.get("vendor")?.jsonPrimitive?.contentOrNull,
+            chosenModelName = meta?.get("requestedModelName")?.jsonPrimitive?.contentOrNull,
+            chosenVendor = meta?.get("requestedVendor")?.jsonPrimitive?.contentOrNull,
+            provider = meta?.get("provider")?.jsonPrimitive?.contentOrNull,
+        ).also { ModelNames.register(it) }
     }
 }
 

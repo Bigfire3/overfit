@@ -48,6 +48,8 @@ export interface UsageEntry {
   /** Anbieterkosten (µ€, Listenpreis ohne Aufschlag) des tatsächlich genutzten Modells; null = unbekannt. */
   providerCostMicro: number | null;
   fallback: boolean;
+  /** Modell der Stufe (zuerst versucht); bei Ausweichen ≠ `model`. */
+  requestedModel?: string;
   photo: boolean;
 }
 
@@ -80,9 +82,9 @@ export async function settle(
   const charged = charge - left;
   stmts.push(
     env.DB.prepare(
-      `INSERT INTO ledger (account_id, ts, type, amount_micro, model, tier, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, ref, cost_micro, fallback, photo)
-       VALUES (?, ?, 'usage', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(accountId, now(), -charged, usage.model, usage.tier, usage.input, usage.cacheRead, usage.cacheWrite, usage.output, holdId, usage.providerCostMicro, usage.fallback ? 1 : 0, usage.photo ? 1 : 0),
+      `INSERT INTO ledger (account_id, ts, type, amount_micro, model, tier, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, ref, cost_micro, fallback, photo, requested_model)
+       VALUES (?, ?, 'usage', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(accountId, now(), -charged, usage.model, usage.tier, usage.input, usage.cacheRead, usage.cacheWrite, usage.output, holdId, usage.providerCostMicro, usage.fallback ? 1 : 0, usage.photo ? 1 : 0, usage.requestedModel ?? null),
   );
   await env.DB.batch(stmts);
   return charged;

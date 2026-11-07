@@ -39,7 +39,7 @@ fun androidDependencies(
     }
     return AppDependencies(
     store = AppStore(kv, secrets, deviceDefaults()),
-    providers = Providers(createHttpClient()) { fuel.service() },
+    providers = Providers(createHttpClient(), kv) { fuel.service() },
     data = AppData(database, kv, photoFiles = AndroidPhotoFiles(context)),
     versionName = versionName,
     haptics = AndroidHaptics(context),

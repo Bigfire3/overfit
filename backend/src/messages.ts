@@ -148,6 +148,7 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     providerCostMicro: usage ? costMicro(usage, servedPrice, 0) : null,
     fallback,
     photo: images > 0,
+    requestedModel: requested.id,
   };
   const charged = await settle(env, device.accountId, holdId, hold, cost, entry);
   const requestId = await logRequest(env, {

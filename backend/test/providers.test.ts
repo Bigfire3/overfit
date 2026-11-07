@@ -215,6 +215,8 @@ describe('Ausweichen über Anbietergrenzen', () => {
     });
     expect(await balance(c)).toBe(f.balanceMicro - expected);
     expect(await lastRequest(c)).toMatchObject({ requestedModel: 'claude-sonnet-5-5', requestedProvider: 'anthropic', model: 'gemini-3.6-flash', provider: 'gemini', fallbackFromStatus: 529 });
+    const ledger = (await c.call('GET', '/v1/account/ledger')).body.entries[0];
+    expect(ledger).toMatchObject({ type: 'usage', model: 'gemini-3.6-flash', requestedModel: 'claude-sonnet-5-5', fallback: 1, amountMicro: -expected });
   });
 
   it('gemischt: Gemini (lite) fällt aus → Haiku antwortet, berechnet höchstens den Gemini-Preis', async () => {

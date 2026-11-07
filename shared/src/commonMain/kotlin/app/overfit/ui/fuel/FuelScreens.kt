@@ -248,7 +248,7 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
                     append(" · ").append(t.ledgerTokens(e.inputTokens + e.cacheReadTokens + e.cacheWriteTokens, e.outputTokens))
                 }
             }
-            val chosen = if (e.type == "usage" && e.fallback) e.tier?.let { app.overfit.fuel.modelOfTierAt(it, e.ts) }?.let { app.overfit.fuel.modelShortName(it) } else null
+            val chosen = if (e.type == "usage" && e.fallback) (e.requestedModel ?: e.tier?.let { app.overfit.fuel.modelOfTierAt(it, e.ts) })?.let { app.overfit.fuel.modelShortName(it) } else null
             Text(detail, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.xs))
             if (chosen != null) Text(t.ledgerFallback(chosen), style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.xs))
             }
