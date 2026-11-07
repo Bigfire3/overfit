@@ -20,6 +20,7 @@ data class Strings(
     val history: HistoryStrings,
     val photos: PhotoStrings,
     val bodyWeight: BodyWeightStrings,
+    val muscles: MuscleStrings,
 
     // Onboarding
     val nameTitle: String,
@@ -261,6 +262,7 @@ val German = Strings(
     history = HistoryGerman,
     photos = PhotoGerman,
     bodyWeight = BodyWeightGerman,
+    muscles = MuscleGerman,
     next = "Weiter",
     back = "Zurück",
     comingSoon = "Folgt in einer späteren Version",
@@ -482,6 +484,7 @@ val English = Strings(
     history = HistoryEnglish,
     photos = PhotoEnglish,
     bodyWeight = BodyWeightEnglish,
+    muscles = MuscleEnglish,
     next = "Continue",
     back = "Back",
     comingSoon = "Coming in a later version",

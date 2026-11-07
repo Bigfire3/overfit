@@ -115,4 +115,15 @@ class WeightCalendarShotTest {
             weights = weights.drop(1),
         )
     }
+
+    private val twoPhotos = photos + DiaryPhoto(WorkoutPhoto("p2", null, "p2.jpg", ms(LocalDate(2026, 10, 3)), "/nonexistent/p2.jpg"), null)
+
+    @Test fun headerAtTodayWithCompareAndMuscles() = shot("kopfzeile-heute-dunkel") {
+        PhotosScreen(twoPhotos, history, Language.DE, today, {}, { _, _ -> }, weights = weights, onMuscles = {})
+    }
+
+    @Test fun headerAwayWithTodayAndMuscles() = shot("kopfzeile-weggescrollt-dunkel", after = { compose.onNodeWithTag(DIARY_GRID_TAG).performScrollToIndex(11) }) {
+        PhotosScreen(twoPhotos, history, Language.DE, today, {}, { _, _ -> }, weights = weights, onMuscles = {})
+    }
 }
+

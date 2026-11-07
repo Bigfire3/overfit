@@ -108,6 +108,8 @@ fun PhotosScreen(
     /** Body-weight log (oldest first, null while loading) and a tap on the weight card (opens today's entry). */
     weights: List<WeightEntry>? = emptyList(),
     onWeightToday: () -> Unit = {},
+    /** Opens the muscle map sheet (body icon in the title row); null hides the icon. */
+    onMuscles: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val p = t.photos
@@ -167,6 +169,7 @@ fun PhotosScreen(
                     // At 360 dp "Heute", "Vergleichen" and the toggle do not fit together: while "Heute" shows, compare
                     // waits (one tap back to today, or start comparing first and then scroll – selection stays).
                     if (!asList && photoList.size >= 2 && !(loaded && awayFromToday)) SmallButton(p.compare, onClick = { selecting = true })
+                    if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
                     // The icon shows the other view: list while the calendar is up, calendar while the list is up.
                     HeaderIconButton(
                         if (asList) Icon.Calendar else Icon.List,

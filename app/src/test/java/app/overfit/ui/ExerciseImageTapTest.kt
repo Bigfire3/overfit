@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.ai.Providers
@@ -118,7 +119,8 @@ class ExerciseImageTapTest {
             }
         }
         waitFor("1/2 erledigt")
-        compose.onNodeWithContentDescription("Details zu Bench Press").performClick()
+        // The card sits below "Trainierte Muskeln", out of view on a small screen.
+        compose.onNodeWithContentDescription("Details zu Bench Press").performScrollTo().performClick()
         assertEquals("wg:bench-press", opened)
     }
 

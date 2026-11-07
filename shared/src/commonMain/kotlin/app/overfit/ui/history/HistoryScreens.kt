@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.data.FinishedWorkout
@@ -193,6 +194,15 @@ fun WorkoutDetailScreen(
             SectionTitle(h.photos)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
                 photos.forEachIndexed { i, p -> PhotoThumb(p, h.photoDescription(i + 1), onClick = { onOpenPhoto(p.id) }) }
+            }
+        }
+
+        // Muscles of exactly this training (completed sets), small version of the calendar's body map.
+        val loads = remember(w) { app.overfit.domain.MuscleMap.ofWorkout(w) }
+        if (loads.isNotEmpty()) {
+            SectionTitle(t.muscles.title)
+            Block(Modifier.testTag("workout-muscles")) {
+                app.overfit.ui.muscles.MuscleMapBody(loads, figureHeight = 240.dp, Modifier.padding(vertical = Space.s))
             }
         }
 

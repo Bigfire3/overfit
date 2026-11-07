@@ -303,3 +303,11 @@ data class ExerciseSetRow(
     val durationSec: Int?,
     val position: Int,
 )
+
+/** Completed sets of one exercise in one finished workout, with its muscle keys (body map). */
+data class MuscleSetEntityRow(
+    val startedAt: Long,
+    val primaryMuscles: List<String>,
+    val secondaryMuscles: List<String>,
+    val sets: Int,
+)

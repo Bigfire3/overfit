@@ -764,6 +764,7 @@ fun OverfitApp(deps: AppDependencies) {
                         val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
                         val viewPref = remember { app.overfit.ui.photos.DiaryViewPref(deps.kv) }
                         val weights by deps.data.bodyWeights.entries.collectAsStateWithLifecycle(initialValue = null)
+                        var showMuscles by rememberSaveable { mutableStateOf(false) }
                         PhotosScreen(
                             weights = weights,
                             onWeightToday = { nav.navigate(DayRoute(deps.today().toString(), focusWeight = true)) },
@@ -776,7 +777,21 @@ fun OverfitApp(deps: AppDependencies) {
                             unit = state.profile.unit,
                             listView = viewPref.list,
                             onListViewChange = { viewPref.list = it },
+                            onMuscles = { showMuscles = true },
                         )
+                        if (showMuscles) {
+                            val muscleSets by deps.data.workouts.muscleSets.collectAsStateWithLifecycle(initialValue = null)
+                            val periodPref = remember { app.overfit.ui.muscles.MusclePeriodPref(deps.kv) }
+                            var period by remember { mutableStateOf(periodPref.period) }
+                            app.overfit.ui.muscles.MuscleMapSheet(
+                                rows = muscleSets,
+                                period = period,
+                                today = deps.today(),
+                                weekStart = app.overfit.domain.DiaryCalendar.weekStart(state.language),
+                                onPeriod = { period = it; periodPref.period = it },
+                                onDismiss = { showMuscles = false },
+                            )
+                        }
                     }
                     composable<PhotoViewerRoute> { entry ->
                         val id = entry.toRoute<PhotoViewerRoute>().photoId

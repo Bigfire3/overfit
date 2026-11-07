@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link, List }
+enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link, List, Body }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -145,6 +145,15 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 drawRoundRect(color, p(3.5f, 6.5f), Size(17f * u, 12f * u), style = stroke)
                 line(3.5f, 10f, 20.5f, 10f)
                 drawCircle(color, 1.1f * u, p(16.5f, 14.25f))
+            }
+            // Body map (calendar title): small standing figure.
+            Icon.Body -> {
+                circle(12f, 5f, 2.25f)
+                path(8f to 9.5f, 16f to 9.5f, 14.5f to 14.5f, 9.5f to 14.5f, close = true)
+                line(8f, 9.5f, 5.5f, 14.5f)
+                line(16f, 9.5f, 18.5f, 14.5f)
+                line(10.5f, 14.5f, 9.5f, 20.5f)
+                line(13.5f, 14.5f, 14.5f, 20.5f)
             }
             // List view: three rows, each with a dot and a line.
             Icon.List -> {
