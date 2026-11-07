@@ -132,6 +132,14 @@ class IosRestAlerts : RestAlerts {
         }
     }
 
+    override fun openNotificationSettings() {
+        dispatch_async(dispatch_get_main_queue()) {
+            NSURL.URLWithString(UIApplicationOpenSettingsURLString)?.let {
+                UIApplication.sharedApplication.openURL(it, options = emptyMap<Any?, Any>(), completionHandler = null)
+            }
+        }
+    }
+
     override fun appPlaysTicks(): Boolean =
         UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive
 

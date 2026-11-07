@@ -65,7 +65,7 @@ class ConfirmShotTest {
                             }) {
                                 Title("Push")
                                 Spacer(Modifier.height(Space.l))
-                                ConfirmButton(t.finishWorkout, {}, Modifier, compact = true)
+                                ConfirmButton(t.finishWorkout, {}, Modifier, compact = true, kind = app.overfit.ui.components.ConfirmKind.Complete)
                                 Spacer(Modifier.height(Space.l))
                                 ConfirmButton(t.discardWorkout, {})
                                 Spacer(Modifier.height(Space.l))
@@ -98,4 +98,23 @@ class ConfirmShotTest {
     @Test fun discardDark() = shot("verwerfen-scharf-dunkel", ::armDiscard)
     @Test fun finishDark() = shot("beenden-scharf-dunkel", ::armFinish)
     @Test fun restoreDark() = shot("backup-scharf-dunkel", ::armRestore)
+
+    @Test fun storyHalfBar() {
+        val dir = System.getenv("SCREENSHOT_DIR")
+        assumeTrue(dir != null)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            OverfitTheme {
+                Box(Modifier.width(360.dp).height(640.dp).background(Theme.colors.background).testTag("shot")) {
+                    app.overfit.ui.coach.CoachStoryScreen(onClose = {}, onTarget = {})
+                }
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(app.overfit.ui.coach.STORY_AUTO_MS * 3 / 2 + 100)
+        val out = File(dir!!).also { it.mkdirs() }
+        File(out, "story-halber-balken-dunkel.png").outputStream().use {
+            compose.onNodeWithTag("shot").captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+    }
 }

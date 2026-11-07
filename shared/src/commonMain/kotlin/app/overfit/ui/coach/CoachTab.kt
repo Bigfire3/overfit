@@ -2,6 +2,7 @@ package app.overfit.ui.coach
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -399,7 +400,8 @@ private fun WorkoutCard(w: SharedTraining, onUse: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(top = Space.m)
-            .border(1.dp, Theme.colors.hairline, RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(Theme.colors.surface)
             .padding(Space.m)
             .testTag("chat:workout"),
     ) {
@@ -429,7 +431,7 @@ private fun PhotoPicker(photos: Flow<List<DiaryPhoto>>, attached: MutableList<St
             val selected = p.photo.id in attached
             val label = h.photoLabel(t.date(Instant.fromEpochMilliseconds(p.photo.takenAt).toLocalDateTime(TimeZone.currentSystemDefault()).date))
             Box(
-                if (selected) Modifier.border(2.dp, Theme.colors.foreground, RoundedCornerShape(6.dp)).padding(2.dp) else Modifier.padding(2.dp),
+                if (selected) Modifier.background(Theme.colors.foreground, RoundedCornerShape(8.dp)).padding(2.dp) else Modifier.padding(2.dp),
             ) {
                 PhotoThumb(p.photo, label, size = 64.dp, onClick = {
                     if (selected) attached.remove(p.photo.id) else if (attached.size < MAX_ATTACHED) attached.add(p.photo.id)

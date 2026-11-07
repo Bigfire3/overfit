@@ -48,7 +48,6 @@ import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Block
 import app.overfit.ui.components.BlockButton
 import app.overfit.ui.components.BlockShape
-import app.overfit.ui.components.HeaderIconButton
 import app.overfit.ui.components.MenuItem
 import app.overfit.ui.components.MoreMenu
 import app.overfit.ui.components.SetField
@@ -219,7 +218,6 @@ fun TemplateEditorScreen(
 
     val back = { if (state.dirty && !backArmed) backArmed = true else onClose() }
     BackHandler(enabled = state.dirty, onBack = back)
-    val nameFocus = remember { FocusRequester() }
 
     Screen(
         header = { BackHeader(t.back, back) },
@@ -251,9 +249,8 @@ fun TemplateEditorScreen(
                         draft.name,
                         { v -> viewModel.edit { it.withName(v.take(60)) } },
                         t.templateNamePlaceholder,
-                        Modifier.weight(1f).focusRequester(nameFocus),
+                        Modifier.weight(1f),
                     )
-                    HeaderIconButton(Icon.Edit, t.rename, { nameFocus.requestFocus() }, color = Theme.colors.muted)
                 }
                 Text(if (draft.isNew) t.newTemplate else t.editMode, style = Theme.type.caption, tone = Tone.Muted)
                 Spacer(Modifier.height(Space.m))

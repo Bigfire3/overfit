@@ -53,6 +53,7 @@ import app.overfit.i18n.CoachStrings
 import app.overfit.i18n.LocalCoachStrings
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.ConfirmButton
+import app.overfit.ui.components.textInputArea
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
@@ -520,7 +521,7 @@ private fun ChangeRow(change: PlanChange, unit: WeightUnit, language: Language, 
             if (enabled) {
                 Spacer(Modifier.width(Space.m))
                 if (checked) LineIcon(Icon.Check)
-                else Box(Modifier.size(20.dp).border(1.dp, Theme.colors.muted, CircleShape))
+                else Box(Modifier.size(20.dp).background(Theme.colors.surfacePressed, CircleShape))
             }
         }
     }
@@ -540,7 +541,7 @@ internal fun TextArea(value: String, onValueChange: (String) -> Unit, placeholde
                     onValueChange = onValueChange,
                     textStyle = Theme.type.body.copy(color = Theme.colors.foreground),
                     cursorBrush = SolidColor(Theme.colors.foreground),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().textInputArea(),
                 )
             }
         }

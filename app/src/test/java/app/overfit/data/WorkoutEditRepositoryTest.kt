@@ -145,4 +145,53 @@ class WorkoutEditRepositoryTest {
         assertTrue(workouts.readPhoto(left)!!.contentEquals(byteArrayOf(1, 2)))
         assertNull(workouts.photos.first().single().workoutName)
     }
+
+    @Test
+    fun renamingAFinishedTrainingChangesOnlyThatTraining() = runTest {
+        val a = custom("A")
+        var w = workoutOf("w1", a, PlannedSet(50.0, 10))
+        w = w.completeSet(w.exercises[0].sets[0].id, 2000)
+        workouts.finish(w, endedAt = 9000)
+
+        assertTrue(workouts.updateFinished(w.withName("  Abendtraining  "), note = null, feeling = null, sauna = false))
+        assertEquals("Abendtraining", workouts.getFinished("w1")!!.workout.name)
+        assertEquals("Abendtraining", workouts.history.first().single().name)
+        assertEquals(1L, workouts.getFinished("w1")!!.workout.templateId)
+
+        // An empty name keeps the old one instead of a nameless training.
+        assertTrue(workouts.updateFinished(w.withName("   "), note = null, feeling = null, sauna = false))
+        assertEquals("Abendtraining", workouts.getFinished("w1")!!.workout.name)
+    }
+
+    @Test
+    fun lastPerformancePrefersThisWorkoutThenAnyAndSkipsUndone() = runTest {
+        val a = custom("A")
+        fun template(id: Long, name: String) = Template(id, name, null, listOf(TemplateExercise(a, 45, null, listOf(PlannedSet(50.0, 10), PlannedSet(50.0, 8)))))
+        suspend fun train(id: String, templateId: Long, startedAt: Long, values: List<SetValues>, done: Boolean = true) {
+            var w = Workout.fromTemplate(template(templateId, "T$templateId"), startedAt, id = id, idGen = { "g${seq++}" })
+            w.exercises[0].sets.forEachIndexed { i, s ->
+                w = w.setValues(s.id, values[i])
+                if (done) w = w.completeSet(s.id, startedAt + 1)
+            }
+            workouts.finish(w, endedAt = startedAt + 10)
+        }
+        assertNull(workouts.lastPerformance(a.id, 1))
+
+        train("old", templateId = 1, startedAt = 1_000, values = listOf(SetValues(60.0, 10), SetValues(62.5, 8)))
+        train("other", templateId = 2, startedAt = 5_000, values = listOf(SetValues(70.0, 5), SetValues(70.0, 4)))
+        // Newest, but nothing checked off: never counts as "last time".
+        train("undone", templateId = 1, startedAt = 9_000, values = listOf(SetValues(99.0, 1), SetValues(99.0, 1)), done = false)
+
+        val inWorkout = workouts.lastPerformance(a.id, 1)!!
+        assertTrue(inWorkout.inThisWorkout)
+        assertEquals(1_000L, inWorkout.startedAt)
+        assertEquals(listOf(SetValues(60.0, 10), SetValues(62.5, 8)), inWorkout.sets)
+
+        val anywhere = workouts.lastPerformance(a.id, 3)!!
+        assertFalse(anywhere.inThisWorkout)
+        assertEquals(5_000L, anywhere.startedAt)
+        assertEquals(listOf(SetValues(70.0, 5), SetValues(70.0, 4)), anywhere.sets)
+        // Same source as "last time" in the running workout.
+        assertEquals(anywhere.sets, workouts.lastSets(a.id))
+    }
 }

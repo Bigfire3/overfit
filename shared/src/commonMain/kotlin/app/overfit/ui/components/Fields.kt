@@ -74,7 +74,7 @@ fun SearchInput(value: String, onValueChange: (String) -> Unit, placeholder: Str
                 cursorBrush = SolidColor(Theme.colors.foreground),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, autoCorrectEnabled = false),
                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                modifier = Modifier.weight(1f).padding(vertical = Space.m),
+                modifier = Modifier.weight(1f).textInputArea().padding(vertical = Space.m),
                 decorationBox = { inner ->
                     Box {
                         if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
@@ -126,7 +126,7 @@ fun SmallInput(
                 cursorBrush = SolidColor(Theme.colors.foreground),
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                modifier = Modifier
+                modifier = Modifier.textInputArea()
                     .weight(1f)
                     .padding(vertical = 10.dp)
                     .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
@@ -143,7 +143,7 @@ fun SmallInput(
     }
 }
 
-/** Multi-line text field (notes) as its own grey, outlined area, so it reads as an input. */
+/** Multi-line text field (notes) as its own grey area, so it reads as an input. */
 @Composable
 fun MultilineInput(
     value: String,
@@ -164,9 +164,10 @@ fun MultilineInput(
         cursorBrush = SolidColor(c.foreground),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
         modifier = Modifier
+            .textInputArea()
             .fillMaxWidth()
             .heightIn(min = minHeight)
-            .then(if (inPanel) Modifier.background(c.surface) else Modifier.clip(shape).background(c.surface).border(1.dp, c.hairline, shape))
+            .then(if (inPanel) Modifier.background(c.surface) else Modifier.clip(shape).background(c.surface))
             .padding(Space.m),
         decorationBox = { inner ->
             Box {

@@ -151,8 +151,8 @@ class ExerciseImageTapTest {
     fun editor_iconOpensDetails_backReturnsToEditor() {
         launch()
         compose.onNodeWithText("Push").performClick()
-        waitFor("Bearbeiten")
-        compose.onNodeWithText("Bearbeiten").performClick()
+        waitForDescription("Bearbeiten")
+        compose.onNodeWithContentDescription("Bearbeiten").performClick()
         waitFor("Bearbeitungsmodus")
         compose.onNodeWithContentDescription("Details zu Bench Press").performClick()
         waitFor("FORTSCHRITT")
@@ -164,8 +164,8 @@ class ExerciseImageTapTest {
     fun picker_imageOpensDetails_rowStillSelects() {
         launch()
         compose.onNodeWithText("Push").performClick()
-        waitFor("Bearbeiten")
-        compose.onNodeWithText("Bearbeiten").performClick()
+        waitForDescription("Bearbeiten")
+        compose.onNodeWithContentDescription("Bearbeiten").performClick()
         waitFor("Bearbeitungsmodus")
         compose.onNodeWithText("Übung hinzufügen").performClick()
         waitFor("Übungen hinzufügen")

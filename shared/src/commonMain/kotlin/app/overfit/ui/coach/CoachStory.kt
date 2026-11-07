@@ -1,6 +1,10 @@
 package app.overfit.ui.coach
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -53,7 +57,6 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
-import kotlinx.coroutines.delay
 
 /** Where a story page can lead: the matching place of the app (null = no shortcut on that page). */
 enum class StoryTarget { OwnKey, Credit, ChatConnections }
@@ -81,11 +84,15 @@ fun CoachStoryScreen(
     var page by rememberSaveable { mutableIntStateOf(0) }
     val last = pages.lastIndex
 
-    // Restarts on every page change (also after a tap), so a tap gives the new page its full time.
+    // Fill of the current page's bar, 0..1 over STORY_AUTO_MS. Restarts on every page change (also after a tap), so a
+    // tap gives the new page its full time. Without auto advance the bar stays full.
+    // Keyed by page: a fresh bar starts empty in the very first frame of the new page (no flash of a full bar).
+    val progress = remember(page, autoAdvance) { Animatable(if (autoAdvance) 0f else 1f) }
     LaunchedEffect(page, autoAdvance) {
-        if (autoAdvance && page < last) {
-            delay(STORY_AUTO_MS)
-            page += 1
+        if (autoAdvance) {
+            progress.animateTo(1f, tween(STORY_AUTO_MS.toInt(), easing = LinearEasing))
+            // The last page runs through too, then the story closes like with the X.
+            if (page < last) page += 1 else onClose()
         }
     }
 
@@ -122,12 +129,14 @@ fun CoachStoryScreen(
     ) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = Space.m)) {
             Spacer(Modifier.height(Space.m))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                // Screen readers still hear "page N of 4" (no visible text any more).
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = s.progress(page + 1, pages.size); liveRegion = LiveRegionMode.Polite },
+            ) {
                 repeat(pages.size) { i ->
-                    Box(
-                        Modifier.weight(1f).height(2.dp)
-                            .background(if (i <= page) Theme.colors.foreground else Theme.colors.hairline),
-                    )
+                    // Past bars full, coming ones empty, the current one runs from left to right.
+                    StoryBar(i, Modifier.weight(1f)) { if (i < page) 1f else if (i == page) progress.value else 0f }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(top = Space.s), horizontalArrangement = Arrangement.End) {
@@ -156,12 +165,16 @@ fun CoachStoryScreen(
                     SmallButton(p.action, { onTarget(target) }, Modifier.testTag("story:action"))
                 }
             }
-            Text(
-                s.progress(page + 1, pages.size),
-                Modifier.fillMaxWidth().padding(bottom = Space.m).semantics { liveRegion = LiveRegionMode.Polite },
-                style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center,
-            )
+            Spacer(Modifier.height(Space.m))
         }
+    }
+}
+
+/** One progress bar of the story: [fill] 0..1 is read here only, so just the bars redraw while it runs. */
+@Composable
+private fun StoryBar(index: Int, modifier: Modifier, fill: () -> Float) {
+    Box(modifier.height(3.dp).background(Theme.colors.hairline).testTag("story:bar:$index")) {
+        Box(Modifier.fillMaxHeight().fillMaxWidth(fill().coerceIn(0f, 1f)).background(Theme.colors.foreground).testTag("story:fill:$index"))
     }
 }
 

@@ -125,7 +125,7 @@ fun ExerciseImage(exercise: Exercise, modifier: Modifier = Modifier, size: Dp = 
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            Modifier.size(size).clip(shape).border(0.5.dp, Theme.colors.hairline, shape),
+            Modifier.size(size).clip(shape),
             contentAlignment = Alignment.Center,
         ) {
             ExerciseImageContent(exercise, model, vector, size, failed) { failed = true }

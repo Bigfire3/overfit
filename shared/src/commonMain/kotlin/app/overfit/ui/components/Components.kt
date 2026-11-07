@@ -60,7 +60,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -145,16 +149,38 @@ fun Screen(
         Spacer(Modifier.height(if (compact) Space.xs else Space.m))
         header?.invoke()
         val body = Modifier.weight(1f).fillMaxWidth()
-        Column(if (scroll) body.verticalScroll(rememberScrollState()) else body) {
-            content()
-            if (scroll) Spacer(Modifier.height(Space.xxl))
-        }
-        if (footer != null) {
-            Column(
-                Modifier.fillMaxWidth().padding(top = if (compact) Space.s else Space.m, bottom = if (compact) Space.s else Space.m),
-                verticalArrangement = Arrangement.spacedBy(if (compact) Space.s else Space.m),
-                content = footer,
-            )
+        val footerModifier = Modifier.fillMaxWidth().padding(top = if (compact) Space.s else Space.m, bottom = if (compact) Space.s else Space.m)
+        val footerSpacing = Arrangement.spacedBy(if (compact) Space.s else Space.m)
+        if (footer != null && scroll) {
+            // Floating main button: no bar. The content scrolls underneath (a short fade keeps the label readable), the
+            // trailing spacer in the scroll content is as tall as the footer so nothing stays covered at the end.
+            val density = LocalDensity.current
+            var footerHeight by remember { mutableStateOf(0.dp) }
+            Box(body) {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    content()
+                    Spacer(Modifier.height(maxOf(footerHeight, Space.xxl)))
+                }
+                val bg = Theme.colors.background
+                Column(
+                    Modifier.align(Alignment.BottomCenter)
+                        .onSizeChanged { footerHeight = with(density) { it.height.toDp() } }
+                        .drawBehind {
+                            // One soft gradient over the whole footer area (no hard edge, no flat bar).
+                            drawRect(Brush.verticalGradient(listOf(Color.Transparent, bg.copy(alpha = 0.85f)), startY = 0f, endY = size.height))
+                        }
+                        .padding(top = 24.dp)
+                        .then(footerModifier),
+                    verticalArrangement = footerSpacing,
+                    content = footer,
+                )
+            }
+        } else {
+            Column(if (scroll) body.verticalScroll(rememberScrollState()) else body) {
+                content()
+                if (scroll) Spacer(Modifier.height(Space.xxl))
+            }
+            if (footer != null) Column(footerModifier, verticalArrangement = footerSpacing, content = footer)
         }
     }
 }
@@ -313,11 +339,11 @@ private fun PillButton(
             .background(fill, ButtonShape)
             .padding(horizontal = if (compact) Space.m else Space.l),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        // Left-aligned, bold; long labels on narrow phones shrink a little before they would be cut off.
+        // Centred (text + icon as one group), bold; long labels on narrow phones shrink a little before they would be cut off.
         BasicText(
-            label, modifier = if (icon != null) Modifier.weight(1f) else Modifier.weight(1f, fill = false),
+            label, modifier = Modifier.weight(1f, fill = false),
             style = textStyle, maxLines = 1, overflow = TextOverflow.Ellipsis,
             autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = textStyle.fontSize),
         )
@@ -370,9 +396,12 @@ fun DestructiveButton(
     PillButton(label, onClick, modifier, enabled, compact, haptic = false, fill = c.negativeSubtle, contentTone = c.negative)
 }
 
+/** What a two-tap button does: delete/remove/reset (red when armed) or finish/complete (green when armed). */
+enum class ConfirmKind { Destructive, Complete }
+
 /**
  * Two-tap button for actions that need a confirmation (finish, discard, reset, delete all): the first tap
- * arms it (the button fills solid [Colors.armedFill] red with a white label, the text stays the same; screen readers hear
+ * arms it (the button fills solid red ([Colors.armedFill]; green [Colors.confirmFill] for [ConfirmKind.Complete]) with a white label, the text stays the same; screen readers hear
  * "zum Bestätigen erneut tippen"), a second tap within 3 s runs [onConfirm]. A tap elsewhere, scrolling
  * or the timeout disarm it ([ConfirmArea]). [primary] = black main action of a screen (backup restore).
  */
@@ -385,6 +414,8 @@ fun ConfirmButton(
     enabled: Boolean = true,
     primary: Boolean = false,
     loading: Boolean = false,
+    /** [ConfirmKind.Destructive] (default) arms red, [ConfirmKind.Complete] green. */
+    kind: ConfirmKind = ConfirmKind.Destructive,
 ) {
     val arm = rememberConfirmArm()
     val haptics = LocalHapticFeedback.current
@@ -393,7 +424,7 @@ fun ConfirmButton(
     val c = Theme.colors
     // Armed: solid red fill, white label (no border), whatever the button looked like before.
     val (fill, tone) = when {
-        armed -> c.armedFill to c.foreground
+        armed -> (if (kind == ConfirmKind.Complete) c.confirmFill else c.armedFill) to c.foreground
         primary -> c.inverseBackground to c.inverseForeground
         else -> c.surface to c.foreground
     }
@@ -481,7 +512,7 @@ fun BigInput(
             cursorBrush = SolidColor(Theme.colors.foreground),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); onDone() }),
-            modifier = if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth(),
+            modifier = (if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth()).textInputArea(),
             decorationBox = { inner ->
                 Box {
                     if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
@@ -530,7 +561,7 @@ private fun UnderlinedInput(
                 keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text, autoCorrectEnabled = false, imeAction = ImeAction.Done,
             ),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); onDone() }),
-            modifier = Modifier.fillMaxWidth().padding(vertical = Space.m),
+            modifier = Modifier.fillMaxWidth().textInputArea().padding(vertical = Space.m),
             decorationBox = { inner ->
                 Box {
                     if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
@@ -565,7 +596,7 @@ fun RowInput(
         cursorBrush = SolidColor(Theme.colors.foreground),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-        modifier = Modifier.width(width).onFocusLost(onCommit),
+        modifier = Modifier.width(width).textInputArea().onFocusLost(onCommit),
         // 48 dp high tap area, text vertically centred.
         decorationBox = { inner ->
             Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
@@ -613,8 +644,8 @@ val PanelShape = RoundedCornerShape(16.dp)
 val CardShape = RoundedCornerShape(24.dp)
 
 /**
- * Grouped area that stands out from the background: grey [Colors.surface] fill, 1 dp [Colors.hairline] outline,
- * rounded corners, 1 dp dividers between its children (the outline colour shows through the gaps). Rows
+ * Grouped area that stands out from the background: grey [Colors.surface] fill, no outline,
+ * rounded corners, 1 dp dividers between its children (the black background shows through the gaps). Rows
  * ([ListRow], [CheckRow]) adapt by themselves; other content goes into [PanelItem].
  */
 @Composable
@@ -624,9 +655,8 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
         modifier
             .fillMaxWidth()
             .clip(PanelShape)
-            // The outline colour shows through the 1 dp padding and the gaps between rows: border and dividers in one.
-            .background(c.hairline)
-            .padding(1.dp),
+            // No outline: the black background shows through the 1 dp gaps between rows as a hairline divider.
+            .background(c.background),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
         CompositionLocalProvider(LocalInPanel provides true) { content() }
@@ -763,7 +793,7 @@ fun ListRow(label: String, value: String, tone: Tone = Tone.Default, onClick: ((
 }
 
 /**
- * A list row with a square checkbox at the end (e.g. "Sauna" after the workout). Unchecked = hairline outline,
+ * A list row with a square checkbox at the end (e.g. "Sauna" after the workout). Unchecked = grey fill,
  * checked = filled (inverted) with a check mark. The whole row toggles.
  */
 @Composable
@@ -791,7 +821,7 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
                     .size(22.dp)
                     .then(
                         if (checked) Modifier.background(Theme.colors.inverseBackground, shape)
-                        else Modifier.border(1.dp, Theme.colors.muted, shape),
+                        else Modifier.background(Theme.colors.surfacePressed, shape),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -804,7 +834,7 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
 
 /**
  * A list row with a plain on/off switch at the end (vibration, ticks, photos …). No "An/Aus" text: knob left =
- * off (dark track with grey outline, grey knob; outline [Colors.muted] for >= 3:1 contrast on black), knob right = on (filled light track, black knob); mirrored in RTL.
+ * off (grey track [Colors.surfacePressed], grey knob), knob right = on (filled light track, black knob); mirrored in RTL.
  * The whole row toggles; screen readers get role Switch and the on/off state from the semantics.
  */
 @Composable
@@ -845,8 +875,7 @@ private fun SwitchTrack(checked: Boolean) {
     Box(
         Modifier
             .size(width = 52.dp, height = 32.dp)
-            .background(if (checked) c.foreground else c.background, shape)
-            .then(if (checked) Modifier else Modifier.border(1.5.dp, c.muted, shape))
+            .background(if (checked) c.foreground else c.surfacePressed, shape)
             .padding(4.dp),
         contentAlignment = BiasAlignment(bias, 0f),
     ) {

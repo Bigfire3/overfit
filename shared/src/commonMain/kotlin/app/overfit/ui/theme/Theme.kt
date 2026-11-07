@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusTarget
+import app.overfit.ui.components.clearFocusOutsideTextInput
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -33,6 +34,7 @@ import org.jetbrains.compose.resources.Font
  *   The *Subtle variants are low-contrast fills behind such values (e.g. a delta badge).
  * - [armed]: the one deliberate colour exception in the UI chrome: red icon/label/border of a destructive
  *   two-tap button after the first tap ("tap again to confirm"). Nowhere else.
+ * - [confirmFill]: green fill of an armed two-tap button that completes something (finish workout). Red = delete, green = finish.
  */
 @Immutable
 data class Colors(
@@ -58,6 +60,8 @@ data class Colors(
     val armed: Color,
     /** Fill of an armed text button: darker red so white text on it reaches 4.5:1. */
     val armedFill: Color,
+    /** Fill of an armed button that finishes something (finish workout): green, white text on it reaches 4.5:1. */
+    val confirmFill: Color,
 )
 
 val DarkColors = Colors(
@@ -76,6 +80,7 @@ val DarkColors = Colors(
     negativeSubtle = Color(0xFF331311),
     armed = Color(0xFFFF453A),
     armedFill = Color(0xFFD32F2F),
+    confirmFill = Color(0xFF1E7D34),
 )
 
 /** Only a handful of sizes on purpose. */
@@ -130,7 +135,7 @@ fun OverfitTheme(content: @Composable () -> Unit) {
         LocalColors provides DarkColors,
         LocalTypography provides typography,
     ) {
-        Box {
+        Box(Modifier.clearFocusOutsideTextInput()) {
             // Focus sink: after "Done" a text field clears its focus; Android then hands focus back to the
             // root, which would put it on the first text field again (cursor + keyboard return). This
             // invisible first focus target takes it instead, so the cursor really goes away.

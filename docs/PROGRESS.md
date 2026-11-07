@@ -26,6 +26,22 @@ Server-Fehler verständlich. Details in DECISIONS.md. Tests: `tiers.test.ts`, `C
 ### Bitte auf dem Handy testen (Hotfix KI)
 1. Training beenden → Coach-Auswertung mit Guthaben: Auswertung kommt (zurzeit von Claude Sonnet 5.5, weil Gemini Flash fehlt), Guthaben sinkt um wenige Cent (ca. 3–10 ct).
 2. Profil → Guthaben → Modell: Gemini 3.6 Flash erscheint erst, wenn `GEMINI_API_KEY` gesetzt und der Server neu deployt ist.
+## Letzte Werte im Workout, Trainings umbenennen (7.11.)
+**Erledigt:** In einem gespeicherten Workout klappt ein Tipp auf eine Übung die Karte auf: „Letztes Mal · Datum“ und jeder Satz
+wie eingetragen (Gewicht × Wdh., Zeit … je Tracking-Typ). Bevorzugt aus diesem Workout, sonst „Letztes Mal in einem anderen
+Workout“; nie trainiert: „Noch nicht trainiert“. Tipp aufs Bild öffnet weiter die Übungsdetails. Vergangene Trainings lassen sich
+umbenennen: In der Trainingsdetail-Ansicht auf den Namen tippen (oder Stift) → Name oben ändern → Speichern. Nur das Training wird
+umbenannt, das Workout behält seinen Namen. Keine DB-Migration nötig (Trainings hatten schon ein eigenes Namensfeld). Details in
+DECISIONS.md. Tests: `LastTimeAndRenameTest` (ganze App), `WorkoutEditRepositoryTest`, `BackupTest`. Screenshots:
+`docs/screenshots/letzte-werte-umbenennen/`.
+
+### Bitte auf dem Handy testen (Letzte Werte, Umbenennen)
+1. Workouts → ein Workout öffnen, das du schon trainiert hast → auf eine Übung (Name, nicht Bild) tippen: Karte klappt auf mit Datum
+   und deinen Sätzen vom letzten Mal; nochmal tippen klappt zu. Bild antippen öffnet weiter die Übungsdetails.
+2. Eine Übung, die du nur in einem anderen Workout gemacht hast: „Letztes Mal in einem anderen Workout · Datum“. Nie gemacht: „Noch nicht trainiert“.
+3. „Direkt starten“, ein paar Sätze, beenden. Kalender → Tag → Training öffnen → auf den Namen tippen → Name ändern → Speichern:
+   Detail, Tagesansicht und Kalender zeigen den neuen Namen; das gespeicherte Workout heißt weiter wie vorher.
+4. Bearbeiten ohne Namensänderung bzw. Name ganz löschen und speichern: Der alte Name bleibt.
 
 ## Trainings-Benachrichtigung rot/grün (6.11.)
 **Erledigt:** Während des ganzen Trainings gibt es jetzt eine Benachrichtigung (Foreground-Service): grün im Satz (Übung,
@@ -1107,3 +1123,22 @@ Offen / Hinweise:
 3. Training: Pausenleiste (−15 s, +15 s, Überspringen) dunkelgrau, „Beenden“ antippen → rot gefüllt mit weißem Text → nochmal → Abschluss
 4. Mülleimer im Workout: erster Tipp rotes Icon, zweiter löscht
 5. Onboarding „Weiter“ mit Pfeil rechts; Profil/Coach/Guthaben: keine Rahmen um Knöpfe
+
+## Session AU – Cursor, Stift-Icon, Rot/Grün, Story-Balken (6.11.)
+- Erledigt: Tipp außerhalb eines Textfelds, Scrollen oder Zurück bei offener Tastatur nimmt den Fokus (kein Cursor mehr, zentral im Theme). Workout bearbeiten über Stift-Icon oben rechts, großer „Bearbeiten“-Knopf entfällt. Rot nur noch für Löschen/Abbrechen; „Beenden“ scharf grün. Story-Balken füllen sich über 6 s. Belege `docs/screenshots/fokus-farben-story/vorher|nachher/`, Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (Cursor, Stift, Farben, Story)
+1. Training: in ein Gewichtsfeld tippen, dann auf leere Fläche/Übungsname tippen → Cursor und Tastatur weg; ebenso beim Scrollen und beim Zurück-Wischen mit offener Tastatur
+2. Workout öffnen → Stift oben rechts → Bearbeiten-Modus; unten nur „Starten“
+3. Training → „Beenden“ antippen → grün; „Training abbrechen“ und Mülleimer → rot
+4. Coach → Story: aktueller Balken läuft von links nach rechts, nächste Seite nach ca. 6 s; Tipp startet den Balken neu
+
+## Session AX – Ohne Rahmen (7.11.)
+- Erledigt: alle Rahmen app-weit weg (nur Flächen), Hauptknopf unten schwebt ohne Leiste, Knöpfe zentriert, funktionsloser Stift im Workout-Editor entfernt, Profil → Benachrichtigungen „Erlaubt“ öffnet die Systemeinstellungen. Belege `docs/screenshots/ohne-rahmen/vorher|nachher/`.
+
+### Bitte auf dem Handy testen (ohne Rahmen)
+1. Workouts, Workout ansehen, Kalender, Profil, Coach: nirgends mehr ein Rahmen um Karten, Felder, Chips
+2. Workout bearbeiten: nur ein Stift (oben), unten „Speichern“ schwebt ohne schwarze Leiste, Inhalt scrollt darunter
+3. „Training starten“/„Speichern“: Text mittig im Knopf
+4. Profil → Benachrichtigungen → „Erlaubt“ antippen → Android-Benachrichtigungseinstellungen der App
+5. Schalter aus (grau gefüllt, kein Rand) noch klar erkennbar; Kalender „heute“ und Foto-Auswahl erkennbar
