@@ -32,7 +32,7 @@ class ModelContextTest {
             today = today,
         )
         assertEquals(
-            "Name: Fabi · Age: 31 · Body weight: 82 kg (as of 2026-11-02)\n" +
+            "Name: Fabi · Age: 31 · Body weight: 82 kg (as of 2026-11-02) · Weight trend: -2 kg over 32 days\n" +
                 "Reply language: German · Units: metric · Today: 2026-11-02",
             block,
         )
@@ -66,13 +66,13 @@ class ModelContextTest {
     @Test
     fun factsEnglishKg() {
         val f = aiProfileFacts(Profile(name = "Fabi", birthYear = 1995), weights, today, Language.EN)
-        assertEquals("Name: Fabi · Age: 31 · Body weight: 82.5 kg (as of 2026-11-02)", f)
+        assertEquals("Name: Fabi · Age: 31 · Body weight: 82.5 kg (as of 2026-11-02) · Weight trend: -1.5 kg over 32 days", f)
     }
 
     @Test
     fun factsGermanUsesDecimalCommaAndGermanLabels() {
         val f = aiProfileFacts(Profile(name = "Fabi", birthYear = 1995), weights, today, Language.DE)
-        assertEquals("Name: Fabi · Alter: 31 · Körpergewicht: 82,5 kg (Stand 2026-11-02)", f)
+        assertEquals("Name: Fabi · Alter: 31 · Körpergewicht: 82,5 kg (Stand 2026-11-02) · Gewichtstrend: -1,5 kg in 32 Tagen", f)
     }
 
     @Test
@@ -88,7 +88,7 @@ class ModelContextTest {
         val onlyName = aiProfileFacts(Profile(name = "  Eva ", birthYear = null), emptyList(), today, Language.EN)
         assertEquals("Name: Eva", onlyName)
         val onlyWeight = aiProfileFacts(Profile(name = "", birthYear = null), weights, today, Language.DE)!!
-        assertEquals("Körpergewicht: 82,5 kg (Stand 2026-11-02)", onlyWeight)
+        assertEquals("Körpergewicht: 82,5 kg (Stand 2026-11-02) · Gewichtstrend: -1,5 kg in 32 Tagen", onlyWeight)
         val onlyAge = aiProfileFacts(Profile(name = "", birthYear = 1995), emptyList(), today, Language.EN)
         assertEquals("Age: 31", onlyAge)
         listOf(onlyName, onlyWeight, onlyAge).forEach { assertFalse(it!!.contains("null")) }

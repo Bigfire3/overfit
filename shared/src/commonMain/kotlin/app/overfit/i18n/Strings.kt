@@ -19,6 +19,7 @@ data class Strings(
     val share: ShareStrings,
     val history: HistoryStrings,
     val photos: PhotoStrings,
+    val bodyWeight: BodyWeightStrings,
 
     // Onboarding
     val nameTitle: String,
@@ -259,6 +260,7 @@ val German = Strings(
     share = ShareGerman,
     history = HistoryGerman,
     photos = PhotoGerman,
+    bodyWeight = BodyWeightGerman,
     next = "Weiter",
     back = "Zurück",
     comingSoon = "Folgt in einer späteren Version",
@@ -479,6 +481,7 @@ val English = Strings(
     share = ShareEnglish,
     history = HistoryEnglish,
     photos = PhotoEnglish,
+    bodyWeight = BodyWeightEnglish,
     next = "Continue",
     back = "Back",
     comingSoon = "Coming in a later version",

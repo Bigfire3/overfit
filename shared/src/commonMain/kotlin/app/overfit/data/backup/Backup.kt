@@ -4,6 +4,7 @@ import app.overfit.data.AppData
 import app.overfit.data.AppStore
 import app.overfit.data.PersistedState
 import app.overfit.data.db.AiStatus
+import app.overfit.data.db.BodyWeightEntity
 import app.overfit.data.db.ExerciseEntity
 import app.overfit.data.db.SessionExerciseEntity
 import app.overfit.data.db.SessionStatus
@@ -38,6 +39,11 @@ data class BackupJson(
     val templates: List<BTemplate> = emptyList(),
     val workouts: List<BWorkout> = emptyList(),
     val photos: List<BPhoto> = emptyList(),
+    /**
+     * Body-weight log (DB v10). Older backups have none; their weights are in [PersistedState.weights] and come back
+     * from there. Newer backups carry both, so an older app still restores the weights into its profile.
+     */
+    val bodyWeights: List<BBodyWeight> = emptyList(),
     /** Data of other features (e.g. coach memory), see [BackupContributor]. */
     val extras: Map<String, JsonElement> = emptyMap(),
 ) {
@@ -144,6 +150,15 @@ data class BPhoto(
     val position: Int = 0,
 )
 
+@Serializable
+data class BBodyWeight(
+    /** ISO date, one entry per day. */
+    val date: String,
+    val kg: Double,
+    val at: Long? = null,
+    val updatedAt: Long = 0,
+)
+
 /** Lets another feature (coach memory, AI chat settings) put its data into the backup. */
 interface BackupContributor {
     /** Key in [BackupJson.extras]. */
@@ -227,6 +242,7 @@ class BackupService(
                 )
             },
             photos = bPhotos,
+            bodyWeights = data.bodyWeights.all().map { BBodyWeight(it.date, it.weightKg, it.measuredAt, it.updatedAt) },
             v = BackupJson.versionFor(bPhotos),
             extras = buildMap { contributors().forEach { c -> c.export()?.let { put(c.key, it) } } },
         )
@@ -342,6 +358,14 @@ class BackupService(
         val files = data.workouts.photoFiles
         json.photos.forEach { p -> preview.photoBytes[p.file]?.let { files.write(p.file, it) } }
         json.state?.let { store.restore(it) }
+        // Body weight: the log of the backup plus profile weights of days it lacks (backups before DB v10 only have those).
+        val weights = data.bodyWeights
+        weights.replaceAll(
+            json.bodyWeights.filter { runCatching { kotlinx.datetime.LocalDate.parse(it.date) }.isSuccess }
+                .map { BodyWeightEntity(it.date, it.kg, it.at, it.updatedAt) },
+        )
+        json.state?.weights?.let { weights.importMissing(it) }
+        store.mirrorWeights(weights.all().map { app.overfit.domain.WeightEntry(it.date, it.weightKg) })
         contributors().forEach { c -> c.import(json.extras[c.key]) }
     }
 

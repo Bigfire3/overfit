@@ -1131,3 +1131,18 @@ Offen / Hinweise:
 3. „Training starten“/„Speichern“: Text mittig im Knopf
 4. Profil → Benachrichtigungen → „Erlaubt“ antippen → Android-Benachrichtigungseinstellungen der App
 5. Schalter aus (grau gefüllt, kein Rand) noch klar erkennbar; Kalender „heute“ und Foto-Auswahl erkennbar
+
+## Session AZ – Körpergewicht im Kalender, Zukunftsmonate, „Heute“ (7.11.)
+- Erledigt: Gewicht tracken (eigene Tabelle, DB v10, ein Wert pro Tag), Schnell-Karte oben im Kalender mit Wert, Veränderung zur Vorwoche und 8-Wochen-Verlauf, Eintrag/Löschen in der Tagesansicht, Strich im Kalender + Legende, Wert in der Liste, Trend im Coach-Kontext, Backup inklusive. Kalender zeigt 12 Monate in die Zukunft (ausgegraut, nicht antippbar), „Heute“-Knopf springt zurück. Belege `docs/screenshots/gewicht-kalender/`, Details in docs/DECISIONS.md.
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Gewicht, Kalender)
+1. Kalender-Tab: oben Karte „Körpergewicht“ (bzw. „Gewicht eintragen“); falls im Onboarding ein Gewicht eingegeben wurde, steht es schon da
+2. Karte antippen → Tagesansicht von heute, Tastatur offen; z. B. 82,4 tippen → zurück → Karte zeigt 82,4 kg, heute im Kalender ein kleiner Strich unter der 7, Legende „Gewicht“
+3. Nochmal öffnen, 81,9 eingeben → ersetzt den Wert (kein zweiter Eintrag); Mülleimer: erster Tipp rot, zweiter löscht
+4. Ein paar Tage in der Vergangenheit eintragen (Tag antippen) → Verlauf in der Karte, „… zur Vorwoche“ sobald ein Wert von vor 7–14 Tagen da ist
+5. Kalender nach oben scrollen → Dezember 2026 … November 2027, Tage grau und nicht antippbar; oben erscheint „Heute“ → Tipp springt zum aktuellen Monat, Knopf verschwindet; ebenso nach unten in die Vergangenheit
+6. Listenansicht: Tage mit Gewicht als Karte bzw. „Gewicht 82,4 kg“ in der Zeile; runterscrollen → „Heute“ → wieder oben
+7. Profil auf lb stellen → Werte in lb; Coach fragen: kennt aktuelles Gewicht und Trend
+8. Backup exportieren und wieder einspielen → Gewichte sind wieder da
+

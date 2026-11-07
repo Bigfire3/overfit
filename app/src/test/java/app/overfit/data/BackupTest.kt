@@ -231,4 +231,44 @@ class BackupTest {
         assertEquals(75, back.defaultRestSec)
         assertEquals(ExerciseSource.CUSTOM, back.source)
     }
+
+    @Test
+    fun bodyWeightSurvivesExportAndRestore() = runTest {
+        data.seedCatalog().getOrThrow()
+        data.bodyWeights.set(kotlinx.datetime.LocalDate(2026, 11, 1), 83.0)
+        data.bodyWeights.set(kotlinx.datetime.LocalDate(2026, 11, 7), 82.44)
+        store.mirrorWeights(data.bodyWeights.entries.first())
+        val file = backup.export()
+        val json = String(Zip.read(file).getValue("backup.json"))
+        assertTrue(json, json.contains("\"bodyWeights\""))
+
+        data.resetAll()
+        store.resetAll()
+        assertEquals(0, data.bodyWeights.all().size)
+
+        backup.restore(backup.preview(file).getOrThrow())
+        val back = data.bodyWeights.all()
+        assertEquals(listOf("2026-11-01" to 83.0, "2026-11-07" to 82.4), back.map { it.date to it.weightKg })
+        assertEquals(1_000L, back.last().measuredAt) // time of day kept
+        // The profile mirror (AI context) matches the table.
+        assertEquals(back.map { it.date }, store.state.value.weights.map { it.date })
+    }
+
+    @Test
+    fun oldBackupWithWeightsOnlyInTheProfileFillsTheTable() = runTest {
+        data.seedCatalog().getOrThrow()
+        val old = Zip.write(
+            listOf(
+                Zip.Entry(
+                    "backup.json",
+                    """{"format":"overfit-backup","v":1,"createdAt":5,
+                       "state":{"profile":{"name":"Alt","unit":"KG"},"weights":[{"date":"2026-10-01","kg":84.5},{"date":"2026-10-08","kg":84.0}],
+                                "settings":{"language":"DE"}}}""".encodeToByteArray(),
+                ),
+            ),
+        )
+        backup.restore(backup.preview(old).getOrThrow())
+        assertEquals(listOf("2026-10-01" to 84.5, "2026-10-08" to 84.0), data.bodyWeights.all().map { it.date to it.weightKg })
+        assertEquals(84.0, store.state.value.weights.last().kg, 0.001)
+    }
 }
