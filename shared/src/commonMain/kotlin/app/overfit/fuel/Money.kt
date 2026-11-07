@@ -33,13 +33,6 @@ fun formatCost(micro: Long, language: Language): String {
     }
 }
 
-/** Euro amount counted up for the invite reveal: always two decimals, e.g. "0,37" (no currency sign; the UI adds "€"). */
-fun formatRevealNumber(micro: Long, language: Language): String {
-    val cents = microToCents(micro).coerceAtLeast(0)
-    val frac = (cents % 100).toString().padStart(2, '0')
-    return if (language == Language.DE) "${cents / 100},$frac" else "${cents / 100}.$frac"
-}
-
 /**
  * Estimated cost in cents for the model setting: "1,5 ct" (from 1 ct, one decimal), "0,02 ct" (below, two decimals),
  * "< 0,01 ct"; from 1 € as euro. Integer maths only.

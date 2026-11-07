@@ -43,8 +43,6 @@ data class CoachReply(
     val truncated: Boolean = false,
     /** The model declined (safety). */
     val refused: Boolean = false,
-    /** Credit: paid with a gifted review (invite bonus), nothing taken from the credit. */
-    val giftReview: Boolean = false,
     /** Token usage reported by the provider (null when it reports none). */
     val usage: TokenUsage? = null,
     /** Credit: ID of the server's request log entry; why the chosen model did not answer on a fallback. */
@@ -354,7 +352,6 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
         }
         val body = result.body as? JsonObject ?: throw CoachException(CoachErrorKind.SERVER, "Not an object")
         return anthropicReply(body, body.toString()).copy(
-            giftReview = result.giftReview,
             costMicro = result.costMicro,
             balanceMicro = result.balanceMicro,
             servedModel = result.servedModel,

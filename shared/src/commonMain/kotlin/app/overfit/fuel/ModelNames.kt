@@ -29,3 +29,16 @@ fun modelOfTier(tier: String): String? = when (tier) {
     "lite" -> "@cf/meta/llama-3.1-8b-instruct"
     else -> null
 }
+
+/** From this moment (7.11.2026, 00:00 UTC) every credit tier is a Claude model (Haiku/Sonnet/Opus 5.5). */
+const val CLAUDE_ONLY_SINCE_SEC = 1_794_009_600L
+
+/** Model whose price a booking of [tier] at [tsSec] was charged at: the Claude tiers since the switch, the old table before. */
+fun modelOfTierAt(tier: String, tsSec: Long): String? =
+    if (tsSec < CLAUDE_ONLY_SINCE_SEC) modelOfTier(tier)
+    else when (tier) {
+        "lite" -> "claude-haiku-5-5"
+        "standard" -> "claude-sonnet-5-5"
+        "pro" -> "claude-opus-5-5"
+        else -> null
+    }

@@ -11,7 +11,6 @@ import app.overfit.data.db.buildDatabase
 import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.FuelApi
 import app.overfit.fuel.RequestSigner
-import app.overfit.platform.AndroidAttestor
 import app.overfit.platform.AndroidDeviceKey
 import app.overfit.platform.AndroidHaptics
 import app.overfit.platform.AndroidPhotoFiles
@@ -36,7 +35,7 @@ fun androidDependencies(
     restIcon: Int = context.applicationInfo.icon,
 ): AppDependencies {
     val fuel = FuelAccess(kv, backendUrl) { url ->
-        FuelApi(createHttpClient(), url, RequestSigner(AndroidDeviceKey()), AndroidAttestor(context))
+        FuelApi(createHttpClient(), url, RequestSigner(AndroidDeviceKey()))
     }
     return AppDependencies(
     store = AppStore(kv, secrets, deviceDefaults()),

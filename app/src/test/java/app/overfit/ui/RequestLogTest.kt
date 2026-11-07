@@ -79,7 +79,7 @@ class RequestLogTest {
         val body = when (req.url.encodedPath) {
             "/v1/account/requests" -> """{"entries":[{"id":42,"ts":${(at(4, 9, 15) / 1000)},"durationMs":2100,"purpose":"plan","tier":"standard",
                 "status":"ok","requestedModel":"claude-sonnet-5-5","model":"claude-sonnet-5-5","inputTokens":5200,"outputTokens":900,"chargedMicro":12300}],"next":null}"""
-            else -> """{"deviceId":"d","balanceMicro":0,"expiring":[]}"""
+            else -> """{"deviceId":"d","balanceMicro":0}"""
         }
         respond(body, HttpStatusCode.OK, json)
     }
@@ -107,7 +107,7 @@ class RequestLogTest {
         AiRequestEntity("r4", at(5, 20, 10), 1800, "OPENROUTER", "autofill", "anthropic/claude-haiku-5-5", "anthropic/claude-haiku-5-5", "OK", inputTokens = 900, outputTokens = 120),
         // Own key, no connection.
         AiRequestEntity("r5", at(5, 8, 0), 15_000, "ANTHROPIC", "chat", "claude-sonnet-5-5", null, "FAILED", errorKind = "NETWORK"),
-        // Credit, gifted review.
+        // Credit, nothing charged (an old row from the former gifted reviews keeps gift = true): shown neutrally.
         AiRequestEntity("r6", at(4, 7, 45), 2900, "FUEL", "review", "claude-haiku-5-5", "claude-haiku-5-5", "OK", costMicro = 0, gift = true),
     )
 
@@ -143,7 +143,8 @@ class RequestLogTest {
         assertTrue(shown("Mit KI ausfüllen"))
         assertTrue(shown("0,4 ct · ok"))
         assertTrue(shown("1,23 € · ok"))
-        assertTrue(shown("geschenkt · ok"))
+        assertTrue(shown("nichts berechnet · ok"))
+        assertTrue(!shown("geschenkt", substring = true))
         assertTrue(shown("Fehler: Guthaben reichte nicht"))
         assertTrue(shown("Fehler: Keine Verbindung"))
         assertTrue(shown("über deinen Schlüssel · ok"))
@@ -152,7 +153,7 @@ class RequestLogTest {
         // Sum of the last 30 days (credit only): 0.4 ct + 1.234 € = 1.238 € → 1,24 €.
         assertTrue(shown("Letzte 30 Tage: 1,24 € Guthaben"))
         assertTrue(shown("nie gespeichert", substring = true))
-        // Newest first: the review of today comes before the gifted one of Nov 4.
+        // Newest first: the review of today comes before the one of Nov 4.
         val top = compose.onNodeWithTag("request:r1").fetchSemanticsNode().positionInRoot.y
         val bottom = compose.onNodeWithTag("request:r6").fetchSemanticsNode().positionInRoot.y
         assertTrue(top < bottom)

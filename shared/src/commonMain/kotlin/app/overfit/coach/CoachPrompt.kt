@@ -36,10 +36,7 @@ data class CoachPrompt(
     val maxTokens: Int? = null,
     /** Earlier turns (coach chat), oldest first; they go before [user]. Empty for one-shot requests. */
     val history: List<PromptTurn> = emptyList(),
-    /**
-     * True for a coach review (workout evaluation). Through the credit backend, reviews on the cheapest image model
-     * first use gifted reviews (invite bonus); chat and other features always pay from the credit.
-     */
+    /** True for a coach review (workout evaluation). */
     val review: Boolean = false,
     /** What the request is for (request log, credit backend). Null = derived: [review] → REVIEW, else CHAT. */
     val purpose: AiPurpose? = null,

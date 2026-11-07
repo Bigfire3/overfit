@@ -199,7 +199,7 @@ fun AboutScreen(versionName: String, onBack: () -> Unit, fuel: FuelAccess? = nul
 private const val DEV_TAPS = 7
 private const val REPO_URL = "https://github.com/Bigfire3/overfit"
 
-/** Hidden developer settings: override of the credit/invite backend URL. */
+/** Hidden developer settings: override of the credit backend URL. */
 @Composable
 private fun DeveloperSection(fuel: FuelAccess) {
     val f = LocalFuelStrings.current

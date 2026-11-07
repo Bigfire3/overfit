@@ -11,7 +11,7 @@ settings:
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
-    # Guthaben/Einladungs backend URL, passed by CI (xcodebuild OVERFIT_BACKEND_URL=…); empty = not configured.
+    # Guthaben backend URL, passed by CI (xcodebuild OVERFIT_BACKEND_URL=…); empty = not configured.
     OVERFIT_BACKEND_URL: ""
     # Kotlin builds only iosArm64 and iosSimulatorArm64 (no Intel simulator).
     "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64

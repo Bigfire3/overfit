@@ -39,7 +39,7 @@ data class AiRequestEntity(
     val cacheWriteTokens: Long? = null,
     /** Charged credit in µ€ (credit only; null for own keys). */
     val costMicro: Long? = null,
-    /** Paid with a gifted review (invite bonus). */
+    /** Unused since 7.11.2026 (former gifted reviews); kept so the table needs no migration. Always false for new rows. */
     val gift: Boolean = false,
     /** ID of the server log entry (credit), null for own keys and requests that never reached the server. */
     val serverId: Long? = null,

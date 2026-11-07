@@ -108,7 +108,7 @@ class WebCreditTest {
             )
             "/v1/codes/redeem" -> respond(redeemAnswer.second, redeemAnswer.first, json)
             "/v1/devices" -> respond("""{"deviceId":"d"}""", HttpStatusCode.OK, json)
-            else -> respond("""{"accountId":"a","balanceMicro":$balance,"expiring":[]}""", HttpStatusCode.OK, json)
+            else -> respond("""{"accountId":"a","balanceMicro":$balance}""", HttpStatusCode.OK, json)
         }
     }
     private val kv = InMemoryKeyValueStore()
@@ -132,7 +132,7 @@ class WebCreditTest {
                 LocalLifecycleOwner provides lifecycle,
             ) {
                 if (redeemOpen.value) RedeemCodeScreen(session, onBack = {})
-                else FuelScreen(session, onBack = {}, onLedger = {}, onRecovery = {}, onInviteShow = {}, onInviteRedeem = {},
+                else FuelScreen(session, onBack = {}, onLedger = {}, onRecovery = {},
                     fuelActive = true, onRedeemCode = { onRedeem(); redeemOpen.value = true }, distribution = distribution)
             }
         }
@@ -234,7 +234,7 @@ class CreditReturnLinkTest {
             "/v1/config" -> respond("""{"packages":[]}""", HttpStatusCode.OK, json)
             "/v1/chat/inbox" -> respond("""{"items":[]}""", HttpStatusCode.OK, json)
             "/v1/chat" -> respond("""{"enabled":false,"photos":false,"connections":[]}""", HttpStatusCode.OK, json)
-            else -> respond("""{"accountId":"a","balanceMicro":0,"expiring":[]}""", HttpStatusCode.OK, json)
+            else -> respond("""{"accountId":"a","balanceMicro":0}""", HttpStatusCode.OK, json)
         }
     }
 

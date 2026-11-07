@@ -24,7 +24,6 @@ class RequestLogStrings(
     val providerFuel: String,
     /** Own key: "über OpenRouter". */
     val viaProvider: (provider: String) -> String,
-    val costGift: String,
     val costOwnKey: String,
     val costNone: String,
     val statusOk: String,
@@ -70,7 +69,6 @@ val GermanRequestLog = RequestLogStrings(
     purposeOther = "Sonstiges",
     providerFuel = "Guthaben",
     viaProvider = { "über $it" },
-    costGift = "geschenkt",
     costOwnKey = "über deinen Schlüssel",
     costNone = "nichts berechnet",
     statusOk = "ok",
@@ -117,7 +115,6 @@ val EnglishRequestLog = RequestLogStrings(
     purposeOther = "Other",
     providerFuel = "Credit",
     viaProvider = { "via $it" },
-    costGift = "gifted",
     costOwnKey = "via your key",
     costNone = "nothing charged",
     statusOk = "ok",

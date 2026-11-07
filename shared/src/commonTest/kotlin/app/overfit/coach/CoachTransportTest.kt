@@ -9,8 +9,6 @@ import app.overfit.fuel.FuelMessageResult
 import app.overfit.fuel.FuelService
 import app.overfit.fuel.FuelTierInfo
 import app.overfit.fuel.LedgerPage
-import app.overfit.fuel.InviteRedeemResult
-import app.overfit.fuel.InviteToken
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -247,12 +245,9 @@ class CoachTransportTest {
         override val isDemo = false
         override suspend fun config(): FuelConfig { configCalls++; return config ?: error("offline") }
         override suspend fun account(): FuelAccount = error("unused")
-        override suspend fun setDisplayName(name: String?): String? = error("unused")
         override suspend fun ledger(before: Long?, limit: Int): LedgerPage = error("unused")
         override suspend fun createRecoveryCode(): String = error("unused")
         override suspend fun restore(code: String): FuelAccount = error("unused")
-        override suspend fun inviteToken(): InviteToken = error("unused")
-        override suspend fun redeemInvite(token: String): InviteRedeemResult = error("unused")
         override suspend fun messages(bodyJson: String): FuelMessageResult {
             lastBody = bodyJson
             return onMessages(bodyJson)
@@ -286,10 +281,9 @@ class CoachTransportTest {
     }
 
     @Test
-    fun fuelMarksCoachReviewsSoGiftedReviewsCanApply() = runTest {
-        val fake = FakeFuel(tiers("standard")) { FuelMessageResult(fuelAnswer, 0, 0, giftReview = true) }
-        val reply = FuelCoach(FuelProvider { fake }).send(prompt.copy(review = true), "standard")
-        assertTrue(reply.giftReview)
+    fun fuelMarksCoachReviewsWithTheirPurpose() = runTest {
+        val fake = FakeFuel(tiers("standard")) { FuelMessageResult(fuelAnswer, 0, 0) }
+        FuelCoach(FuelProvider { fake }).send(prompt.copy(review = true), "standard")
         assertEquals("review", Json.parseToJsonElement(fake.lastBody!!).jsonObject["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)
         FuelCoach(FuelProvider { fake }).send(prompt.copy(review = false), "standard")
         assertEquals("chat", Json.parseToJsonElement(fake.lastBody!!).jsonObject["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)

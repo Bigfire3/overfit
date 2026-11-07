@@ -1325,3 +1325,31 @@ möglichst genau sehen, wo, wann, was angefragt wurde“.
   im Weg; ohne Token geht alles direkt an Anthropic. Das Binding `AI` bleibt nur für die Gateway-URL. Kein Zahlungsmittel bei Cloudflare nötig.
 - **Offen:** `effort: medium` geht an alle drei Modelle; laut Anthropic unterstützt Haiku 5.5 `effort` (Standard `medium`), geprüft im
   E2E-Test nach dem Deploy. Die Spalte `fallback_reason` hält bei Fehlschlägen ohne Ausweichen den Fehlertext des letzten Versuchs.
+
+## Einladungen, Startguthaben und Verfall entfernt (7.11.2026)
+Fabian (Owner), wörtlich: „Dieses Freunde werben und diesen 1 Euro geschenkt bekommen, das ist mir am Anfang jetzt erstmal zu viel
+Heckmeck. Entferne das mal komplett aus der App. Da soll nichts mehr zu finden sein in der App, irgendwas über dieses Referral-Programm.
+… mir das auch zu undurchsichtig und ich mag es auch nicht, wenn Guthaben so abläuft.“ Entschieden, nicht verhandelbar.
+- **Backend:** `/v1/invite/*` antwortet 404, `/v1/config` ohne `invite`, `/v1/account` ohne `giftReviews` und `invite`, `/v1/messages` ohne
+  `giftReview`. Kein Startguthaben (auch nicht im Testbetrieb, neue Konten 0 €), nichts verfällt (Migration 0009, `expiring` immer leer).
+  Keine Geräteprüfung mehr (Play Integrity / App Attest gab es nur für Einladungen). **Die D1-Tabellen bleiben** (`invite_tokens_used`,
+  `invite_redemptions`, `review_gifts`, alte Buchungen): nicht destruktiv, keine Datenverluste, nur ungenutzt.
+- **App (Android und iOS):** entfernt sind „Freunde einladen“ (QR mit rotierendem Code, Name für Freunde), „Einladung einlösen“ (Scan,
+  Einfügen), der Deep-Link `overfit://invite#…` (ein alter Link landet jetzt wie jeder fremde Text im Import und wird dort abgelehnt; das
+  Schema `overfit://` bleibt für Trainings und `overfit://guthaben`), die Reveal-Animation samt Haptik-Mustern `Reveal`/`RevealFinish`,
+  geschenkte Auswertungen (Zähler, Verfallsdaten, Hinweis auf das Modell, „geschenkte Auswertung“ unter der Antwort, „geschenkt“ in der
+  Abrechnung), die Aufteilung „Gekauft/geschenkt“ und die Zeile „gültig bis“, die Erwähnung in der Coach-Story und im „Startet bald“-Text,
+  `FuelService.inviteToken/redeemInvite/setDisplayName`, `Attestor`/`AndroidAttestor`/`IosAttestor`, die Modelle `InviteConfig`,
+  `InviteToken`, `InviteChallenge`, `InviteRedeemResult`, `GiftReviews`, `ExpiringItem`, `InviteStatus`, alle zugehörigen Texte (DE+EN)
+  und die Abhängigkeit `com.google.android.play:integrity`. Das Profil-Feld `displayName` nutzt die App nicht mehr (es war nur der Name
+  für Einladungen); der Endpunkt `PUT /v1/account/profile` bleibt im Backend unangetastet.
+- **Alte Konten:** Ein altes Backend, das noch `invite`/`giftReviews`/`expiring` schickt, stört nicht (`ignoreUnknownKeys`). Buchungen
+  alter Typen (`invite_bonus`, `invite_reward`, `test_credit`, …) zeigt die Buchungsliste neutral als „Gutschrift“, negative als
+  „Ausbuchung“; die Kategorien heißen „gutgeschrieben“ bzw. „ausgebucht“ statt „geschenkt“/„verfallen“. Das Feld `reviews` wird ignoriert.
+  Die lokale Spalte `ai_request.gift` bleibt (keine Migration), wird aber nicht mehr gesetzt oder angezeigt.
+- **Preise:** Aufschlag bleibt 28 %. Die bisherige Rücklage von 10 % vom Netto für Geschenktes bleibt in der Rechnung als konservative
+  Rücklage für Kulanz-Gutschriften und Ausfälle (Chargebacks), damit `backend/test/pricing.test.ts` und die Tabellen gleich bleiben. Ob der
+  Aufschlag dadurch sinken kann, ist eine Geldfrage für Fabian (offen).
+- **Dokumentation:** SPEC (Phase 9 gestrichen), monetization.md, backend-api.md, backend/README.md, PROGRESS.md und die Preisseite
+  `web/preise/` sind angepasst. Die Kaufseite (`web/guthaben/`) bietet weiter Guthaben-Codes „als Geschenk“ an: das ist ein gekaufter Code,
+  kein Empfehlungsprogramm, und bleibt.

@@ -70,7 +70,6 @@ class LoggingTransport(
                 inputTokens = reply.usage?.input, outputTokens = reply.usage?.output,
                 cacheReadTokens = reply.usage?.cacheRead, cacheWriteTokens = reply.usage?.cacheWrite,
                 costMicro = if (providerId == ProviderId.FUEL) reply.costMicro ?: 0 else null,
-                gift = reply.giftReview,
                 serverId = reply.serverRequestId,
             ),
         )
@@ -115,7 +114,6 @@ fun ServerRequest.toEntity(existingId: String?): AiRequestEntity = AiRequestEnti
     fallbackReason = fallbackReason ?: fallbackFromStatus?.let { "HTTP $it" },
     inputTokens = inputTokens, outputTokens = outputTokens, cacheReadTokens = cacheReadTokens, cacheWriteTokens = cacheWriteTokens,
     costMicro = chargedMicro,
-    gift = gift,
     serverId = id,
 )
 

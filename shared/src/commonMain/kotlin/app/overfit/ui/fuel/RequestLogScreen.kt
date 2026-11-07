@@ -131,7 +131,6 @@ private fun RequestCard(e: AiRequestEntity, r: RequestLogStrings, language: Lang
             Text("$model · $provider", style = Theme.type.caption, tone = Tone.Muted)
             val cost = when {
                 !isFuel -> r.costOwnKey
-                e.gift -> r.costGift
                 (e.costMicro ?: 0) == 0L -> r.costNone
                 else -> formatRequestCost(e.costMicro!!, language)
             }

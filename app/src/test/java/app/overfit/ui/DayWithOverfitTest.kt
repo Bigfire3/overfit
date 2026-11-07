@@ -66,7 +66,7 @@ import java.io.File
 /**
  * "Ein Tag mit Overfit": one long walk through the app as a user would use it – onboarding, the Push/Pull/Legs
  * samples, sharing and re-importing, a workout with rest timer, edits, an app restart in the middle,
- * the AI template, credit/invite demo, "copy context", language, theme and "delete all data".
+ * the AI template, credit demo, "copy context", language, theme and "delete all data".
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
@@ -358,24 +358,16 @@ class DayWithOverfitTest {
         waitFor("Starten")
         compose.waitUntilState(10_000) { templates().any { it.name == "Oberkörper A" } }
 
-        // --- Profile: Fuel demo + invite reveal, KI-Coach context ------------------
+        // --- Profile: Fuel demo (balance, ledger), KI-Coach context ------------------
         tab("Profil")
         click("startet bald")
         waitFor("Guthaben startet bald")
         click("Demo ansehen")
         waitFor("4,20 € Guthaben")
-        waitFor("5 geschenkte Auswertungen")
-        click("Freunde einladen")
-        waitFor("Neuer Code in", substring = true)
+        assertTrue(compose.onAllNodes(hasText("einlad", substring = true, ignoreCase = true)).fetchSemanticsNodes().isEmpty())
+        click("Buchungen")
+        waitFor("Claude Sonnet 5.5 (Anthropic)", substring = true)
         back()
-        click("Einladung einlösen")
-        compose.onNodeWithText("Link oder Code").performTextInput("overfit://invite#demo-invite-token-1")
-        click("Einlösen")
-        waitFor("Einladung von Fabian")
-        waitFor("Coach-Auswertungen geschenkt")
-        assertTrue(HapticPattern.Reveal in haptics.played)
-        waitFor("Tippen zum Schließen")
-        click("Tippen zum Schließen")
         waitFor("4,20 € Guthaben")
 
         // Coach tab → prompts show their text → copy context: contains the profile and the finished workout

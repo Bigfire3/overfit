@@ -37,7 +37,7 @@ val GermanCoachStory = CoachStoryStrings(
     ),
     credit = StoryPage(
         "Mit Guthaben",
-        "Kein Schlüssel nötig: Du nutzt Guthaben. Wenn du Freunde einlädst, bekommt ihr beide einen Einladungsbonus.",
+        "Kein Schlüssel nötig: Du lädst Guthaben auf und zahlst nur, was eine Auswertung wirklich kostet.",
         "Zum Guthaben",
     ),
     subscription = StoryPage(
@@ -64,7 +64,7 @@ val EnglishCoachStory = CoachStoryStrings(
     ),
     credit = StoryPage(
         "With credit",
-        "No key needed: you use credit. When you invite friends, you both get a referral bonus.",
+        "No key needed: you top up credit and only pay what an analysis really costs.",
         "Go to credit",
     ),
     subscription = StoryPage(

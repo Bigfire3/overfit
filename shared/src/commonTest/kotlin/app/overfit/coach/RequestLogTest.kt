@@ -8,8 +8,6 @@ import app.overfit.fuel.FuelAccount
 import app.overfit.fuel.FuelConfig
 import app.overfit.fuel.FuelMessageResult
 import app.overfit.fuel.FuelService
-import app.overfit.fuel.InviteRedeemResult
-import app.overfit.fuel.InviteToken
 import app.overfit.fuel.LedgerPage
 import app.overfit.fuel.ServerRequest
 import app.overfit.fuel.ServerRequestPage
@@ -22,7 +20,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -60,7 +57,7 @@ class RequestLogTest {
     }
 
     @Test
-    fun creditRequestShowsModelOfTierCostGiftFallbackAndServerId() = runTest {
+    fun creditRequestShowsModelOfTierCostFallbackAndServerId() = runTest {
         val sink = ListSink()
         val t = LoggingTransport(
             transport(ProviderId.FUEL) {
@@ -80,7 +77,6 @@ class RequestLogTest {
         assertEquals("HTTP 529: Overloaded", e.fallbackReason)
         assertEquals(3_100L, e.costMicro)
         assertEquals(42L, e.serverId)
-        assertFalse(e.gift)
     }
 
     @Test
@@ -160,12 +156,9 @@ class RequestLogTest {
         }
         override suspend fun config(): FuelConfig = error("unused")
         override suspend fun account(): FuelAccount = error("unused")
-        override suspend fun setDisplayName(name: String?): String? = error("unused")
         override suspend fun ledger(before: Long?, limit: Int): LedgerPage = error("unused")
         override suspend fun createRecoveryCode(): String = error("unused")
         override suspend fun restore(code: String): FuelAccount = error("unused")
-        override suspend fun inviteToken(): InviteToken = error("unused")
-        override suspend fun redeemInvite(token: String): InviteRedeemResult = error("unused")
         override suspend fun messages(bodyJson: String): FuelMessageResult = error("unused")
     }
 
@@ -183,7 +176,7 @@ class RequestLogTest {
                     ),
                     next = 5,
                 ),
-                ServerRequestPage(listOf(ServerRequest(4, ts = 0, tier = "standard", status = "ok", requestedModel = "", gift = true)), next = null),
+                ServerRequestPage(listOf(ServerRequest(4, ts = 0, tier = "standard", status = "ok", requestedModel = "")), next = null),
             ),
         )
         assertEquals(3, syncServerRequests(service, dao))
@@ -200,7 +193,6 @@ class RequestLogTest {
         assertEquals("insufficient_funds", failed.errorKind)
         assertEquals(2_000L, failed.startedAt)
         val old = rows.getValue("srv-4")
-        assertTrue(old.gift)
         assertEquals("other", old.purpose) // old app version sent no purpose
     }
 
