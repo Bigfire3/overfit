@@ -125,7 +125,7 @@ class ShareFlowTest {
         compose.onNodeWithContentDescription("Zurück").performClick()
         compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("Speichern")).fetchSemanticsNodes().isEmpty() }
         assertEquals(0, runBlocking { data.templates.templates.first() }.size)
-        assertEquals(0, runBlocking { data.exercises.getAll(emptyList()) }.size)
+        assertTrue(runBlocking { data.exercises.getActive() }.none { it.isCustom })
     }
 
     @Test

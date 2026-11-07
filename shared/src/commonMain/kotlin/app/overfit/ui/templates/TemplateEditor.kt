@@ -246,7 +246,8 @@ fun TemplateEditorScreen(
         }
     }
 
-    val back = { if (state.dirty && !backArmed) backArmed = true else onClose() }
+    // No leaving while saving: the save must not be cancelled half-way (new exercises, workout, chat acknowledgement).
+    val back = { if (state.saving) Unit else if (state.dirty && !backArmed) backArmed = true else onClose() }
     BackHandler(enabled = state.dirty, onBack = back)
 
     Screen(
