@@ -219,7 +219,7 @@ class CoachChatShotTest {
             Box {
                 Tab(e)
                 BottomSheet(true, onDismiss = {}, closeLabel = "Zurück") {
-                    ModelPicker(store.state.value, store, d.providers, d.coach, onApplied = {})
+                    ModelPicker(store.state.value, store, d.providers, d.coach, onApplied = {}, onSurface = true)
                 }
             }
         }

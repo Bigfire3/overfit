@@ -19,6 +19,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
+import app.overfit.ui.components.LocalInPanel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -154,7 +157,26 @@ fun ModelPicker(
     coach: CoachService,
     onApplied: () -> Unit,
     modifier: Modifier = Modifier,
+    /** True in the chat's bottom sheet (surface colour): rows, fields and chips one step lighter. */
+    onSurface: Boolean = false,
 ) {
+    CompositionLocalProvider(LocalInPanel provides (onSurface || LocalInPanel.current)) {
+        ModelPickerContent(state, store, providers, coach, onApplied, modifier, onSurface)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ModelPickerContent(
+    state: AppState,
+    store: AppStore,
+    providers: Providers,
+    coach: CoachService,
+    onApplied: () -> Unit,
+    modifier: Modifier,
+    onSurface: Boolean,
+) {
+    val fieldFill = if (onSurface) Theme.colors.surfacePressed else Theme.colors.surface
     val language = LocalFuelStrings.current.language
     val s = coachSettingsStringsFor(language)
     val settings by coach.settings.state.collectAsState()
@@ -193,7 +215,7 @@ fun ModelPicker(
         Spacer(Modifier.height(Space.l))
 
         if (credit) {
-            CreditModels(coach, providers.fuel.available, creditAsked, tier, language, s) { tier = it }
+            CreditModels(coach, providers.fuel.available, creditAsked, tier, language, s, fieldFill) { tier = it }
         } else {
             Text(s.provider, style = Theme.type.caption, tone = Tone.Muted)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
@@ -208,6 +230,7 @@ fun ModelPicker(
                 key, { key = it.trim(); result = null },
                 placeholder = savedKey?.let { s.savedKey(it.takeLast(4)) } ?: s.keyPlaceholder,
                 modifier = Modifier.fillMaxWidth().testTag("key:input"),
+                fill = fieldFill,
                 secret = true,
                 onDone = ::runTest,
             )
@@ -223,6 +246,7 @@ fun ModelPicker(
                 model, { model = it.trim().take(100) },
                 placeholder = CoachModels.default(provider),
                 modifier = Modifier.fillMaxWidth().testTag("model:input"),
+                fill = fieldFill,
             )
             val suggestions = (result as? KeyTestResult.Ok)?.models.orEmpty().take(MAX_SUGGESTIONS)
             if (suggestions.isNotEmpty()) {
@@ -265,6 +289,7 @@ private fun CreditModels(
     tier: String,
     language: Language,
     s: CoachSettingsStrings,
+    rowFill: Color,
     onSelect: (String) -> Unit,
 ) {
     val f = LocalFuelStrings.current
@@ -291,7 +316,7 @@ private fun CreditModels(
             Spacer(Modifier.height(Space.xs))
             Panel {
                 offered.forEach { (id, info) ->
-                    TierRow(info, CostEstimate.micro(info, cfg.markupBp, FuelTask.CHAT, cfg.usageProfiles), id == selected, language, s) { onSelect(id) }
+                    TierRow(info, CostEstimate.micro(info, cfg.markupBp, FuelTask.CHAT, cfg.usageProfiles), id == selected, language, s, rowFill) { onSelect(id) }
                 }
             }
             Hint(s.creditNote)
@@ -300,10 +325,10 @@ private fun CreditModels(
 }
 
 @Composable
-private fun TierRow(info: FuelTierInfo, perMessage: Long, selected: Boolean, language: Language, s: CoachSettingsStrings, onClick: () -> Unit) {
+private fun TierRow(info: FuelTierInfo, perMessage: Long, selected: Boolean, language: Language, s: CoachSettingsStrings, fill: Color, onClick: () -> Unit) {
     val name = info.displayName.ifEmpty { modelShortName(info.model) }
     Row(
-        Modifier.fillMaxWidth().background(Theme.colors.surface).pressableRow(onClick)
+        Modifier.fillMaxWidth().background(fill).pressableRow(onClick)
             .semantics { this.selected = selected }
             .testTag("tier:${info.model}")
             .heightIn(min = 64.dp).padding(horizontal = Space.m, vertical = Space.s),
@@ -345,6 +370,7 @@ internal fun FilledField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
+    fill: Color = Theme.colors.surface,
     secret: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
     onDone: () -> Unit = {},
@@ -365,7 +391,7 @@ internal fun FilledField(
             ),
             keyboardActions = KeyboardActions(onDone = { focus.clearFocus(); onDone() }),
             modifier = Modifier.textInputArea().fillMaxWidth().heightIn(min = 48.dp)
-                .clip(RoundedCornerShape(16.dp)).background(c.surface).padding(horizontal = Space.m, vertical = 13.dp),
+                .clip(RoundedCornerShape(16.dp)).background(fill).padding(horizontal = Space.m, vertical = 13.dp),
             decorationBox = { inner ->
                 Box {
                     if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = c.muted), maxLines = 1)

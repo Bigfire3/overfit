@@ -1019,7 +1019,7 @@ fun OverfitApp(deps: AppDependencies) {
                             )
                             val close = LocalStrings.current.back
                             app.overfit.ui.components.BottomSheet(modelSheet, onDismiss = { modelSheet = false }, closeLabel = close) {
-                                app.overfit.ui.coach.ModelPicker(state, deps.store, deps.providers, deps.coach, onApplied = { modelSheet = false })
+                                app.overfit.ui.coach.ModelPicker(state, deps.store, deps.providers, deps.coach, onApplied = { modelSheet = false }, onSurface = true)
                             }
                             app.overfit.ui.components.CenterPopup(creditPopup, onDismiss = { creditPopup = false }, closeLabel = close) {
                                 app.overfit.ui.coach.CreditPopupContent(
