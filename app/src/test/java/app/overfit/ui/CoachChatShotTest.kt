@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -33,7 +34,16 @@ import app.overfit.data.DiaryPhoto
 import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.data.InMemorySecretStore
 import app.overfit.data.WorkoutPhoto
+import app.overfit.data.db.AiRequestEntity
 import app.overfit.data.db.OverfitDatabase
+import app.overfit.fuel.DemoFuelService
+import app.overfit.fuel.FuelAccess
+import app.overfit.fuel.FuelSession
+import app.overfit.ui.coach.CreditChip
+import app.overfit.ui.coach.CreditPopupContent
+import app.overfit.ui.coach.ModelPicker
+import app.overfit.ui.components.BottomSheet
+import app.overfit.ui.components.CenterPopup
 import app.overfit.domain.Language
 import app.overfit.domain.WeightUnit
 import app.overfit.i18n.LocalCoachStrings
@@ -102,12 +112,17 @@ class CoachChatShotTest {
         DiaryPhoto(WorkoutPhoto("p$i", "s1", "p$i.jpg", 1_762_000_000_000L - i * 86_400_000L, "/nonexistent/p$i.jpg"), "Push")
     }
 
+    private val demo = DemoFuelService()
+    private val now = System.currentTimeMillis()
+    private val push = ChatAttachment.Training("s1", "Push", startedAt = now)
+    private val pull = ChatAttachment.Training("s0", "Pull", startedAt = now - 2 * 86_400_000L)
+
     private fun deps(): AppDependencies {
         store.setName("Fabi")
         store.completeOnboarding()
         store.useFuel()
         return AppDependencies(
-            store, Providers(HttpClient(MockEngine { respond("{}") })), data, versionName = "t", share = NoopPlatformShare(),
+            store, Providers(HttpClient(MockEngine { respond("{}") })) { demo }, data, versionName = "t", share = NoopPlatformShare(),
             today = { LocalDate(2026, 11, 3) }, coachTransport = { fake },
         )
     }
@@ -115,8 +130,8 @@ class CoachChatShotTest {
     private fun env(d: AppDependencies) = CoachChatEnv(
         chat = d.coachChat,
         prefs = data.coachChatPrefs,
-        lastTraining = flowOf(ChatAttachment.Training("s1", "Push · heute")),
-        trainings = flowOf(listOf(ChatAttachment.Training("s1", "Push · heute"), ChatAttachment.Training("s0", "Pull · 01.11."))),
+        lastTraining = flowOf(push),
+        trainings = flowOf(listOf(push, pull)),
         plans = flowOf(listOf(ChatAttachment.Plan(1, "Push"), ChatAttachment.Plan(2, "Pull"))),
         exercises = { listOf(ChatAttachment.Exercise("wg:bench-press", "Bankdrücken") to "Bestwert 80×8") },
         photos = flowOf(photos),
@@ -153,8 +168,8 @@ class CoachChatShotTest {
     }
 
     @Composable
-    private fun Tab(env: CoachChatEnv, request: ChatOpenRequest? = null) {
-        CoachChatTabScreen(env, request, {}, onHistory = {}, onStory = {}, onModelChip = {}, onApplyWorkout = {})
+    private fun Tab(env: CoachChatEnv, request: ChatOpenRequest? = null, creditChip: @Composable () -> Unit = {}) {
+        CoachChatTabScreen(env, request, {}, onHistory = {}, onStory = {}, onModelChip = {}, onApplyWorkout = {}, creditChip = creditChip)
     }
 
     @Test
@@ -167,7 +182,7 @@ class CoachChatShotTest {
     @Test
     fun conversation() {
         val d = deps()
-        runBlocking { d.coachChat.sendNow("c1", ChatSendRequest("Wie lief mein Training heute?", listOf(ChatAttachment.Training("s1", "Push · heute")))) }
+        runBlocking { d.coachChat.sendNow("c1", ChatSendRequest("Wie lief mein Training heute?", listOf(push))) }
         val e = env(d)
         render { Tab(e, ChatOpenRequest(chatId = "c1")) }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("chat:workout").fetchSemanticsNodes().isNotEmpty() }
@@ -194,6 +209,46 @@ class CoachChatShotTest {
         compose.onNodeWithTag("chip:profile").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("profile:save").fetchSemanticsNodes().isNotEmpty() }
         save("04-profil-popup")
+    }
+
+    @Test
+    fun modelSheet() {
+        val d = deps()
+        val e = env(d)
+        render {
+            Box {
+                Tab(e)
+                BottomSheet(true, onDismiss = {}, closeLabel = "Zurück") {
+                    ModelPicker(store.state.value, store, d.providers, d.coach, onApplied = {})
+                }
+            }
+        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Claude Opus 5.5").fetchSemanticsNodes().isNotEmpty() }
+        save("06b-modell-sheet")
+    }
+
+    @Test
+    fun creditPopup() {
+        val d = deps()
+        val e = env(d)
+        val t = 1_794_052_800_000L
+        runBlocking {
+            val dao = database.aiRequestDao()
+            dao.upsert(AiRequestEntity("r1", t - 60_000, providerId = "FUEL", purpose = "chat", requestedModel = "claude-sonnet-5-5", servedModel = "claude-sonnet-5-5", status = "OK", costMicro = 21_668))
+            dao.upsert(AiRequestEntity("r2", t - 3_600_000, providerId = "FUEL", purpose = "review", requestedModel = "claude-opus-5-5", servedModel = "claude-opus-5-5", status = "OK", costMicro = 104_120))
+        }
+        val session = FuelSession(FuelAccess(kv, "") { error("No backend") }).also { it.startDemo() }
+        render {
+            Box {
+                Tab(e, creditChip = { CreditChip(session, fuelActive = true, onClick = {}) })
+                CenterPopup(true, onDismiss = {}, closeLabel = "Schließen") {
+                    CreditPopupContent(session, database.aiRequestDao(), onOpenFuel = {}, onAllRequests = {}, onClose = {})
+                }
+            }
+        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Alle Anfragen ansehen").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("4,20 €").fetchSemanticsNodes().isNotEmpty() }
+        save("08b-guthaben-popup")
     }
 
     @Test

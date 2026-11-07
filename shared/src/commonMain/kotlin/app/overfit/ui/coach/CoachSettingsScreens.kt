@@ -1,6 +1,15 @@
 package app.overfit.ui.coach
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
+import app.overfit.ui.components.pressScale
+import app.overfit.ui.components.textInputArea
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -92,7 +101,9 @@ fun CoachProfileScreen(state: AppState, prefs: CoachChatPrefsStore, onBack: () -
 
 /**
  * The coach profile as a form (goal, experience, days per week, height, weight read-only, equipment, limitations) with
- * its own "Save". Pure content, so the chat can show it in a popup too.
+ * its own "Save". Pure content: the settings page shows it as is, the chat's popup with [popup] = true (controls one
+ * step lighter, because the popup itself is the surface colour). The height must be 100–250 cm or empty: outside that
+ * range a hint shows at the field and "Save" waits.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -101,48 +112,159 @@ fun CoachProfileForm(
     latestWeight: String?,
     onSave: (AthleteProfile) -> Unit,
     modifier: Modifier = Modifier,
+    popup: Boolean = false,
 ) {
-    val s = coachSettingsStringsFor(LocalFuelStrings.current.language)
-    var goal by remember(profile) { mutableStateOf(profile.goal) }
-    var experience by remember(profile) { mutableStateOf(profile.experience) }
-    var days by remember(profile) { mutableStateOf(profile.daysPerWeek) }
-    var height by remember(profile) { mutableStateOf(profile.heightCm?.toString().orEmpty()) }
-    var equipment by remember(profile) { mutableStateOf(profile.equipment) }
-    var limitations by remember(profile) { mutableStateOf(profile.limitations) }
+    val language = LocalFuelStrings.current.language
+    val s = coachSettingsStringsFor(language)
+    var goal by rememberSaveable(profile) { mutableStateOf(profile.goal) }
+    var experience by rememberSaveable(profile) { mutableStateOf(profile.experience) }
+    var days by rememberSaveable(profile) { mutableStateOf(profile.daysPerWeek) }
+    var height by rememberSaveable(profile) { mutableStateOf(profile.heightCm?.toString().orEmpty()) }
+    var equipment by rememberSaveable(profile) { mutableStateOf(profile.equipment) }
+    var limitations by rememberSaveable(profile) { mutableStateOf(profile.limitations) }
     var saved by remember { mutableStateOf(false) }
-    val edited = AthleteProfile(goal, experience, days, height.toIntOrNull(), equipment.trim(), limitations.trim())
+    val heightCm = height.toIntOrNull()
+    val heightValid = height.isEmpty() || (heightCm != null && heightCm in AthleteProfile.HEIGHT_MIN..AthleteProfile.HEIGHT_MAX)
+    val edited = AthleteProfile(goal, experience, days, heightCm, equipment.trim(), limitations.trim())
+    val onHeight: (String) -> Unit = { height = it.filter(Char::isDigit).take(3); saved = false }
 
     Column(modifier.fillMaxWidth()) {
-        SectionTitle(s.goal)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-            listOf(TrainingGoal.MUSCLE to s.goalMuscle, TrainingGoal.STRENGTH to s.goalStrength, TrainingGoal.FAT_LOSS to s.goalFatLoss, TrainingGoal.FITNESS to s.goalFitness)
-                .forEach { (g, label) -> Chip(label, goal == g, { goal = if (goal == g) null else g; saved = false }, Modifier.testTag("profile:goal:${g.name}")) }
-        }
-        SectionTitle(s.experience)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-            listOf(TrainingExperience.BEGINNER to s.expBeginner, TrainingExperience.INTERMEDIATE to s.expIntermediate, TrainingExperience.ADVANCED to s.expAdvanced)
-                .forEach { (e, label) -> Chip(label, experience == e, { experience = if (experience == e) null else e; saved = false }) }
-        }
-        SectionTitle(s.daysPerWeek)
-        DaysPicker(days) { days = if (days == it) null else it; saved = false }
-
-        Spacer(Modifier.height(Space.l))
-        Panel {
-            ListRow(s.height) {
-                RowInput(height, { height = it.filter(Char::isDigit).take(3); saved = false }, onCommit = {}, keyboardType = KeyboardType.Number)
+        if (popup) {
+            val cs = app.overfit.i18n.coachChatStringsFor(language)
+            FieldLabel(cs.goal)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+                TrainingGoal.entries.forEach { g ->
+                    SelectChip(cs.goalLabel(g), goal == g, "profile:goal:${g.name}") { goal = if (goal == g) null else g }
+                }
             }
-            ListRow(s.weight, latestWeight ?: s.weightNone)
-        }
-        Hint(s.weightHint)
+            FieldLabel(cs.experience)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+                TrainingExperience.entries.forEach { e ->
+                    SelectChip(cs.experienceLabel(e), experience == e, "profile:experience:${e.name}") { experience = if (experience == e) null else e }
+                }
+            }
+            FieldLabel(cs.days)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                (AthleteProfile.DAYS_MIN..AthleteProfile.DAYS_MAX).forEach { n ->
+                    SelectChip(n.toString(), days == n, "profile:days:$n", Modifier.weight(1f), compact = true) { days = if (days == n) null else n }
+                }
+            }
+            FieldLabel(cs.height)
+            PopupField(height, onHeight, "175", "profile:height", KeyboardType.Number, suffix = cs.heightUnit)
+            if (!heightValid) HeightHint(s.heightRange, Modifier.padding(top = Space.xs))
+            FieldLabel(cs.weight)
+            Text(latestWeight ?: cs.weightMissing, tone = if (latestWeight == null) Tone.Muted else Tone.Default)
+            FieldLabel(cs.equipment)
+            PopupField(equipment, { equipment = it.take(AthleteProfile.TEXT_MAX) }, cs.equipmentPlaceholder, "profile:equipment")
+            FieldLabel(cs.limitations)
+            PopupField(limitations, { limitations = it.take(AthleteProfile.TEXT_MAX) }, cs.limitationsPlaceholder, "profile:limitations")
+        } else {
+            SectionTitle(s.goal)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                listOf(TrainingGoal.MUSCLE to s.goalMuscle, TrainingGoal.STRENGTH to s.goalStrength, TrainingGoal.FAT_LOSS to s.goalFatLoss, TrainingGoal.FITNESS to s.goalFitness)
+                    .forEach { (g, label) -> Chip(label, goal == g, { goal = if (goal == g) null else g; saved = false }, Modifier.testTag("profile:goal:${g.name}")) }
+            }
+            SectionTitle(s.experience)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                listOf(TrainingExperience.BEGINNER to s.expBeginner, TrainingExperience.INTERMEDIATE to s.expIntermediate, TrainingExperience.ADVANCED to s.expAdvanced)
+                    .forEach { (e, label) -> Chip(label, experience == e, { experience = if (experience == e) null else e; saved = false }) }
+            }
+            SectionTitle(s.daysPerWeek)
+            DaysPicker(days) { days = if (days == it) null else it; saved = false }
 
-        SectionTitle(s.equipment)
-        MultilineInput(equipment, { equipment = it.take(AthleteProfile.TEXT_MAX); saved = false }, s.equipmentPlaceholder, Modifier.testTag("profile:equipment"), minHeight = 56.dp)
-        SectionTitle(s.limitations)
-        MultilineInput(limitations, { limitations = it.take(AthleteProfile.TEXT_MAX); saved = false }, s.limitationsPlaceholder, Modifier.testTag("profile:limitations"), minHeight = 56.dp)
+            Spacer(Modifier.height(Space.l))
+            Panel {
+                ListRow(s.height) {
+                    RowInput(height, onHeight, onCommit = {}, keyboardType = KeyboardType.Number)
+                }
+                ListRow(s.weight, latestWeight ?: s.weightNone)
+            }
+            if (!heightValid) HeightHint(s.heightRange, Modifier.padding(start = Space.m, top = Space.s))
+            Hint(s.weightHint)
+
+            SectionTitle(s.equipment)
+            MultilineInput(equipment, { equipment = it.take(AthleteProfile.TEXT_MAX); saved = false }, s.equipmentPlaceholder, Modifier.testTag("profile:equipment"), minHeight = 56.dp)
+            SectionTitle(s.limitations)
+            MultilineInput(limitations, { limitations = it.take(AthleteProfile.TEXT_MAX); saved = false }, s.limitationsPlaceholder, Modifier.testTag("profile:limitations"), minHeight = 56.dp)
+        }
 
         Spacer(Modifier.height(Space.l))
-        PrimaryButton(s.save, onClick = { onSave(edited); saved = true }, enabled = edited != profile, modifier = Modifier.fillMaxWidth().testTag("profile:save"))
-        if (saved) Text(s.saved, Modifier.padding(top = Space.s).fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted)
+        // The popup closes on "Save", so it may save unchanged; the page only saves a change.
+        PrimaryButton(
+            s.save,
+            onClick = { onSave(edited); saved = true },
+            enabled = heightValid && (popup || edited != profile),
+            modifier = Modifier.fillMaxWidth().testTag("profile:save"),
+        )
+        if (saved && !popup) Text(s.saved, Modifier.padding(top = Space.s).fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted)
+    }
+}
+
+/** Hint at the height field while its value is outside 100–250 cm. */
+@Composable
+private fun HeightHint(text: String, modifier: Modifier) {
+    Text(text, modifier.testTag("profile:height-hint"), style = Theme.type.caption, tone = Tone.Muted)
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(text, Modifier.padding(top = Space.l, bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+}
+
+/** Single-choice chip in the popup: chosen = white fill with black text, otherwise [Colors.surfacePressed]. */
+@Composable
+private fun SelectChip(label: String, selected: Boolean, tag: String, modifier: Modifier = Modifier, compact: Boolean = false, onClick: () -> Unit) {
+    val c = Theme.colors
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        modifier
+            .pressScale(interaction)
+            .clickable(interaction, indication = null, role = Role.RadioButton, onClick = onClick)
+            .semantics { this.selected = selected }
+            .testTag(tag)
+            .heightIn(min = 40.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) c.foreground else c.surfacePressed)
+            .padding(horizontal = if (compact) 0.dp else 14.dp, vertical = Space.s),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = Theme.type.caption, tone = if (selected) Tone.Inverse else Tone.Default, maxLines = 1)
+    }
+}
+
+/** Text field in the popup: [Colors.surfacePressed] area, no border, optional unit at the end. */
+@Composable
+private fun PopupField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    tag: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    suffix: String? = null,
+) {
+    val c = Theme.colors
+    val style = Theme.type.body.copy(color = c.foreground)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surfacePressed).testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = style,
+            singleLine = keyboardType == KeyboardType.Number,
+            maxLines = 3,
+            cursorBrush = SolidColor(c.foreground),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
+            modifier = Modifier.textInputArea().weight(1f).heightIn(min = 48.dp).padding(horizontal = Space.m, vertical = 12.dp),
+            decorationBox = { inner ->
+                Box {
+                    if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = c.muted))
+                    inner()
+                }
+            },
+        )
+        if (suffix != null) Text(suffix, Modifier.padding(end = Space.m), style = Theme.type.caption, tone = Tone.Muted)
     }
 }
 

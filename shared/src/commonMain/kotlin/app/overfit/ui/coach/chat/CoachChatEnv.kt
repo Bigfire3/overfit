@@ -46,5 +46,6 @@ class CoachChatRequests {
     val pending = MutableStateFlow<ChatOpenRequest?>(null)
 
     fun open(request: ChatOpenRequest) { pending.value = request }
-    fun consumed() { pending.value = null }
+    /** Clears [request] once the Coach tab has taken it; a newer request that arrived meanwhile stays pending. */
+    fun consumed(request: ChatOpenRequest) { pending.compareAndSet(request, null) }
 }

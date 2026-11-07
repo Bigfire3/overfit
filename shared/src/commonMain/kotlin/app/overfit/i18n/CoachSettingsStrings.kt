@@ -89,6 +89,12 @@ data class CoachSettingsStrings(
     val neverExpires: String,
     val topUp: String,
     val topUpElsewhere: String,
+    /** The one button that opens the web purchase page (the amount is chosen there). */
+    val topUpOpen: String,
+    /** Under that button: the amounts the purchase page offers ("5 €", "50 €"). */
+    val topUpChooseAmount: (min: String, max: String) -> String,
+    /** Coach profile: allowed height range, shown at the field while the value is outside it. */
+    val heightRange: String,
     val openCreditPage: String,
     val billing: String,
     val billingEmpty: String,
@@ -174,6 +180,9 @@ val GermanCoachSettings = CoachSettingsStrings(
     neverExpires = "läuft nicht ab",
     topUp = "Aufladen",
     topUpElsewhere = "Aufladen geht in dieser Version über die Guthaben-Seite.",
+    topUpOpen = "Aufladen",
+    topUpChooseAmount = { min, max -> "Betrag ($min–$max) auf der Kaufseite wählen." },
+    heightRange = "Erlaubt: 100–250 cm",
     openCreditPage = "Zur Guthaben-Seite",
     billing = "Abrechnung",
     billingEmpty = "Noch keine Anfragen.",
@@ -259,6 +268,9 @@ val EnglishCoachSettings = CoachSettingsStrings(
     neverExpires = "never expires",
     topUp = "Top up",
     topUpElsewhere = "In this version, topping up works on the credit page.",
+    topUpOpen = "Top up",
+    topUpChooseAmount = { min, max -> "Choose the amount ($min–$max) on the purchase page." },
+    heightRange = "Allowed: 100–250 cm",
     openCreditPage = "Go to the credit page",
     billing = "Billing",
     billingEmpty = "No requests yet.",

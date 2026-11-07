@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -284,6 +285,8 @@ private fun CreditModels(
             val offered = TIERS.mapNotNull { id -> cfg.tiers[id]?.takeIf { it.available }?.let { id to it } }
             if (offered.isEmpty()) { Text(f.unreachable, tone = Tone.Muted); return }
             val selected = offered.firstOrNull { it.first == tier }?.first ?: offered.firstOrNull { it.first == TIER_STANDARD }?.first ?: offered.first().first
+            // The stored tier is no longer offered: the marked fallback is what "Apply" saves.
+            LaunchedEffect(selected) { if (selected != tier) onSelect(selected) }
             Text(s.creditModels, style = Theme.type.caption, tone = Tone.Muted)
             Spacer(Modifier.height(Space.xs))
             Panel {
@@ -314,7 +317,7 @@ private fun TierRow(info: FuelTierInfo, perMessage: Long, selected: Boolean, lan
     }
 }
 
-/** Result of "Test": success with a green check (the design system's "ok" green), otherwise an understandable error. */
+/** Result of "Test": success with a white check (green is only for completing double-tap confirmations), otherwise an understandable error. */
 @Composable
 private fun KeyResultLine(r: KeyTestResult, s: CoachSettingsStrings) {
     val text = when (r) {
@@ -328,10 +331,10 @@ private fun KeyResultLine(r: KeyTestResult, s: CoachSettingsStrings) {
     }
     Row(Modifier.fillMaxWidth().padding(top = Space.s).testTag("key:result"), verticalAlignment = Alignment.CenterVertically) {
         if (r is KeyTestResult.Ok) {
-            LineIcon(Icon.Check, size = 18.dp, color = Theme.colors.confirmFill)
+            LineIcon(Icon.Check, size = 18.dp, color = Theme.colors.foreground)
             Spacer(Modifier.width(Space.s))
         }
-        Text(text, style = Theme.type.caption, tone = if (r is KeyTestResult.Ok) Tone.Default else Tone.Default)
+        Text(text, style = Theme.type.caption)
     }
 }
 

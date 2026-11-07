@@ -107,7 +107,7 @@ private val Gutter = Space.m
 fun CoachChatTabScreen(
     env: CoachChatEnv,
     openRequest: ChatOpenRequest?,
-    onOpenRequestConsumed: () -> Unit,
+    onOpenRequestConsumed: (ChatOpenRequest) -> Unit,
     onHistory: () -> Unit,
     onStory: () -> Unit,
     onModelChip: () -> Unit,
@@ -128,13 +128,16 @@ fun CoachChatTabScreen(
 
     val messages by remember(chatId) { if (chatId.isEmpty()) flowOf(emptyList()) else env.chat.messages(chatId) }.collectAsState(initial = emptyList())
     val chatRow by remember(chatId) { if (chatId.isEmpty()) flowOf(null) else env.chat.chat(chatId) }.collectAsState(initial = null)
+    /** The open chat's row was there once: if it disappears again, the chat was deleted (earlier chats, delete all data). */
+    var chatSeen by remember(chatId) { mutableStateOf(false) }
     val last by env.lastTraining.collectAsState(initial = null)
     val photos by env.photos.collectAsState(initial = emptyList())
     val templateNames by env.templateNames.collectAsState(initial = emptySet())
     val modelLabel by env.modelLabel.collectAsState()
     val cost by env.costEstimate.collectAsState()
 
-    val profileIncluded = if (chatId.isEmpty()) !newProfileOff else chatRow?.profileOff != true
+    // Until the chat row of a just sent first question exists, the local choice holds (no chip flashing back).
+    val profileIncluded = if (chatId.isEmpty()) !newProfileOff else chatRow?.let { !it.profileOff } ?: !newProfileOff
     val autoTraining = last?.takeIf { t -> chatId.isEmpty() && !trainingRemoved && pending.none { it.key() == t.key() } }
     val chips = listOfNotNull(autoTraining) + pending
 
@@ -152,13 +155,22 @@ fun CoachChatTabScreen(
     }
 
     fun setProfile(included: Boolean) {
-        if (chatId.isEmpty()) newProfileOff = !included else env.chat.setProfileIncluded(chatId, included)
+        newProfileOff = !included
+        if (chatId.isNotEmpty()) env.chat.setProfileIncluded(chatId, included)
+    }
+
+    // The open chat was deleted (in "Earlier chats" or with "Delete all data"): start a new one.
+    LaunchedEffect(chatId, chatRow, messages.isEmpty()) {
+        if (chatId.isEmpty()) return@LaunchedEffect
+        if (chatRow != null) chatSeen = true
+        else if (chatSeen && messages.isEmpty()) newChat()
     }
 
     LaunchedEffect(openRequest) {
         val r = openRequest ?: return@LaunchedEffect
         chatId = r.chatId
-        input = r.draft
+        // A draft only fills an empty input: text the user typed is never replaced.
+        if (r.draft.isNotEmpty() && input.isBlank()) input = r.draft
         pending = r.attachments
         // Exactly what was asked for: no automatic training on top of an explicit request.
         trainingRemoved = r.attachments.isNotEmpty() || r.send
@@ -166,8 +178,12 @@ fun CoachChatTabScreen(
         sheet = false
         profilePopup = false
         // A new chat from a request always starts with the profile (the state above is only read on the next composition).
-        if (r.send && r.draft.isNotBlank()) send(r.draft, r.attachments, includeProfile = r.chatId.isEmpty() || profileIncluded)
-        onOpenRequestConsumed()
+        if (r.send && r.draft.isNotBlank()) {
+            val typed = input.takeIf { it != r.draft }
+            send(r.draft, r.attachments, includeProfile = r.chatId.isEmpty() || profileIncluded)
+            if (typed != null) input = typed
+        }
+        onOpenRequestConsumed(r)
     }
 
     Box(Modifier.fillMaxSize().background(Theme.colors.background)) {
@@ -214,6 +230,7 @@ fun CoachChatTabScreen(
             visible = sheet,
             env = env,
             photos = photos,
+            photosLeft = (ContextSelection.MAX_PHOTOS - pending.count { it is ChatAttachment.Photo }).coerceAtLeast(0),
             profileRemoved = !profileIncluded,
             onCamera = onCamera,
             onProfileAgain = { setProfile(true) },
@@ -221,7 +238,10 @@ fun CoachChatTabScreen(
                 val photoCount = pending.count { it is ChatAttachment.Photo }
                 var n = photoCount
                 val labelled = added.map { a -> if (a is ChatAttachment.Photo) { n += 1; a.copy(label = s.photoN(n)) } else a }
+                // At most MAX_PHOTOS photos per question, also across several openings of the sheet.
+                var photosKept = 0
                 pending = (pending + labelled).distinctBy { it.key() }
+                    .filter { it !is ChatAttachment.Photo || ++photosKept <= ContextSelection.MAX_PHOTOS }
                 sheet = false
             },
             onDismiss = { sheet = false },
@@ -237,14 +257,15 @@ private fun BottomSheetHost(
     visible: Boolean,
     env: CoachChatEnv,
     photos: List<DiaryPhoto>,
+    photosLeft: Int,
     profileRemoved: Boolean,
     onCamera: (() -> Unit)?,
     onProfileAgain: () -> Unit,
     onAdd: (List<ChatAttachment>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Fresh selection every time the sheet opens.
-    val state = remember(visible) { ContextSelection() }
+    // Fresh selection every time the sheet opens; photos only up to what the question can still take.
+    val state = remember(visible) { ContextSelection(maxPhotos = photosLeft) }
     app.overfit.ui.components.BottomSheet(
         visible = visible,
         onDismiss = onDismiss,
@@ -263,10 +284,12 @@ private fun ChatHeader(s: CoachChatStrings, onStory: () -> Unit, onHistory: () -
     val story = LocalCoachStrings.current.hub.story.open
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         // Tapping the title opens the story; the info icon shows that it can be tapped.
+        val storyInteraction = remember { MutableInteractionSource() }
         Row(
             Modifier
                 .weight(1f)
-                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onStory)
+                .pressScale(storyInteraction)
+                .clickable(storyInteraction, indication = null, role = Role.Button, onClick = onStory)
                 .semantics(mergeDescendants = true) { contentDescription = story }
                 .testTag("coach:storyOpen"),
             verticalAlignment = Alignment.CenterVertically,
@@ -423,6 +446,9 @@ private fun CoachMessage(m: ChatMessage, templateNames: Set<String>, s: CoachCha
             ChatMessageStatus.SENDING -> Text(s.thinking, tone = Tone.Muted)
             ChatMessageStatus.FAILED -> {
                 Text(s.failed, tone = Tone.Muted)
+                // Why: key, model / rejected request, credit, connection, provider (same wording as the request log).
+                val reason = app.overfit.ui.fuel.errorText((m.errorKind ?: app.overfit.coach.CoachErrorKind.SERVER).name, app.overfit.i18n.requestLogStringsFor(language))
+                Text(reason, Modifier.testTag("chat:error"), style = Theme.type.caption, tone = Tone.Muted)
                 Spacer(Modifier.height(Space.xs))
                 SmallButton(s.retry, { onRetry(m.id) })
             }
@@ -528,10 +554,12 @@ private fun ContextChip(label: String, icon: Icon, removeLabel: String, tag: Str
             Spacer(Modifier.width(6.dp))
             Text(label, style = Theme.type.caption, maxLines = 1)
         }
+        val removeInteraction = remember { MutableInteractionSource() }
         Box(
             Modifier
                 .size(36.dp)
-                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onRemove)
+                .pressScale(removeInteraction, PressScale.icon)
+                .clickable(removeInteraction, indication = null, role = Role.Button, onClick = onRemove)
                 .semantics { contentDescription = removeLabel }
                 .testTag("$tag:remove"),
             contentAlignment = Alignment.Center,

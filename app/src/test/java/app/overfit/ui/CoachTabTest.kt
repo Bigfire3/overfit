@@ -95,9 +95,11 @@ class CoachTabTest {
             val id = data.templates.save(
                 Template(0, "Push", null, listOf(TemplateExercise(bench, restSec = 60, note = null, sets = List(2) { PlannedSet(60.0, 8) }))),
             )
-            var w = Workout.fromTemplate(requireNotNull(data.templates.get(id)), 1_000L, id = "w1")
-            w.exercises.forEach { e -> e.sets.forEach { w = w.completeSet(it.id, 2_000L) } }
-            data.workouts.finish(w, 3_600_000L)
+            // Trained a minute ago: the automatic chip reads "Push · heute".
+            val start = System.currentTimeMillis() - 60_000L
+            var w = Workout.fromTemplate(requireNotNull(data.templates.get(id)), start, id = "w1")
+            w.exercises.forEach { e -> e.sets.forEach { w = w.completeSet(it.id, start + 1_000L) } }
+            data.workouts.finish(w, start + 30_000L)
         }
         deps = AppDependencies(
             store,
@@ -166,6 +168,8 @@ class CoachTabTest {
     fun lastTrainingIsAttachedAutomaticallyUnlessRemoved() {
         setUp(withKey = true)
         waitForTag("chip:training")
+        // Label plus the day, computed when shown.
+        waitFor("Push · heute")
         ask("Wie war das?")
         compose.waitUntilState(10_000) { chatPrompts().size == 1 }
         val withTraining = chatPrompts().last().dynamicSystem
@@ -280,6 +284,58 @@ class CoachTabTest {
         assertTrue(prompt.dynamicSystem, prompt.dynamicSystem.contains("## Attached training"))
         waitFor("Probier das hier.")
         compose.waitUntilState(10_000) { deps.coachChatRequests.pending.value == null }
+    }
+
+    @Test
+    fun deletedOpenChatSwitchesToANewChat() {
+        setUp(withKey = true)
+        ask("Erste Frage")
+        waitFor("Probier das hier.")
+        compose.waitUntilState(10_000) { runBlocking { database.coachChatDao().allChats() }.size == 1 }
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("chip:training")).fetchSemanticsNodes().isEmpty() }
+
+        // Deleted elsewhere (earlier chats, delete all data) while it is the open chat.
+        val id = runBlocking { database.coachChatDao().allChats() }.single().id
+        runBlocking { deps.coachChat.delete(id).join() }
+        waitForTag("chat:suggestion:0")
+        waitForTag("chip:training")
+        assertTrue(compose.onAllNodes(hasTestTag("chat:user")).fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test
+    fun draftNeverReplacesTypedText() {
+        setUp(withKey = true)
+        input().performTextInput("Meine eigene Frage")
+        deps.coachChatRequests.open(ChatOpenRequest(draft = "Entwurf von woanders"))
+        compose.waitUntilState(10_000) { deps.coachChatRequests.pending.value == null }
+        waitFor("Meine eigene Frage")
+        assertTrue(compose.onAllNodes(hasText("Entwurf von woanders")).fetchSemanticsNodes().isEmpty())
+        assertTrue(fake.prompts.isEmpty())
+    }
+
+    @Test
+    fun consumedLeavesANewerRequestPending() {
+        setUp(withKey = true, openTab = false)
+        val first = ChatOpenRequest(draft = "Erste")
+        val second = ChatOpenRequest(draft = "Zweite")
+        deps.coachChatRequests.open(first)
+        deps.coachChatRequests.open(second)
+        deps.coachChatRequests.consumed(first)
+        assertEquals(second, deps.coachChatRequests.pending.value)
+        deps.coachChatRequests.consumed(second)
+        assertEquals(null, deps.coachChatRequests.pending.value)
+    }
+
+    @Test
+    fun reviewCarriesTheUsersAddition() {
+        setUp(withKey = true, openTab = false)
+        data.coachChatPrefs.setAddition("Antworte kurz.")
+        runBlocking {
+            deps.coach.requestSessionReview("w1")
+            deps.coach.processQueue().join()
+        }
+        val review = fake.prompts.last { it.schemaName != CoachChatSchema.NAME }
+        assertTrue(review.staticSystem, review.staticSystem.contains("Antworte kurz."))
     }
 
     private fun input() = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("coach:input")))

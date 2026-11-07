@@ -26,6 +26,10 @@ import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.data.InMemorySecretStore
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.domain.Language
+import app.overfit.domain.PlannedSet
+import app.overfit.domain.Template
+import app.overfit.domain.TemplateExercise
+import app.overfit.domain.Workout
 import app.overfit.domain.WeightUnit
 import app.overfit.share.NoopPlatformShare
 import app.overfit.ui.components.ConfirmTags
@@ -82,13 +86,14 @@ class CoachSettingsTest {
         )
     }
     private lateinit var deps: AppDependencies
+    private val share = NoopPlatformShare()
 
     private fun setUp() {
         store.setName("Fabi")
         store.completeOnboarding()
         store.connectAi(ProviderId.ANTHROPIC, "sk-ant-test")
         deps = AppDependencies(
-            store, Providers(HttpClient(engine)), data, versionName = "0.1.test", share = NoopPlatformShare(),
+            store, Providers(HttpClient(engine)), data, versionName = "0.1.test", share = share,
             today = { LocalDate(2026, 11, 3) }, coachTransport = { fake },
         )
         compose.setContent { OverfitApp(deps) }
@@ -164,6 +169,39 @@ class CoachSettingsTest {
         compose.onNodeWithTag("key:test").performClick()
         waitFor("Schlüssel ungültig – bitte prüfen, ob er vollständig kopiert ist.")
         assertEquals(listOf("api.anthropic.com /v1/models sk-falsch"), requests.toList())
+    }
+
+    @Test
+    fun promptsCanBeCopiedAndUsedInTheChat() {
+        runBlocking {
+            data.seedCatalog()
+            val bench = requireNotNull(data.exercises.get("wg:bench-press"))
+            val id = data.templates.save(Template(0, "Push", null, listOf(TemplateExercise(bench, 60, null, List(2) { PlannedSet(60.0, 8) }))))
+            val start = System.currentTimeMillis() - 3_600_000L
+            var w = Workout.fromTemplate(requireNotNull(data.templates.get(id)), start, id = "w1")
+            w.exercises.forEach { e -> e.sets.forEach { w = w.completeSet(it.id, start + 1_000L) } }
+            data.workouts.finish(w, start + 1_800_000L)
+        }
+        setUp()
+        compose.onNodeWithText("Prompts kopieren").performScrollTo().performClick()
+        waitFor("Training auswerten lassen")
+        waitFor("Nächste Woche planen")
+
+        // Copy: the full prompt with the profile and the finished training goes to the clipboard.
+        compose.onNodeWithTag("prompt-copy:Training auswerten lassen").performScrollTo().performClick()
+        compose.waitUntilState { share.clipboard != null }
+        val copied = share.clipboard.orEmpty()
+        assertTrue(copied, copied.contains("Fabi"))
+        assertTrue(copied, copied.contains("Bench Press"))
+
+        // Use in chat: Coach tab with the question in the input, not sent.
+        compose.onNodeWithTag("prompt-chat:Nächste Woche planen").performScrollTo().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("coach:input")).fetchSemanticsNodes().isNotEmpty() }
+        val ask = "Plane meine nächste Trainingswoche"
+        compose.waitUntil(10_000) { compose.onAllNodes(hasSetTextAction() and hasText(ask, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        assertTrue(fake.prompts.none { it.schemaName == CoachChatSchema.NAME })
+        assertTrue(runBlocking { database.coachChatDao().allChats() }.isEmpty())
     }
 
     @Test

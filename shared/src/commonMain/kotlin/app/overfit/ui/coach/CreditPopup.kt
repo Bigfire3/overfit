@@ -137,9 +137,12 @@ fun CreditPopupContent(
     Column(modifier.fillMaxWidth().padding(Space.l)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(s.creditTitle, Modifier.weight(1f), style = Theme.type.label, tone = Tone.Muted)
+            val closeInteraction = remember { MutableInteractionSource() }
             Box(
                 Modifier.size(40.dp).semantics { contentDescription = s.close }
-                    .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClose),
+                    .pressScale(closeInteraction, app.overfit.ui.components.PressScale.icon)
+                    .clickable(closeInteraction, indication = null, role = Role.Button, onClick = onClose)
+                    .testTag("credit:close"),
                 contentAlignment = Alignment.Center,
             ) { LineIcon(Icon.Close, size = 20.dp, color = Theme.colors.muted) }
         }
@@ -176,7 +179,11 @@ fun CreditPopupContent(
     }
 }
 
-/** Amount buttons on the web purchase (the purchase page lets the user confirm the package), or the way to the credit page. */
+/**
+ * One "Top up" button that opens the web purchase page, with the amounts it offers as a hint; or the way to the credit
+ * page. The purchase link from the backend cannot carry an amount (web/guthaben preselects its own package), so the app
+ * shows no amount buttons that would all open the same page.
+ */
 @Composable
 private fun TopUp(
     service: app.overfit.fuel.FuelService?,
@@ -198,26 +205,27 @@ private fun TopUp(
     val scope = rememberCoroutineScope()
     var opening by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
-    val amounts = config!!.webPurchase.packages.map { it.creditMicro }.ifEmpty { DEFAULT_TOP_UPS }.take(4)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-        amounts.forEach { micro ->
-            PopupPill(formatEuro(micro, language).replace(",00", ""), Modifier.weight(1f).testTag("credit:topup:$micro")) {
-                if (opening) return@PopupPill
-                opening = true
-                failed = false
-                scope.launch {
-                    try {
-                        uriHandler.openUri(service!!.webPurchaseLink(if (language == Language.EN) "en" else "de").url)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        failed = true
-                    }
-                    opening = false
-                }
+    val amounts = config!!.webPurchase.packages.map { it.creditMicro }.ifEmpty { DEFAULT_TOP_UPS }
+    PopupPill(s.topUpOpen, Modifier.fillMaxWidth().testTag("credit:topup")) {
+        if (opening) return@PopupPill
+        opening = true
+        failed = false
+        scope.launch {
+            try {
+                uriHandler.openUri(service!!.webPurchaseLink(if (language == Language.EN) "en" else "de").url)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                failed = true
             }
+            opening = false
         }
     }
+    fun euro(micro: Long) = formatEuro(micro, language).replace(",00", "").replace(".00", "")
+    Text(
+        s.topUpChooseAmount(euro(amounts.min()), euro(amounts.max())),
+        Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted,
+    )
     if (failed) Text(app.overfit.i18n.webCreditStringsFor(language).webTopUpFailed, Modifier.padding(top = Space.xs), style = Theme.type.caption)
 }
 

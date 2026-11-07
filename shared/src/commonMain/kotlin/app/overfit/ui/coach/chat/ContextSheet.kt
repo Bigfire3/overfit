@@ -32,10 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -59,17 +61,22 @@ import app.overfit.ui.theme.Theme
 
 internal enum class ContextPage { Main, Trainings, Plans, Exercises }
 
-/** Selection of one opening of the "+" sheet: photos in tap order (max. [MAX_PHOTOS]) and the other attachments. */
+/**
+ * Selection of one opening of the "+" sheet: photos in tap order and the other attachments. [maxPhotos] is what the
+ * question can still take (at most [MAX_PHOTOS] photos per question, photos already attached count).
+ */
 @Stable
-internal class ContextSelection {
+internal class ContextSelection(val maxPhotos: Int = MAX_PHOTOS) {
     var page by mutableStateOf(ContextPage.Main)
     val photos = mutableStateListOf<String>()
     val items = mutableStateListOf<ChatAttachment>()
     val count: Int get() = photos.size + items.size
 
     fun togglePhoto(id: String) {
-        if (id in photos) photos.remove(id) else if (photos.size < MAX_PHOTOS) photos.add(id)
+        if (id in photos) photos.remove(id) else if (canAddPhoto) photos.add(id)
     }
+
+    val canAddPhoto: Boolean get() = photos.size < maxPhotos
 
     fun selected(a: ChatAttachment): Boolean = items.any { it.key() == a.key() }
 
@@ -144,7 +151,7 @@ private fun MainPage(
             if (onCamera != null) item(key = "camera") { CameraTile(s.camera, onCamera) }
             items(recent, key = { it.photo.id }) { p ->
                 val number = state.photos.indexOf(p.photo.id).takeIf { it >= 0 }?.plus(1)
-                PhotoTile(p, number, s) { state.togglePhoto(p.photo.id) }
+                PhotoTile(p, number, enabled = number != null || state.canAddPhoto, s) { state.togglePhoto(p.photo.id) }
             }
         }
     }
@@ -205,10 +212,17 @@ private fun <T : ChatAttachment> ItemList(list: List<T>?, empty: String, state: 
     }
 }
 
-/** Rows of the sheet: [Colors.surfacePressed] fill on the sheet's surface, 1 dp gaps as dividers, round corners. */
+/**
+ * Rows of the sheet: [Colors.surfacePressed] fill on the sheet's surface, round corners and black 1 dp dividers like
+ * [app.overfit.ui.components.Panel] (the black background shows through the 1 dp gaps).
+ */
 @Composable
 private fun SheetGroup(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)), verticalArrangement = Arrangement.spacedBy(1.dp), content = content)
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Theme.colors.background),
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+        content = content,
+    )
 }
 
 @Composable
@@ -250,10 +264,14 @@ private fun SheetRow(
     }
 }
 
+/**
+ * Round check: chosen = white with a black tick. Empty = a darker fill than its row: the rows are already
+ * [Colors.surfacePressed] (one step up from the sheet's surface), so the empty circle is the black background.
+ */
 @Composable
 private fun CheckCircle(checked: Boolean) {
     val c = Theme.colors
-    Box(Modifier.size(24.dp).clip(CircleShape).background(if (checked) c.foreground else c.surface), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(24.dp).clip(CircleShape).background(if (checked) c.foreground else c.background), contentAlignment = Alignment.Center) {
         if (checked) LineIcon(Icon.Check, size = 16.dp, color = c.background)
     }
 }
@@ -287,15 +305,17 @@ private fun CameraTile(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PhotoTile(p: DiaryPhoto, number: Int?, s: CoachChatStrings, onClick: () -> Unit) {
+private fun PhotoTile(p: DiaryPhoto, number: Int?, enabled: Boolean, s: CoachChatStrings, onClick: () -> Unit) {
     val c = Theme.colors
     Box(
-        Modifier.size(TILE).testTag("context:photo").semantics(mergeDescendants = true) {
+        Modifier.size(TILE).alpha(if (enabled) 1f else 0.35f).testTag("context:photo").semantics(mergeDescendants = true) {
             selected = number != null
             if (number != null) contentDescription = s.selectedPhoto(number)
+            if (!enabled) disabled()
         },
     ) {
-        PhotoThumb(p.photo, p.workoutName ?: s.photos, size = TILE, onClick = onClick)
+        // Limit reached: the other photos cannot be chosen (dimmed, no tap).
+        PhotoThumb(p.photo, p.workoutName ?: s.photos, size = TILE, onClick = if (enabled) onClick else null)
         if (number != null) {
             Box(
                 Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).clip(CircleShape).background(c.foreground),
