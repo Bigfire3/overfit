@@ -53,12 +53,10 @@ import app.overfit.ui.components.MoreMenu
 import app.overfit.ui.components.SetField
 import app.overfit.ui.components.SetRowSurface
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.sp
 import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.ExerciseImage
 import app.overfit.ui.components.Icon
@@ -182,7 +180,7 @@ class TemplateEditorViewModel(
 
 /**
  * Create/edit a saved workout ("Bearbeitungsmodus"): name in the header (pencil = rename), one grey [Block] per
- * exercise (collapsible; image with "?" for details; ⋮ for replace/move/remove), one [SetRowSurface] per set
+ * exercise (collapsible; image opens details; ⋮ for replace/move/remove), one [SetRowSurface] per set
  * (swipe left = delete, with "Undo"), "+ Add set", "+ Add exercise" and "Save" pinned at the bottom.
  * No share or delete here: those live on the workout screen. Leaving with unsaved changes needs a second back press.
  */
