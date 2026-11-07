@@ -9,7 +9,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
-// --- Coach chat (schema v6, v11: attachments, model, profileOff) ----------------------------------------------------------------------
+// --- Coach chat (schema v6, v12: attachments, model, profileOff) ----------------------------------------------------------------------
 
 /** One conversation with the coach in the Coach tab. [title] is the start of the first question. */
 @kotlinx.serialization.Serializable
@@ -19,7 +19,7 @@ data class CoachChatEntity(
     val title: String,
     val createdAt: Long,
     val updatedAt: Long,
-    /** The user removed the profile chip for this chat (schema v11): the coach profile is not sent along. */
+    /** The user removed the profile chip for this chat (schema v12): the coach profile is not sent along. */
     @androidx.room.ColumnInfo(defaultValue = "0") val profileOff: Boolean = false,
 )
 
@@ -51,9 +51,9 @@ data class CoachChatMessageEntity(
     val errorKind: String? = null,
     /** Answer of the demo mode (no AI access): shown with a hint, never sent to a provider as history. */
     val demo: Boolean = false,
-    /** Question: what the user attached ([app.overfit.coach.ChatAttachment] list as JSON; schema v11). */
+    /** Question: what the user attached ([app.overfit.coach.ChatAttachment] list as JSON; schema v12). */
     val attachments: String? = null,
-    /** Answer: provider and model that were asked (own key: the model typed in; credit: the tier). Schema v11. */
+    /** Answer: provider and model that were asked (own key: the model typed in; credit: the tier). Schema v12. */
     val providerId: String? = null,
     val model: String? = null,
 )

@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link, List, ArrowUp }
+enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link, List, Body, Today, Compare, ArrowUp }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -150,6 +150,29 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
                 drawRoundRect(color, p(3.5f, 6.5f), Size(17f * u, 12f * u), style = stroke)
                 line(3.5f, 10f, 20.5f, 10f)
                 drawCircle(color, 1.1f * u, p(16.5f, 14.25f))
+            }
+            // Body map (calendar title): small standing figure.
+            Icon.Body -> {
+                circle(12f, 5f, 2.25f)
+                path(8f to 9.5f, 16f to 9.5f, 14.5f to 14.5f, 9.5f to 14.5f, close = true)
+                line(8f, 9.5f, 5.5f, 14.5f)
+                line(16f, 9.5f, 18.5f, 14.5f)
+                line(10.5f, 14.5f, 9.5f, 20.5f)
+                line(13.5f, 14.5f, 14.5f, 20.5f)
+            }
+            // Jump to today: a locate mark (ring with a centre dot and four ticks), "back to where I am".
+            Icon.Today -> {
+                circle(12f, 12f, 6.5f)
+                drawCircle(color, 1.75f * u, p(12f, 12f))
+                line(12f, 2.5f, 12f, 5.5f)
+                line(12f, 18.5f, 12f, 21.5f)
+                line(2.5f, 12f, 5.5f, 12f)
+                line(18.5f, 12f, 21.5f, 12f)
+            }
+            // Compare photos: two pictures side by side.
+            Icon.Compare -> {
+                drawRoundRect(color, p(3.5f, 6f), Size(7.5f * u, 12f * u), CornerRadius(1.5f * u), style = stroke)
+                drawRoundRect(color, p(13f, 6f), Size(7.5f * u, 12f * u), CornerRadius(1.5f * u), style = stroke)
             }
             // List view: three rows, each with a dot and a line.
             Icon.List -> {

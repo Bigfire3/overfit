@@ -98,6 +98,18 @@ class WorkoutRepository(
     /** Completed sets of an exercise in finished workouts, newest workout first. */
     fun exerciseSets(exerciseId: String): Flow<List<ExerciseSetRow>> = dao.observeExerciseSets(exerciseId)
 
+    /** Completed sets per exercise of all finished workouts with their muscle groups (body map in the calendar). */
+    val muscleSets: Flow<List<app.overfit.domain.MuscleSetRow>> = dao.observeMuscleSets().map { rows ->
+        rows.map { r ->
+            app.overfit.domain.MuscleSetRow(
+                r.startedAt,
+                r.primaryMuscles.mapNotNull { app.overfit.domain.Muscle.fromKey(it) },
+                r.secondaryMuscles.mapNotNull { app.overfit.domain.Muscle.fromKey(it) },
+                r.sets,
+            )
+        }
+    }
+
     // --- Photos ------------------------------------------------------------------------------
 
     /** Photos of one workout in order (AI chat sync, coach). */

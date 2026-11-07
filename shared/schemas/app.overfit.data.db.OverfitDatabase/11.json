@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 11,
-    "identityHash": "10074093ab1783d27eaacf87f17465a3",
+    "identityHash": "de89138079484a5b026aef0b466016d3",
     "entities": [
       {
         "tableName": "exercise",
@@ -903,7 +903,7 @@
       },
       {
         "tableName": "coach_chat",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `profileOff` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -928,13 +928,6 @@
             "columnName": "updatedAt",
             "affinity": "INTEGER",
             "notNull": true
-          },
-          {
-            "fieldPath": "profileOff",
-            "columnName": "profileOff",
-            "affinity": "INTEGER",
-            "notNull": true,
-            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -957,7 +950,7 @@
       },
       {
         "tableName": "coach_chat_message",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `chatId` TEXT NOT NULL, `fromUser` INTEGER NOT NULL, `text` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `workoutJson` TEXT, `photoIds` TEXT, `costMicro` INTEGER, `servedModel` TEXT, `fallbackFrom` TEXT, `errorKind` TEXT, `demo` INTEGER NOT NULL, `attachments` TEXT, `providerId` TEXT, `model` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`chatId`) REFERENCES `coach_chat`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `chatId` TEXT NOT NULL, `fromUser` INTEGER NOT NULL, `text` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `workoutJson` TEXT, `photoIds` TEXT, `costMicro` INTEGER, `servedModel` TEXT, `fallbackFrom` TEXT, `errorKind` TEXT, `demo` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`chatId`) REFERENCES `coach_chat`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -1030,21 +1023,6 @@
             "columnName": "demo",
             "affinity": "INTEGER",
             "notNull": true
-          },
-          {
-            "fieldPath": "attachments",
-            "columnName": "attachments",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "providerId",
-            "columnName": "providerId",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "model",
-            "columnName": "model",
-            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -1086,6 +1064,41 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "body_weight",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`date` TEXT NOT NULL, `weightKg` REAL NOT NULL, `measuredAt` INTEGER, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`date`))",
+        "fields": [
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weightKg",
+            "columnName": "weightKg",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "measuredAt",
+            "columnName": "measuredAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "date"
+          ]
+        }
       },
       {
         "tableName": "ai_request",
@@ -1214,7 +1227,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '10074093ab1783d27eaacf87f17465a3')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'de89138079484a5b026aef0b466016d3')"
     ]
   }
 }
