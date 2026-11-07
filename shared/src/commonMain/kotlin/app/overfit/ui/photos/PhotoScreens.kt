@@ -101,6 +101,8 @@ fun PhotosScreen(
     /** Start in the list view (remembered choice); [onListViewChange] stores each switch. */
     listView: Boolean = false,
     onListViewChange: (Boolean) -> Unit = {},
+    /** Opens the muscle map sheet (body icon in the title row); null hides the icon. */
+    onMuscles: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val p = t.photos
@@ -137,6 +139,7 @@ fun PhotosScreen(
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!asList && photoList.size >= 2) SmallButton(p.compare, onClick = { selecting = true })
+                    if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
                     // The icon shows the other view: list while the calendar is up, calendar while the list is up.
                     HeaderIconButton(
                         if (asList) Icon.Calendar else Icon.List,
