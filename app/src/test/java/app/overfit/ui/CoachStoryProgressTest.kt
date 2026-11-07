@@ -5,6 +5,8 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.click
 import app.overfit.ui.coach.CoachStoryScreen
 import app.overfit.ui.coach.STORY_AUTO_MS
@@ -64,10 +66,24 @@ class CoachStoryProgressTest {
     }
 
     @Test
-    fun lastPageStaysFull() {
-        launch()
+    fun lastPageRunsThroughThenCloses() {
+        var closed = false
+        compose.mainClock.autoAdvance = false
+        compose.setContent { OverfitTheme { CoachStoryScreen(onClose = { closed = true }, onTarget = {}) } }
+        compose.mainClock.advanceTimeByFrame()
         repeat(3) { compose.mainClock.advanceTimeBy(STORY_AUTO_MS + 200) }
-        compose.mainClock.advanceTimeBy(STORY_AUTO_MS * 2)
-        assertEquals(1f, fraction(3), 0.001f)
+        // Last page starts empty, is half full after half the time and has not closed yet.
+        assertEquals(0f, fraction(3), 0.1f)
+        compose.mainClock.advanceTimeBy(STORY_AUTO_MS / 2)
+        assertEquals(0.5f, fraction(3), 0.1f)
+        assertEquals(false, closed)
+        compose.mainClock.advanceTimeBy(STORY_AUTO_MS / 2 + 300)
+        assertEquals(true, closed)
+    }
+
+    @Test
+    fun noVisiblePageCounter() {
+        launch()
+        compose.onAllNodesWithText("Seite 1 von 4").assertCountEquals(0)
     }
 }

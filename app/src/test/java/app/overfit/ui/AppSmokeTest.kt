@@ -119,6 +119,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Eigene Übung").assertIsDisplayed()
         compose.onNodeWithContentDescription("Zurück").performClick()
         compose.onNodeWithTag("tab:PHOTOS").performClick()
+        waitFor("Noch keine Trainings oder Fotos.")
         compose.onNodeWithText("Noch keine Trainings oder Fotos.").assertIsDisplayed()
 
         // Coach tab: AI access with provider, memory

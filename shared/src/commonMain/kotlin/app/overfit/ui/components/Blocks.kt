@@ -81,7 +81,7 @@ object BlockShape {
 /** One exercise (or other group) as a grey rounded area. */
 @Composable
 fun Block(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    // Same card look as [FloatingCard] (fill + 1 dp outline): every exercise is its own card, running or not.
+    // Same card look as [FloatingCard] (fill, no outline): every exercise is its own card, running or not.
     Column(
         modifier.fillMaxWidth().clip(BlockShape.block).background(Theme.colors.surface)
             .padding(Space.s),
@@ -227,7 +227,7 @@ fun SetColumnsHeader(numberLabel: String, labels: List<String>, trailing: Dp = 0
 }
 
 /**
- * Number field of a set row: a plain rounded box (48 dp high, 1 dp outline) with large tabular digits,
+ * Number field of a set row: a plain rounded box (48 dp high, no outline) with large tabular digits,
  * centred. The unit stands once in [SetColumnsHeader] above the rows, so even "1000" at 1.3x font fits on a
  * 360 dp phone. [imeAction] Next moves to [next] (or the next field), Done (and checking off a set) closes
  * the keyboard and removes the cursor.

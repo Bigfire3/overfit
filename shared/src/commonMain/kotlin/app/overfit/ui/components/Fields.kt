@@ -143,7 +143,7 @@ fun SmallInput(
     }
 }
 
-/** Multi-line text field (notes) as its own grey, outlined area, so it reads as an input. */
+/** Multi-line text field (notes) as its own grey area, so it reads as an input. */
 @Composable
 fun MultilineInput(
     value: String,

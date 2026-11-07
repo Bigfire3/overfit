@@ -447,7 +447,7 @@ fun WorkoutSetRow(
     }
 }
 
-/** Round check-off button: open = outline, done = filled (tone, not colour). */
+/** Round check-off button: open = grey fill, done = filled (tone, not colour). */
 @Composable
 private fun CheckButton(done: Boolean, description: String, onClick: () -> Unit) {
     Box(

@@ -1266,3 +1266,7 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - Hauptknöpfe (alle `PillButton` in Standardhöhe) zentrieren Text + Icon; vorher linksbündig.
 - Zweiter Stift im Vorlagen-Editor neben dem Namen entfernt (Feld ist selbst editierbar). Regel: kein Icon ohne Aktion.
 - Profil → Benachrichtigungen „Erlaubt“ öffnet die System-Benachrichtigungseinstellungen (`RestAlerts.openNotificationSettings`). „Genaue Alarme“ zeigt die Zeile nur, wenn nicht erlaubt, und öffnet dann schon die Einstellung.
+- Coach-Story: „Seite N von 4“ nicht mehr sichtbar (Ansage per contentDescription der Balken bleibt); die letzte Seite läuft 6 s durch und schließt dann wie mit X.
+- Einstellungen → Benachrichtigungen: lange Erklärtexte (Ticken, Trainings-Benachrichtigung) samt Strings entfernt; kurze Warnhinweise bei verweigerter Erlaubnis bleiben.
+- `NoBordersTest` verhindert `.border(`/`BorderStroke`/`.shadow(` in `shared/.../ui` (Ausnahme Sauna-Ring-Symbol).
+- Nicht scrollende Screens mit Fußzeile (laufendes Training, Chat) behalten die feste Fußzeile.

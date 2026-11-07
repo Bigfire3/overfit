@@ -644,8 +644,8 @@ val PanelShape = RoundedCornerShape(16.dp)
 val CardShape = RoundedCornerShape(24.dp)
 
 /**
- * Grouped area that stands out from the background: grey [Colors.surface] fill, 1 dp [Colors.hairline] outline,
- * rounded corners, 1 dp dividers between its children (the outline colour shows through the gaps). Rows
+ * Grouped area that stands out from the background: grey [Colors.surface] fill, no outline,
+ * rounded corners, 1 dp dividers between its children (the black background shows through the gaps). Rows
  * ([ListRow], [CheckRow]) adapt by themselves; other content goes into [PanelItem].
  */
 @Composable
@@ -793,7 +793,7 @@ fun ListRow(label: String, value: String, tone: Tone = Tone.Default, onClick: ((
 }
 
 /**
- * A list row with a square checkbox at the end (e.g. "Sauna" after the workout). Unchecked = hairline outline,
+ * A list row with a square checkbox at the end (e.g. "Sauna" after the workout). Unchecked = grey fill,
  * checked = filled (inverted) with a check mark. The whole row toggles.
  */
 @Composable
@@ -834,7 +834,7 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
 
 /**
  * A list row with a plain on/off switch at the end (vibration, ticks, photos …). No "An/Aus" text: knob left =
- * off (dark track with grey outline, grey knob; outline [Colors.muted] for >= 3:1 contrast on black), knob right = on (filled light track, black knob); mirrored in RTL.
+ * off (grey track [Colors.surfacePressed], grey knob), knob right = on (filled light track, black knob); mirrored in RTL.
  * The whole row toggles; screen readers get role Switch and the on/off state from the semantics.
  */
 @Composable

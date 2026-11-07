@@ -85,13 +85,14 @@ fun CoachStoryScreen(
     val last = pages.lastIndex
 
     // Fill of the current page's bar, 0..1 over STORY_AUTO_MS. Restarts on every page change (also after a tap), so a
-    // tap gives the new page its full time. On the last page (or without auto advance) the bar stays full.
+    // tap gives the new page its full time. Without auto advance the bar stays full.
     // Keyed by page: a fresh bar starts empty in the very first frame of the new page (no flash of a full bar).
-    val progress = remember(page, autoAdvance) { Animatable(if (autoAdvance && page < last) 0f else 1f) }
+    val progress = remember(page, autoAdvance) { Animatable(if (autoAdvance) 0f else 1f) }
     LaunchedEffect(page, autoAdvance) {
-        if (autoAdvance && page < last) {
+        if (autoAdvance) {
             progress.animateTo(1f, tween(STORY_AUTO_MS.toInt(), easing = LinearEasing))
-            page += 1
+            // The last page runs through too, then the story closes like with the X.
+            if (page < last) page += 1 else onClose()
         }
     }
 
@@ -128,7 +129,11 @@ fun CoachStoryScreen(
     ) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = Space.m)) {
             Spacer(Modifier.height(Space.m))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                // Screen readers still hear "page N of 4" (no visible text any more).
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = s.progress(page + 1, pages.size); liveRegion = LiveRegionMode.Polite },
+            ) {
                 repeat(pages.size) { i ->
                     // Past bars full, coming ones empty, the current one runs from left to right.
                     StoryBar(i, Modifier.weight(1f)) { if (i < page) 1f else if (i == page) progress.value else 0f }
@@ -160,11 +165,7 @@ fun CoachStoryScreen(
                     SmallButton(p.action, { onTarget(target) }, Modifier.testTag("story:action"))
                 }
             }
-            Text(
-                s.progress(page + 1, pages.size),
-                Modifier.fillMaxWidth().padding(bottom = Space.m).semantics { liveRegion = LiveRegionMode.Polite },
-                style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center,
-            )
+            Spacer(Modifier.height(Space.m))
         }
     }
 }
