@@ -268,8 +268,8 @@ final class ScreenshotTests: OverfitUITestCase {
         waitFor("Datei auswählen")
         shot("15-import")
         tap("Aus Zwischenablage importieren")
-        waitFor("Übernehmen")
-        shot("16-import-vorschau")
+        waitFor("Speichern")
+        shot("16-import-editor")
     }
 }
 

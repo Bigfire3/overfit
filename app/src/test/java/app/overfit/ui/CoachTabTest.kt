@@ -211,7 +211,7 @@ class CoachTabTest {
     }
 
     @Test
-    fun workoutProposalShowsACardAndApplyOpensTheImportPreview() {
+    fun workoutProposalShowsACardAndApplyOpensTheEditor() {
         setUp(withKey = true)
         ask("Neues Push-Workout bitte")
         waitFor("Probier das hier.")
@@ -226,11 +226,10 @@ class CoachTabTest {
 
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("chat:apply")).fetchSemanticsNodes().size == 2 }
         compose.onAllNodes(hasTestTag("chat:apply"))[1].performClick()
+        // The proposal opens in the normal editor; "Speichern" saves it.
+        waitFor("Speichern")
         waitFor("Coach Oberkörper")
-        // The import preview's own "Übernehmen" (not the chat card's).
-        val importButton = hasText("Übernehmen") and !hasTestTag("chat:apply")
-        compose.waitUntil(10_000) { compose.onAllNodes(importButton).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNode(importButton).performClick()
+        compose.onNodeWithText("Speichern").performClick()
         compose.waitUntilState(10_000) { runBlocking { data.templates.templates.first() }.any { it.name == "Coach Oberkörper" } }
     }
 

@@ -1211,6 +1211,16 @@ Offen / Hinweise:
 4. Profil → Benachrichtigungen → „Erlaubt“ antippen → Android-Benachrichtigungseinstellungen der App
 5. Schalter aus (grau gefüllt, kein Rand) noch klar erkennbar; Kalender „heute“ und Foto-Auswahl erkennbar
 
+## Session AY – Import direkt im Editor (7.11.)
+- Erledigt: Import (Zwischenablage, QR, Datei, Link, Coach-Vorschlag) öffnet den normalen Workout-Editor statt der Vorschau-Seite; Name ändern, Übungen ansehen (Tipp aufs Bild), umsortieren, Sätze ändern. Gespeichert erst mit „Speichern“; Zurück fragt wie gewohnt. Hinweis „Wird neu angelegt“ oben. Belege `docs/screenshots/import-editor/`.
+
+### Bitte auf dem Handy testen (Import im Editor)
+1. Workout-JSON kopieren → Neues Workout → Workout importieren → Aus Zwischenablage: Editor mit Name, Übungen, Sätzen, Pausen
+2. Name ändern, Satz hinzufügen/löschen, Übung per Bild öffnen (Details), Speichern → Workout in der Liste
+3. Import → Zurück → „Nicht gespeichert“ → nochmal Zurück: nichts gespeichert
+4. Unbekannte Übung im JSON: Hinweis oben, nach Speichern als eigene Übung vorhanden
+5. Coach-Vorschlag „Workout übernehmen“ und Posteingang-Vorschlag: öffnet ebenfalls den Editor; „Verwerfen“ oben
+
 ## Session AY – Story schließt sofort, „?“ weg (7.11.)
 - Erledigt: „?“ am Übungsbild im Workout-Bearbeiten entfernt; Story schließt (Auto, X, Wischen, Zurück) ohne Animation; Story kommt nach „Alle Daten löschen“ beim ersten Coach-Besuch wieder (Flag wurde nicht zurückgesetzt).
 

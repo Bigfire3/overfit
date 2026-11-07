@@ -197,10 +197,9 @@ class DayWithOverfitTest {
             compose.onNodeWithContentDescription("Neues Workout").performClick()
             click("Workout importieren")
             click("Aus Zwischenablage importieren")
-            waitFor("Vorschau")
+            waitFor("Speichern") // the imported workout opens in the normal editor
             waitFor(name)
-            click("Übernehmen")
-            waitFor("Starten") // the imported workout opens in its plan screen
+            click("Speichern")
             compose.waitUntilState(10_000) { templates().size == 3 + listOf("Push", "Pull", "Legs").indexOf(name) + 1 }
         }
         assertEquals(6, templates().size)
@@ -342,9 +341,9 @@ class DayWithOverfitTest {
         share.clipboard = "Hier dein Plan:\n```json\n${AiPrompt.EXAMPLE}\n```"
         click("Workout importieren")
         click("Aus Zwischenablage importieren")
+        waitFor("Speichern")
         waitFor("Oberkörper A")
-        click("Übernehmen")
-        waitFor("Starten")
+        click("Speichern")
         compose.waitUntilState(10_000) { templates().any { it.name == "Oberkörper A" } }
 
         // --- Profile: Fuel demo (balance, ledger), KI-Coach context ------------------
@@ -361,7 +360,7 @@ class DayWithOverfitTest {
         waitFor("4,20 € Guthaben")
 
         // Coach tab = chat: ask (profile and the last training go along), the answer proposes a workout,
-        // "Übernehmen" opens the import preview. (The prompts with "Copy context" moved to the coach settings.)
+        // "Übernehmen" opens the editor. (The prompts with "Copy context" moved to the coach settings.)
         tab("Coach")
         waitFor("Wie lief mein Training?")
         compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:input"))).performTextInput("Was soll ich morgen trainieren?")
@@ -372,9 +371,9 @@ class DayWithOverfitTest {
         assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Fabi"))
         assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Bench Press"))
         compose.onNodeWithTag("chat:apply").performClick()
+        waitFor("Speichern")
         waitFor("Coach Push")
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Übernehmen") and !androidx.compose.ui.test.hasTestTag("chat:apply")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNode(hasText("Übernehmen") and !androidx.compose.ui.test.hasTestTag("chat:apply")).performClick()
+        click("Speichern")
         compose.waitUntilState(10_000) { templates().any { it.name == "Coach Push" } }
         tab("Coach")
 

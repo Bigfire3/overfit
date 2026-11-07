@@ -93,6 +93,8 @@ import app.overfit.ui.exercises.ExerciseDetailScreen
 import app.overfit.ui.exercises.ExercisePickerScreen
 import app.overfit.ui.exercises.ExerciseViewModel
 import app.overfit.ui.exercises.ExercisesScreen
+import app.overfit.ui.templates.EditorSeed
+import app.overfit.ui.templates.EditorSeedHolder
 import app.overfit.ui.templates.TemplateEditorScreen
 import app.overfit.ui.workout.NewWorkoutScreen
 import app.overfit.ui.templates.WorkoutPlanScreen
@@ -366,7 +368,7 @@ class AppDependencies(
 /** A saved workout with "Start", edit and share. */
 @Serializable data class WorkoutPlanRoute(val templateId: Long)
 /** Template editor; [templateId] 0 = new template. */
-@Serializable data class TemplateEditorRoute(val templateId: Long = 0)
+@Serializable data class TemplateEditorRoute(val templateId: Long = 0, val seeded: Boolean = false)
 /** Exercise picker; [single] = replace mode. The result goes through [PickedExercises]. */
 @Serializable data class ExercisePickerRoute(val single: Boolean = false)
 
@@ -391,6 +393,8 @@ fun OverfitApp(deps: AppDependencies) {
     val state by deps.store.state.collectAsStateWithLifecycle()
     val templates by deps.data.templates.templates.collectAsStateWithLifecycle(initialValue = null)
     val picked = remember { PickedExercises() }
+    val editorSeeds = remember { EditorSeedHolder() }
+
     /** "Apply" on a coach proposal: same path as an imported workout (the import screen picks it up from the inbox). */
     val applyCoachWorkout: (String) -> Unit = { json -> deps.inbox.offer(json) }
     val workoutState by deps.workout.state.collectAsStateWithLifecycle()
@@ -756,9 +760,12 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<TemplateEditorRoute> { entry ->
-                        val id = entry.toRoute<TemplateEditorRoute>().templateId
+                        val route = entry.toRoute<TemplateEditorRoute>()
                         val editor = viewModel {
-                            TemplateEditorViewModel(id, deps.data.templates, deps.data.exercises, state.profile.unit, state.language)
+                            TemplateEditorViewModel(
+                                route.templateId, deps.data.templates, deps.data.exercises, state.profile.unit, state.language,
+                                seed = if (route.seeded) editorSeeds.take() else null,
+                            )
                         }
                         val result by picked.result.collectAsStateWithLifecycle()
                         LaunchedEffect(result) {
@@ -950,7 +957,7 @@ fun OverfitApp(deps: AppDependencies) {
                             unit = state.profile.unit,
                             language = state.language,
                             onBack = nav::popBackStack,
-                            onTemplate = { id -> nav.popBackStack(); nav.navigate(WorkoutPlanRoute(id)) },
+                            onEdit = { seed -> editorSeeds.put(seed); nav.navigate(TemplateEditorRoute(seeded = true)) },
                         )
                     }
                     composable<ChatNotesRoute> { ChatNotesScreen(deps.chat, onBack = nav::popBackStack) }
@@ -958,12 +965,12 @@ fun OverfitApp(deps: AppDependencies) {
                         ImportScreen(
                             viewModel = viewModel { ImportViewModel(deps.data.importer, share.shortCodes) },
                             share = share,
-                            unit = state.profile.unit,
-                            language = state.language,
                             onBack = nav::popBackStack,
-                            onImported = { id ->
+                            // Same page as "New workout", pre-filled; saved only with "Save".
+                            onImported = { preview ->
+                                editorSeeds.put(EditorSeed(preview))
                                 nav.popBackStack()
-                                nav.navigate(WorkoutPlanRoute(id))
+                                nav.navigate(TemplateEditorRoute(seeded = true))
                             },
                         )
                     }

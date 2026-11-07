@@ -1298,6 +1298,12 @@ Modell in den Coach-Einstellungen.“ – für Guthaben-Nutzer nicht lösbar.
   - Verworfen: „Direkt starten“-Trainings hätten keine `templateId`. Falsch, denn beim Beenden entsteht das Workout und das Training wird ihm zugeordnet (`TemplateRepository`); „in diesem Workout“ greift also auch dort.
   - Bewusst offen: Die Werte werden einmal beim Öffnen der Workout-Seite geladen. Ein Training, das endet, während die Seite im Hintergrund liegt, erscheint erst beim nächsten Öffnen (die Seite wird nach einem Training ohnehin neu geöffnet). Ein leerer Name wird beim Speichern still durch den alten ersetzt (Platzhalter zeigt, dass das Feld leer ist). Feste Einrückung der Satzzeilen (Bildbreite 48 dp) und Import-Reihenfolge sind kosmetisch.
 
+## Import öffnet den normalen Workout-Editor (7.11.)
+- Zwischenablage, QR, `.overfit`-Datei, Link und Coach-Vorschläge (Chat-Inbox, „Workout übernehmen“) öffnen direkt den Editor („Neues Workout“) vorausgefüllt (`EditorSeed`); die Vorschau-Seite und ihre Strings sind entfernt. Gespeichert wird erst mit „Speichern“, Zurück nutzt die übliche Verwerfen-Logik.
+- Unbekannte Übungen bekommen im Editor eine temporäre ID (`import:<name>`) und werden erst beim Speichern als eigene Übungen angelegt (nur die, die noch im Workout sind). Ihr Bild ist bis dahin nicht antippbar (keine Details möglich). Hinweis „Wird neu angelegt: …“ als `Hint` oben.
+- Die Klemmung negativer Gewichte beim Einlesen (`≥ 0`) wurde in der Vorschau nie angezeigt, daher gibt es dafür auch jetzt keinen Hinweis.
+- Coach-Vorschläge: Nachricht des Coachs und Unterschiede zum alten Workout erscheinen als Hints oben, „Verwerfen“ als kleiner Knopf oben. Ersetzt ein Vorschlag ein Workout, überschreibt „Speichern“ dieses; die Wahl „Als neues Workout“ entfällt (Entscheidung: ein Weg weniger, Kopie lässt sich über Teilen/Neu anlegen erreichen).
+
 ## Guthaben nur mit Claude, Anfrage-Protokoll „Abrechnung“ (7.11.2026)
 Fabian: „möglichst alle Modelle von Claude nutzen … nicht überall ein API-Token erzeugen … für günstige Anfragen Haiku“ und „in der App
 möglichst genau sehen, wo, wann, was angefragt wurde“.

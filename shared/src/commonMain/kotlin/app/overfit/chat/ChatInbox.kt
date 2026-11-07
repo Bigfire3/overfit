@@ -73,13 +73,6 @@ class ChatInbox(
         return TemplateProposal(preview, replaces)
     }
 
-    /** Saves a proposal as a new template or, with [replace], over the template it was made for. Returns the template ID. */
-    suspend fun acceptTemplate(item: InboxTemplate, proposal: TemplateProposal, replace: Boolean): Long {
-        val id = importer.accept(proposal.preview, replaceId = if (replace) proposal.replaces?.id else null)
-        done(item.id)
-        return id
-    }
-
     suspend fun acceptNote(item: InboxNote) {
         notes.add(item.toChatNote())
         done(item.id)

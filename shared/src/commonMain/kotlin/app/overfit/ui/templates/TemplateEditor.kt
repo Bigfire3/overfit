@@ -36,7 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import app.overfit.data.CustomExerciseInput
 import app.overfit.data.ExerciseRepository
+import app.overfit.share.ShareMapper
 import app.overfit.data.TemplateRepository
 import app.overfit.domain.Language
 import app.overfit.domain.Numbers
@@ -87,6 +89,8 @@ class TemplateEditorViewModel(
     private val exercises: ExerciseRepository,
     private val unit: WeightUnit,
     private val language: Language,
+    /** A workout from outside: opens pre-filled, counts as unsaved and creates its new exercises only on "Save". */
+    val seed: EditorSeed? = null,
 ) : ViewModel() {
 
     data class State(
@@ -99,6 +103,8 @@ class TemplateEditorViewModel(
         val closed: Boolean = false,
     )
 
+    private val pendingExercises: Map<String, CustomExerciseInput> = seed?.let { ShareMapper.pendingInputs(it.preview) }.orEmpty()
+
     private var original = TemplateDraft()
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -108,6 +114,14 @@ class TemplateEditorViewModel(
 
     init {
         viewModelScope.launch {
+            if (seed != null) {
+                _state.value = State(
+                    loading = false,
+                    draft = TemplateDraft.from(ShareMapper.toDraftTemplate(seed.preview, seed.replaceId ?: 0), unit, language),
+                    dirty = true,
+                )
+                return@launch
+            }
             if (templateId == 0L) {
                 _state.value = State(loading = false)
                 return@launch
@@ -164,9 +178,25 @@ class TemplateEditorViewModel(
         s.draft.validate(unit)?.let { problem -> _state.update { it.copy(problem = problem) }; return }
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
-            templates.save(s.draft.toTemplate(unit))
+            var template = s.draft.toTemplate(unit)
+            if (pendingExercises.isNotEmpty()) {
+                // New exercises of the import (only those still in the workout) are created now.
+                val created = HashMap<String, String>()
+                template = template.copy(exercises = template.exercises.map { te ->
+                    val input = pendingExercises[te.exercise.id] ?: return@map te
+                    te.copy(exercise = te.exercise.copy(id = created.getOrPut(te.exercise.id) { exercises.createCustom(input) }))
+                })
+            }
+            templates.save(template)
+            seed?.onSaved?.invoke()
             _state.update { it.copy(saving = false, dirty = false, closed = true) }
         }
+    }
+
+    /** "Discard" of a chat proposal: acknowledges it without saving. */
+    fun discardSeed() {
+        val discard = seed?.onDiscard ?: return
+        viewModelScope.launch { discard(); _state.update { it.copy(dirty = false, closed = true) } }
     }
 
     fun delete() {
@@ -213,7 +243,8 @@ fun TemplateEditorScreen(
         }
     }
 
-    val back = { if (state.dirty && !backArmed) backArmed = true else onClose() }
+    // No leaving while saving: the save must not be cancelled half-way (new exercises, workout, chat acknowledgement).
+    val back = { if (state.saving) Unit else if (state.dirty && !backArmed) backArmed = true else onClose() }
     BackHandler(enabled = state.dirty, onBack = back)
 
     Screen(
@@ -250,6 +281,15 @@ fun TemplateEditorScreen(
                     )
                 }
                 Text(if (draft.isNew) t.newTemplate else t.editMode, style = Theme.type.caption, tone = Tone.Muted)
+                // Notes of an import (new exercises, chat message, diff): short, only when they apply.
+                val newNames = draft.exercises.filter { it.exercise.id.startsWith(ShareMapper.PENDING_PREFIX) }
+                    .map { it.exercise.name }.distinctBy { it.lowercase() }
+                viewModel.seed?.hints?.forEach { Text(it, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
+                if (newNames.isNotEmpty()) Text(t.share.importNewNote(newNames), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+                viewModel.seed?.discardLabel?.let { label ->
+                    Spacer(Modifier.height(Space.s))
+                    SmallButton(label, onClick = viewModel::discardSeed)
+                }
                 Spacer(Modifier.height(Space.m))
             }
             itemsIndexed(draft.exercises, key = { _, e -> e.key }) { index, entry ->
@@ -265,7 +305,7 @@ fun TemplateEditorScreen(
                     onEdit = viewModel::edit,
                     onRemoveSet = { setKey -> viewModel.removeSet(entry.key, setKey) },
                     onReplace = { viewModel.pendingReplaceKey = entry.key; onReplaceExercise() },
-                    onDetails = { onExerciseDetails(entry.exercise.id) },
+                    onDetails = { if (!entry.exercise.id.startsWith(ShareMapper.PENDING_PREFIX)) onExerciseDetails(entry.exercise.id) },
                 )
             }
             item(key = "actions") {

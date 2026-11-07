@@ -12,6 +12,7 @@ import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.ai.Providers
@@ -84,30 +85,65 @@ class ShareFlowTest {
         compose.onAllNodes(androidx.compose.ui.test.hasText(text, substring = true, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty()
     }
 
-    @Test
-    fun importFromClipboardShowsPreviewAndSaves() {
+    private fun importFromClipboard() {
         launchOnboarded()
         share.clipboard = "Hier dein Plan:\n```json\n${AiPrompt.EXAMPLE}\n```\nViel Erfolg!"
         openPlus()
         waitFor("Workout importieren")
         compose.onNodeWithText("Workout importieren").performScrollTo().performClick()
         compose.onNodeWithText("Aus Zwischenablage importieren").performClick()
-        // Wait for the preview itself: the import screen shows the AI prompt, whose example also says "Oberkörper A".
-        waitFor("Vorschau")
-        compose.onNodeWithText("Vorschau").assertIsDisplayed()
-        compose.onNodeWithText("Bench Press").assertIsDisplayed()
-        compose.onNodeWithText("3 Übungen").assertIsDisplayed()
-        compose.onNodeWithText("Übernehmen").performClick()
-        // The new workout opens in its plan screen (primary action "Starten" pinned in the footer).
-        waitFor("Starten")
-        // The plan screen shows its footer before the workout is loaded: wait for the exact name and "Bearbeiten".
-        compose.waitUntil(20_000) {
-            compose.onAllNodes(androidx.compose.ui.test.hasText("Oberkörper A")).fetchSemanticsNodes().isNotEmpty() &&
-                compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Bearbeiten")).fetchSemanticsNodes().isNotEmpty()
-        }
+        // The normal editor opens pre-filled (the import screen also shows "Oberkörper A" in the AI prompt, so wait for "Speichern").
+        waitFor("Speichern")
+        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("Bench Press")).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test
+    fun importFromClipboardOpensEditorRenamesAndSaves() {
+        importFromClipboard()
         compose.onNodeWithText("Oberkörper A").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Bearbeiten").assertIsDisplayed()
-        assertEquals(1, runBlocking { data.templates.templates.first() }.size)
+        compose.onNodeWithText("Bench Press").assertIsDisplayed()
+        // Nothing is saved yet.
+        assertEquals(0, runBlocking { data.templates.templates.first() }.size)
+        compose.onNodeWithText("Oberkörper A").performTextReplacement("Mein Import")
+        compose.onNodeWithText("Speichern").performClick()
+        compose.waitUntilState(20_000) { runBlocking { data.templates.templates.first() }.size == 1 }
+        val saved = runBlocking { data.templates.get(data.templates.templates.first().single().id)!! }
+        assertEquals("Mein Import", saved.name)
+        assertEquals(listOf("Bench Press", "Pull-up", "Plank"), saved.exercises.map { it.exercise.name })
+        assertEquals(3, saved.exercises.first().sets.size)
+        assertEquals(150, saved.exercises.first().restSec)
+        // Back in the list.
+        waitFor("Mein Import")
+    }
+
+    @Test
+    fun importThenBackSavesNothing() {
+        importFromClipboard()
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        waitFor("Nicht gespeichert")
+        assertEquals(0, runBlocking { data.templates.templates.first() }.size)
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("Speichern")).fetchSemanticsNodes().isEmpty() }
+        assertEquals(0, runBlocking { data.templates.templates.first() }.size)
+        assertTrue(runBlocking { data.exercises.getActive() }.none { it.isCustom })
+    }
+
+    @Test
+    fun importedUnknownExerciseIsCreatedOnlyOnSave() {
+        launchOnboarded()
+        share.clipboard = """{"v":1,"kind":"template","name":"Exot","exercises":[{"name":"Zzyzx Spezialcurl","sets":[{"kg":10,"reps":8}]}]}"""
+        openPlus()
+        waitFor("Workout importieren")
+        compose.onNodeWithText("Workout importieren").performScrollTo().performClick()
+        compose.onNodeWithText("Aus Zwischenablage importieren").performClick()
+        waitFor("Wird neu angelegt: Zzyzx Spezialcurl")
+        assertEquals(null, runBlocking { data.exercises.getActive() }.firstOrNull { it.name == "Zzyzx Spezialcurl" })
+        compose.onNodeWithText("Speichern").performClick()
+        compose.waitUntilState(20_000) { runBlocking { data.templates.templates.first() }.size == 1 }
+        val ex = runBlocking { data.exercises.getActive() }.single { it.name == "Zzyzx Spezialcurl" }
+        assertTrue(ex.isCustom)
+        val saved = runBlocking { data.templates.get(data.templates.templates.first().single().id)!! }
+        assertEquals(ex.id, saved.exercises.single().exercise.id)
     }
 
     @Test
@@ -124,13 +160,14 @@ class ShareFlowTest {
     }
 
     @Test
-    fun openedLinkGoesToImportPreview() {
+    fun openedLinkOpensTheEditor() {
         launchOnboarded()
         val link = app.overfit.share.ShareFormat.toLink(
             (app.overfit.share.ShareFormat.parseInput(AiPrompt.EXAMPLE) as app.overfit.share.ShareParse.Ok).training,
         )
         inbox.offer(link)
-        waitFor("Vorschau")
+        waitFor("Speichern")
+        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("Bench Press")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Oberkörper A").assertIsDisplayed()
     }
 

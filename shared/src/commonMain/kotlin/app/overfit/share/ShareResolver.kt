@@ -178,6 +178,24 @@ object ShareMapper {
         }
     }
 
+    /** Prefix of the temporary ID of an exercise that does not exist yet (created when the editor saves). */
+    const val PENDING_PREFIX = "import:"
+
+    /** The exercises of [preview] that do not exist yet, by their temporary ID. */
+    fun pendingInputs(preview: ImportPreview): Map<String, CustomExerciseInput> =
+        preview.exercises.mapNotNull { it.newExercise }.associateBy { PENDING_PREFIX + it.name.trim().lowercase() }
+
+    /** The template for the editor: new exercises carry a temporary ID, nothing is created yet. */
+    fun toDraftTemplate(preview: ImportPreview, id: Long = 0): Template = Template(
+        id = id,
+        name = preview.name,
+        note = preview.note,
+        exercises = preview.exercises.map { line ->
+            val exercise = line.exercise ?: line.newExercise!!.let { it.toExercise(PENDING_PREFIX + it.name.trim().lowercase()) }
+            TemplateExercise(exercise, line.restSec, line.note, line.sets)
+        },
+    )
+
     /** Builds the template to save. [createdIds] maps the lowercase name of each new exercise to its new ID. */
     fun toTemplate(preview: ImportPreview, createdIds: Map<String, String>): Template = Template(
         id = 0,
