@@ -316,7 +316,7 @@ class DayWithOverfitTest {
         // The calendar day shows the photo
         tab("Kalender")
         compose.waitUntil(10_000) {
-            compose.onAllNodes(hasContentDescription("Tag ${realToday().dayOfMonth}, 1 Foto")).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodes(hasContentDescription("Tag ${realToday().dayOfMonth}, 1 Foto", substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
 
         // --- Coach: the review request waits offline, goes out on the next app start ---------
