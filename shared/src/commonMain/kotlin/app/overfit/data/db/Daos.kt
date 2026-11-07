@@ -238,6 +238,18 @@ interface WorkoutDao {
     @Query("UPDATE workout_session SET name = :name, updatedAt = :now WHERE id = :id")
     suspend fun rename(id: String, name: String, now: Long)
 
+    /** Completed sets per exercise of every finished workout, with the exercise's muscle groups (body map). */
+    @Query(
+        """SELECT ws.startedAt AS startedAt, e.primaryMuscles AS primaryMuscles, e.secondaryMuscles AS secondaryMuscles,
+             COUNT(*) AS sets
+           FROM set_entry s JOIN session_exercise se ON se.id = s.sessionExerciseId
+           JOIN workout_session ws ON ws.id = se.sessionId
+           JOIN exercise e ON e.id = se.exerciseId
+           WHERE ws.status = 'FINISHED' AND s.completed = 1
+           GROUP BY se.id""",
+    )
+    fun observeMuscleSets(): Flow<List<MuscleSetEntityRow>>
+
     /** Completed sets of [exerciseId] in finished workouts, newest workout first. */
     @Query(
         """SELECT ws.id AS sessionId, ws.startedAt AS startedAt, ws.name AS sessionName, se.exerciseId AS exerciseId,
