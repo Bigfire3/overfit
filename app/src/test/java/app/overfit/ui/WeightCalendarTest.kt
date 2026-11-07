@@ -191,12 +191,12 @@ class WeightCalendarTest {
         fun photo(id: String, d: LocalDate) = app.overfit.data.DiaryPhoto(app.overfit.data.WorkoutPhoto(id, null, "$id.jpg", ms(d), "/nonexistent/$id.jpg"), null)
         val photos = listOf(photo("a", LocalDate(2026, 11, 2)), photo("b", LocalDate(2026, 10, 2)))
         show { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }, weights = weights, onMuscles = {}) }
-        compose.onNodeWithText("Vergleichen").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Vergleichen").assertIsDisplayed()
         compose.onNodeWithTag(DIARY_GRID_TAG).performScrollToIndex(0)
         compose.onNodeWithTag(TODAY_BUTTON_TAG).assertIsDisplayed()
         compose.onNodeWithContentDescription("Als Liste anzeigen").assertIsDisplayed()
         compose.onNodeWithContentDescription(stringsFor(Language.DE).muscles.open).assertIsDisplayed()
-        compose.onAllNodesWithText("Vergleichen").assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Vergleichen").assertCountEquals(0)
     }
 }
 

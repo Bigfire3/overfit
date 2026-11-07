@@ -158,17 +158,16 @@ fun PhotosScreen(
             if (selecting) {
                 SmallButton(p.cancel, onClick = { selecting = false; selected = emptyList() })
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                    if (loaded && awayFromToday) SmallButton(
-                        t.bodyWeight.jumpToday,
-                        onClick = {
+                // Icons only (48 dp each), so the row fits at 360 dp: at most three of today / compare / muscles /
+                // toggle at once – while "today" shows, compare waits (one tap back, or start comparing first and then
+                // scroll: the selection stays).
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (loaded && awayFromToday) Box(Modifier.testTag(TODAY_BUTTON_TAG)) {
+                        HeaderIconButton(Icon.Today, t.bodyWeight.jumpTodayDescription, {
                             jumpScope.launch { if (asList) listState.animateScrollToItem(0) else gridState.animateScrollToItem(todayIndex) }
-                        },
-                        modifier = Modifier.testTag(TODAY_BUTTON_TAG).semantics { contentDescription = t.bodyWeight.jumpTodayDescription },
-                    )
-                    // At 360 dp "Heute", "Vergleichen" and the toggle do not fit together: while "Heute" shows, compare
-                    // waits (one tap back to today, or start comparing first and then scroll – selection stays).
-                    if (!asList && photoList.size >= 2 && !(loaded && awayFromToday)) SmallButton(p.compare, onClick = { selecting = true })
+                        })
+                    }
+                    if (!asList && photoList.size >= 2 && !(loaded && awayFromToday)) HeaderIconButton(Icon.Compare, p.compare, { selecting = true })
                     if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
                     // The icon shows the other view: list while the calendar is up, calendar while the list is up.
                     HeaderIconButton(

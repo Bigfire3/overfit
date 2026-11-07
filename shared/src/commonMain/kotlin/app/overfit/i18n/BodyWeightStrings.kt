@@ -25,8 +25,7 @@ data class BodyWeightStrings(
     val listValue: (String) -> String,
     /** Appended to the screen-reader text of a calendar day. */
     val dayDescription: (String) -> String,
-    /** "Heute" button in the calendar title row. */
-    val jumpToday: String,
+    /** "Today" icon in the calendar title row (screen-reader label). */
     val jumpTodayDescription: String,
 )
 
@@ -47,7 +46,6 @@ val BodyWeightGerman = BodyWeightStrings(
     legend = "Gewicht",
     listValue = { "Gewicht $it" },
     dayDescription = { ", Gewicht $it" },
-    jumpToday = "Heute",
     jumpTodayDescription = "Zu heute springen",
 )
 
@@ -68,6 +66,5 @@ val BodyWeightEnglish = BodyWeightStrings(
     legend = "Weight",
     listValue = { "Weight $it" },
     dayDescription = { ", weight $it" },
-    jumpToday = "Today",
     jumpTodayDescription = "Jump to today",
 )

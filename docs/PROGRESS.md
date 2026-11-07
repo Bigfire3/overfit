@@ -1181,8 +1181,9 @@ Offen / Hinweise:
 2. Karte antippen → Tagesansicht von heute, Tastatur offen; z. B. 82,4 tippen → zurück → Karte zeigt 82,4 kg, heute im Kalender ein kleiner Strich unter der 7, Legende „Gewicht“
 3. Nochmal öffnen, 81,9 eingeben → ersetzt den Wert (kein zweiter Eintrag); Mülleimer: erster Tipp rot, zweiter löscht
 4. Ein paar Tage in der Vergangenheit eintragen (Tag antippen) → Verlauf in der Karte, „… zur Vorwoche“ sobald ein Wert von vor 7–14 Tagen da ist
-5. Kalender nach oben scrollen → Dezember 2026 … November 2027, Tage grau und nicht antippbar; oben erscheint „Heute“ → Tipp springt zum aktuellen Monat, Knopf verschwindet; ebenso nach unten in die Vergangenheit
-6. Listenansicht: Tage mit Gewicht als Karte bzw. „Gewicht 82,4 kg“ in der Zeile; runterscrollen → „Heute“ → wieder oben
-7. Profil auf lb stellen → Werte in lb; Coach fragen: kennt aktuelles Gewicht und Trend
-8. Backup exportieren und wieder einspielen → Gewichte sind wieder da
+5. Kalender nach oben scrollen → Dezember 2026 … November 2027, Tage grau und nicht antippbar; oben rechts erscheint das „Heute“-Symbol (Ring mit Punkt) → Tipp springt zum aktuellen Monat, Symbol verschwindet; ebenso nach unten in die Vergangenheit
+6. Listenansicht: Tage mit Gewicht als Karte bzw. „Gewicht 82,4 kg“ in der Zeile; runterscrollen → „Heute“-Symbol → wieder oben
+7. Titelzeile bei mehreren Fotos: „Vergleichen“ ist jetzt ein Symbol (zwei Rechtecke), daneben Muskel-Symbol und Liste/Kalender; nichts abgeschnitten
+8. Profil auf lb stellen → Werte in lb; Coach fragen: kennt aktuelles Gewicht und Trend
+9. Backup exportieren und wieder einspielen → Gewichte sind wieder da
 
