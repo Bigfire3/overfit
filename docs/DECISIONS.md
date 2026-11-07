@@ -1364,3 +1364,24 @@ Heckmeck. Entferne das mal komplett aus der App. Da soll nichts mehr zu finden s
   gespeichertem `pro` bekommen jetzt Opus (abgerechnet wird, was angezeigt wird; die einzige installierte App ist Fabians, die per
   Update migriert). Migration 0009 macht auch schon abgelaufene Restposten alter Testkonten wieder nutzbar (gewollt: „Guthaben läuft nie
   ab“). Haiku über 100 000 Eingabe-Token (0,50 $/2,50 $) kommt bei Overfit nicht vor.
+## Coach-Tab als Chat (Session Coach-Chat, 7.11.)
+Umsetzung des von Fabian freigegebenen Entwurfs (7 Bildschirme). Annahmen und Entscheidungen:
+- **Kontext nur, was mitgeschickt wird:** Der Chat schickt nicht mehr den ganzen Trainingsstand („Kontext kopieren“-Text) mit, sondern
+  das Profil (Chip „Profil“, standardmäßig an; × gilt für den Chat und wird in `coach_chat.profileOff` gespeichert) und die Anhänge.
+  Profil = Coach-Profil (Ziel, Erfahrung, Tage/Woche, Größe, Equipment, Einschränkungen), Name/Alter/Gewicht aus dem Kalender und das
+  Coach-Gedächtnis. Ohne Profil gehen nur App-Sprache, Einheiten und das Datum mit. Anhänge aller Fragen eines Chats bleiben im
+  System-Prompt (Folgefragen beziehen sich darauf), Fotos gehen nur mit der Frage, an der sie hängen. Ohne Anhang steht im Prompt, dass
+  nichts weiter angehängt ist und der Coach um „+“ bitten soll (passt zur Grundanweisung „nur mitgeschickte Daten, nichts erfinden“).
+- **Antwortsprache:** Grundanweisung „Antworte in der Sprache der Frage“; im Profilblock des Chats wird „Reply language“ zu „App language
+  … (answer in the language of the question)“. Auswertungen (ohne Frage) behalten die App-Sprache.
+- **Grundanweisung:** neuer Personal-Trainer-Text (DE/EN), die bisherigen Steigerungs-, Stagnations- und Calisthenics-Regeln stehen darin
+  weiter; Format- und Übungsregeln (`CoachChatSchema.RULES`, Beispiel, Übungsliste, `OUTPUT_RULES` der Auswertung) sind unverändert.
+  „Deine Ergänzung“ (eigener Speicher `overfit.coachChat.v1`) wird an jede Anfrage angehängt (Chat und Auswertung, jedes Modell, eigener
+  Schlüssel und Guthaben). Wer früher die ganze Anweisung bearbeitet hatte: Der Text wandert einmalig in die Ergänzung, damit nichts
+  verloren geht und trotzdem die neue Grundanweisung gilt.
+- **Schlüssel testen:** kostenlos über die Modell-Liste des Anbieters, direkt vom Gerät (Anthropic/OpenAI `GET /v1/models`, Google
+  `GET /v1beta/models` mit `x-goog-api-key`, nur Modelle mit `generateContent`, ohne `models/`-Präfix). OpenRouters Modell-Liste ist
+  öffentlich und sagt nichts über den Schlüssel: Dort prüft zuerst `GET /api/v1/key` den Schlüssel, dann kommt die Liste. OpenAI-Liste
+  ohne Audio/Bild/Embedding-Modelle. 402 = gültig, aber kein Guthaben beim Anbieter.
+- **Chat-Verlauf nur lokal:** Tabellen `coach_chat`/`coach_chat_message` (seit v6) bleiben auf dem Gerät (und im eigenen Backup); v11 ergänzt
+  `profileOff`, `attachments` (JSON), `providerId`, `model` (reine Ergänzung, AutoMigration, Test `migration10to11…`).

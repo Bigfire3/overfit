@@ -156,8 +156,8 @@ object ChatAttachmentText {
         sb.append("Trained ${points.size} times. Best set: ${ChatContext.setText(best.set, type, src.unit, src.language)} (${date(best.at, src.zone)})")
         if (type.usesWeight && type.usesReps) {
             val e1rm = ChatContext.score(best.set, type)
-            if (e1rm > 0) sb.append(", estimated 1RM ${Numbers.formatWeight(e1rm, src.unit, src.language)}")
-            points.mapNotNull { it.set.actual.weightKg }.maxOrNull()?.let { sb.append(", heaviest ${Numbers.formatWeight(it, src.unit, src.language)}") }
+            if (e1rm > 0) sb.append(", estimated 1RM ${Numbers.formatWeight(e1rm, src.unit, src.language)} ${src.unit.symbol}")
+            points.mapNotNull { it.set.actual.weightKg }.maxOrNull()?.let { sb.append(", heaviest ${Numbers.formatWeight(it, src.unit, src.language)} ${src.unit.symbol}") }
         }
         sb.append('\n')
         sb.append("History (best set per training): ")
