@@ -1,7 +1,7 @@
 ---
 name: test-writer
 description: Schreibt und repariert Unit-, Room- und Migrationstests für bestehenden Code nach Vorgabe.
-model: claude-sonnet-5-5
+model: claude-opus-5-5
 effort: medium
 maxTurns: 30
 ---

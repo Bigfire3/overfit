@@ -21,10 +21,10 @@
 
 ## Modelle & Effort
 - Hauptsession: Opus 5.5, Effort high. Kein Ultracode, keine automatischen Workflows.
-- Einfache, klar abgegrenzte Aufgaben an die Subagents in .claude/agents/ (kmp-worker, test-writer: Sonnet 5.5, effort medium). Sind die Agent-Dateien in der laufenden Session nicht verfügbar, nutze das Agent-Tool mit Modell Sonnet und effort medium.
+- Owner (7.11.): Umsetzungs-Subagents laufen mit **Opus 5.5, effort medium** (`.claude/agents/kmp-worker`, `test-writer`). Sind die Agent-Dateien nicht verfügbar, das Agent-Tool mit Modell Opus und effort medium nutzen.
 - Bei dir bleiben: Architektur, Datenmodell + Migrationen, Workout-State, Pausentimer/Hintergrund-Logik, KI-Schnittstelle, Reviews der Subagent-Ergebnisse.
 - Maximal 2 Subagents parallel.
-- **Gegencheck mit Sonnet** (Owner: „Überprüfe dich mit Sonnet am Agenten immer gegen.“): Vor jedem Merge prüft ein frischer Sonnet-Subagent (effort medium, zählt ins Limit oben) die Änderung unabhängig. Er bekommt Aufgabe und Diff, nicht die eigene Schlussfolgerung, sucht Fehler und prüft das Ergebnis selbst nach: Build/Tests ausführen, bei UI und Bildern Robolectric-Screenshots bzw. gerenderte Bilder ansehen (geht etwas lokal nicht, z. B. iOS, sagen, was offen bleibt). Befunde beheben oder begründet verwerfen und in der PR-Beschreibung bzw. im Bericht nennen. Nach größeren Fixes erneut prüfen lassen.
+- **Gegencheck mit Sonnet** (Owner: „Überprüfe dich mit Sonnet am Agenten immer gegen.“): Vor jedem Merge prüft ein frischer Sonnet-5.5-Subagent (**effort high**, zählt ins Limit oben) die Änderung unabhängig. Er bekommt Aufgabe und Diff, nicht die eigene Schlussfolgerung, sucht Fehler und prüft das Ergebnis selbst nach: Build/Tests ausführen, bei UI und Bildern Robolectric-Screenshots bzw. gerenderte Bilder ansehen (geht etwas lokal nicht, z. B. iOS, sagen, was offen bleibt). Befunde beheben oder begründet verwerfen und in der PR-Beschreibung bzw. im Bericht nennen. Nach größeren Fixes erneut prüfen lassen.
 
 ## Sparregeln
 - Nur Dateien lesen, die du brauchst. Keine kompletten Verzeichnis-Dumps.
