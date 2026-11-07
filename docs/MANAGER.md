@@ -1,6 +1,6 @@
 # Manager-Übergabe (Koordinations-Session)
 
-Für die Claude-Session, die Fabians Feedback koordiniert. Stand: 4.11.2026. Keine Secrets in diese Datei.
+Für die Claude-Session, die Fabians Feedback koordiniert. Stand: 7.11.2026. Keine Secrets in diese Datei.
 
 ## Rolle
 - Fabian (Owner) gibt Feedback, oft per Handy mit Screenshots, auf Deutsch. Der Manager setzt es nicht selbst um, sondern startet je Thema eine Sub-Session (`create_session`, source `https://github.com/Bigfire3/overfit`, Tag `overfit-feedback-3-11`, Titel „<Buchstabe>: <Thema>“) mit einem Briefing per `append_system_prompt`. Kleine Doku- oder Konfig-Änderungen macht der Manager selbst (eigener Branch, PR, nach Sonnet-Gegencheck und grüner CI selbst mergen).
@@ -42,5 +42,7 @@ AF #58 Feedback-Runde 4 · #59 Name „Overfit“ · AG #60 Ticken, nicht wegwis
 Fabian will das später umsetzen lassen. Vorschlag des Managers (6.11.) plus Fabians Festlegungen:
 - Coach-Tab = schlichter Chat: oben Modell-Auswahl-Chip, Verlauf (frühere Chats), neuer Chat; Mitte Nachrichten; unten Eingabe mit „+“ für Kontext und Senden. Keine Vorschlagskacheln. Alles andere (KI-Zugang, Guthaben, Einladen, Standardmodell, automatische Auswertung, Coach-Profil, Story) wandert in die Einstellungen.
 - **Fabian:** Das Profil wird **immer** mitgeschickt (nicht erst hinzufügen müssen). Bilder wählt man selbst aus. Das (aktuelle) Workout/Training ist schon **automatisch angehängt**.
-- System-Prompt sinngemäß: „Du bist ein professioneller Fitness-Trainer … Antworte in der Sprache, in der die Frage gestellt wurde …“, konkret, ehrlich, keine Diagnosen, nur Übungen aus der mitgeschickten Liste, Vorschläge im Overfit-Format zum Übernehmen (Entwurf im Chat vom 6.11., siehe Manager-Verlauf).
+- „Profil“ = das Coach-Profil (Ziel, Niveau, Einschränkungen, Equipment, Trainingstage). Es geht nur an den gewählten KI-Weg (eigener Schlüssel direkt zum Anbieter, sonst Backend). Die Datenschutzregeln gelten unverändert (eigener Schlüssel ohne Opt-in: null Backend-Anfragen).
+- Entwurf System-Prompt (vom 6.11.):
+  > Du bist ein erfahrener, professioneller Personal Trainer und Kraft- und Athletiktrainer. Du betreust die Person in dieser App individuell. Antworte immer in der Sprache, in der die Frage gestellt wurde. Sei konkret, knapp und ehrlich; nenne Zahlen (Gewicht, Wiederholungen, Sätze, Pausen, Häufigkeit), wo möglich, und begründe kurz. Nutze die mitgeschickten Daten (Profil, Trainings, Workouts, Verlauf, Fotos); erfinde keine Daten, frage gezielt nach, wenn Wichtiges fehlt. Orientiere dich an Ziel, Niveau, Einschränkungen und Ausrüstung. Progressive Überlastung mit Augenmaß, Technik vor Gewicht, Erholung einplanen. Bei Technik-Fotos konkret benennen, was gut ist und was zu korrigieren ist. Keine medizinischen Diagnosen; bei Schmerzen, Verletzungen, Schwindel oder Vorerkrankungen zu ärztlicher/physiotherapeutischer Abklärung raten. Workouts/Änderungen nur mit Übungen aus der mitgeschickten Liste und zusätzlich im Overfit-Format, damit die App sie übernehmen kann. Motivierend, ohne Floskeln.
 - Offen: Chat-Verlauf nur lokal (Vorschlag) oder auch Server.
