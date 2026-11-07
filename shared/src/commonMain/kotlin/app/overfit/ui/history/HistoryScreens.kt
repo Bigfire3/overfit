@@ -1,5 +1,9 @@
 package app.overfit.ui.history
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import app.overfit.ui.components.pressScale
+import androidx.compose.ui.semantics.Role
 import app.overfit.ui.components.FloatingCard
 import androidx.compose.foundation.layout.heightIn
 import app.overfit.ui.components.ExerciseCardHeader
@@ -157,7 +161,13 @@ fun WorkoutDetailScreen(
         val w = d.finished.workout
         Text("${t.date(localDateTime(w.startedAt).date)} · ${clockTime(w.startedAt)}", tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
-        Title(w.name)
+        // Tapping the name opens the edit mode with the name field (rename this training only).
+        val titleInteraction = remember { MutableInteractionSource() }
+        Title(
+            w.name,
+            if (onEdit == null) Modifier else Modifier.pressScale(titleInteraction)
+                .clickable(titleInteraction, indication = null, onClickLabel = h.renameWorkout, role = Role.Button, onClick = onEdit),
+        )
         Spacer(Modifier.height(Space.l))
         SummaryRows(d.summary, unit, language, t) {
             d.finished.feeling?.let { ListRow(h.feeling, "$it / 5") }

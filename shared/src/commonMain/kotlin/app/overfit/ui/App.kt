@@ -548,6 +548,7 @@ fun OverfitApp(deps: AppDependencies) {
                             // App scope: the screen closes itself as soon as the workout is gone.
                             onDelete = { deps.data.scope.launch { deps.data.templates.delete(id) } },
                             onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
+                            loadLast = { deps.data.workouts.lastPerformance(it, id) },
                         )
                     }
                     composable<WorkoutRoute> {
