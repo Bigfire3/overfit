@@ -11,6 +11,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -79,7 +81,9 @@ class CoachTabTest {
         put("reply", JsonPrimitive("Probier das hier."))
         put("workout", JsonPrimitive(AiPrompt.EXAMPLE.replace("Oberkörper A", "Coach Oberkörper")))
     }.toString()
+    @Volatile private var failure: Exception? = null
     private val fake = FakeCoachTransport { prompt, _ ->
+        failure?.let { throw it }
         if (prompt.schemaName == CoachChatSchema.NAME) CoachReply(chatAnswer, chatAnswer, costMicro = 4_200, servedModel = "gemini-3.6-flash") else CoachReply("{}", "{}")
     }
 
@@ -336,6 +340,31 @@ class CoachTabTest {
         }
         val review = fake.prompts.last { it.schemaName != CoachChatSchema.NAME }
         assertTrue(review.staticSystem, review.staticSystem.contains("Antworte kurz."))
+    }
+
+    @Test
+    fun failedAnswerNamesTheReason() {
+        failure = app.overfit.coach.CoachException(app.overfit.coach.CoachErrorKind.AUTH)
+        setUp(withKey = true)
+        ask("Hallo?")
+        waitFor("Keine Antwort bekommen.")
+        waitFor("Schlüssel ungültig oder abgelaufen")
+    }
+
+    @Test
+    fun profilePopupWaitsForAValidHeight() {
+        setUp(withKey = true)
+        compose.onNodeWithTag("chip:profile").performClick()
+        waitForTag("profile:save")
+        val height = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("profile:height")))
+        height.performTextInput("99")
+        waitFor("Erlaubt: 100–250 cm")
+        compose.onNodeWithTag("profile:save").assertIsNotEnabled()
+        height.performTextClearance()
+        height.performTextInput("180")
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Erlaubt: 100–250 cm")).fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("profile:save").assertIsEnabled().performScrollTo().performClick()
+        compose.waitUntilState(10_000) { data.coachChatPrefs.state.value.profile.heightCm == 180 }
     }
 
     private fun input() = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("coach:input")))
