@@ -14,7 +14,7 @@ Spezifikation: [SPEC.md](SPEC.md) · Fortschritt: [docs/PROGRESS.md](docs/PROGRE
 - **Teilen und Importieren**: Workouts und Trainings als Link, QR-Code oder Datei; Beispiel-Workouts Push/Pull/Legs;
   **KI-Workout** per Chat (ChatGPT, Claude, Gemini) erstellen und aus der Zwischenablage einfügen
 - **KI-Coach**: Coach-Tab mit Chat (Workout-Vorschläge, Auswertungen, Gedächtnis, Prompts); mit eigenem API-Key oder Guthaben (Coach-Guthaben in Euro, Modell frei wählbar, Kosten immer sichtbar); **KI-Chat-Verbindung** (Claude, ChatGPT, Gemini) oder „Kontext kopieren“
-- **Guthaben und Einladungen**: Guthaben in Euro; Freunde per QR einladen (Empfehlungsprogramm), Einladungsbonus: 1 € Guthaben für dich und deinen Freund
+- **Guthaben** in Euro: im Web 1:1 aufladen, verbraucht wird nur, was eine Anfrage kostet; Guthaben verfällt nie
 - **Backup** als eine ZIP-Datei (Export/Import), **Alle Daten löschen**
 - Deutsch und Englisch, nur Dunkelmodus, kg/lb, ohne Werbung und Tracking
 

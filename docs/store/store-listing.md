@@ -42,7 +42,6 @@ KI-COACH
 
 TEILEN
 • Workouts und Trainings per Link, QR-Code oder Datei teilen
-• Freunde einladen (Empfehlungsprogramm): Einladungsbonus von 1 € Guthaben für dich und deinen Freund
 
 DEINE DATEN
 • Alles liegt lokal auf deinem Gerät, ohne Konto, ohne Werbung, ohne Tracking
@@ -88,7 +87,6 @@ AI COACH
 
 SHARING
 • Share workouts and trainings as link, QR code or file
-• Invite friends (referral program): referral bonus of €1 credit for you and your friend
 
 YOUR DATA
 • Everything stays on your device, no account, no ads, no tracking

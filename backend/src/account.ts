@@ -1,7 +1,7 @@
 import { ApiError } from './errors';
 import type { Config, Device, Env } from './types';
 import { b64uEncode, randomId, sha256, hex } from './crypto';
-import { availableMicro, balanceBreakdown, expiringLots, giftReviews, grantStatements, ledgerCategory, monthKey, now } from './ledger';
+import { availableMicro, balanceBreakdown, expiringLots, grantStatements, ledgerCategory, now } from './ledger';
 
 export function json(req: Uint8Array): Record<string, unknown> {
   try {
@@ -17,29 +17,14 @@ export async function accountSummary(env: Env, cfg: Config, accountId: string) {
   const acc = await env.DB.prepare('SELECT display_name, recovery_hash FROM accounts WHERE id = ?')
     .bind(accountId)
     .first<{ display_name: string | null; recovery_hash: string | null }>();
-  const invited = await env.DB.prepare(
-    'SELECT COUNT(*) AS c FROM invite_redemptions WHERE inviter_account_id = ? AND month = ?',
-  )
-    .bind(accountId, monthKey())
-    .first<{ c: number }>();
-  const redeemed = await env.DB.prepare('SELECT 1 AS x FROM invite_redemptions WHERE redeemer_account_id = ?')
-    .bind(accountId)
-    .first();
   return {
     accountId,
     balanceMicro: await availableMicro(env, accountId),
-    /** Gekauft vs. geschenkt (Startguthaben, Admin-Gutschrift, alte Euro-Einladungsboni); Geschenktes wird zuerst verbraucht. */
+    /** Gekauft vs. geschenkt (Test-Gutschrift, alte Start-/Einladungsboni); Geschenktes wird zuerst verbraucht. */
     ...(await balanceBreakdown(env, accountId)),
     expiring: await expiringLots(env, accountId),
-    /** Geschenkte Coach-Auswertungen (Einladungsbonus), eigener Zähler, kein Euro-Betrag. */
-    giftReviews: await giftReviews(env, accountId),
     displayName: acc?.display_name ?? null,
     hasRecoveryCode: !!acc?.recovery_hash,
-    invite: {
-      invitedThisMonth: invited?.c ?? 0,
-      monthlyLimit: cfg.inviteMonthlyLimitPerInviter,
-      redeemedStarter: !!redeemed,
-    },
   };
 }
 
@@ -59,7 +44,7 @@ export async function registerDevice(env: Env, deviceId: string, publicKeyRaw: U
       t,
     ),
   ]);
-  if (cfg?.testMode && cfg.testStarterMicro > 0) await grantTestCredit(env, cfg, accountId, cfg.testStarterMicro, 'starter');
+  // Kein Startguthaben (Fabian, 7.11.2026): neue Konten starten mit 0 €.
   return { accountId, created: true };
 }
 
@@ -69,7 +54,8 @@ export async function grantTestCredit(env: Env, cfg: Config, accountId: string, 
   const used = await env.DB.prepare("SELECT COALESCE(SUM(amount_micro), 0) AS s FROM ledger WHERE type = 'test_credit'").first<{ s: number }>();
   const amount = Math.min(amountMicro, Math.max(cfg.testCreditCapMicro - (used?.s ?? 0), 0));
   if (amount <= 0) return 0;
-  await env.DB.batch(grantStatements(env, accountId, 'test_credit', amount, now() + 60 * 86_400, `test:${ref}`));
+  // Läuft nie ab (Fabian, 7.11.2026: Guthaben verfällt nicht).
+  await env.DB.batch(grantStatements(env, accountId, 'test_credit', amount, null, `test:${ref}`));
   return amount;
 }
 
@@ -140,28 +126,7 @@ export async function restoreAccount(env: Env, cfg: Config, device: Device, code
   if (!target) throw new ApiError(404, 'invalid_recovery_code', 'Wiederherstellungscode ungültig');
   const from = device.accountId;
   if (target.id !== from) {
-    const t = now();
-    // Missbrauchsschutz: Geschenkte Einladungs-Auswertungen und alte Euro-Einladungsboni des aufgegebenen Kontos verfallen
-    // (sonst: neu installieren → eigene Einladung einlösen → per Code ins Hauptkonto). Gekauftes wandert mit.
-    const forfeit = await env.DB.prepare(
-      `SELECT (SELECT COALESCE(SUM(remaining), 0) FROM review_gifts WHERE account_id = ?1 AND remaining > 0 AND expires_at > ?2) AS r,
-              (SELECT COALESCE(SUM(remaining_micro), 0) FROM lots WHERE account_id = ?1 AND kind IN ('invite_bonus', 'invite_reward')
-                 AND remaining_micro > 0 AND (expires_at IS NULL OR expires_at > ?2)) AS m`,
-    )
-      .bind(from, t)
-      .first<{ r: number; m: number }>();
-    const forfeitStmts =
-      (forfeit?.r ?? 0) > 0 || (forfeit?.m ?? 0) > 0
-        ? [
-            env.DB.prepare('UPDATE review_gifts SET remaining = 0 WHERE account_id = ?').bind(from),
-            env.DB.prepare(`UPDATE lots SET remaining_micro = 0 WHERE account_id = ? AND kind IN ('invite_bonus', 'invite_reward')`).bind(from),
-            env.DB.prepare(
-              `INSERT INTO ledger (account_id, ts, type, amount_micro, ref, reviews) VALUES (?, ?, 'invite_expired', ?, 'restore', ?)`,
-            ).bind(from, t, -(forfeit?.m ?? 0), -(forfeit?.r ?? 0)),
-          ]
-        : [];
     await env.DB.batch([
-      ...forfeitStmts,
       env.DB.prepare('DELETE FROM devices WHERE account_id = ? AND id != ?').bind(target.id, device.id),
       env.DB.prepare('UPDATE devices SET account_id = ? WHERE id = ?').bind(target.id, device.id),
       env.DB.prepare('UPDATE lots SET account_id = ? WHERE account_id = ?').bind(target.id, from),
@@ -175,6 +140,7 @@ export async function restoreAccount(env: Env, cfg: Config, device: Device, code
       env.DB.prepare('UPDATE review_gifts SET account_id = ? WHERE account_id = ?').bind(target.id, from),
       env.DB.prepare('UPDATE web_orders SET account_id = ? WHERE account_id = ?').bind(target.id, from),
       env.DB.prepare('UPDATE web_links SET account_id = ? WHERE account_id = ?').bind(target.id, from),
+      env.DB.prepare('UPDATE requests SET account_id = ? WHERE account_id = ?').bind(target.id, from),
       env.DB.prepare('UPDATE credit_codes SET redeemed_by = ? WHERE redeemed_by = ?').bind(target.id, from),
       env.DB.prepare('UPDATE accounts SET recovery_hash = NULL WHERE id = ?').bind(target.id),
       env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(from),

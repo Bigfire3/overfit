@@ -1298,6 +1298,61 @@ Modell in den Coach-Einstellungen.“ – für Guthaben-Nutzer nicht lösbar.
   - Verworfen: „Direkt starten“-Trainings hätten keine `templateId`. Falsch, denn beim Beenden entsteht das Workout und das Training wird ihm zugeordnet (`TemplateRepository`); „in diesem Workout“ greift also auch dort.
   - Bewusst offen: Die Werte werden einmal beim Öffnen der Workout-Seite geladen. Ein Training, das endet, während die Seite im Hintergrund liegt, erscheint erst beim nächsten Öffnen (die Seite wird nach einem Training ohnehin neu geöffnet). Ein leerer Name wird beim Speichern still durch den alten ersetzt (Platzhalter zeigt, dass das Feld leer ist). Feste Einrückung der Satzzeilen (Bildbreite 48 dp) und Import-Reihenfolge sind kosmetisch.
 
+## Guthaben nur mit Claude, Anfrage-Protokoll „Abrechnung“ (7.11.2026)
+Fabian: „möglichst alle Modelle von Claude nutzen … nicht überall ein API-Token erzeugen … für günstige Anfragen Haiku“ und „in der App
+möglichst genau sehen, wo, wann, was angefragt wurde“.
+- **Stufen:** `lite` = Claude Haiku 5.5, `standard` = Claude Sonnet 5.5 (Voreinstellung für Auswertung und Chat), `pro` = Claude Opus 5.5.
+  Der Server braucht nur noch `ANTHROPIC_API_KEY`; Gemini und Workers AI sind aus dem Guthaben-Weg entfernt (Code gelöscht, Preise bleiben
+  für alte Buchungen, alte Modell-IDs werden auf Stufen abgebildet). Der Weg „eigener Schlüssel“ ist unverändert (Gemini, OpenAI, OpenRouter).
+- **Preise** aus der Preisliste von Anthropic (über den claude-api-Skill geprüft, Stand 7.11.): Haiku 0,10 $/0,50 $, Sonnet 2 $/10 $,
+  Opus 4 $/20 $ je MTok, Cache-Lesen 0,01/0,20/0,20 $, Cache-Schreiben 1,25 × Eingabe. `MARKUP_BP` bleibt 2800.
+- **Ausweichen:** lite → standard, standard → lite, pro → standard. Nie ungefragt zu Opus. Berechnet wird wie bisher höchstens der Preis
+  der gewählten Stufe; ein Fehlversuch kostet nichts. Die App wählt bei fehlender Stufe ebenso nie die teurere (standard → lite, lite → standard).
+- **Einladungsbonus:** zunächst auf Haiku umgestellt, am selben Tag auf Fabians Wunsch ganz entfernt (Abschnitt „Einladungen entfernt“).
+- **Gespeicherte Modellwahl:** `pro` hieß bis jetzt Claude Sonnet. Damit niemand plötzlich Opus-Preise zahlt, wird ein gespeichertes `pro`
+  einmalig zu `standard` (= wieder Sonnet), auch beim Wiederherstellen alter Backups (`CoachSettings.claudeTiers`). Die Modellwahl bietet
+  jetzt alle drei Modelle an.
+- **Anfrage-Protokoll:** Server-Tabelle `requests` (Migration 0008), geschrieben für jede Anfrage nach der Body-Prüfung, auch bei
+  `insufficient_funds` und Anbieter-Fehlern; nur Metadaten (Zeit, Dauer, Zweck, Stufe, zuerst versuchtes und antwortendes Modell, Ausfall des
+  ersten Versuchs, Token, berechneter Betrag, geschenkt, Foto ja/nein). `GET /v1/account/requests`. Die Antwort von `/v1/messages` nennt die
+  Protokoll-ID (`requestId`), Fehler in `details.requestId`, so dass App und Server einen Eintrag nur einmal zeigen.
+  App: Room-Tabelle `ai_request` (DB v11, AutoMigration 10→11 nach `body_weight` v10, Migrationstest), geschrieben von `LoggingTransport` um jeden Transport, also auch
+  mit eigenem Schlüssel (dann rein lokal, ohne Kosten, mit Token aus der Antwort des Anbieters; keine Backend-Anfrage). Für Guthaben holt die
+  Ansicht „Abrechnung“ zusätzlich das Server-Protokoll (auch Anfragen anderer Geräte des Kontos) und führt Einträge über `serverId` zusammen.
+  Zweck kommt aus `CoachPrompt.purpose` (review, chat, autofill, plan, other). Verworfen: Protokoll im Geld-Ledger (Fehlversuche ohne Betrag
+  hätten Summen und Admin-Auswertung verfälscht).
+- **Cloudflare:** Workers AI wird nicht mehr aufgerufen (keine Kosten). Das AI Gateway ist kostenlos und nur noch mit `AI_GATEWAY_TOKEN`
+  im Weg; ohne Token geht alles direkt an Anthropic. Das Binding `AI` bleibt nur für die Gateway-URL. Kein Zahlungsmittel bei Cloudflare nötig.
+- **Offen:** `effort: medium` geht an alle drei Modelle; laut Anthropic unterstützt Haiku 5.5 `effort` (Standard `medium`), geprüft im
+  E2E-Test nach dem Deploy. Die Spalte `fallback_reason` hält bei Fehlschlägen ohne Ausweichen den Fehlertext des letzten Versuchs.
+
+## Einladungen, Startguthaben und Verfall entfernt (7.11.2026)
+Fabian (Owner), wörtlich: „Dieses Freunde werben und diesen 1 Euro geschenkt bekommen, das ist mir am Anfang jetzt erstmal zu viel
+Heckmeck. Entferne das mal komplett aus der App. Da soll nichts mehr zu finden sein in der App, irgendwas über dieses Referral-Programm.
+… mir das auch zu undurchsichtig und ich mag es auch nicht, wenn Guthaben so abläuft.“ Entschieden, nicht verhandelbar.
+- **Backend:** `/v1/invite/*` antwortet 404, `/v1/config` ohne `invite`, `/v1/account` ohne `giftReviews` und `invite`, `/v1/messages` ohne
+  `giftReview`. Kein Startguthaben (auch nicht im Testbetrieb, neue Konten 0 €), nichts verfällt (Migration 0009, `expiring` immer leer).
+  Keine Geräteprüfung mehr (Play Integrity / App Attest gab es nur für Einladungen). **Die D1-Tabellen bleiben** (`invite_tokens_used`,
+  `invite_redemptions`, `review_gifts`, alte Buchungen): nicht destruktiv, keine Datenverluste, nur ungenutzt.
+- **App (Android und iOS):** entfernt sind „Freunde einladen“ (QR mit rotierendem Code, Name für Freunde), „Einladung einlösen“ (Scan,
+  Einfügen), der Deep-Link `overfit://invite#…` (ein alter Link landet jetzt wie jeder fremde Text im Import und wird dort abgelehnt; das
+  Schema `overfit://` bleibt für Trainings und `overfit://guthaben`), die Reveal-Animation samt Haptik-Mustern `Reveal`/`RevealFinish`,
+  geschenkte Auswertungen (Zähler, Verfallsdaten, Hinweis auf das Modell, „geschenkte Auswertung“ unter der Antwort, „geschenkt“ in der
+  Abrechnung), die Aufteilung „Gekauft/geschenkt“ und die Zeile „gültig bis“, die Erwähnung in der Coach-Story und im „Startet bald“-Text,
+  `FuelService.inviteToken/redeemInvite/setDisplayName`, `Attestor`/`AndroidAttestor`/`IosAttestor`, die Modelle `InviteConfig`,
+  `InviteToken`, `InviteChallenge`, `InviteRedeemResult`, `GiftReviews`, `ExpiringItem`, `InviteStatus`, alle zugehörigen Texte (DE+EN)
+  und die Abhängigkeit `com.google.android.play:integrity`. Das Profil-Feld `displayName` nutzt die App nicht mehr (es war nur der Name
+  für Einladungen); der Endpunkt `PUT /v1/account/profile` bleibt im Backend unangetastet.
+- **Alte Konten:** Ein altes Backend, das noch `invite`/`giftReviews`/`expiring` schickt, stört nicht (`ignoreUnknownKeys`). Buchungen
+  alter Typen (`invite_bonus`, `invite_reward`, `test_credit`, …) zeigt die Buchungsliste neutral als „Gutschrift“, negative als
+  „Ausbuchung“; die Kategorien heißen „gutgeschrieben“ bzw. „ausgebucht“ statt „geschenkt“/„verfallen“. Das Feld `reviews` wird ignoriert.
+  Die lokale Spalte `ai_request.gift` bleibt (keine Migration), wird aber nicht mehr gesetzt oder angezeigt.
+- **Preise:** Aufschlag bleibt 28 %. Die bisherige Rücklage von 10 % vom Netto für Geschenktes bleibt in der Rechnung als konservative
+  Rücklage für Kulanz-Gutschriften und Ausfälle (Chargebacks), damit `backend/test/pricing.test.ts` und die Tabellen gleich bleiben. Ob der
+  Aufschlag dadurch sinken kann, ist eine Geldfrage für Fabian (offen).
+- **Dokumentation:** SPEC (Phase 9 gestrichen), monetization.md, backend-api.md, backend/README.md, PROGRESS.md und die Preisseite
+  `web/preise/` sind angepasst. Die Kaufseite (`web/guthaben/`) bietet weiter Guthaben-Codes „als Geschenk“ an: das ist ein gekaufter Code,
+  kein Empfehlungsprogramm, und bleibt.
 ## Muskel-Heatmap „Trainierte Muskeln“ (7.11.)
 - **Auftrag (Fabian):** Ansicht wie „Training Frequency“ einer anderen App (Vorder-/Rückansicht, Muskeln nach Trainingshäufigkeit eingefärbt, Zeitraumwahl), „auch im Calendar irgendwo vielleicht als popup“. Nicht deren Design oder Grafik übernommen.
 - **Grafik – Herkunft und Lizenz:** Eigene, schlichte, stilisierte Figur, für Overfit selbst gezeichnet (Polygone in Figur-Einheiten 100 × 180, linke Hälfte gespiegelt, Ecken beim Zeichnen gerundet). Keine fremde Vorlage, kein Download, keine Lizenzpflicht, daher kein Eintrag in „Über Overfit“/LICENSE. Liegt als Compose-Daten in `ui/muscles/BodyShapes.kt` (kein Netz zur Laufzeit). Muskeln sind durch schmale Lücken getrennt, nicht durch Linien (Regel „keine Rahmen“).
@@ -1315,6 +1370,12 @@ Modell in den Coach-Einstellungen.“ – für Guthaben-Nutzer nicht lösbar.
 - Ursache Ruckeln: Story-Route ist kein Tab, die Tab-Leiste kam erst nach dem Fade zurück. `ScreenMotion`: Wechsel Story → Tab ist instant (keine Animation), Leiste und Coach-Seite im selben Frame.
 - Ursache Story fehlte: `resetAll()` (Alle Daten löschen) ließ `overfit.coachStorySeen` stehen. Jetzt entfernt, Story kommt beim nächsten ersten Coach-Besuch wieder.
 - Nachtrag: Tab- und Mini-Workout-Leiste bleiben versteckt, solange die Story noch in `visibleEntries` ist (ca. 3 Frames nach dem Schließen), damit sie nicht zuerst unter der Story auftauchen.
+- **Gegencheck (Sonnet, effort high) zu PR #91:** behoben: Protokoll und Antwort speichern als Ausfallgrund nur noch „HTTP 529“ /
+  „Zeitüberschreitung“, nie den Fehlertext des Anbieters (könnte Teile der Anfrage wiederholen; Test mit geheimem Prompt);
+  Ausweich-Text „berechnet zum Preis des günstigeren der beiden Modelle“; README-Rest. Bewusst so gelassen: alte App-Versionen mit
+  gespeichertem `pro` bekommen jetzt Opus (abgerechnet wird, was angezeigt wird; die einzige installierte App ist Fabians, die per
+  Update migriert). Migration 0009 macht auch schon abgelaufene Restposten alter Testkonten wieder nutzbar (gewollt: „Guthaben läuft nie
+  ab“). Haiku über 100 000 Eingabe-Token (0,50 $/2,50 $) kommt bei Overfit nicht vor.
 
 ## Körpergewicht im Kalender, Zukunftsmonate, „Heute“-Knopf (7.11.)
 - **Auftrag (Fabian):** Gewicht tracken, eingebaut in die Kalenderseite; im Kalender auch zukünftige Monate sehen; ein Knopf, der zum heutigen Tag springt.

@@ -24,14 +24,13 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlin.random.Random
 import kotlin.time.Clock
 
 /**
- * Client of the credit/invite backend (docs/backend-api.md). Signs every request with the device key.
+ * Client of the credit backend (docs/backend-api.md). Signs every request with the device key.
  * Recovers on its own from `unknown_device` (registers, then retries once) and from clock skew
  * (`timestamp_out_of_range` carries the server time).
  */
@@ -39,7 +38,6 @@ class FuelApi(
     http: HttpClient,
     baseUrl: String,
     private val signer: RequestSigner,
-    private val attestor: Attestor = NoAttestor,
     private val nowSec: () -> Long = { Clock.System.now().epochSeconds },
     private val nonce: () -> String = ::randomNonce,
 ) : FuelService, SignedTransport {
@@ -152,14 +150,14 @@ class FuelApi(
 
     override suspend fun account(): FuelAccount = parse(call(HttpMethod.Get, "/v1/account")) { decode(it) }
 
-    override suspend fun setDisplayName(name: String?): String? {
-        val body = buildJsonObject { put("displayName", name?.trim()?.takeIf { it.isNotEmpty() }) }.toString()
-        return parse(call(HttpMethod.Put, "/v1/account/profile", body)) { it.jsonObject["displayName"]?.jsonPrimitive?.contentOrNull }
-    }
-
     override suspend fun ledger(before: Long?, limit: Int): LedgerPage {
         val query = buildString { append("?limit=").append(limit); if (before != null) append("&before=").append(before) }
         return parse(call(HttpMethod.Get, "/v1/account/ledger$query")) { decode(it) }
+    }
+
+    override suspend fun requests(before: Long?, limit: Int): ServerRequestPage {
+        val query = buildString { append("?limit=").append(limit); if (before != null) append("&before=").append(before) }
+        return parse(call(HttpMethod.Get, "/v1/account/requests$query")) { decode(it) }
     }
 
     override suspend fun createRecoveryCode(): String =
@@ -168,25 +166,6 @@ class FuelApi(
     override suspend fun restore(code: String): FuelAccount {
         val body = buildJsonObject { put("code", code.trim()) }.toString()
         return parse(call(HttpMethod.Post, "/v1/recovery/restore", body)) { decode(it) }
-    }
-
-    override suspend fun inviteToken(): InviteToken = parse(call(HttpMethod.Post, "/v1/invite/token")) { decode(it) }
-
-    override suspend fun redeemInvite(token: String): InviteRedeemResult {
-        val challenge = parse(call(HttpMethod.Post, "/v1/invite/challenge")) { decode<InviteChallenge>(it) }
-        // Test server (DEPLOY_MODE=test): no device check, a test token bound to this device instead. Production never accepts it.
-        val attestation = attestor.attest(challenge.challenge)
-            ?: if (config().mode == "test") Attestation("google", "test:${signer.deviceId}") else null
-            ?: throw FuelException("attestation_unavailable", 503)
-        val body = buildJsonObject {
-            put("token", token)
-            put("attestation", buildJsonObject {
-                put("platform", attestation.platform)
-                put("token", attestation.token)
-                put("challenge", challenge.challenge)
-            })
-        }.toString()
-        return parse(call(HttpMethod.Post, "/v1/invite/redeem", body)) { decode(it) }
     }
 
     override suspend fun webPurchaseLink(locale: String): WebPurchaseLink {
@@ -207,7 +186,8 @@ class FuelApi(
             balanceMicro = meta?.get("balanceMicro")?.jsonPrimitive?.longOrNull ?: 0,
             servedModel = meta?.get("model")?.jsonPrimitive?.contentOrNull,
             chosenModel = meta?.get("requestedModel")?.jsonPrimitive?.contentOrNull,
-            giftReview = meta?.get("giftReview")?.jsonPrimitive?.booleanOrNull ?: false,
+            requestId = meta?.get("requestId")?.jsonPrimitive?.longOrNull,
+            fallbackReason = meta?.get("fallbackReason")?.jsonPrimitive?.contentOrNull,
         )
     }
 }

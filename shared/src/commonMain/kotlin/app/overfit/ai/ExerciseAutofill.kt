@@ -127,6 +127,7 @@ object ExerciseAutofillPrompt {
         schema = ExerciseAutofillSchema.schema,
         schemaName = ExerciseAutofillSchema.NAME,
         maxTokens = ExerciseAutofillSchema.MAX_TOKENS,
+        purpose = app.overfit.coach.AiPurpose.AUTOFILL,
     )
 }
 

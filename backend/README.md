@@ -1,7 +1,7 @@
-# Overfit-Backend (Guthaben, Einladungen, KI-Chat-Verbindung)
+# Overfit-Backend (Guthaben, KI-Chat-Verbindung)
 
-Cloudflare Worker (TypeScript) + D1 (+ R2 für freigegebene Fotos). Schlank, Open Source. Für Guthaben und Einladungen speichert es nur
-Konto-ID, Saldo, Buchungen und Einladungs-Zuordnungen – **keine Trainingsinhalte, keine Fotos** (KI-Anfragen werden nur durchgeleitet).
+Cloudflare Worker (TypeScript) + D1 (+ R2 für freigegebene Fotos). Schlank, Open Source. Für das Guthaben speichert es nur
+Konto-ID, Saldo und Buchungen – **keine Trainingsinhalte, keine Fotos** (KI-Anfragen werden nur durchgeleitet).
 **Ausnahme, nur nach ausdrücklichem Opt-in in der App („KI-Chat verbinden“):** Trainingsdaten (und nur mit eigenem Häkchen
 Körperfotos) werden verschlüsselt gespeichert, damit Claude, ChatGPT und Gemini sie über den MCP-Server unter `/mcp` lesen
 können. Abschalten löscht alles. API-Vertrag: [`docs/backend-api.md`](../docs/backend-api.md).
@@ -20,18 +20,15 @@ npm run dev         # wrangler dev, lokaler D1, DEV_MODE=true
 Für `npm run dev` Secrets lokal in `backend/.dev.vars` (nicht committen):
 
 ```
-GEMINI_API_KEY=AIza...              # Gemini 3.6 Flash; oder GEMINI_BASE_URL=http://localhost:9999 mit eigenem Fake
-ANTHROPIC_API_KEY=sk-ant-...        # Claude Sonnet 5.5; oder ANTHROPIC_BASE_URL=…
-INVITE_SIGNING_KEY=irgendein-langer-zufallswert
-ATTESTATION_MODE=mock               # nur mit DEV_MODE=true wirksam
+ANTHROPIC_API_KEY=sk-ant-...        # alle Guthaben-Stufen (Haiku, Sonnet, Opus 5.5); oder ANTHROPIC_BASE_URL=… mit eigenem Fake
 PURCHASE_MODE=mock
 ```
 
-Lokal gibt es kein Workers-AI-Binding und kein AI Gateway: die Stufe `lite` ist dort nicht verfügbar, Gemini und Anthropic werden
-direkt angesprochen. Die Tests ersetzen beides durch Mocks (`test/tiers.test.ts`).
+Lokal gibt es kein AI Gateway: Anthropic wird direkt angesprochen. Die Tests ersetzen Anthropic und das Gateway durch Mocks
+(`test/tiers.test.ts`).
 
-Im Dev-Modus akzeptieren Kauf und Einladung Token der Form `mock:<id>` statt echter Store-/Attestierungs-Belege. In Produktion
-(`DEV_MODE` nicht `true`) werden die Mock-Modi ignoriert: ohne echte Prüfer sind Käufe und Einladungen abgeschaltet (503).
+Im Dev-Modus akzeptiert der Kauf Token der Form `mock:<id>` statt echter Store-Belege. In Produktion
+(`DEV_MODE` nicht `true`) wird der Mock-Modus ignoriert: ohne echte Prüfer sind Käufe abgeschaltet (503).
 
 ## Deployment ohne Terminal (empfohlen): der Deploy-Knopf
 
@@ -55,7 +52,7 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    - **D1 – Edit**
    - **Workers R2 Storage – Edit**
    - **Account Settings – Read**
-   - **Workers AI – Read** (Workers-AI-Binding für die Stufe `lite`; der Workflow prüft das Recht vorab)
+   - **Workers AI – Read** (für das AI-Binding, über das die AI-Gateway-URL ermittelt wird; der Workflow prüft das Recht vorab. Workers AI selbst wird nicht aufgerufen, es entstehen dort keine Kosten)
    - **AI Gateway – Edit** (AI Gateway anlegen und lesen; „Edit“ schließt „Read“ ein)
 
    Hast du schon einen Token mit den ersten vier Rechten: beim Token auf **Edit** → die zwei Zeilen ergänzen → Update Token. Der Wert
@@ -68,11 +65,13 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    |---|---|---|
    | `CLOUDFLARE_API_TOKEN` | ja | der Token aus Schritt 5 |
    | `CLOUDFLARE_ACCOUNT_ID` | ja | Account-ID aus Schritt 4 |
-   | `GEMINI_API_KEY` | mindestens einer der beiden KI-Keys (nur beim ersten Mal, danach merkt sich der Worker ihn) | Google-AI-Studio-Key für Gemini 3.6 Flash (aistudio.google.com/apikey → Create API key, Projekt mit Abrechnung; Ausgabenlimit im Google-Cloud-Projekt setzen) |
-   | `ANTHROPIC_API_KEY` | optional, siehe oben | Anthropic-Key für Claude Sonnet 5.5 (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit). Fehlt er, ist Claude Sonnet nicht verfügbar und die App blendet es aus |
-   | `INVITE_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY` | nein | werden, wenn nicht gesetzt, einmalig zufällig erzeugt und im Worker gespeichert. `SYNC_ENCRYPTION_KEY` nie ändern. Fehlt `INVITE_SIGNING_KEY` als GitHub-Secret, übernimmt der Workflow das alte Secret `SPOT_SIGNING_KEY` (früherer Name) und löscht den alten Namen im Worker; nichts zu tun |
+   | `ANTHROPIC_API_KEY` | ja (nur beim ersten Mal, danach merkt sich der Worker ihn) | Anthropic-Key für alle Guthaben-Stufen: Claude Haiku, Sonnet und Opus 5.5 (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit) |
+   | `AI_GATEWAY_TOKEN` | nein | Token fürs Cloudflare AI Gateway (Protokolle/Kosten im Dashboard); ohne geht alles direkt an Anthropic |
+   | `GEMINI_API_KEY` | nein, nicht mehr genutzt | seit 7.11.2026 läuft Guthaben nur über Claude; darf gelöscht werden |
+   | `SYNC_ENCRYPTION_KEY` | nein | wird, wenn nicht gesetzt, einmalig zufällig erzeugt und im Worker gespeichert. Nie ändern |
+   | `INVITE_SIGNING_KEY`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_APP_ATTEST_TEAM_ID` | nein, nicht mehr genutzt | Einladungen sind seit 7.11.2026 entfernt; dürfen gelöscht werden |
    | `ADMIN_SECRET` | nein | nur Testbetrieb; sonst bei jedem Lauf neu erzeugt |
-   | `GOOGLE_PLAY_*`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_*` | nein | Store-Prüfer (siehe Tabelle unten); fehlen sie, überspringt der Workflow sie mit Hinweis |
+   | `GOOGLE_PLAY_*`, `APPLE_*` | nein | Store-Prüfer (siehe Tabelle unten); fehlen sie, überspringt der Workflow sie mit Hinweis |
 
    Fehlt ein Pflicht-Secret, bricht der Lauf mit einer Anleitung in der Zusammenfassung ab.
 7. **Run workflow:** GitHub → Actions → „Backend deployen“ → Run workflow → `mode` = **test** → Run. Nach 2–3 Minuten steht in der
@@ -85,12 +84,10 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
 
 **Testbetrieb (`mode = test`) – für Handys ohne Store-Konten.** Test und Produktion sind getrennte Instanzen (eigener Worker, Datenbank, Bucket),
 Testdaten gelangen nie in die Produktion; beim Wechsel auf `production` ändert sich die Adresse (Schritt 8 wiederholen).
-- Keine Geräteprüfung (Play Integrity/App Attest): Einladungen gehen mit seitlich installierten APKs (Test-Token, eine Einladung je Gerät).
-- Jedes neue Konto bekommt **1 € Test-Guthaben** automatisch (Guthaben öffnen → „Guthaben ansehen“). Mehr: Run workflow mit `credit_eur` (z. B. `5`) →
-  schreibt allen bestehenden Konten bis zu 10 € gut. Alles Test-Guthaben zusammen ist auf 20 € gedeckelt (`TEST_CREDIT_CAP_MICRO`).
+- Neue Konten starten mit 0 € (kein Startguthaben, auch nicht im Testbetrieb). Test-Guthaben: erst in der App Guthaben öffnen („Guthaben ansehen“
+  legt das Konto an), dann Run workflow mit `credit_eur` (z. B. `5`) → schreibt allen bestehenden Konten bis zu 10 € gut; es läuft nie ab. Alles Test-Guthaben zusammen ist auf 20 € gedeckelt (`TEST_CREDIT_CAP_MICRO`).
   Ist es aufgebraucht: Instanz zurücksetzen (Datenbank `overfit-test` im Dashboard unter Storage & Databases → D1 löschen, Workflow neu starten).
-- Käufe gibt es im Testbetrieb nicht (kein Store); Guthaben nur so. Niedrige Limits: `max_tokens` 2048, 5 KI-Anfragen/Minute, 3 Einladungen je Einladendem
-  und Monat, Gesamtbudget für Einladungsboni 10 €.
+- Käufe gibt es im Testbetrieb nicht (kein Store); Guthaben nur so. Niedrige Limits: `max_tokens` 2048, 5 KI-Anfragen/Minute.
 - Markierung: `GET /v1/config` liefert `"mode": "test"`, die App zeigt unter Guthaben „Testserver“. Der Workflow prüft, dass der Modus stimmt.
 - Sicherheit: Der Testmodus braucht `DEPLOY_MODE=test` (exakt). Die Admin-Gutschrift gibt es nur dort und nur mit `ADMIN_SECRET`; in Produktion antwortet
   der Pfad 404 und ein `test:`-Token wird abgelehnt (beides in `backend/test/testmode.test.ts`).
@@ -113,19 +110,16 @@ Secrets (im Workflow oder von Hand):
 
    | Secret | Zweck | Nötig für |
    |---|---|---|
-   | `GEMINI_API_KEY` | Google-AI-Studio-Key des Betreibers | Gemini 3.6 Flash (Google) |
-   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | Claude Sonnet 5.5 (Anthropic) |
-   | `INVITE_SIGNING_KEY` | Zufälliger String ≥ 32 Zeichen (`openssl rand -base64 48`); signiert Einladungs-Tokens und Challenges | Einladungen |
+   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | alle Guthaben-Stufen (Claude Haiku, Sonnet, Opus 5.5) |
+   | `AI_GATEWAY_TOKEN` | optional: Token des authentifizierten AI Gateways | Gateway-Protokolle |
    | `SYNC_ENCRYPTION_KEY` | Zufällige 32 Byte als Base64url; verschlüsselt alle KI-Chat-Daten (die OAuth-Anmeldung des MCP-Servers braucht kein eigenes Geheimnis). **Nie ändern** (sonst sind gespeicherte Daten unlesbar; die App lädt dann beim nächsten Sync neu hoch) | KI-Chat |
    | `ADMIN_SECRET` | ≥ 16 Zeichen, nur Testbetrieb (`POST /v1/admin/credit`) | Test-Guthaben |
    | `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_PACKAGE_NAME` (`app.overfit`) | Dienstkonto mit Play-Developer-API-Zugriff | Käufe Android |
-   | `PLAY_INTEGRITY_SERVICE_ACCOUNT` | Dienstkonto für `decodeIntegrityToken` | Einladungen Android |
    | `APPLE_IAP_KEY`, `APPLE_IAP_KEY_ID`, `APPLE_IAP_ISSUER_ID`, `APPLE_BUNDLE_ID` | App-Store-Server-API-Schlüssel (.p8) | Käufe iOS |
-   | `APPLE_APP_ATTEST_TEAM_ID` | Team-ID für App Attest | Einladungen iOS |
 
    **Stand:** Die echten Prüfer für Google Play / Apple (`src/verifiers.ts`) sind noch nicht implementiert – nur die
-   Schnittstellen, die Mock-Varianten (Dev) und der Test-Prüfer (Testbetrieb). Käufe und Einladungen antworten in Produktion daher mit
-   `purchases_unavailable` bzw. `attestation_unavailable`, bis die Prüfer mit echten Zugangsdaten nachgezogen werden
+   Schnittstellen, die Mock-Varianten (Dev) und der Test-Prüfer (Testbetrieb). Käufe antworten in Produktion daher mit
+   `purchases_unavailable`, bis die Prüfer mit echten Zugangsdaten nachgezogen werden
    (eigene Aufgabe, setzt die Store-Konten aus Phase 6 voraus). `/v1/messages`, Konten und Wiederherstellung laufen schon
    mit einem KI-Key allein.
 
@@ -175,13 +169,6 @@ den gleichen OAuth-Ablauf.
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `MARKUP_BP` | 2800 | Einziger Aufschlag auf alle Modellpreise (Basispunkte, 2800 = 28 %); Herleitung in docs/monetization.md. Web: Guthaben = Preis; Store: Guthaben laut `PACKAGES`, Store-Preis offen darüber |
-| `INVITE_STARTER_REVIEWS` / `INVITE_REWARD_REVIEWS` | 5 | Geschenkte Coach-Auswertungen für den Eingeladenen / den Einladenden (nach der ersten Coach-Anfrage des Eingeladenen) |
-| `INVITE_TOKEN_TTL_SEC` | 45 | Gültigkeit des QR-Tokens |
-| `INVITE_MONTHLY_LIMIT_PER_INVITER` | 10 | Einladungen pro Einladendem und Monat |
-| `INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS` | 1000 | Budget für alle Einladungsboni im Monat in Auswertungen (jede Einladung = Start + Belohnung) |
-| `INVITE_GIFT_MONTHLY_COST_CAP_MICRO` | 50 000 000 | Harte Obergrenze für die echten KI-Kosten geschenkter Auswertungen im Monat; danach zahlt das Guthaben |
-| `INVITE_GIFT_MAX_COST_MICRO` | 250 000 | Höchste Anbieterkosten (der Reservierung) je geschenkter Auswertung; darüber zahlt das Guthaben |
-| `INVITE_EXPIRY_DAYS` | 180 | Verfall der geschenkten Auswertungen |
 | `MAX_TOKENS_CAP` | 8192 | Obergrenze für `max_tokens` (begrenzt die Reservierung) |
 | `MAX_BODY_BYTES` | 8 388 608 | Größtes Request-Body (Fotos) |
 | `IMAGE_TOKENS_RESERVE` | 3000 | Pauschale Eingabe-Token je Bild bei der Reservierung |
@@ -201,7 +188,7 @@ den gleichen OAuth-Ablauf.
 | `PUBLIC_BASE_URL` | Origin der Anfrage | Issuer/Resource für OAuth (bei eigener Domain setzen) |
 | `SHARE_BASE_URL` | `https://bigfire3.github.io/overfit/t` | Basis der Import-Links, die `create_template` liefert |
 | `DEPLOY_MODE` | `production` | `test` = Testbetrieb (siehe oben); setzt der Deploy-Workflow |
-| `TEST_STARTER_MICRO` / `TEST_CREDIT_CAP_MICRO` | 1 000 000 / 20 000 000 | Test-Startguthaben je Konto / Obergrenze für alles Test-Guthaben |
+| `TEST_CREDIT_CAP_MICRO` | 20 000 000 | Obergrenze für alles Test-Guthaben (Admin-Gutschriften) |
 | `RL_*` | siehe API-Doku | Rate-Limits (`RL_MCP_PER_MIN` 120 je Verbindung) |
 
 ## Web-Kauf (Stripe, Testmodus)
@@ -263,9 +250,13 @@ Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `displayName`, `vendo
 
 | Stufe | Anbieter, Modell | Bilder | Ausweichen bei Ausfall | Listenpreis je MTok (ein / aus) |
 |---|---|---|---|---|
-| `standard` (Voreinstellung) | Google Gemini `gemini-3.6-flash` (native API, `responseJsonSchema`) | ja | → `pro` | 0,75 $ / 3,75 $ (ab 2027-01-01: 1,50 $ / 7,50 $) |
-| `pro` | Anthropic `claude-sonnet-5-5` | ja | → `standard` | 2 $ / 10 $ |
-| `lite` | Workers AI `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (JSON-Modus; bis 6.11.2026 `llama-3.1-8b-instruct`, bei Cloudflare abgekündigt) | nein (400 `images_not_supported`) | → `standard` | 0,293 $ / 2,253 $ |
+| `lite` | Anthropic `claude-haiku-5-5` (kurze Anfragen, z. B. „Mit KI ausfüllen“) | ja | → `standard` | 0,10 $ / 0,50 $ |
+| `standard` (Voreinstellung) | Anthropic `claude-sonnet-5-5` (Coach-Auswertung, Chat) | ja | → `lite` | 2 $ / 10 $ |
+| `pro` | Anthropic `claude-opus-5-5` | ja | → `standard` | 4 $ / 20 $ |
+
+Cache-Lesen 0,01 $ / 0,20 $ / 0,20 $, Cache-Schreiben 1,25 × Eingabe, Thinking-Token zählen als Ausgabe. Bis 7.11.2026 waren
+`standard` = Gemini 3.6 Flash und `lite` = Llama über Workers AI; alte Modell-IDs werden noch auf die Stufen abgebildet, alte
+Buchungen behalten ihren Preis. Workers AI und Gemini werden nicht mehr aufgerufen.
 
 - Die App schickt das Anthropic-Format mit `model` = Stufe; das Backend bildet es auf den Anbieter ab und antwortet im Anthropic-Format.
 - Preise stehen in `src/providers.ts` (`MODEL_PRICES`, mit Gültig-ab-Datum, Wechselkurs `EUR_PER_USD`). Ändern: Tabelle anpassen
@@ -273,13 +264,12 @@ Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `displayName`, `vendo
 - Ausweichen (5xx, 429, Zeitüberschreitung, Netzwerk): berechnet wird höchstens der Preis der angefragten Stufe für die tatsächlich
   verbrauchten Token; die Differenz trägt die Marge. 401/403 des Anbieters (Schlüssel des Betreibers ungültig) zählt wie ein Ausfall
   (`502 upstream_unavailable`, Fehlertext in `message`). Andere Ablehnungen (4xx) weichen nicht aus.
-- AI Gateway: Workers AI läuft immer über die `gateway`-Option des Bindings. Gemini und Anthropic laufen nur dann über das Gateway
-  (`getUrl`), wenn zusätzlich das Secret `AI_GATEWAY_TOKEN` gesetzt ist: Cloudflare legt neue Gateways seit 2026 immer mit
-  Pflicht-Authentifizierung an (lässt sich nicht abschalten), ohne `cf-aig-authorization` antwortet das Gateway mit 401. Ohne Token
-  gehen diese beiden Stufen direkt an den Anbieter (funktioniert, nur ohne Gateway-Protokoll). Lehnt das Gateway trotz Token ab
-  (401/403), geht dieselbe Anfrage einmal direkt an den Anbieter. **Token anlegen (optional):** dash.cloudflare.com → AI → AI Gateway
-  → `overfit-test` bzw. `overfit` → Settings → Authentication → „Create authentication token“ (Recht *AI Gateway · Run*), als
-  GitHub-Secret `AI_GATEWAY_TOKEN` speichern und den Workflow erneut starten.
+- AI Gateway (kostenlos, nur Protokolle und Kosten-Übersicht): Anfragen laufen nur dann über das Gateway (`getUrl` des Bindings
+  `AI`), wenn das Secret `AI_GATEWAY_TOKEN` gesetzt ist: Cloudflare legt neue Gateways seit 2026 immer mit Pflicht-Authentifizierung
+  an (lässt sich nicht abschalten), ohne `cf-aig-authorization` antwortet es mit 401. Ohne Token gehen alle Anfragen direkt an
+  Anthropic. Lehnt das Gateway trotz Token ab (401/403), geht dieselbe Anfrage einmal direkt. **Token anlegen (optional):**
+  dash.cloudflare.com → AI → AI Gateway → `overfit-test` bzw. `overfit` → Settings → Authentication → „Create authentication token“
+  (Recht *AI Gateway · Run*), als GitHub-Secret `AI_GATEWAY_TOKEN` speichern und den Workflow erneut starten.
   Protokolle und Kosten: dash.cloudflare.com → AI → AI Gateway → `overfit` bzw. `overfit-test`. Der Workflow legt es mit
   Protokollen an, Rate-Limit 600 Anfragen/Minute (gleitend, Notbremse) und Cache aus. Anfragen mit Körperfotos werden nicht
   inhaltlich protokolliert: Sie bekommen `cf-aig-collect-log-payload: false`, das Gateway speichert dann weder Anfrage noch Antwort,
@@ -302,7 +292,8 @@ ADMIN_SECRET=… node scripts/usage-report.mjs https://<worker-domain> 2026-11-0
   Refresh-Rotation) · `pages.ts` Anmeldeseite · `sync.ts` Geräte-Endpunkte · `data.ts` Lesen + Kennzahlen · `vault.ts`
   AES-GCM · `catalog.ts` Übungskatalog (`catalog.gen.json` aus dem App-Katalog, neu erzeugen mit `node scripts/build-catalog.mjs`)
 - `src/index.ts` Router · `auth.ts` Signaturprüfung/Replay-Schutz · `ledger.ts` Saldo, Reservierung, Abrechnung ·
-  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `providers.ts` Stufen, Preise, Anbieter-Adapter · `purchases.ts` · `invite.ts` (Einladungen) · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-/Attestierungs-Schnittstellen)
-- Guthaben als „Posten“ (`lots`): Käufe verfallen nie, Geschenktes (Startguthaben) nach 180 Tagen; Verbrauch zuerst verfallende Posten. Einladungsboni sind ein eigener Zähler geschenkter Coach-Auswertungen (`review_gifts`), kein Euro-Guthaben; sie werden vor dem Guthaben verbraucht. Reservierung =
+  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `providers.ts` Stufen, Preise, Anbieter-Adapter · `purchases.ts` · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-Prüfer-Schnittstellen)
+- Guthaben als „Posten“ (`lots`): nichts verfällt (seit 7.11.2026, Migration 0009); Verbrauch zuerst Gutschriften, dann Gekauftes. Die
+  Tabellen der früheren Einladungen (`invite_tokens_used`, `invite_redemptions`, `review_gifts`) bleiben bestehen, werden aber nicht genutzt. Reservierung =
   ein atomares `INSERT … SELECT … WHERE saldo ≥ betrag` (D1 serialisiert Schreibzugriffe) – parallele Anfragen können nicht überziehen.
   Reservierungen älter als 15 min gelten als verwaist und zählen nicht mehr.

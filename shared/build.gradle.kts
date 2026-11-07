@@ -47,7 +47,6 @@ kotlin {
             // Notifications (NotificationCompat) and Dispatchers.Main for the workout controller.
             implementation(libs.androidx.core.ktx)
             implementation(libs.kotlinx.coroutines.android)
-            implementation(libs.play.integrity)
             implementation(libs.androidx.activity.compose)
             implementation(libs.camerax.camera2)
             implementation(libs.camerax.lifecycle)

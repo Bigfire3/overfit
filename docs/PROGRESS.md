@@ -12,9 +12,26 @@
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Session Z, seit Session AB über Stripe, Web 1:1, Store-Aufpreis offen, Aufschlag 28 %); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
-| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
+| 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Einladungen, Startguthaben und Verfall entfernt (7.11.2026)
+**Erledigt:** Fabians Entscheidung (Zitat in DECISIONS.md): Das Empfehlungsprogramm ist komplett aus der App (Android und iOS) entfernt:
+„Freunde einladen“, „Einladung einlösen“, QR/Link `overfit://invite`, Reveal-Animation, geschenkte Auswertungen (Zähler, Hinweise,
+„geschenkt“ unter Antworten und in der Abrechnung), Gekauft/geschenkt-Aufteilung, „gültig bis“, Erwähnung in der Coach-Story,
+Geräteprüfung (Play Integrity / App Attest, inkl. Bibliothek). Kein Startguthaben, Guthaben verfällt nie. Alte Buchungen erscheinen
+neutral als „Gutschrift“/„Ausbuchung“. Doku (SPEC, monetization, backend-api, backend/README) und Preisseite angepasst; die D1-Tabellen
+bleiben. Tests: `FuelDemoTest` (neue Demo nur mit Claude, ohne Einladung), `DayWithOverfitTest`, `FuelBasicsTest`, `FuelApiTest`,
+`RequestLogTest`, `CoachTransportTest`, `OwnKeyPrivacyTest`, `WebCreditTest` angepasst; reine Einladungs-Tests entfernt.
+**Offen (Fabian):** Ob der Aufschlag (28 %) sinken soll, nachdem die Rücklage für Geschenktes entfällt (bleibt vorerst als Kulanz-Rücklage).
+Alte GitHub-Secrets `INVITE_SIGNING_KEY`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_APP_ATTEST_TEAM_ID` dürfen gelöscht werden.
+
+### Bitte auf dem Handy testen (Einladungen entfernt)
+1. Profil → Guthaben: nur noch „X € Guthaben“, keine geschenkten Auswertungen, kein „gültig bis“, kein Bereich „Einladungen“.
+2. Profil → Guthaben → Buchungen: alte Einladungs-/Test-Buchungen (falls vorhanden) heißen „Gutschrift“, nirgends „Einladung“.
+3. Coach → „Über den Coach“ → Seite „Mit Guthaben“: kein Wort mehr über Freunde/Einladungsbonus.
+4. Ein alter Einladungs-QR (`overfit://invite#…`) öffnet nichts Besonderes mehr (höchstens die Import-Meldung „kein Training“).
+5. Coach-Antwort mit Guthaben: darunter immer ein Betrag „… € Guthaben“, nie „geschenkte Auswertung“.
 ## Muskel-Heatmap „Trainierte Muskeln“ (7.11.)
 **Erledigt:** Kalender → neues Körper-Icon in der Titelzeile öffnet ein Bottom-Sheet „Trainierte Muskeln“: eigene, stilisierte
 Figur vorne und hinten, jeder Muskel je nach Sätzen im Zeitraum von Dunkelgrau (untrainiert) bis Weiß (am meisten), Legende
@@ -40,7 +57,7 @@ Screenshots: `docs/screenshots/muskel-heatmap/`.
 authentifizierte) Cloudflare AI Gateway mit 401, Lite-Modell bei Cloudflare abgekündigt. Backend geht ohne Gateway-Token direkt zum
 Anbieter, 401/403 weicht auf die andere Stufe aus, Lite = Llama 3.3 70B. App lädt bei `tier_unavailable` die Config neu und zeigt
 Server-Fehler verständlich. Details in DECISIONS.md. Tests: `tiers.test.ts`, `CoachTransportTest`.
-**Offen (Fabian):** GitHub-Secret `GEMINI_API_KEY` (Gemini Flash = Standard, nur dafür gilt der Einladungsbonus); optional
+**Offen (Fabian):** GitHub-Secret `GEMINI_API_KEY` (seit 7.11. nicht mehr nötig, Guthaben nur Claude); optional
 `AI_GATEWAY_TOKEN` (Gateway-Protokolle). Repo-Variable `BACKEND_DEPLOY_MODE=test` für Auto-Deploy nach jedem Backend-Merge.
 
 ### Bitte auf dem Handy testen (Hotfix KI)
@@ -571,7 +588,7 @@ Erledigt: Minimieren-Knopf im Workout (Pfeil runter) und System-Zurück minimier
 5. Minimiert in anderen Tab, Bildschirm sperren, Benachrichtigung tippen → maximiertes Training. App aus den letzten Apps wischen und neu öffnen → Training maximiert
 
 ## Morgen-Testliste für Fabian (3.11.)
-Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Guthaben/Einladungen); die Demo in 36–38 braucht keinen Server.
+Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Guthaben); die Demo in 36–38 braucht keinen Server.
 Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).
 
 **Installieren und starten**
@@ -625,11 +642,10 @@ Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft di
 34. Mit Backend: „KI-Chat verbinden“ → Zustimmen → Kopplungscode, Connector im Chat anlegen, „Plane mir ein Push-Training“ → Eingang auf dem Start-Tab → Vorschau → Übernehmen
 35. „Trennen“ und „KI-Chat trennen“ (zweimal tippen) → Chat hat keinen Zugriff mehr
 
-**Guthaben und Einladungen**
-36. Profil → „Fuel · startet bald“ → „Demo ansehen“: „Fuel · 4,20 €“, Pakete („Bald im Store“), Buchungen, Wiederherstellungscode
-37. „Freunde einladen“ (Profil → Guthaben): QR mit rotierendem Code (`overfit://invite#…`), Name; „Einladung einlösen“: beliebigen Link einfügen → Einlösen → schwarz, zwei Pulse,
-    Zahl zählt 0,00 → 1,00 €, „Einladung von Fabian“, kräftiger Puls; Tippen schließt
-38. „Demo beenden“ → Fuel zeigt wieder „startet bald“. (Echtes Guthaben/Einladungen erst mit Backend, Punkt 1 unten)
+**Guthaben**
+36. Profil → „Guthaben · startet bald“ → „Demo ansehen“: „4,20 € Guthaben“, Pakete („Bald im Store“), Buchungen (nur Claude-Modelle), Wiederherstellungscode
+37. (entfällt: Einladungen sind seit 7.11.2026 entfernt)
+38. „Demo beenden“ → Guthaben zeigt wieder „startet bald“. (Echtes Guthaben erst mit Backend, Punkt 1 unten)
 
 **Backup und Löschen**
 39. Profil → „Backup exportieren“ → in Dateien/Drive sichern (Datei lässt sich als ZIP öffnen, kein API-Key drin)
@@ -643,7 +659,7 @@ Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
    `wrangler.jsonc`), Migrationen (inkl. `0002_chat.sql`), Secrets `ANTHROPIC_API_KEY`, `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY`
    (32 Zufallsbytes Base64url, nie ändern), R2 aktivieren + `wrangler r2 bucket create overfit-chat-photos`, `npm run deploy`. Danach
    GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL. Ohne das zeigt die App „startet bald“ + Demo
-   (Guthaben, Einladungen, KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
+   (Guthaben und KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
 2. **GitHub Pages aktivieren** (Repo → Settings → Pages → Source „GitHub Actions“; oder Actions → „Web veröffentlichen“ → Run workflow):
    Web-Fallback `https://bigfire3.github.io/overfit/` und Teilen-Seite `/t` für Links ohne App
 3. **KI-Chat-Connectoren eintragen** (nach 1.): Claude → Connectors → Custom Connector, ChatGPT → Entwicklermodus → Connector,
@@ -651,9 +667,9 @@ Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
 4. **Zu prüfen (Annahmen von Session G):** Standardmodelle OpenAI `gpt-5` und OpenRouter `anthropic/claude-sonnet-5.5` sind geraten – in
    Profil → KI-Coach → Coach-Einstellungen mit echtem Key ausprobieren und ggf. korrigieren; „Zur Prüfung durch Fabian“ in `docs/DECISIONS.md` lesen
 5. **Datenschutzerklärung vor dem Store-Start** um KI-Chat-Verbindung (Art. 9 DSGVO, Opt-in) und Daten an Chat-Anbieter ergänzen
-6. **Store-Konten (Phase 6/7):** Google-Play-Console und Apple-Developer-Konto, Play Billing / StoreKit, Play Integrity (Cloud-Projekt), App Attest,
+6. **Store-Konten (Phase 6/7):** Google-Play-Console und Apple-Developer-Konto, Play Billing / StoreKit,
    Server-Prüfer in `backend/src/verifiers.ts`. Store-Texte DE/EN liegen als Entwurf in `docs/store/store-listing.md`
-7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Einladungs-Links
+7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Links
    ohne installierte App
 8. iOS: Kamera, Fotoauswahl, Dateiauswahl und Haptik sind nur in der iOS-CI gebaut, nicht auf einem echten iPhone getestet
 

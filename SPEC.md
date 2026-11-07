@@ -126,10 +126,9 @@ ausdrücklich freiwillige KI-Chat-Verbindung (verschlüsselter Upload nur für C
 6. Store-Release: App Store (iOS) und Play Store (Android)
 7. Credits-System (eigenes Backend, In-App-Purchase)
 8. Trainings teilen: Share-Link, Share-Sheet (WhatsApp, Quick Share, AirDrop), QR anzeigen/scannen, Import mit Vorschau, Web-Fallback-Seite (kann nach Phase 3 vorgezogen werden)
-9. Einladen per QR mit Startguthaben, Attestierung, Missbrauchsschutz (setzt Phase 6 und 7 voraus)
+9. ~~Einladen per QR mit Startguthaben~~ – entfernt (7.11.2026, Fabian: zu viel Aufwand am Anfang; DECISIONS „Einladungen, Startguthaben und Verfall entfernt“)
 10. KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per Remote-MCP): 10a Backend + Konzept ✔ (Nacht 3.11.), 10b App-Seite
     (Einstellungsseite mit fünf KI-Wegen, Kopplungscode, Sync, Eingang mit Import-Vorschau, „Kontext kopieren“; nach Phase 3)
-Später als Spielerei: NFC-Einladung.
 
 ## Erweiterung: Teilen, Open Source, Coach-Guthaben
 
@@ -148,16 +147,14 @@ Später als Spielerei: NFC-Einladung.
 
 ### Coach-Guthaben (Phase 7)
 - Im KI-Zugang zusätzlich zu den eigenen Keys: „Overfit-Guthaben" als weitere `LlmProvider`-Implementierung.
-- Backend (neu, schlank, Open Source): Messages-API-Proxy, Guthabenkonto, Einladungen, Kaufbestätigung. Vorschlag: Cloudflare Workers + D1/Durable Objects (atomare Abbuchung, kleiner Betrieb fast kostenlos). Das Backend speichert keine Trainingsinhalte und keine Fotos (nur durchgeleitet), sondern nur Konto-ID, Saldo und Buchungen (Modell, Tokens, Betrag).
+- Backend (neu, schlank, Open Source): Messages-API-Proxy, Guthabenkonto, Kaufbestätigung. Vorschlag: Cloudflare Workers + D1/Durable Objects (atomare Abbuchung, kleiner Betrieb fast kostenlos). Das Backend speichert keine Trainingsinhalte und keine Fotos (nur durchgeleitet), sondern nur Konto-ID, Saldo und Buchungen (Modell, Tokens, Betrag).
 - Abrechnung: Vor dem Request werden die maximal erwarteten Kosten reserviert. Danach wird nach `usage` (Input, Cache-Read, Output) × Listenpreis × (1 + Aufschlag) abgerechnet und der Rest freigegeben. Saldo und Kosten pro Auswertung werden in der App transparent angezeigt.
 - Richtwert: Eine Coach-Auswertung mit Sonnet 5.5 (2 $ / 10 $ pro MTok, Cache-Read 0,20 $) inkl. zweier Fotos kostet ca. 6–8 ct. 1 € reicht damit für ca. 12–15 Auswertungen.
 - Kauf: Pakete (z. B. 5 € / 10 €). Im Play Store und App Store ist für digitale Inhalte die Store-Abrechnung Pflicht (Play Billing / Apple IAP, 15 % im Small-Business-Programm; dafür übernimmt der Store die Umsatzsteuer). Der Guthabenwert eines Pakets ist deshalb Kaufpreis × (1 − Store-Gebühr) / (1 + Aufschlag). Beim APK über GitHub ginge ein Zahlungsanbieter direkt; dann ist die Umsatzsteuer selbst zu klären oder ein Merchant of Record zu nutzen.
 
-### Einladen mit Startguthaben (Phase 9)
-- Wer von einem bestehenden Nutzer persönlich eingeladen wird, bekommt ein Startguthaben (Start: 1 €, serverseitig konfigurierbar). Der Einladende bekommt eine Gutschrift, sobald der Neue seine erste Coach-Auswertung gemacht hat.
-- Ablauf: Der Einladende öffnet „Freund einladen", die App zeigt einen QR-Code mit einem vom Server signierten Einmal-Token (rotiert alle 30 s, kurz gültig) plus Installationslink. Der Neue installiert die App, tippt „Ich wurde eingeladen" und scannt den QR-Code.
-- NFC kommt später als Spielerei: Android sendet per Host Card Emulation (NDEF-Tag), Android und iPhone lesen ihn (iPhone über Core NFC). Vom iPhone aus geht NFC nicht (Kartenemulation auf iOS nur mit spezieller Apple-Berechtigung).
-- Missbrauchsschutz (Pflicht, weil echte Kosten entstehen): Geräteattestierung (Play Integrity / App Attest), Bonus einmal pro Gerät (Play Integrity Device Recall bzw. DeviceCheck, beides übersteht Neuinstallation), Token einmalig und kurzlebig, Limit pro Einladendem (z. B. 10 pro Monat) und globales Monatsbudget. Startguthaben gilt nur für Coach-Anfragen, ist nicht auszahlbar und verfällt nach 6 Monaten. Geräteattestierung setzt Store-Installationen voraus: Seitlich installierte APKs bekommen kein Startguthaben.
+### Einladen mit Startguthaben (Phase 9) – entfernt
+Am 7.11.2026 von Fabian gestrichen: kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie (DECISIONS.md
+„Einladungen, Startguthaben und Verfall entfernt“).
 
 ### Open Source – Voraussetzungen
 - Erledigt: Signatur über GitHub-Secrets mit neuem Schlüssel, `signing/` entfernt, Lizenz MIT (`LICENSE`, Entscheidung Fabian 3.11.; vorher Apache-2.0, kurz „alle Rechte vorbehalten“). Die Workout-Guide-Grafiken bleiben CC BY-SA 4.0, Inter bleibt OFL.

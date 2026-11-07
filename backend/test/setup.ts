@@ -7,7 +7,7 @@ await applyD1Migrations(e.DB, e.TEST_MIGRATIONS);
 
 const TABLES = ['accounts', 'devices', 'lots', 'holds', 'ledger', 'nonces', 'rate_limits', 'purchases', 'invite_tokens_used', 'invite_redemptions',
   'chat_sync', 'chat_docs', 'chat_inbox', 'chat_pairing', 'oauth_clients', 'oauth_grants', 'oauth_codes', 'oauth_tokens',
-  'web_links', 'web_orders', 'web_events', 'credit_codes', 'review_gifts'];
+  'web_links', 'web_orders', 'web_events', 'credit_codes', 'review_gifts', 'requests'];
 beforeEach(async () => {
   await e.DB.batch([...TABLES].reverse().map((t) => e.DB.prepare(`DELETE FROM ${t}`)));
 });

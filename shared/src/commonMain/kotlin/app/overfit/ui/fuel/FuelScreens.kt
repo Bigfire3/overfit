@@ -67,20 +67,20 @@ private fun ErrorBlock(t: FuelStrings, onRetry: () -> Unit) {
     SmallButton(t.retry, onRetry, tone = Tone.Default)
 }
 
-/** Profile → Fuel: balance, top-up packages, invitations, transactions, recovery. Not configured: "coming soon" + demo. */
+/** Profile → Fuel: balance, top-up packages, transactions, recovery. Not configured: "coming soon" + demo. */
 @Composable
 fun FuelScreen(
     session: FuelSession,
     onBack: () -> Unit,
     onLedger: () -> Unit,
     onRecovery: () -> Unit,
-    onInviteShow: () -> Unit,
-    onInviteRedeem: () -> Unit,
     /** True when Fuel is the chosen AI access. With an own key the screen asks first (no request before). */
     fuelActive: Boolean = true,
     onRedeemCode: () -> Unit = {},
     /** How this build was installed; with `/v1/config` it decides whether "Top up on the web" is shown. */
     distribution: app.overfit.fuel.Distribution = app.overfit.fuel.Distribution.Sideload,
+    /** Opens the request log ("Abrechnung"); null = no row. */
+    onRequestLog: (() -> Unit)? = null,
 ) {
     val t = LocalFuelStrings.current
     val language = t.language
@@ -136,7 +136,7 @@ fun FuelScreen(
         when (val a = account) {
             is Loaded.Loading -> Text(t.loading, tone = Tone.Muted)
             is Loaded.Failed -> ErrorBlock(t, reload)
-            is Loaded.Ready -> Balance(a.value, (config as? Loaded.Ready<FuelConfig>)?.value, language, t)
+            is Loaded.Ready -> Balance(a.value, language, t)
         }
 
         SectionTitle(t.topUp)
@@ -162,65 +162,24 @@ fun FuelScreen(
         }
         WebCreditSection(service, (config as? Loaded.Ready<FuelConfig>)?.value, distribution, language, isDemo, onRedeemCode)
 
-        PanelSection(t.invite) {
-            ListRow(t.inviteShow, onClick = onInviteShow)
-            ListRow(t.inviteRedeem, onClick = onInviteRedeem)
-        }
-
         PanelSection(t.fuel) {
+            if (onRequestLog != null) ListRow(app.overfit.i18n.requestLogStringsFor(language).title, onClick = onRequestLog)
             ListRow(t.ledger, onClick = onLedger)
             ListRow(t.recovery, onClick = onRecovery)
         }
     }
 }
 
-/**
- * Balance: "4,20 € Guthaben", gifted reviews as their own counter, bought vs. gifted credit and what expires when.
- * Credit is always "X € Guthaben"; real money (prices) only appears with the packages.
- */
+/** Balance: "4,20 € Guthaben". Credit is always "X € Guthaben"; real money (prices) only appears with the packages. */
 @Composable
-private fun Balance(account: FuelAccount, config: FuelConfig?, language: Language, t: FuelStrings) {
-    val s = LocalStrings.current
+private fun Balance(account: FuelAccount, language: Language, t: FuelStrings) {
     Spacer(Modifier.height(Space.m))
     Panel {
         PanelItem {
             Text(t.balanceLabel, style = Theme.type.caption, tone = Tone.Muted)
             Text(t.creditAmount(formatEuro(account.balanceMicro, language)), style = Theme.type.title)
-            val reviews = account.giftReviews
-            if (reviews.remaining > 0) {
-                Spacer(Modifier.height(Space.xs))
-                Text(t.giftReviews(reviews.remaining))
-            }
-            val gifted = account.giftedMicro ?: 0
-            val bought = account.purchasedMicro
-            if (bought != null && gifted > 0) {
-                Spacer(Modifier.height(Space.xs))
-                Text(t.balanceSplit(formatEuro(bought, language), formatEuro(gifted, language)), style = Theme.type.caption, tone = Tone.Muted)
-            }
-            account.expiring.sumOf { it.amountMicro }.takeIf { it > 0 }?.let { amount ->
-                val until = account.expiring.minOf { it.expiresAt }
-                Text(t.expiringLine(formatEuro(amount, language), s.date(epochToDate(until))), style = Theme.type.caption, tone = Tone.Muted)
-            }
-            reviews.expiring.forEach { item ->
-                Text(t.giftReviewsExpiring(item.count, s.date(epochToDate(item.expiresAt))), style = Theme.type.caption, tone = Tone.Muted)
-            }
-            if (gifted > 0 || reviews.remaining > 0) {
-                Text(t.giftedFirst, style = Theme.type.caption, tone = Tone.Muted)
-            }
-            if (reviews.remaining > 0) {
-                Spacer(Modifier.height(Space.xs))
-                Text(t.giftReviewsScope(giftModelName(config)), style = Theme.type.caption, tone = Tone.Muted)
-            }
         }
     }
-}
-
-/** Real name of the model the gifted reviews cover ("Gemini 3.6 Flash"). */
-internal fun giftModelName(config: FuelConfig?): String {
-    val tier = config?.invite?.giftTier ?: app.overfit.ai.TIER_STANDARD
-    return config?.tiers?.get(tier)?.displayName?.takeIf { it.isNotEmpty() }
-        ?: app.overfit.fuel.modelOfTier(tier)?.let { app.overfit.fuel.modelShortName(it) }
-        ?: "Gemini Flash"
 }
 
 /** Transactions, newest first, paged. */
@@ -260,25 +219,18 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
         if (entries.isNotEmpty()) Panel { entries.forEach { e ->
             val w = app.overfit.i18n.webCreditStringsFor(language)
             val title = when (e.type) {
-                "usage" -> if (e.reviews != null && e.reviews < 0) t.ledgerGiftReviewUsage else t.ledgerUsage
-                "test_credit" -> t.ledgerTestCredit
-                "invite_expired" -> t.ledgerInviteExpired
+                "usage" -> t.ledgerUsage
                 "purchase" -> if (e.source == "web") w.ledgerWebPurchase else t.ledgerPurchase
                 "code_redeem" -> w.ledgerCode
                 "refund" -> w.ledgerRefund
                 "chargeback" -> w.ledgerChargeback
-                "invite_bonus" -> t.ledgerInviteBonus
-                "invite_reward" -> t.ledgerInviteReward
-                else -> e.type
+                // Other types of older accounts (e.g. former starting credit): neutral credit/debit.
+                else -> if (e.amountMicro < 0) t.ledgerDebit else t.ledgerCredit
             }
             val sign = if (e.amountMicro > 0) "+" else ""
-            // Euro amounts are credit ("… € Guthaben"); gifted reviews are a count of their own.
-            val amount = when {
-                e.reviews != null && e.amountMicro == 0L -> t.ledgerReviews(e.reviews)
-                e.type == "usage" -> t.creditAmount(formatCost(e.amountMicro, language))
-                e.reviews != null -> t.creditAmount(sign + formatEuro(e.amountMicro, language)) + " · " + t.ledgerReviews(e.reviews)
-                else -> t.creditAmount(sign + formatEuro(e.amountMicro, language))
-            }
+            // Amounts are credit ("… € Guthaben").
+            val amount = if (e.type == "usage") t.creditAmount(formatCost(e.amountMicro, language))
+            else t.creditAmount(sign + formatEuro(e.amountMicro, language))
             PanelItem {
             androidx.compose.foundation.layout.Row(
                 Modifier.fillMaxWidth(),
@@ -287,7 +239,7 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
                 Text(title, Modifier.weight(1f).padding(end = Space.m))
                 Text(amount)
             }
-            // detail line under the row: paid/gifted/used/refunded, date and, for usage, tokens
+            // detail line under the row: paid/credited/used/refunded, date and, for usage, tokens
             val detail = buildString {
                 append(ledgerKindLabel(e.kind, t)).append(" · ")
                 append(s.date(epochToDate(e.ts)))
@@ -296,7 +248,7 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
                     append(" · ").append(t.ledgerTokens(e.inputTokens + e.cacheReadTokens + e.cacheWriteTokens, e.outputTokens))
                 }
             }
-            val chosen = if (e.type == "usage" && e.fallback) e.tier?.let { app.overfit.fuel.modelOfTier(it) }?.let { app.overfit.fuel.modelShortName(it) } else null
+            val chosen = if (e.type == "usage" && e.fallback) e.tier?.let { app.overfit.fuel.modelOfTierAt(it, e.ts) }?.let { app.overfit.fuel.modelShortName(it) } else null
             Text(detail, style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.xs))
             if (chosen != null) Text(t.ledgerFallback(chosen), style = Theme.type.caption, tone = Tone.Muted, modifier = Modifier.padding(top = Space.xs))
             }
@@ -311,10 +263,10 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
 
 internal fun ledgerKindLabel(kind: app.overfit.fuel.LedgerKind, t: FuelStrings): String = when (kind) {
     app.overfit.fuel.LedgerKind.Paid -> t.ledgerKindPaid
-    app.overfit.fuel.LedgerKind.Gifted -> t.ledgerKindGifted
+    app.overfit.fuel.LedgerKind.Credited -> t.ledgerKindCredited
     app.overfit.fuel.LedgerKind.Used -> t.ledgerKindUsed
     app.overfit.fuel.LedgerKind.Refunded -> t.ledgerKindRefunded
-    app.overfit.fuel.LedgerKind.Expired -> t.ledgerKindExpired
+    app.overfit.fuel.LedgerKind.Deducted -> t.ledgerKindDeducted
 }
 
 /** Create/show the recovery code (shown once) and restore on a new phone. */

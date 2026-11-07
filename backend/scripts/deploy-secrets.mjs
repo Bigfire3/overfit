@@ -4,16 +4,17 @@
 //
 //   node scripts/deploy-secrets.mjs <test|production> <vorhandene-secrets.json> <ausgabe.json> <zusammenfassung.md>
 //
-// - KI-Schlüssel: GEMINI_API_KEY (Stufe standard) und ANTHROPIC_API_KEY (Stufe pro), je aus GitHub oder schon im Worker.
-//   Mindestens einer ist Pflicht, sonst Exit 1 mit Anleitung. Fehlt einer, ist die Stufe aus /v1/config nicht verfügbar.
-// - INVITE_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
-//   ein Zufallswert erzeugt. Fehlt INVITE_SIGNING_KEY, wird das alte GitHub-Secret (LEGACY_INVITE_SIGNING_KEY) übernommen. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
+// - KI-Schlüssel: ANTHROPIC_API_KEY (alle Stufen: Haiku, Sonnet, Opus), aus GitHub oder schon im Worker. Pflicht, sonst Exit 1
+//   mit Anleitung. GEMINI_API_KEY wird nicht mehr gebraucht (nur Hinweis, falls noch gesetzt).
+// - SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
+//   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
+//   Einladungen gibt es nicht mehr (7.11.2026): INVITE_SIGNING_KEY wird nicht mehr gebraucht.
 // - ADMIN_SECRET (nur Testbetrieb): wird bei jedem Lauf neu erzeugt, außer ein GitHub-Secret ist gesetzt; der Workflow nutzt ihn sofort.
 // - Web-Kauf (Stripe): STRIPE_SECRET_KEY (sk_test_… im Testbetrieb, sk_live_… in Produktion), STRIPE_WEBHOOK_SECRET (whsec_…).
 //   In Produktion haben STRIPE_LIVE_SECRET_KEY / STRIPE_LIVE_WEBHOOK_SECRET Vorrang (Test- und Live-Werte parallel in GitHub).
 //   Optional; fehlt einer (weder in GitHub noch im Worker) oder passt der Schlüssel nicht zum Modus, bleibt der Web-Kauf aus,
 //   mit Hinweis in der Zusammenfassung (kein Abbruch).
-// - AI_GATEWAY_TOKEN (optional): Token für das authentifizierte AI Gateway; ohne gehen Gemini/Anthropic direkt.
+// - AI_GATEWAY_TOKEN (optional): Token für das authentifizierte AI Gateway; ohne gehen Anfragen direkt an Anthropic.
 // - Optional (Play/Apple-Prüfer): nur gesetzt, wenn vorhanden; sonst Hinweis in der Zusammenfassung.
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -21,13 +22,12 @@ import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 export const STRIPE = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
 
 export const OPTIONAL = [
-  'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME', 'PLAY_INTEGRITY_SERVICE_ACCOUNT',
-  'APPLE_IAP_KEY', 'APPLE_IAP_KEY_ID', 'APPLE_IAP_ISSUER_ID', 'APPLE_BUNDLE_ID', 'APPLE_APP_ATTEST_TEAM_ID',
+  'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME',
+  'APPLE_IAP_KEY', 'APPLE_IAP_KEY_ID', 'APPLE_IAP_ISSUER_ID', 'APPLE_BUNDLE_ID',
 ];
 
 const b64u = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 export const generators = {
-  INVITE_SIGNING_KEY: () => randomBytes(48).toString('base64'),
   SYNC_ENCRYPTION_KEY: () => b64u(randomBytes(32)),
   ADMIN_SECRET: () => randomBytes(32).toString('hex'),
 };
@@ -41,23 +41,16 @@ export function plan(mode, env, existing) {
   const generated = [];
   const given = (n) => (env[n] ?? '').trim();
 
-  const aiKeys = { GEMINI_API_KEY: 'standard (Gemini)', ANTHROPIC_API_KEY: 'pro (Claude)' };
-  const missingAi = [];
-  for (const [n, tier] of Object.entries(aiKeys)) {
-    if (given(n)) secrets[n] = given(n);
-    else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
-    else missingAi.push([n, tier]);
+  // KI: nur noch Anthropic (alle Guthaben-Stufen sind Claude-Modelle). GEMINI_API_KEY wird nicht mehr gebraucht.
+  if (given('ANTHROPIC_API_KEY')) secrets.ANTHROPIC_API_KEY = given('ANTHROPIC_API_KEY');
+  else if (have.has('ANTHROPIC_API_KEY')) notes.push('`ANTHROPIC_API_KEY`: bleibt wie im Worker gesetzt.');
+  else errors.push('AI_KEY');
+  if (given('GEMINI_API_KEY') || have.has('GEMINI_API_KEY')) {
+    notes.push('`GEMINI_API_KEY` wird nicht mehr genutzt (Guthaben nur mit Claude) und kann in GitHub und im Worker gelöscht werden.');
   }
-  if (missingAi.length === 2) errors.push('AI_KEY');
-  else for (const [n, tier] of missingAi) notes.push(`\`${n}\` fehlt: Stufe ${tier} ist nicht verfügbar (die App blendet sie aus).`);
 
-  for (const n of ['INVITE_SIGNING_KEY', 'SYNC_ENCRYPTION_KEY']) {
+  for (const n of ['SYNC_ENCRYPTION_KEY']) {
     if (given(n)) secrets[n] = given(n);
-    // Früherer GitHub-Secret-Name (vor Session AD), vom Workflow als LEGACY_INVITE_SIGNING_KEY durchgereicht.
-    else if (n === 'INVITE_SIGNING_KEY' && given('LEGACY_INVITE_SIGNING_KEY')) {
-      secrets[n] = given('LEGACY_INVITE_SIGNING_KEY');
-      notes.push('`INVITE_SIGNING_KEY`: aus dem alten GitHub-Secret übernommen (darf gelöscht werden, sobald `INVITE_SIGNING_KEY` gesetzt ist).');
-    }
     else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
     else {
       secrets[n] = generators[n]();
@@ -92,10 +85,10 @@ export function plan(mode, env, existing) {
     notes.push(`Web-Kauf bleibt **aus**: \`STRIPE_SECRET_KEY\` muss im Modus ${mode} mit \`${wantLive ? 'sk_live_' : 'sk_test_'}\` beginnen ` +
       '(Testbetrieb nur Testmodus-Schlüssel, Produktion nur Live-Schlüssel).');
   } else notes.push(`Web-Kauf (Stripe${wantLive ? '' : ', Testmodus'}): beide Secrets vorhanden.`);
-  // AI Gateway (Protokolle, Kosten): neue Gateways verlangen immer ein Token. Ohne Token gehen Gemini/Anthropic direkt.
+  // AI Gateway (Protokolle, Kosten): neue Gateways verlangen immer ein Token. Ohne Token gehen Anfragen direkt an Anthropic.
   if (given('AI_GATEWAY_TOKEN')) secrets.AI_GATEWAY_TOKEN = given('AI_GATEWAY_TOKEN');
   else if (have.has('AI_GATEWAY_TOKEN')) notes.push('`AI_GATEWAY_TOKEN`: bleibt wie im Worker gesetzt.');
-  else notes.push('`AI_GATEWAY_TOKEN` fehlt (optional): Gemini und Anthropic laufen direkt, nicht über das AI Gateway ' +
+  else notes.push('`AI_GATEWAY_TOKEN` fehlt (optional): Anfragen gehen direkt an Anthropic, nicht über das AI Gateway ' +
     '(keine Gateway-Protokolle für diese Stufen, Auswertungen funktionieren). Anleitung: backend/README.md → „AI Gateway“.');
   const skipped = [];
   for (const n of OPTIONAL) {
@@ -104,15 +97,14 @@ export function plan(mode, env, existing) {
   }
   if (skipped.length) {
     notes.push(`Optional übersprungen (kein GitHub-Secret gesetzt): ${skipped.map((n) => `\`${n}\``).join(', ')}. ` +
-      'Das sind die Store-Prüfer für echte Käufe und Geräteprüfung für Einladungen; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
+      'Das sind die Store-Prüfer für echte Käufe; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
   }
   return { secrets, notes, errors, generated, webPurchase };
 }
 
 const MISSING_HELP = {
-  AI_KEY: 'Mindestens ein KI-Schlüssel für Guthaben: **`GEMINI_API_KEY`** (Gemini 3.6 Flash, Google AI Studio: aistudio.google.com/apikey, ' +
-    'beginnt mit `AIza`, Projekt mit Abrechnung) und/oder **`ANTHROPIC_API_KEY`** (Claude Sonnet 5.5, console.anthropic.com → API Keys, beginnt mit `sk-ant-`). ' +
-    'Am besten je mit Ausgabenlimit.',
+  AI_KEY: 'Der KI-Schlüssel für Guthaben: **`ANTHROPIC_API_KEY`** (Claude Haiku, Sonnet und Opus 5.5; console.anthropic.com → API Keys, ' +
+    'beginnt mit `sk-ant-`). Am besten mit Ausgabenlimit in der Anthropic-Konsole.',
 };
 
 if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {

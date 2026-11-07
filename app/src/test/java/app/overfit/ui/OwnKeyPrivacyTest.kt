@@ -61,7 +61,7 @@ private class PrivacyKey : DeviceKey {
 }
 
 /**
- * Guarantee: with an own API key and without switching on credit, invites, the AI chat connection or a short-code QR,
+ * Guarantee: with an own API key and without switching on credit, the AI chat connection or a short-code QR,
  * the app makes **zero** requests to the overfit backend. A backend URL is configured on purpose and every request
  * of every HttpClient (backend and providers) goes through one counting engine.
  */
@@ -87,10 +87,10 @@ class OwnKeyPrivacyTest {
         requests += "${req.url.host} ${req.method.value} ${req.url.encodedPath}"
         val body = if (req.url.host == backendHost) {
             when (req.url.encodedPath) {
-                "/v1/config" -> """{"currency":"EUR","unit":"micro-euro","markupBp":800,"storeFeeBp":1500,"models":{},"maxTokensCap":8192,"packages":[],"invite":{"starterReviews":5,"rewardReviews":5,"tokenTtlSec":45,"monthlyLimitPerInviter":10,"expiryDays":180}}"""
+                "/v1/config" -> """{"currency":"EUR","unit":"micro-euro","markupBp":800,"storeFeeBp":1500,"models":{},"maxTokensCap":8192,"packages":[]}"""
                 "/v1/chat/inbox" -> """{"items":[]}"""
                 "/v1/chat" -> """{"enabled":false,"photos":false,"connections":[]}"""
-                else -> """{"deviceId":"d","balanceMicro":0,"expiring":[]}"""
+                else -> """{"deviceId":"d","balanceMicro":0}"""
             }
         } else "{}"
         respond(body, HttpStatusCode.OK, json)
@@ -142,6 +142,17 @@ class OwnKeyPrivacyTest {
         compose.onNodeWithText("Senden").performScrollTo().performClick()
         waitFor("Direkt vom Anbieter.")
         compose.runOnIdle { backDispatcher!!.onBackPressed() } // the chat covers the tab bar
+        waitFor("Prompts & Vorlagen")
+        // Coach settings → "Abrechnung": the chat request is listed from the device, the server log is not asked.
+        compose.onNodeWithText("Coach-Einstellungen").performScrollTo().performClick()
+        compose.onNodeWithText("Abrechnung").performScrollTo().performClick()
+        waitFor("über deinen Schlüssel · ok")
+        compose.onNodeWithText("Chat").assertExists()
+        compose.waitForIdle()
+        assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)
+        compose.runOnIdle { backDispatcher!!.onBackPressed() }
+        waitFor("Coach-Einstellungen")
+        compose.runOnIdle { backDispatcher!!.onBackPressed() }
         waitFor("Prompts & Vorlagen")
         compose.onNodeWithTag("tab:PROFILE").performClick()
         waitFor("Guthaben")

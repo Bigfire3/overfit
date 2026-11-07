@@ -26,8 +26,6 @@ class AndroidHaptics(context: Context) : Haptics {
             if (Build.VERSION.SDK_INT >= 29) VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
             else VibrationEffect.createOneShot(TICK_MS, VibrationEffect.DEFAULT_AMPLITUDE)
         HapticPattern.RestEnd -> waveform(REST_END_TIMINGS, REST_END_AMPLITUDES, amplitudes)
-        HapticPattern.Reveal -> waveform(HEARTBEAT_TIMINGS, HEARTBEAT_AMPLITUDES, amplitudes)
-        HapticPattern.RevealFinish -> VibrationEffect.createOneShot(FINISH_MS, if (amplitudes) 255 else VibrationEffect.DEFAULT_AMPLITUDE)
     }
 
     private fun waveform(timings: LongArray, amps: IntArray, amplitudes: Boolean): VibrationEffect =
@@ -38,9 +36,5 @@ class AndroidHaptics(context: Context) : Haptics {
         /** Three short pulses. Also used for the notification channel at the end of a rest. */
         val REST_END_TIMINGS = longArrayOf(0, 120, 100, 120, 100, 120)
         val REST_END_AMPLITUDES = intArrayOf(0, 255, 0, 255, 0, 255)
-        /** Heartbeat: a lighter and a stronger beat. */
-        val HEARTBEAT_TIMINGS = longArrayOf(0, 60, 110, 80)
-        val HEARTBEAT_AMPLITUDES = intArrayOf(0, 160, 0, 255)
-        const val FINISH_MS = 220L
     }
 }

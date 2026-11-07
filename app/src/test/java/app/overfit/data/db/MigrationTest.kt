@@ -386,6 +386,46 @@ class MigrationTest {
         }
     }
 
+    /** v10 → v11: new request log `ai_request` (pure addition); workouts and body weights stay; the log can be written and read. */
+    @Test
+    fun migration10to11KeepsDataAndAddsEmptyRequestLog() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v10 = helper.createDatabase(10)
+        v10.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt, sauna) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1000, 5000, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 5000, 0)",
+        )
+        v10.close()
+        // Validates the migrated schema against schemas/.../11.json.
+        val v11 = helper.runMigrationsAndValidate(11, OverfitDatabase.MIGRATIONS.toList())
+        try {
+            assertEquals(1L, v11.count("workout_session"))
+            assertEquals(0L, v11.count("ai_request"))
+        } finally {
+            v11.close()
+        }
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            assertEquals("Push", db.workoutDao().get("w1")!!.session.name)
+            val log = db.aiRequestDao()
+            log.upsert(AiRequestEntity("r1", 2000, 1200, "FUEL", "review", "claude-sonnet-5-5", "claude-sonnet-5-5", "OK", inputTokens = 900, outputTokens = 100, costMicro = 3000, serverId = 9))
+            assertEquals(3000L, log.byServerId(9)!!.costMicro)
+            assertEquals(listOf("r1"), log.observeRecent().first().map { it.id })
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

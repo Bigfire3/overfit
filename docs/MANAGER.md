@@ -28,7 +28,7 @@ Für die Claude-Session, die Fabians Feedback koordiniert. Stand: 7.11.2026. Kei
 - Vor jedem Merge ein Sonnet-Gegencheck (CLAUDE.md).
 
 ## Offene To-dos für Fabian (bei Gelegenheit erinnern)
-- Secret `GEMINI_API_KEY` (Gemini Flash ist Standardmodell und Modell des Einladungsbonus; ohne Schlüssel nicht verfügbar). Kostet Geld, seine Entscheidung.
+- Secret `GEMINI_API_KEY` (seit 7.11.2026 nicht mehr nötig: Guthaben nur noch über Claude; Einladungen entfernt). Kostet Geld, seine Entscheidung.
 - Repo-Variable `BACKEND_DEPLOY_MODE=test` für automatische Backend-Deploys.
 - Stripe-Testkonto + Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (später Live-Varianten).
 - Apple Developer (99 €/Jahr) und TestFlight-Secrets laut README „iPhone: TestFlight“.
@@ -40,7 +40,7 @@ AF #58 Feedback-Runde 4 · #59 Name „Overfit“ · AG #60 Ticken, nicht wegwis
 
 ## Geplant, noch nicht beauftragt: Coach-Tab als Chat (Stand 7.11.)
 Fabian will das später umsetzen lassen. Vorschlag des Managers (6.11.) plus Fabians Festlegungen:
-- Coach-Tab = schlichter Chat: oben Modell-Auswahl-Chip, Verlauf (frühere Chats), neuer Chat; Mitte Nachrichten; unten Eingabe mit „+“ für Kontext und Senden. Keine Vorschlagskacheln. Alles andere (KI-Zugang, Guthaben, Einladen, Standardmodell, automatische Auswertung, Coach-Profil, Story) wandert in die Einstellungen.
+- Coach-Tab = schlichter Chat: oben Modell-Auswahl-Chip, Verlauf (frühere Chats), neuer Chat; Mitte Nachrichten; unten Eingabe mit „+“ für Kontext und Senden. Keine Vorschlagskacheln. Alles andere (KI-Zugang, Guthaben, Standardmodell, automatische Auswertung, Coach-Profil, Story) wandert in die Einstellungen.
 - **Fabian:** Das Profil wird **immer** mitgeschickt (nicht erst hinzufügen müssen). Bilder wählt man selbst aus. Das (aktuelle) Workout/Training ist schon **automatisch angehängt**.
 - „Profil“ = das Coach-Profil (Ziel, Niveau, Einschränkungen, Equipment, Trainingstage). Es geht nur an den gewählten KI-Weg (eigener Schlüssel direkt zum Anbieter, sonst Backend). Die Datenschutzregeln gelten unverändert (eigener Schlüssel ohne Opt-in: null Backend-Anfragen).
 - Entwurf System-Prompt (vom 6.11.):

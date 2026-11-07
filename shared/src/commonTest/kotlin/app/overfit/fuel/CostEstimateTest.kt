@@ -4,6 +4,7 @@ import app.overfit.domain.Language
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CostEstimateTest {
@@ -72,5 +73,11 @@ class CostEstimateTest {
         }
         assertEquals("gemini-3.6-flash", modelOfTier("standard"))
         assertFalse(modelOfTier("quatsch") != null)
+        // Bookings since the Claude switch (7.11.2026) name the Claude model of their tier, older ones the old table.
+        assertEquals("claude-sonnet-5-5", modelOfTierAt("standard", CLAUDE_ONLY_SINCE_SEC))
+        assertEquals("claude-opus-5-5", modelOfTierAt("pro", CLAUDE_ONLY_SINCE_SEC + 60))
+        assertEquals("claude-haiku-5-5", modelOfTierAt("lite", CLAUDE_ONLY_SINCE_SEC))
+        assertEquals("gemini-3.6-flash", modelOfTierAt("standard", CLAUDE_ONLY_SINCE_SEC - 1))
+        assertNull(modelOfTierAt("quatsch", CLAUDE_ONLY_SINCE_SEC))
     }
 }

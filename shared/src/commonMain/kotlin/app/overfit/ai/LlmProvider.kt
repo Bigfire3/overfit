@@ -180,9 +180,10 @@ class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
         val tiers = tiers() ?: return wanted
         if (tiers.isEmpty()) return LEGACY_MODEL
         val order = when (wanted) {
-            TIER_LITE -> listOf(TIER_LITE, TIER_STANDARD, TIER_PRO)
-            TIER_PRO -> listOf(TIER_PRO, TIER_STANDARD)
-            else -> listOf(TIER_STANDARD, TIER_PRO)
+            TIER_LITE -> listOf(TIER_LITE, TIER_STANDARD)
+            TIER_PRO -> listOf(TIER_PRO, TIER_STANDARD, TIER_LITE)
+            // Never silently up to the expensive model.
+            else -> listOf(TIER_STANDARD, TIER_LITE)
         }
         return order.firstOrNull { tiers[it]?.available == true } ?: wanted
     }

@@ -1,6 +1,6 @@
 name: Backend deployen
 
-# Deploy-Knopf für das Cloudflare-Backend (Guthaben, Einladungen, KI-Chat): Actions → „Backend deployen“ → Run workflow.
+# Deploy-Knopf für das Cloudflare-Backend (Guthaben, KI-Chat): Actions → „Backend deployen“ → Run workflow.
 # Anleitung im Browser: backend/README.md → „Deployment ohne Terminal“.
 # Alles ist idempotent: D1-Datenbank, R2-Bucket und AI Gateway werden nur angelegt, wenn sie fehlen; Migrationen laufen nur, wenn neu.
 
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Betrieb: test (Testserver, keine Geräteprüfung, Test-Guthaben) oder production (echt, mit Store-Prüfung)'
+        description: 'Betrieb: test (Testserver, Test-Guthaben per credit_eur) oder production (echt, mit Store-Prüfung)'
         type: choice
         options: [test, production]
         default: test
@@ -42,24 +42,20 @@ jobs:
       MODE: ${{ inputs.mode || vars.BACKEND_DEPLOY_MODE }}
       EVENT: ${{ github.event_name }}
       CURRENT_URL: ${{ vars.OVERFIT_BACKEND_URL }}
-      # Worker-Secrets (mindestens GEMINI_API_KEY oder ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
+      # Worker-Secrets (Pflicht: ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
+      # Nicht mehr genutzt (Guthaben nur mit Claude); nur für den Hinweis „kann gelöscht werden“.
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      # Optional: Token fürs AI Gateway (neue Gateways verlangen eins); ohne gehen Gemini/Anthropic direkt.
+      # Optional: Token fürs AI Gateway (neue Gateways verlangen eins); ohne gehen Anfragen direkt an Anthropic.
       AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
-      INVITE_SIGNING_KEY: ${{ secrets.INVITE_SIGNING_KEY }}
-      # Früherer Name (vor Session AD); wird übernommen, falls INVITE_SIGNING_KEY fehlt.
-      LEGACY_INVITE_SIGNING_KEY: ${{ secrets.SPOT_SIGNING_KEY }}
       SYNC_ENCRYPTION_KEY: ${{ secrets.SYNC_ENCRYPTION_KEY }}
       ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
       GOOGLE_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
       GOOGLE_PLAY_PACKAGE_NAME: ${{ secrets.GOOGLE_PLAY_PACKAGE_NAME }}
-      PLAY_INTEGRITY_SERVICE_ACCOUNT: ${{ secrets.PLAY_INTEGRITY_SERVICE_ACCOUNT }}
       APPLE_IAP_KEY: ${{ secrets.APPLE_IAP_KEY }}
       APPLE_IAP_KEY_ID: ${{ secrets.APPLE_IAP_KEY_ID }}
       APPLE_IAP_ISSUER_ID: ${{ secrets.APPLE_IAP_ISSUER_ID }}
       APPLE_BUNDLE_ID: ${{ secrets.APPLE_BUNDLE_ID }}
-      APPLE_APP_ATTEST_TEAM_ID: ${{ secrets.APPLE_APP_ATTEST_TEAM_ID }}
       # Web-Kauf über Stripe (optional; fehlt einer, bleibt der Web-Kauf aus). Testbetrieb: sk_test_…, Produktion: sk_live_….
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
@@ -249,8 +245,6 @@ jobs:
           npx wrangler secret list --format json -c wrangler.generated.jsonc > "$RUNNER_TEMP/existing.json" 2>/dev/null || echo '[]' > "$RUNNER_TEMP/existing.json"
           node scripts/deploy-secrets.mjs "$MODE" "$RUNNER_TEMP/existing.json" "$RUNNER_TEMP/secrets.json" "$GITHUB_STEP_SUMMARY"
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json" -c wrangler.generated.jsonc
-          # Alten Secret-Namen im Worker aufräumen (seit Session AD heißt er INVITE_SIGNING_KEY).
-          if grep -q '"SPOT_SIGNING_KEY"' "$RUNNER_TEMP/existing.json"; then npx wrangler secret delete SPOT_SIGNING_KEY --force -c wrangler.generated.jsonc || true; fi
           if [ -f "$RUNNER_TEMP/secrets.json.admin" ]; then echo "ADMIN_SECRET_FILE=$RUNNER_TEMP/secrets.json.admin" >> "$GITHUB_ENV"; fi
           rm -f "$RUNNER_TEMP/secrets.json"
 
@@ -309,7 +303,7 @@ jobs:
             echo "### Test-Guthaben"
             echo
             echo "$CREDIT_EUR € auf alle bestehenden Konten gebucht: $(echo "$BODY" | jq -r '"\(.credited) von \(.accounts) Konten, zusammen \(.totalMicro / 1000000) € (Obergrenze insgesamt \(.capMicro / 1000000) €)"')."
-            echo "Die Konten entstehen, sobald die App zum ersten Mal das Guthaben öffnet (neue Konten bekommen 1 € automatisch)."
+            echo "Die Konten entstehen, sobald die App zum ersten Mal das Guthaben öffnet. Neue Konten starten mit 0 €; Guthaben läuft nie ab."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -340,10 +334,10 @@ jobs:
             fi
             echo
             if [ "$MODE" = "test" ]; then
-              echo "**Testbetrieb:** keine Geräteprüfung, neue Konten bekommen 1 € Test-Guthaben, niedrige Limits, die App zeigt „Testserver“ unter Guthaben. Mehr Test-Guthaben: diesen Workflow mit \`credit_eur\` starten."
+              echo "**Testbetrieb:** neue Konten starten mit 0 € (Test-Guthaben mit diesem Workflow und \`credit_eur\`), niedrige Limits, die App zeigt „Testserver“ unter Guthaben. Mehr Test-Guthaben: diesen Workflow mit \`credit_eur\` starten."
               echo "Für den echten Betrieb später mit \`mode = production\` deployen (eigener Worker und eigene Datenbank, die Adresse ändert sich dann)."
             else
-              echo "**Produktion:** Käufe und die Geräteprüfung für Einladungen brauchen die Store-Prüfer (Play/Apple), solange sind Käufe und Einladungen hier abgeschaltet (siehe backend/README.md)."
+              echo "**Produktion:** Store-Käufe brauchen die Store-Prüfer (Play/Apple), solange sind sie hier abgeschaltet (siehe backend/README.md)."
             fi
             echo
             echo "Beim nächsten Mal dauert dieser Lauf kürzer: Datenbank und Bucket sind da, nur Migrationen und Code werden aktualisiert."

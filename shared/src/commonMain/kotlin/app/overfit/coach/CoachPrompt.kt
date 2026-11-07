@@ -36,15 +36,25 @@ data class CoachPrompt(
     val maxTokens: Int? = null,
     /** Earlier turns (coach chat), oldest first; they go before [user]. Empty for one-shot requests. */
     val history: List<PromptTurn> = emptyList(),
-    /**
-     * True for a coach review (workout evaluation). Through the credit backend, reviews on the cheapest image model
-     * first use gifted reviews (invite bonus); chat and other features always pay from the credit.
-     */
+    /** True for a coach review (workout evaluation). */
     val review: Boolean = false,
+    /** What the request is for (request log, credit backend). Null = derived: [review] → REVIEW, else CHAT. */
+    val purpose: AiPurpose? = null,
 ) {
+    val effectivePurpose: AiPurpose get() = purpose ?: if (review) AiPurpose.REVIEW else AiPurpose.CHAT
+
     val outputSchema: JsonObject get() = schema ?: CoachSchema.schema
     val outputSchemaName: String get() = schemaName ?: CoachSchema.NAME
     val outputMaxTokens: Int get() = maxTokens ?: CoachModels.MAX_TOKENS
+}
+
+/** Purpose of an AI request; [wire] goes to the credit backend (`overfit.purpose`) and into the request log. */
+enum class AiPurpose(val wire: String) {
+    REVIEW("review"), CHAT("chat"), AUTOFILL("autofill"), PLAN("plan"), OTHER("other");
+
+    companion object {
+        fun of(wire: String?): AiPurpose = entries.firstOrNull { it.wire == wire } ?: OTHER
+    }
 }
 
 /** Everything the request is built from. Collected by [CoachService] from database, store and files. */

@@ -2,6 +2,7 @@ package app.overfit.ui.coach
 
 import app.overfit.ai.ProviderId
 import app.overfit.ai.Providers
+import app.overfit.coach.asSink
 import app.overfit.coach.AnthropicCoach
 import app.overfit.coach.CoachAccess
 import app.overfit.coach.CoachPhotoLoader
@@ -34,14 +35,18 @@ internal fun createCoach(
     transportOverride: ((ProviderId) -> CoachTransport)?,
 ): CoachService {
     val transports = mutableMapOf<ProviderId, CoachTransport>()
-    fun transport(id: ProviderId): CoachTransport = transportOverride?.invoke(id) ?: transports.getOrPut(id) {
-        when (id) {
+    val log = data.database.aiRequestDao().asSink()
+    // Every request goes into the request log ("Abrechnung"), whatever the provider.
+    fun transport(id: ProviderId): CoachTransport = transportOverride?.let { app.overfit.coach.LoggingTransport(it(id), log, clock) }
+        ?: transports.getOrPut(id) {
+        val inner = when (id) {
             ProviderId.ANTHROPIC -> AnthropicCoach(providers.http, store::apiKey)
             ProviderId.OPENAI -> OpenAiCoach(providers.http, store::apiKey)
             ProviderId.OPENROUTER -> OpenRouterCoach(providers.http, store::apiKey)
             ProviderId.FUEL -> FuelCoach(providers.fuel)
             ProviderId.GEMINI -> GeminiCoach(providers.http, store::apiKey)
         }
+        app.overfit.coach.LoggingTransport(inner, log, clock)
     }
     return CoachService(
         dao = data.database.coachDao(),

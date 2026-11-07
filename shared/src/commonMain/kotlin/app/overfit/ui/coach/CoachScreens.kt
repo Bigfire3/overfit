@@ -588,7 +588,7 @@ fun CoachMemoryScreen(coach: CoachService, onBack: () -> Unit) {
 }
 
 @Composable
-fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
+fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit, onRequestLog: (() -> Unit)? = null) {
     val c = LocalCoachStrings.current
     val t = LocalStrings.current
     val settings by coach.settings.state.collectAsState()
@@ -619,6 +619,11 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
             }
             Hint(c.modelHint(app.overfit.coach.CoachModels.default(provider)))
         }
+        // Every AI request with time, model, tokens and cost (own key: only on this device, no backend request).
+        if (onRequestLog != null) {
+            Spacer(Modifier.height(Space.m))
+            Panel { ListRow(app.overfit.i18n.requestLogStringsFor(app.overfit.i18n.LocalFuelStrings.current.language).title, onClick = onRequestLog) }
+        }
         PanelSection(c.sendPhotos) {
             app.overfit.ui.components.SwitchRow(c.sendPhotos, settings.sendPhotos, onCheckedChange = coach.settings::setSendPhotos)
         }
@@ -642,8 +647,8 @@ fun CoachSettingsScreen(coach: CoachService, onBack: () -> Unit) {
 internal fun AnswerCostLine(c: CoachStrings, language: app.overfit.domain.Language, cost: Long, balance: Long?, served: String?, fallbackFrom: String?) {
     val model = served?.let { app.overfit.fuel.modelLabel(it) }
     val f = app.overfit.i18n.LocalFuelStrings.current
-    // Cost is credit used (never a price); 0 = paid with a gifted review (invite bonus).
-    val money = if (cost == 0L) f.answerGifted else f.creditAmount(app.overfit.fuel.formatCost(cost, language))
+    // Cost is credit used (never a price).
+    val money = f.creditAmount(app.overfit.fuel.formatCost(cost, language))
     val line = c.answerInfo(model, money, balance?.let { formatEuro(it, language) })
     Text(line, style = Theme.type.caption, tone = Tone.Muted)
     if (served != null && fallbackFrom != null) {
@@ -668,13 +673,13 @@ private fun FuelQuality(coach: CoachService, tier: String) {
     val cfg = config
     val tiers = cfg?.tiers
     if (cfg == null) { Text(app.overfit.i18n.LocalFuelStrings.current.loading, tone = Tone.Muted); return }
-    val offered = listOf(app.overfit.ai.TIER_STANDARD, app.overfit.ai.TIER_PRO).mapNotNull { id -> tiers?.get(id)?.takeIf { it.available }?.let { id to it } }
+    val offered = listOf(app.overfit.ai.TIER_LITE, app.overfit.ai.TIER_STANDARD, app.overfit.ai.TIER_PRO).mapNotNull { id -> tiers?.get(id)?.takeIf { it.available }?.let { id to it } }
     if (offered.isEmpty()) return
     if (offered.size == 1) {
         Text(c.modelFixed(offered[0].second.label), tone = Tone.Muted)
         // The one model answers whatever is stored: keep the stored choice in sync.
     }
-    val selected = offered.firstOrNull { it.first == tier } ?: offered.first()
+    val selected = offered.firstOrNull { it.first == tier } ?: offered.firstOrNull { it.first == app.overfit.ai.TIER_STANDARD } ?: offered.first()
     fun cost(info: app.overfit.fuel.FuelTierInfo, task: app.overfit.fuel.FuelTask) =
         app.overfit.fuel.CostEstimate.micro(info, cfg.markupBp, task, cfg.usageProfiles)
     if (offered.size > 1) Panel {
