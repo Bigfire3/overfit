@@ -32,6 +32,8 @@ data class FinishedEdit(
 
     fun removeSet(setId: String) = copy(workout = workout.removeSet(setId))
 
+    /** Name of this training only (the saved workout keeps its name); empty is kept while typing, saving keeps the old one. */
+    fun withName(text: String) = copy(workout = workout.withName(text.take(80)))
     fun withNote(text: String) = copy(note = text.take(2000))
     fun withFeeling(value: Int?) = copy(feeling = value?.coerceIn(1, 5))
     fun withSauna(value: Boolean) = copy(sauna = value)

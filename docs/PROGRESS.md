@@ -15,6 +15,23 @@
 | 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Letzte Werte im Workout, Trainings umbenennen (7.11.)
+**Erledigt:** In einem gespeicherten Workout klappt ein Tipp auf eine Übung die Karte auf: „Letztes Mal · Datum“ und jeder Satz
+wie eingetragen (Gewicht × Wdh., Zeit … je Tracking-Typ). Bevorzugt aus diesem Workout, sonst „Letztes Mal in einem anderen
+Workout“; nie trainiert: „Noch nicht trainiert“. Tipp aufs Bild öffnet weiter die Übungsdetails. Vergangene Trainings lassen sich
+umbenennen: In der Trainingsdetail-Ansicht auf den Namen tippen (oder Stift) → Name oben ändern → Speichern. Nur das Training wird
+umbenannt, das Workout behält seinen Namen. Keine DB-Migration nötig (Trainings hatten schon ein eigenes Namensfeld). Details in
+DECISIONS.md. Tests: `LastTimeAndRenameTest` (ganze App), `WorkoutEditRepositoryTest`, `BackupTest`. Screenshots:
+`docs/screenshots/letzte-werte-umbenennen/`.
+
+### Bitte auf dem Handy testen (Letzte Werte, Umbenennen)
+1. Workouts → ein Workout öffnen, das du schon trainiert hast → auf eine Übung (Name, nicht Bild) tippen: Karte klappt auf mit Datum
+   und deinen Sätzen vom letzten Mal; nochmal tippen klappt zu. Bild antippen öffnet weiter die Übungsdetails.
+2. Eine Übung, die du nur in einem anderen Workout gemacht hast: „Letztes Mal in einem anderen Workout · Datum“. Nie gemacht: „Noch nicht trainiert“.
+3. „Direkt starten“, ein paar Sätze, beenden. Kalender → Tag → Training öffnen → auf den Namen tippen → Name ändern → Speichern:
+   Detail, Tagesansicht und Kalender zeigen den neuen Namen; das gespeicherte Workout heißt weiter wie vorher.
+4. Bearbeiten ohne Namensänderung bzw. Name ganz löschen und speichern: Der alte Name bleibt.
+
 ## Trainings-Benachrichtigung rot/grün (6.11.)
 **Erledigt:** Während des ganzen Trainings gibt es jetzt eine Benachrichtigung (Foreground-Service): grün im Satz (Übung,
 „Satz 2/4 · 80 kg × 5“, Trainingszeit, „Satz fertig“), rot in der Pause (Countdown, „Nächste: …“, +15 s, Überspringen).

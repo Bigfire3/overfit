@@ -105,6 +105,23 @@ class BackupTest {
     }
 
     @Test
+    fun renamedTrainingKeepsItsNameThroughExportAndRestore() = runTest {
+        fill()
+        val finished = data.workouts.getFinished("w1")!!
+        assertTrue(data.workouts.updateFinished(finished.workout.withName("Brust Montag"), finished.note, finished.feeling, finished.sauna))
+        val file = backup.export()
+
+        data.resetAll()
+        store.resetAll()
+        backup.restore(backup.preview(file).getOrThrow())
+
+        assertEquals("Brust Montag", data.workouts.getFinished("w1")!!.workout.name)
+        assertEquals("Brust Montag", data.workouts.history.first().single().name)
+        // Only the training was renamed, the saved workout keeps its name.
+        assertEquals(listOf("Push"), data.templates.templates.first().map { it.name })
+    }
+
+    @Test
     fun photoWithoutWorkoutSurvivesExportAndImport() = runTest {
         val photo = data.workouts.addPhoto(null, byteArrayOf(5, 4, 3), takenAt = 33_000)
         val file = backup.export()

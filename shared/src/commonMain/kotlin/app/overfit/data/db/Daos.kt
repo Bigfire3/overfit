@@ -185,6 +185,24 @@ interface WorkoutDao {
     )
     suspend fun lastCompletedSets(exerciseId: String): List<SetEntryEntity>
 
+    /**
+     * The last finished performance of [exerciseId] with at least one completed set; with [templateId] only within
+     * trainings of that saved workout. Feeds "last time" in the workout plan (and, via [lastCompletedSets], the
+     * running workout).
+     */
+    @Query(
+        """SELECT se2.id AS sessionExerciseId, ws.startedAt AS startedAt FROM session_exercise se2
+           JOIN workout_session ws ON ws.id = se2.sessionId
+           WHERE se2.exerciseId = :exerciseId AND ws.status = 'FINISHED'
+             AND (:templateId IS NULL OR ws.templateId = :templateId)
+             AND EXISTS (SELECT 1 FROM set_entry s2 WHERE s2.sessionExerciseId = se2.id AND s2.completed = 1)
+           ORDER BY ws.startedAt DESC, se2.position DESC LIMIT 1""",
+    )
+    suspend fun lastPerformance(exerciseId: String, templateId: Long?): LastPerformanceRow?
+
+    @Query("SELECT * FROM set_entry WHERE sessionExerciseId = :sessionExerciseId AND completed = 1 ORDER BY position")
+    suspend fun completedSetsOf(sessionExerciseId: String): List<SetEntryEntity>
+
     // --- History (phase 3) ---------------------------------------------------------------------
 
     @Query(
@@ -280,3 +298,6 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_photo ORDER BY takenAt")
     suspend fun allPhotos(): List<WorkoutPhotoEntity>
 }
+
+/** Where an exercise was done last: the exercise entry of that training and when it started. */
+data class LastPerformanceRow(val sessionExerciseId: String, val startedAt: Long)

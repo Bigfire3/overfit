@@ -33,7 +33,7 @@ import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
-import app.overfit.ui.components.Title
+import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Edit a finished training afterwards: feeling, sauna, note and the sets (same inputs as during the
+ * Edit a finished training afterwards: name, feeling, sauna, note and the sets (same inputs as during the
  * workout; add, remove by swiping, check off). "Save" writes everything at once; back with changes
  * asks for a second back press (= discard), like the workout editor.
  */
@@ -114,7 +114,8 @@ fun WorkoutEditScreen(
         val d = draft ?: return@Screen
         Text(h.editTitle, tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
-        Title(d.workout.name)
+        // The name of this training (not of its saved workout): tap and type, like the workout editor.
+        BigInput(d.workout.name, { draft = draft?.withName(it) }, h.trainingNamePlaceholder, Modifier.fillMaxWidth())
         Spacer(Modifier.height(Space.s))
         Text(h.editHint, style = Theme.type.caption, tone = Tone.Muted)
 

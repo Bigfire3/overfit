@@ -10,7 +10,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
+import app.overfit.data.LastPerformance
+import app.overfit.ui.components.LineIcon
+import app.overfit.ui.components.PressScale
+import app.overfit.ui.components.pressScale
+import app.overfit.ui.history.localDateTime
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +78,8 @@ fun WorkoutPlanScreen(
     onDelete: () -> Unit,
     /** Tap on an exercise's image: its details (read only), like in the running workout. */
     onExerciseDetails: (String) -> Unit = {},
+    /** "Last time" of an exercise (preferably in this workout); null = never done. Shown when its card is opened. */
+    loadLast: suspend (exerciseId: String) -> LastPerformance? = { null },
 ) {
     val t = LocalStrings.current
     var template by remember(templateId) { mutableStateOf<Template?>(null) }
@@ -80,6 +94,14 @@ fun WorkoutPlanScreen(
         }
     }
     val w = template
+    // Loaded once per set of exercises (not on every edit of the values), so opening a card shows them right away.
+    val exerciseIds = w?.exercises?.map { it.exercise.id }?.distinct()
+    var last by remember(templateId) { mutableStateOf<Map<String, LastPerformance?>?>(null) }
+    LaunchedEffect(exerciseIds) {
+        if (exerciseIds != null) last = exerciseIds.associateWith {
+            try { loadLast(it) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { null }
+        }
+    }
     Screen(
         scroll = true,
         header = {
@@ -109,14 +131,56 @@ fun WorkoutPlanScreen(
         if (w.exercises.isEmpty()) Text(t.workoutPlanEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
         // One card per exercise, as in the running workout (image left, name, sets), only without input.
         else Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
-            w.exercises.forEach { PlanExerciseCard(it, unit, language) { onExerciseDetails(it.exercise.id) } }
+            w.exercises.forEachIndexed { i, e ->
+                key(i, e.exercise.id) {
+                    PlanExerciseCard(e, unit, language, last?.let { Loaded(it[e.exercise.id]) }) { onExerciseDetails(e.exercise.id) }
+                }
+            }
         }
     }
 }
 
+/** Wraps the loaded "last time" so that "loaded, never done" (null inside) differs from "still loading". */
+private class Loaded(val value: LastPerformance?)
+
+/**
+ * One exercise of the plan: image, name and targets. A tap opens the card and shows the sets from last time
+ * (date, every set as entered), a second tap closes it; the image still opens the exercise details.
+ */
 @Composable
-private fun PlanExerciseCard(e: TemplateExercise, unit: WeightUnit, language: Language, onDetails: () -> Unit) {
+private fun PlanExerciseCard(e: TemplateExercise, unit: WeightUnit, language: Language, last: Loaded?, onDetails: () -> Unit) {
     val t = LocalStrings.current
-    val values = e.sets.map { WorkoutFormat.values(it, e.exercise.trackingType, unit, language, t) }.filter { it.isNotEmpty() }.distinct()
-    Block { ExerciseCardHeader(e.exercise, listOf(listOf(t.setCount(e.sets.size)).plus(values).joinToString(" · ")), onDetails) }
+    val type = e.exercise.trackingType
+    val values = e.sets.map { WorkoutFormat.values(it, type, unit, language, t) }.filter { it.isNotEmpty() }.distinct()
+    var open by rememberSaveable { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    Block(
+        Modifier.pressScale(interaction, PressScale.card)
+            .clickable(interaction, indication = null, role = Role.Button, onClickLabel = t.showLastTime(e.exercise.name)) { open = !open },
+    ) {
+        ExerciseCardHeader(
+            e.exercise,
+            listOf(listOf(t.setCount(e.sets.size)).plus(values).joinToString(" · ")),
+            onDetails,
+            trailing = { LineIcon(if (open) Icon.ChevronUp else Icon.ChevronDown, size = 20.dp, color = Theme.colors.muted) },
+        )
+        if (open && last != null) {
+            val p = last.value
+            val sets = p?.sets?.map { WorkoutFormat.values(it, type, unit, language, t) }?.filter { it.isNotEmpty() }.orEmpty()
+            Column(Modifier.fillMaxWidth().padding(start = 48.dp + Space.m, top = Space.xs, bottom = Space.xs)) {
+                if (p == null || sets.isEmpty()) {
+                    Text(t.notTrainedYet, style = Theme.type.caption, tone = Tone.Muted)
+                } else {
+                    Text(t.lastTimeOn(t.date(localDateTime(p.startedAt).date), p.inThisWorkout), style = Theme.type.caption, tone = Tone.Muted)
+                    Spacer(Modifier.height(Space.xs))
+                    sets.forEachIndexed { i, v ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(t.setNumber(i + 1), Modifier.width(72.dp), style = Theme.type.caption, tone = Tone.Muted)
+                            Text(v, style = Theme.type.label)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
