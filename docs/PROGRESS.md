@@ -44,8 +44,8 @@ Coach-Anweisungen mit „Deine Ergänzung“, Gedächtnis, Auswertungen, Abrechn
 Grundanweisung (Personal Trainer, antwortet in der Sprache der Frage). Die Auswertung nach dem Training ist ein neuer Chat mit dem
 Training und „Werte mein Training aus“. DB v12 (Chat-Anhänge, Modell, Profil aus; Migration + Test). Details in DECISIONS.md.
 Screenshots: `docs/screenshots/coach-chat/`.
-**Offen:** Kamera-Kachel im „+“-Sheet (braucht Kamera-Zugriff per expect/actual, bis dahin nur Galerie); Fotos ohne Netz/Antwort
-werden nicht wie früher die Auswertung in einer Warteschlange gehalten, sondern zeigen „Erneut versuchen“.
+**Offen:** Kamera-Kachel im „+“-Sheet (braucht Kamera-Zugriff per expect/actual, bis dahin nur Galerie); eine Chat-Frage ohne Netz wartet nicht
+wie früher die Auswertung in einer Warteschlange, sondern zeigt „Erneut versuchen“.
 
 ### Bitte auf dem Handy testen (Coach-Chat)
 1. Coach-Tab: „Coach ⓘ“, rechts Liste und Stift; drei graue Vorschläge. Tipp auf einen Vorschlag setzt nur den Text ins Feld.
