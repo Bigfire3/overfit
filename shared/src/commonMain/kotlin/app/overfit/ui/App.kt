@@ -1076,8 +1076,11 @@ private fun AppScaffold(
             })
         }
         // A running workout that is not on screen (minimized) sits above the tab bar on every main screen.
-        if (current != null && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
-        if (current != null) {
+        // While the story is still on screen (last frames of closing), the bars stay hidden: they appear in the same
+        // frame the story disappears, never underneath it first.
+        val storyOnScreen = screens.any { it.destination.hasRoute(CoachStoryRoute::class) }
+        if (current != null && !storyOnScreen && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
+        if (current != null && !storyOnScreen) {
             TabBar(current) { tab -> nav.selectTab(tab) }
         }
     }
