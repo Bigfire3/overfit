@@ -160,8 +160,8 @@ val GermanCoach = CoachStrings(
     viewReview = "Coach-Auswertung ansehen",
     finishSend = "Senden",
     finishLater = "Später",
-    finishHint = "Bewertung, Tipps und Plan fürs nächste Mal. Ohne Netz wird später gesendet. Auswertung: Kalender → Tag → Training.",
-    finishNoAccess = "Für eine Coach-Auswertung: Profil → KI-Coach (eigener Key oder Guthaben). Eine Demo gibt es beim Training im Kalender.",
+    finishHint = "Der Coach wertet dein Training in einem neuen Chat im Coach-Tab aus. Ausschalten: Einstellungen → Coach.",
+    finishNoAccess = "Für eine Auswertung im Chat: Einstellungen → Coach → KI-Zugang (eigener Schlüssel oder Guthaben).",
     thinking = "Der Coach sieht sich dein Training an …",
     waitingForNetwork = "Wartet auf Verbindung",
     queuedHint = "Die Anfrage ist gespeichert und wird automatisch gesendet, sobald Overfit wieder online ist (beim Öffnen der App).",
@@ -252,13 +252,18 @@ val GermanCoach = CoachStrings(
     instructionsReset = "Standard wiederherstellen",
     instructionsSave = "Speichern",
     saved = "Gespeichert.",
-    defaultInstructions = """Du bist ein erfahrener, ehrlicher Kraft- und Calisthenics-Coach in der App Overfit.
-Regeln:
-- Plane realistische Steigerungen: meist +2,5 kg (Oberkörper) bzw. +2,5–5 kg (Beine) oder +1–2 Wiederholungen, wenn alle Sätze sauber geschafft wurden. Nicht geschaffte Sätze: Gewicht halten oder leicht senken.
+    defaultInstructions = """Du bist ein erfahrener, professioneller Personal Trainer und Kraft- und Athletiktrainer. Du betreust die Person in der App Overfit individuell.
+- Antworte immer in der Sprache, in der die Frage gestellt wurde.
+- Sei konkret, knapp und ehrlich. Nenne Zahlen (Gewicht, Wiederholungen, Sätze, Pausen, Häufigkeit), wo möglich, und begründe kurz.
+- Nutze nur die mitgeschickten Daten (Profil, Trainings, Workouts, Verlauf, Fotos). Erfinde nichts; frage gezielt nach, wenn Wichtiges fehlt.
+- Orientiere dich an Ziel, Niveau, Einschränkungen und Ausrüstung.
+- Progressive Überlastung mit Augenmaß: meist +2,5 kg (Oberkörper) bzw. +2,5–5 kg (Beine) oder +1–2 Wiederholungen, wenn alle Sätze sauber geschafft wurden. Nicht geschaffte Sätze: Gewicht halten oder leicht senken. Technik vor Gewicht, Erholung einplanen.
 - Erkenne Stagnation (3+ Einheiten ohne Fortschritt) und steuere gegen: Deload, andere Wiederholungsbereiche, Variation.
-- Berücksichtige Calisthenics-Progressionen (z. B. Band-Unterstützung reduzieren, schwierigere Variante), negative Gewichte bedeuten Unterstützung.
-- Berücksichtige Beschwerden und Vorlieben aus dem Gedächtnis. Keine medizinischen Diagnosen.
-- Kurz, konkret, motivierend, ohne Floskeln.""",
+- Berücksichtige Calisthenics-Progressionen (z. B. Band-Unterstützung reduzieren, schwierigere Variante); negative Gewichte bedeuten Unterstützung.
+- Bei Technik-Fotos konkret benennen, was gut ist und was zu korrigieren ist.
+- Keine medizinischen Diagnosen. Bei Schmerzen, Verletzungen, Schwindel oder Vorerkrankungen zu ärztlicher bzw. physiotherapeutischer Abklärung raten.
+- Workouts und Änderungen nur mit Übungen aus der mitgeschickten Liste und zusätzlich im Overfit-Format, damit die App sie übernehmen kann.
+- Motivierend, ohne Floskeln.""",
     demoSummary = { "Solides Training „$it“: Du hast fast alle geplanten Sätze geschafft und die Pausen eingehalten. So sähe eine echte Auswertung aus." },
     demoPositives = listOf("Alle Hauptsätze sauber durchgezogen", "Pausen gleichmäßig, kein Hetzen"),
     demoImprovements = listOf("Letzter Satz der ersten Übung fiel ab: Gewicht dort halten"),
@@ -292,8 +297,8 @@ val EnglishCoach = CoachStrings(
     viewReview = "View coach review",
     finishSend = "Send",
     finishLater = "Later",
-    finishHint = "Rating, tips and the plan for next time. Without network it is sent later. Review: Calendar → day → workout.",
-    finishNoAccess = "For a coach review: Profile → AI coach (own key or credit). A demo is at the workout in the calendar.",
+    finishHint = "The coach reviews your training in a new chat in the Coach tab. Switch off: Settings → Coach.",
+    finishNoAccess = "For a review in the chat: Settings → Coach → AI access (own key or credit).",
     thinking = "The coach is looking at your workout …",
     waitingForNetwork = "Waiting for connection",
     queuedHint = "The request is saved and will be sent automatically as soon as Overfit is online again (when you open the app).",
@@ -384,13 +389,18 @@ val EnglishCoach = CoachStrings(
     instructionsReset = "Restore default",
     instructionsSave = "Save",
     saved = "Saved.",
-    defaultInstructions = """You are an experienced, honest strength and calisthenics coach in the app Overfit.
-Rules:
-- Plan realistic progressions: usually +2.5 kg (upper body) or +2.5–5 kg (legs), or +1–2 reps, when all sets were completed cleanly. Missed sets: keep the weight or lower it slightly.
+    defaultInstructions = """You are an experienced, professional personal trainer and strength and conditioning coach. You coach this person individually in the app Overfit.
+- Always answer in the language the question was asked in.
+- Be concrete, brief and honest. Give numbers (weight, reps, sets, rest, frequency) where possible, with a short reason.
+- Only use the data sent along (profile, trainings, workouts, history, photos). Do not invent anything; ask specifically when something important is missing.
+- Take goal, level, limitations and equipment into account.
+- Progressive overload with judgement: usually +2.5 kg (upper body) or +2.5–5 kg (legs), or +1–2 reps, when all sets were completed cleanly. Missed sets: keep the weight or lower it slightly. Technique before weight; plan recovery.
 - Recognise stagnation (3+ sessions without progress) and counter it: deload, other rep ranges, variation.
 - Take calisthenics progressions into account (e.g. less band assistance, harder variation); negative weights mean assistance.
-- Respect complaints and preferences from the memory. No medical diagnoses.
-- Short, concrete, motivating, no filler.""",
+- For technique photos, name concretely what is good and what to correct.
+- No medical diagnoses. For pain, injuries, dizziness or pre-existing conditions, recommend seeing a doctor or physiotherapist.
+- Workouts and changes only with exercises from the list sent along, and additionally in the Overfit format so the app can apply them.
+- Motivating, without filler.""",
     demoSummary = { "Solid workout \"$it\": you completed almost all planned sets and kept your rests. This is what a real review looks like." },
     demoPositives = listOf("All main sets done cleanly", "Even rests, no rushing"),
     demoImprovements = listOf("The last set of the first exercise dropped off: keep the weight there"),

@@ -30,6 +30,10 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.draw.alpha
+import app.overfit.domain.WeightEntry
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -101,6 +105,11 @@ fun PhotosScreen(
     /** Start in the list view (remembered choice); [onListViewChange] stores each switch. */
     listView: Boolean = false,
     onListViewChange: (Boolean) -> Unit = {},
+    /** Body-weight log (oldest first, null while loading) and a tap on the weight card (opens today's entry). */
+    weights: List<WeightEntry>? = emptyList(),
+    onWeightToday: () -> Unit = {},
+    /** Opens the muscle map sheet (body icon in the title row); null hides the icon. */
+    onMuscles: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val p = t.photos
@@ -109,15 +118,29 @@ fun PhotosScreen(
     var selected by remember { mutableStateOf(listOf<String>()) }
     val photoList = photos.orEmpty()
     val historyList = history.orEmpty()
-    val days = remember(photos, history) { buildDiaryDays(photoList, historyList) }
+    val weightList = weights.orEmpty()
+    val days = remember(photos, history, weights) { buildDiaryDays(photoList, historyList, weightList) }
     val weekStart = DiaryCalendar.weekStart(language)
-    val months = remember(days, today) { DiaryCalendar.months(days.keys.minOrNull(), today) }
+    // Future months on top (newest first): the current month sits at index MONTHS_AHEAD, the list starts there.
+    val months = remember(days, today) { DiaryCalendar.months(days.keys.filter { it <= today }.minOrNull(), today, DiaryCalendar.MONTHS_AHEAD) }
+    val todayIndex = months.indexOf(today.year to today.monthNumber).coerceAtLeast(0)
+    val gridState = rememberLazyListState(initialFirstVisibleItemIndex = todayIndex)
+    val listState = rememberLazyListState()
+    val jumpScope = rememberCoroutineScope()
     val streak = remember(days, today, weekStart) {
         DiaryCalendar.streakWeeks(days.values.filter { it.workouts.isNotEmpty() }.map { it.date }, today, weekStart)
     }
     val valid = selected.filter { id -> photoList.any { it.photo.id == id } }
     val loaded = photos != null && history != null
-    val empty = loaded && photoList.isEmpty() && historyList.isEmpty()
+    // Calendar: the hint speaks of workouts and photos, a weight alone keeps it. List: weight days are rows, so not empty.
+    val empty = loaded && photoList.isEmpty() && historyList.isEmpty() && (!asList || weightList.isEmpty())
+    // "Today" only while away from it: grid not on the current month, list not at its top (newest day = today's end).
+    val awayFromToday by remember(asList, todayIndex) {
+        derivedStateOf {
+            if (asList) listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+            else gridState.firstVisibleItemIndex != todayIndex
+        }
+    }
 
     Screen(
         footer = if (selecting) {
@@ -135,8 +158,17 @@ fun PhotosScreen(
             if (selecting) {
                 SmallButton(p.cancel, onClick = { selecting = false; selected = emptyList() })
             } else {
+                // Icons only (48 dp each), so the row fits at 360 dp: at most three of today / compare / muscles /
+                // toggle at once – while "today" shows, compare waits (one tap back, or start comparing first and then
+                // scroll: the selection stays).
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!asList && photoList.size >= 2) SmallButton(p.compare, onClick = { selecting = true })
+                    if (loaded && awayFromToday) Box(Modifier.testTag(TODAY_BUTTON_TAG)) {
+                        HeaderIconButton(Icon.Today, t.bodyWeight.jumpTodayDescription, {
+                            jumpScope.launch { if (asList) listState.animateScrollToItem(0) else gridState.animateScrollToItem(todayIndex) }
+                        })
+                    }
+                    if (!asList && photoList.size >= 2 && !(loaded && awayFromToday)) HeaderIconButton(Icon.Compare, p.compare, { selecting = true })
+                    if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
                     // The icon shows the other view: list while the calendar is up, calendar while the list is up.
                     HeaderIconButton(
                         if (asList) Icon.Calendar else Icon.List,
@@ -147,6 +179,10 @@ fun PhotosScreen(
             }
         }
         Spacer(Modifier.height(Space.s))
+        if (weights != null && !selecting) {
+            WeightCard(weightList, today, unit, language, onWeightToday)
+            Spacer(Modifier.height(Space.s))
+        }
         if (empty) {
             // The calendar stays visible even without a single photo or workout.
             Text(if (asList) p.listEmpty else t.photosEmpty, tone = Tone.Muted)
@@ -156,7 +192,9 @@ fun PhotosScreen(
         }
         if (loaded) {
             DiaryStats(historyList.size, photoList.size, streak)
-            if (days.values.any { it.sauna }) DiaryLegend()
+            val anySauna = days.values.any { it.sauna }
+            val anyWeight = days.values.any { it.weightKg != null }
+            if (anySauna || anyWeight) DiaryLegend(anySauna, anyWeight)
             Spacer(Modifier.height(Space.s))
             if (!asList) {
                 WeekdayRow(weekStart)
@@ -165,7 +203,7 @@ fun PhotosScreen(
         }
         if (asList) {
             val listMonths = remember(days) { diaryListMonths(days) }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("diary-list")) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("diary-list"), state = listState) {
                 if (loaded) items(listMonths, key = { "${it.first.first}-${it.first.second}" }) { (ym, monthDays) ->
                     Text(p.monthHeader(ym.second, ym.first), Modifier.padding(top = Space.l, bottom = Space.s), style = Theme.type.title)
                     // One floating card per day.
@@ -176,9 +214,9 @@ fun PhotosScreen(
             }
             return@Screen
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag(DIARY_GRID_TAG), state = gridState, verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             if (loaded) items(months, key = { "${it.first}-${it.second}" }) { (year, month) ->
-                MonthBlock(year, month, weekStart, days, today, valid, selecting) { date, day ->
+                MonthBlock(year, month, weekStart, days, today, valid, selecting, unit, language) { date, day ->
                     val last = day?.photos?.lastOrNull()
                     if (selecting) {
                         if (last != null) {
@@ -208,20 +246,39 @@ private fun DiaryStats(workouts: Int, photos: Int, streakWeeks: Int) {
     }
 }
 
-/** Filled dot = workout, ring = sauna. Only shown once a sauna day exists. */
+/** Filled dot = workout, ring = sauna, short dash = body weight. Only shown once a sauna or weight day exists. */
 @Composable
-private fun DiaryLegend() {
+private fun DiaryLegend(sauna: Boolean, weight: Boolean) {
     val p = LocalStrings.current.photos
     Row(Modifier.fillMaxWidth().padding(bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).background(Theme.colors.foreground, CircleShape))
         Spacer(Modifier.width(Space.xs))
         Text(p.legendWorkout, style = Theme.type.caption, tone = Tone.Muted)
-        Spacer(Modifier.width(Space.m))
-        SaunaRing(8.dp, 1.5.dp)
-        Spacer(Modifier.width(Space.xs))
-        Text(p.legendSauna, style = Theme.type.caption, tone = Tone.Muted)
+        if (sauna) {
+            Spacer(Modifier.width(Space.m))
+            SaunaRing(8.dp, 1.5.dp)
+            Spacer(Modifier.width(Space.xs))
+            Text(p.legendSauna, style = Theme.type.caption, tone = Tone.Muted)
+        }
+        if (weight) {
+            Spacer(Modifier.width(Space.m))
+            WeightDash()
+            Spacer(Modifier.width(Space.xs))
+            Text(LocalStrings.current.bodyWeight.legend, style = Theme.type.caption, tone = Tone.Muted)
+        }
     }
 }
+
+/** Body-weight marker: a short muted dash under the day (no confusion with the workout dot or the sauna ring). */
+@Composable
+private fun WeightDash(modifier: Modifier = Modifier) {
+    Box(modifier.size(width = 12.dp, height = 2.dp).background(Theme.colors.muted, RoundedCornerShape(1.dp)))
+}
+
+/** Test tags: weight dash in a calendar day, the month grid, the "Today" button. */
+const val WEIGHT_MARKER_TAG = "diary-weight"
+const val DIARY_GRID_TAG = "diary-grid"
+const val TODAY_BUTTON_TAG = "diary-today"
 
 /** Sauna marker: a hollow ring (the workout is the filled dot). [fill] keeps it readable on a photo. */
 @Composable
@@ -255,6 +312,8 @@ private fun MonthBlock(
     today: LocalDate,
     selected: List<String>,
     selecting: Boolean,
+    unit: WeightUnit,
+    language: Language,
     onDay: (LocalDate, DiaryDay?) -> Unit,
 ) {
     val p = LocalStrings.current.photos
@@ -269,7 +328,7 @@ private fun MonthBlock(
             Row(Modifier.fillMaxWidth().padding(bottom = CELL_GAP), horizontalArrangement = Arrangement.spacedBy(CELL_GAP)) {
                 week.forEach { date ->
                     Box(Modifier.weight(1f)) {
-                        if (date != null) DayCell(date, days[date], date == today, date <= today, selected, selecting, onDay)
+                        if (date != null) DayCell(date, days[date], date == today, date <= today, selected, selecting, unit, language, onDay)
                     }
                 }
             }
@@ -286,19 +345,26 @@ private fun DayCell(
     tappable: Boolean,
     selected: List<String>,
     selecting: Boolean,
+    unit: WeightUnit,
+    language: Language,
     onDay: (LocalDate, DiaryDay?) -> Unit,
 ) {
     val p = LocalStrings.current.photos
     val photo = day?.photos?.lastOrNull()
     val training = day != null && day.workouts.isNotEmpty()
     val sauna = day != null && day.sauna
-    val desc = p.dayDescription(date.dayOfMonth, day?.photos?.size ?: 0, training, sauna)
+    val weightKg = day?.weightKg
+    val w = LocalStrings.current.bodyWeight
+    val desc = p.dayDescription(date.dayOfMonth, day?.photos?.size ?: 0, training, sauna) +
+        (weightKg?.let { w.dayDescription(app.overfit.domain.formatWeight(it, unit, language)) } ?: "")
     val shape = RoundedCornerShape(8.dp)
     val picked = photo != null && photo.photo.id in selected
     Column(
         Modifier
             .fillMaxWidth()
             .aspectRatio(0.62f)
+            // Future days: greyed out and not tappable (nothing to log there yet).
+            .then(if (!tappable) Modifier.alpha(0.5f) else Modifier)
             .then(if (isToday) Modifier.background(Theme.colors.surfacePressed, shape) else Modifier)
             .padding(2.dp)
             .semantics { contentDescription = desc }
@@ -310,7 +376,11 @@ private fun DayCell(
             style = Theme.type.caption,
             tone = if (photo != null || training) Tone.Muted else Tone.Faint,
         )
-        Spacer(Modifier.height(2.dp))
+        // Body weight: short dash right under the day number (belongs clearly to this day); the slot stays reserved
+        // so all cells line up.
+        Box(Modifier.fillMaxWidth().height(6.dp), contentAlignment = Alignment.Center) {
+            if (weightKg != null) WeightDash(Modifier.testTag(WEIGHT_MARKER_TAG))
+        }
         when {
             photo != null -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface)) {
                 AsyncImage(photo.photo.path, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -530,17 +600,26 @@ private fun DiaryListRow(day: DiaryDay, unit: WeightUnit, language: Language, on
     val p = LocalStrings.current.photos
     val h = LocalStrings.current.history
     val weekday = p.weekdaysShort[day.date.dayOfWeek.ordinal]
-    val title = if (day.workouts.isEmpty()) p.statPhotos(day.photos.size) else day.workouts.joinToString(", ") { it.name }
+    val w = LocalStrings.current.bodyWeight
+    val weight = day.weightKg?.let { app.overfit.domain.formatWeight(it, unit, language) }
+    val title = when {
+        day.workouts.isNotEmpty() -> day.workouts.joinToString(", ") { it.name }
+        day.photos.isNotEmpty() -> p.statPhotos(day.photos.size)
+        else -> w.title
+    }
     val ms = day.workouts.sumOf { w -> w.endedAt?.let { it - w.startedAt } ?: 0L }
     val sets = day.workouts.sumOf { it.completedSets }
     val volume = day.workouts.sumOf { it.volumeKg }
-    val meta = if (day.workouts.isEmpty()) null else listOfNotNull(
-        app.overfit.workout.WorkoutFormat.elapsed(ms).takeIf { ms > 0 },
-        h.setCount(sets),
+    val meta = listOfNotNull(
+        app.overfit.workout.WorkoutFormat.elapsed(ms).takeIf { ms > 0 && day.workouts.isNotEmpty() },
+        h.setCount(sets).takeIf { day.workouts.isNotEmpty() },
         formatVolume(volume, unit, language).takeIf { volume > 0 },
         h.sauna.takeIf { day.sauna },
-    ).joinToString(" · ")
-    val desc = p.dayDescription(day.date.dayOfMonth, day.photos.size, day.workouts.isNotEmpty(), day.sauna)
+        // Weight-only day: the title already says "Body weight", the meta line is just the value.
+        weight?.let { if (day.workouts.isEmpty() && day.photos.isEmpty()) it else w.listValue(it) },
+    ).joinToString(" · ").ifEmpty { null }
+    val desc = p.dayDescription(day.date.dayOfMonth, day.photos.size, day.workouts.isNotEmpty(), day.sauna) +
+        (weight?.let { w.dayDescription(it) } ?: "")
     val photo = day.photos.lastOrNull()
     FloatingCard(Modifier.testTag("diary-list-row").semantics(mergeDescendants = true) { contentDescription = "$desc, $title" }, onClick = onClick) {
     Row(

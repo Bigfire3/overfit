@@ -4,29 +4,61 @@
 //
 //   node scripts/deploy-secrets.mjs <test|production> <vorhandene-secrets.json> <ausgabe.json> <zusammenfassung.md>
 //
-// - KI-Schlüssel: GEMINI_API_KEY (Stufe standard) und ANTHROPIC_API_KEY (Stufe pro), je aus GitHub oder schon im Worker.
-//   Mindestens einer ist Pflicht, sonst Exit 1 mit Anleitung. Fehlt einer, ist die Stufe aus /v1/config nicht verfügbar.
-// - INVITE_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
-//   ein Zufallswert erzeugt. Fehlt INVITE_SIGNING_KEY, wird das alte GitHub-Secret (LEGACY_INVITE_SIGNING_KEY) übernommen. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
+// - KI-Anbieter (llm-routing.jsonc): Schlüssel je Anbieter (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY),
+//   aus GitHub oder schon im Worker; Workers AI braucht keinen. Die Voreinstellung kommt aus der Auswahlliste des Workflows
+//   (LLM_PRESET_INPUT, wird im Worker als LLM_PRESET gespeichert), sonst aus der Repo-Variable LLM_PRESET, sonst bleibt die im
+//   Worker gespeicherte, sonst `default` der Datei. Fehlt ein Schlüssel der gewählten Voreinstellung: Warnung, der Worker nimmt
+//   die nächste vollständige aus `fallbackOrder`. Ist keine vollständig: Exit 1 mit Anleitung.
+// - SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
+//   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
+//   Einladungen gibt es nicht mehr (7.11.2026): INVITE_SIGNING_KEY wird nicht mehr gebraucht.
 // - ADMIN_SECRET (nur Testbetrieb): wird bei jedem Lauf neu erzeugt, außer ein GitHub-Secret ist gesetzt; der Workflow nutzt ihn sofort.
 // - Web-Kauf (Stripe): STRIPE_SECRET_KEY (sk_test_… im Testbetrieb, sk_live_… in Produktion), STRIPE_WEBHOOK_SECRET (whsec_…).
 //   In Produktion haben STRIPE_LIVE_SECRET_KEY / STRIPE_LIVE_WEBHOOK_SECRET Vorrang (Test- und Live-Werte parallel in GitHub).
 //   Optional; fehlt einer (weder in GitHub noch im Worker) oder passt der Schlüssel nicht zum Modus, bleibt der Web-Kauf aus,
 //   mit Hinweis in der Zusammenfassung (kein Abbruch).
+// - AI_GATEWAY_TOKEN (optional): Token für das authentifizierte AI Gateway; ohne gehen Anfragen direkt an Anthropic.
 // - Optional (Play/Apple-Prüfer): nur gesetzt, wenn vorhanden; sonst Hinweis in der Zusammenfassung.
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 
+import ROUTING_JSON from '../src/routing.gen.json' with { type: 'json' };
+
+/** Routing-Tabelle (erzeugt aus llm-routing.jsonc). */
+export const ROUTING = ROUTING_JSON;
+export const PROVIDER_SECRETS = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', gemini: 'GEMINI_API_KEY', openrouter: 'OPENROUTER_API_KEY', 'workers-ai': null };
+const TIERS = ['lite', 'standard', 'pro'];
+
+/** Fehlende Secrets der ersten Modelle einer Voreinstellung (gleiche Regel wie src/routing.ts `presetComplete`). */
+export function missingFor(preset, ready, routing = ROUTING) {
+  const p = routing.presets[preset];
+  if (!p) return null;
+  const out = new Set();
+  for (const t of TIERS) {
+    const s = PROVIDER_SECRETS[routing.models[p.tiers[t].model].provider];
+    if (s && !ready.has(s)) out.add(s);
+  }
+  return [...out];
+}
+
+/** Welche Voreinstellung der Worker nutzen wird (wie src/routing.ts `choosePreset`). */
+export function choosePreset(wanted, ready, routing = ROUTING) {
+  const requested = routing.presets[wanted] ? wanted : routing.default;
+  const missing = missingFor(requested, ready, routing);
+  if (missing.length === 0) return { name: requested, requested, missing };
+  const alt = routing.fallbackOrder.find((n) => missingFor(n, ready, routing).length === 0);
+  return { name: alt ?? null, requested, missing };
+}
+
 export const STRIPE = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
 
 export const OPTIONAL = [
-  'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME', 'PLAY_INTEGRITY_SERVICE_ACCOUNT',
-  'APPLE_IAP_KEY', 'APPLE_IAP_KEY_ID', 'APPLE_IAP_ISSUER_ID', 'APPLE_BUNDLE_ID', 'APPLE_APP_ATTEST_TEAM_ID',
+  'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME',
+  'APPLE_IAP_KEY', 'APPLE_IAP_KEY_ID', 'APPLE_IAP_ISSUER_ID', 'APPLE_BUNDLE_ID',
 ];
 
 const b64u = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 export const generators = {
-  INVITE_SIGNING_KEY: () => randomBytes(48).toString('base64'),
   SYNC_ENCRYPTION_KEY: () => b64u(randomBytes(32)),
   ADMIN_SECRET: () => randomBytes(32).toString('hex'),
 };
@@ -37,26 +69,50 @@ export function plan(mode, env, existing) {
   const secrets = {};
   const notes = [];
   const errors = [];
+  const warnings = [];
   const generated = [];
+  let llm = null;
   const given = (n) => (env[n] ?? '').trim();
 
-  const aiKeys = { GEMINI_API_KEY: 'standard (Gemini)', ANTHROPIC_API_KEY: 'pro (Claude)' };
-  const missingAi = [];
-  for (const [n, tier] of Object.entries(aiKeys)) {
-    if (given(n)) secrets[n] = given(n);
-    else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
-    else missingAi.push([n, tier]);
+  // KI: Schlüssel je Anbieter übertragen (nur wenn in GitHub gesetzt); vorhandene im Worker bleiben.
+  const ready = new Set();
+  for (const n of Object.values(PROVIDER_SECRETS).filter(Boolean)) {
+    if (given(n)) { secrets[n] = given(n); ready.add(n); }
+    else if (have.has(n)) ready.add(n);
   }
-  if (missingAi.length === 2) errors.push('AI_KEY');
-  else for (const [n, tier] of missingAi) notes.push(`\`${n}\` fehlt: Stufe ${tier} ist nicht verfügbar (die App blendet sie aus).`);
-
-  for (const n of ['INVITE_SIGNING_KEY', 'SYNC_ENCRYPTION_KEY']) {
-    if (given(n)) secrets[n] = given(n);
-    // Früherer GitHub-Secret-Name (vor Session AD), vom Workflow als LEGACY_INVITE_SIGNING_KEY durchgereicht.
-    else if (n === 'INVITE_SIGNING_KEY' && given('LEGACY_INVITE_SIGNING_KEY')) {
-      secrets[n] = given('LEGACY_INVITE_SIGNING_KEY');
-      notes.push('`INVITE_SIGNING_KEY`: aus dem alten GitHub-Secret übernommen (darf gelöscht werden, sobald `INVITE_SIGNING_KEY` gesetzt ist).');
+  // Voreinstellung: Auswahlliste (wird im Worker gespeichert) → Repo-Variable → im Worker gespeichert → default.
+  const input = given('LLM_PRESET_INPUT');
+  const fromInput = input && input !== 'wie-bisher';
+  const variable = given('LLM_PRESET_VAR');
+  let wanted = ROUTING.default;
+  let source = 'Voreinstellung der Datei';
+  if (fromInput) { wanted = input; source = 'Auswahl beim Start'; }
+  else if (variable) { wanted = variable; source = 'Repo-Variable `LLM_PRESET`'; }
+  else if (have.has('LLM_PRESET')) { wanted = null; source = 'im Worker gespeichert'; }
+  if (wanted !== null) {
+    if (!ROUTING.presets[wanted]) {
+      errors.push('LLM_PRESET');
+      notes.push(`Voreinstellung \`${wanted}\` gibt es nicht (vorhanden: ${Object.keys(ROUTING.presets).map((n) => `\`${n}\``).join(', ')}).`);
+    } else {
+      secrets.LLM_PRESET = wanted;
+      const c = choosePreset(wanted, ready);
+      llm = { ...c, source };
+      if (!c.name) errors.push('AI_KEY');
+      // Produktion: zahlende Nutzer nicht still auf das Gratis-Modell schieben, nur weil ein Schlüssel fehlt.
+      else if (mode === 'production' && c.name === 'gratis' && wanted !== 'gratis') errors.push('AI_KEY');
+      else if (c.name !== wanted) {
+        warnings.push(`KI-Anbieter: „${wanted}“ (${source}) ist unvollständig, es fehlt ${c.missing.map((n) => `\`${n}\``).join(', ')}. ` +
+          `Der Server nutzt stattdessen **„${c.name}“**, bis der Schlüssel als GitHub-Secret eingetragen und neu deployt ist.`);
+      }
     }
+  } else {
+    // Gespeicherte Wahl ist hier unbekannt (Secrets sind nicht lesbar): mindestens eine Voreinstellung muss vollständig sein.
+    const any = Object.keys(ROUTING.presets).find((n) => missingFor(n, ready).length === 0);
+    if (!any) errors.push('AI_KEY');
+    llm = { name: null, requested: null, missing: [], source };
+  }
+  for (const n of ['SYNC_ENCRYPTION_KEY']) {
+    if (given(n)) secrets[n] = given(n);
     else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
     else {
       secrets[n] = generators[n]();
@@ -91,6 +147,11 @@ export function plan(mode, env, existing) {
     notes.push(`Web-Kauf bleibt **aus**: \`STRIPE_SECRET_KEY\` muss im Modus ${mode} mit \`${wantLive ? 'sk_live_' : 'sk_test_'}\` beginnen ` +
       '(Testbetrieb nur Testmodus-Schlüssel, Produktion nur Live-Schlüssel).');
   } else notes.push(`Web-Kauf (Stripe${wantLive ? '' : ', Testmodus'}): beide Secrets vorhanden.`);
+  // AI Gateway (Protokolle, Kosten): neue Gateways verlangen immer ein Token. Ohne Token gehen Anfragen direkt an Anthropic.
+  if (given('AI_GATEWAY_TOKEN')) secrets.AI_GATEWAY_TOKEN = given('AI_GATEWAY_TOKEN');
+  else if (have.has('AI_GATEWAY_TOKEN')) notes.push('`AI_GATEWAY_TOKEN`: bleibt wie im Worker gesetzt.');
+  else notes.push('`AI_GATEWAY_TOKEN` fehlt (optional): Anfragen gehen direkt an den KI-Anbieter, nicht über das AI Gateway ' +
+    '(keine Gateway-Protokolle für diese Stufen, Auswertungen funktionieren). Anleitung: backend/README.md → „AI Gateway“.');
   const skipped = [];
   for (const n of OPTIONAL) {
     if (given(n)) secrets[n] = given(n);
@@ -98,15 +159,17 @@ export function plan(mode, env, existing) {
   }
   if (skipped.length) {
     notes.push(`Optional übersprungen (kein GitHub-Secret gesetzt): ${skipped.map((n) => `\`${n}\``).join(', ')}. ` +
-      'Das sind die Store-Prüfer für echte Käufe und Geräteprüfung für Einladungen; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
+      'Das sind die Store-Prüfer für echte Käufe; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
   }
-  return { secrets, notes, errors, generated, webPurchase };
+  return { secrets, notes, errors, warnings, generated, webPurchase, llm };
 }
 
 const MISSING_HELP = {
-  AI_KEY: 'Mindestens ein KI-Schlüssel für Guthaben: **`GEMINI_API_KEY`** (Gemini 3.6 Flash, Google AI Studio: aistudio.google.com/apikey, ' +
-    'beginnt mit `AIza`, Projekt mit Abrechnung) und/oder **`ANTHROPIC_API_KEY`** (Claude Sonnet 5.5, console.anthropic.com → API Keys, beginnt mit `sk-ant-`). ' +
-    'Am besten je mit Ausgabenlimit.',
+  AI_KEY: 'Kein KI-Anbieter vollständig: Für die gewählte Voreinstellung fehlt ein Schlüssel, und keine andere ist vollständig. ' +
+    'Je Anbieter: **`ANTHROPIC_API_KEY`** (console.anthropic.com → API Keys, `sk-ant-…`), **`OPENAI_API_KEY`** (platform.openai.com → API keys), ' +
+    '**`GEMINI_API_KEY`** (aistudio.google.com → Get API key), **`OPENROUTER_API_KEY`** (openrouter.ai → Keys). Workers AI (Voreinstellung `gratis`) ' +
+    'braucht keinen. Am besten mit Ausgabenlimit beim Anbieter. Anleitung: docs/anbieter-umstellen.md.',
+  LLM_PRESET: 'Unbekannte KI-Voreinstellung (Repo-Variable `LLM_PRESET` oder Auswahl): erlaubt sind die Namen unter `presets` in backend/llm-routing.jsonc.',
 };
 
 if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {
@@ -129,8 +192,15 @@ if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {
     process.exit(1);
   }
   for (const n of r.generated) console.log(`::add-mask::${r.secrets[n]}`);
-  for (const v of Object.values(r.secrets)) for (const line of String(v).split('\n')) if (line.trim().length > 6) console.log(`::add-mask::${line.trim()}`);
+  for (const w of r.warnings) console.log(`::warning::${w.replace(/[`*]/g, '')}`);
+  for (const [k, v] of Object.entries(r.secrets)) if (k !== 'LLM_PRESET') for (const line of String(v).split('\n')) if (line.trim().length > 6) console.log(`::add-mask::${line.trim()}`);
   writeFileSync(outFile, JSON.stringify(r.secrets));
+  const llmLines = ['### KI-Anbieter', '',
+    ...r.warnings.map((w) => `> ⚠️ ${w}`), ...(r.warnings.length ? [''] : []),
+    r.llm?.name ? `- Voreinstellung: **${r.llm.name}** (${r.llm.source}${r.llm.name !== r.llm.requested ? `, gewünscht war „${r.llm.requested}“` : ''}) – ${ROUTING.presets[r.llm.name].description}`
+      : `- Voreinstellung: ${r.llm?.source ?? 'unbekannt'} (Details unten unter „Gesundheitsprüfung“)`,
+    ''];
+  appendFileSync(summaryFile, llmLines.join('\n') + '\n');
   appendFileSync(summaryFile, ['### Secrets', '', ...r.notes.map((n) => `- ${n}`), `- Übertragen: ${Object.keys(r.secrets).map((n) => `\`${n}\``).join(', ') || '–'}`, ''].join('\n') + '\n');
   if (r.secrets.ADMIN_SECRET) writeFileSync(`${outFile}.admin`, r.secrets.ADMIN_SECRET);
 }

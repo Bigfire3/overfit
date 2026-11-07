@@ -9,8 +9,6 @@ import app.overfit.fuel.FuelMessageResult
 import app.overfit.fuel.FuelService
 import app.overfit.fuel.FuelTierInfo
 import app.overfit.fuel.LedgerPage
-import app.overfit.fuel.InviteRedeemResult
-import app.overfit.fuel.InviteToken
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -247,12 +245,9 @@ class CoachTransportTest {
         override val isDemo = false
         override suspend fun config(): FuelConfig { configCalls++; return config ?: error("offline") }
         override suspend fun account(): FuelAccount = error("unused")
-        override suspend fun setDisplayName(name: String?): String? = error("unused")
         override suspend fun ledger(before: Long?, limit: Int): LedgerPage = error("unused")
         override suspend fun createRecoveryCode(): String = error("unused")
         override suspend fun restore(code: String): FuelAccount = error("unused")
-        override suspend fun inviteToken(): InviteToken = error("unused")
-        override suspend fun redeemInvite(token: String): InviteRedeemResult = error("unused")
         override suspend fun messages(bodyJson: String): FuelMessageResult {
             lastBody = bodyJson
             return onMessages(bodyJson)
@@ -286,10 +281,9 @@ class CoachTransportTest {
     }
 
     @Test
-    fun fuelMarksCoachReviewsSoGiftedReviewsCanApply() = runTest {
-        val fake = FakeFuel(tiers("standard")) { FuelMessageResult(fuelAnswer, 0, 0, giftReview = true) }
-        val reply = FuelCoach(FuelProvider { fake }).send(prompt.copy(review = true), "standard")
-        assertTrue(reply.giftReview)
+    fun fuelMarksCoachReviewsWithTheirPurpose() = runTest {
+        val fake = FakeFuel(tiers("standard")) { FuelMessageResult(fuelAnswer, 0, 0) }
+        FuelCoach(FuelProvider { fake }).send(prompt.copy(review = true), "standard")
         assertEquals("review", Json.parseToJsonElement(fake.lastBody!!).jsonObject["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)
         FuelCoach(FuelProvider { fake }).send(prompt.copy(review = false), "standard")
         assertEquals("chat", Json.parseToJsonElement(fake.lastBody!!).jsonObject["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)
@@ -320,9 +314,12 @@ class CoachTransportTest {
         assertEquals("standard", sentModel(tiers("standard", "pro", "lite"), "standard"))
         assertEquals("lite", sentModel(tiers("standard", "pro", "lite"), "lite"))
         assertEquals("standard", sentModel(tiers("standard", "pro"), "lite"))
-        assertEquals("pro", sentModel(tiers("pro"), "lite"))
+        // Never silently up to a more expensive model than the next one: lite → standard only, standard → lite only.
+        assertEquals("lite", sentModel(tiers("pro"), "lite"))
         assertEquals("standard", sentModel(tiers("standard"), "pro"))
-        assertEquals("pro", sentModel(tiers("pro"), "standard"))
+        assertEquals("lite", sentModel(tiers("lite"), "pro"))
+        assertEquals("lite", sentModel(tiers("pro", "lite"), "standard"))
+        assertEquals("standard", sentModel(tiers("pro"), "standard"))
         // Unknown value (old settings) → standard
         assertEquals("standard", sentModel(tiers("standard", "pro"), "claude-haiku-4-5"))
         // Old backend without tiers: its only model
@@ -352,7 +349,48 @@ class CoachTransportTest {
         assertEquals(CoachErrorKind.SERVER, kind(FuelException("x", 502)))
         assertEquals(CoachErrorKind.AUTH, kind(FuelException("x", 401)))
         assertEquals(CoachErrorKind.BAD_REQUEST, kind(FuelException("x", 400)))
-        assertEquals(CoachErrorKind.NO_ACCESS, kind(FuelException("tier_unavailable", 503)))
+        // Server setup problems are not the user's access: "provider not reachable", retry possible.
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("tier_unavailable", 503)))
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("not_configured", 503)))
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("upstream_rejected", 400, mapOf("upstreamStatus" to 401L))))
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("upstream_unavailable", 502, mapOf("upstreamStatus" to 401L))))
+        assertEquals(CoachErrorKind.BAD_REQUEST, kind(FuelException("upstream_rejected", 400, mapOf("upstreamStatus" to 400L))))
+    }
+
+    @Test
+    fun fuelReloadsTheConfigWhenTheServerLacksTheTier() = runTest {
+        // Cached config still lists the standard model, the server no longer offers it (pro and lite remain).
+        var config = tiers("standard", "pro", "lite")
+        val sent = mutableListOf<String>()
+        val service = object : FuelService by FakeFuel(onMessages = { error("unused") }) {
+            override suspend fun config(): FuelConfig = config
+            override suspend fun messages(bodyJson: String): FuelMessageResult {
+                val model = Json.parseToJsonElement(bodyJson).jsonObject["model"]!!.jsonPrimitive.content
+                sent += model
+                if (model == "standard") throw FuelException("tier_unavailable", 503)
+                return FuelMessageResult(fuelAnswer, 30_000, 970_000, servedModel = "claude-haiku-5-5")
+            }
+        }
+        val provider = FuelProvider { service }
+        provider.config() // cached with standard available
+        config = tiers("pro", "lite")
+        val reply = FuelCoach(provider).send(prompt, "standard")
+        assertEquals(listOf("standard", "lite"), sent)
+        assertEquals("claude-haiku-5-5", reply.servedModel)
+    }
+
+    @Test
+    fun fuelTierStillMissingAfterReloadIsAServerError() = runTest {
+        var calls = 0
+        val service = object : FuelService by FakeFuel(onMessages = { error("unused") }) {
+            override suspend fun config(): FuelConfig = tiers("standard")
+            override suspend fun messages(bodyJson: String): FuelMessageResult {
+                calls++
+                throw FuelException("tier_unavailable", 503)
+            }
+        }
+        assertEquals(CoachErrorKind.SERVER, errorKind { FuelCoach(FuelProvider { service }).send(prompt, "standard") })
+        assertEquals(2, calls)
     }
 
     @Test

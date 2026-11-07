@@ -78,13 +78,13 @@ describe('Aufschlag deckt jeden Kanal und jedes Paket', () => {
 });
 
 describe('Kostenschätzung rechnet den Aufschlag ein', () => {
-  it('Coach-Auswertung mit Gemini 3.6 Flash ≈ Listenpreis × 1,28', () => {
+  it('Coach-Auswertung mit der Standard-Stufe (Claude Sonnet 5.5) ≈ Listenpreis × 1,28', () => {
     const cfg = getConfig(baseEnv());
-    const price = currentPrices()['gemini-3.6-flash'];
+    const price = currentPrices()['claude-sonnet-5-5'];
     const u = USAGE_PROFILES.coach;
     const usage = { input_tokens: u.inputTokens, output_tokens: u.outputTokens + 1000 };
     const list = costMicro(usage, price, 0);
     expect(costMicro(usage, price, cfg.markupBp)).toBe(Math.ceil((list * 12_800) / 10_000));
-    expect(cfg.prices['gemini-3.6-flash']).toEqual(price);
+    expect(cfg.prices['claude-sonnet-5-5']).toEqual(price);
   });
 });

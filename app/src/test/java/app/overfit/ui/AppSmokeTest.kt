@@ -122,16 +122,17 @@ class AppSmokeTest {
         waitFor("Noch keine Trainings oder Fotos.")
         compose.onNodeWithText("Noch keine Trainings oder Fotos.").assertIsDisplayed()
 
-        // Coach tab: AI access with provider, memory
-        compose.onNodeWithTag("tab:COACH").performClick()
-        compose.onNodeWithText("Eigener Key · OpenRouter").assertIsDisplayed()
+        // Settings → Coach: AI access with provider, memory
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        compose.onNodeWithText("Eigener Schlüssel · OpenRouter").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Coach-Gedächtnis").performScrollTo().performClick()
         compose.onNodeWithText("Was der Coach über dich weiß", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Zurück").performClick()
 
         // Settings, sub-screens, language switch
-        compose.onNode(androidx.compose.ui.test.hasText("Profil") and androidx.compose.ui.test.hasClickAction()).performClick()
-        compose.onNodeWithText("Coach & KI").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("tab:PROFILE").performClick() // by tag: the Coach tab has a "Profil" chip too
+        // Everything about the coach lives in the settings now (section "Coach").
+        compose.onNodeWithText("Coach-Anweisungen").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Über Overfit").performScrollTo().performClick()
         compose.onNodeWithText("CC BY-SA 4.0", substring = true).assertExists()
         compose.onNodeWithText("Version 0.1.test").assertExists()
@@ -158,7 +159,7 @@ class AppSmokeTest {
 
         compose.onNodeWithTag("tab:COACH").performClick()
         compose.onNodeWithText("Kein KI-Zugang").assertIsDisplayed()
-        compose.onNode(androidx.compose.ui.test.hasText("Profil") and androidx.compose.ui.test.hasClickAction()).performClick()
+        compose.onNodeWithTag("tab:PROFILE").performClick() // by tag: the Coach tab has a "Profil" chip too
         compose.onNodeWithText("Alle Daten löschen").performScrollTo().performClick()
         compose.onNodeWithTag("confirm:armed").performClick()
 

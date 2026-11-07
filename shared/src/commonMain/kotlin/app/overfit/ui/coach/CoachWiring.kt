@@ -2,6 +2,7 @@ package app.overfit.ui.coach
 
 import app.overfit.ai.ProviderId
 import app.overfit.ai.Providers
+import app.overfit.coach.asSink
 import app.overfit.coach.AnthropicCoach
 import app.overfit.coach.CoachAccess
 import app.overfit.coach.CoachPhotoLoader
@@ -34,14 +35,18 @@ internal fun createCoach(
     transportOverride: ((ProviderId) -> CoachTransport)?,
 ): CoachService {
     val transports = mutableMapOf<ProviderId, CoachTransport>()
-    fun transport(id: ProviderId): CoachTransport = transportOverride?.invoke(id) ?: transports.getOrPut(id) {
-        when (id) {
+    val log = data.database.aiRequestDao().asSink()
+    // Every request goes into the request log ("Abrechnung"), whatever the provider.
+    fun transport(id: ProviderId): CoachTransport = transportOverride?.let { app.overfit.coach.LoggingTransport(it(id), log, clock) }
+        ?: transports.getOrPut(id) {
+        val inner = when (id) {
             ProviderId.ANTHROPIC -> AnthropicCoach(providers.http, store::apiKey)
             ProviderId.OPENAI -> OpenAiCoach(providers.http, store::apiKey)
             ProviderId.OPENROUTER -> OpenRouterCoach(providers.http, store::apiKey)
             ProviderId.FUEL -> FuelCoach(providers.fuel)
             ProviderId.GEMINI -> GeminiCoach(providers.http, store::apiKey)
         }
+        app.overfit.coach.LoggingTransport(inner, log, clock)
     }
     return CoachService(
         dao = data.database.coachDao(),
@@ -69,6 +74,7 @@ internal fun createCoach(
         fuelTiers = providers.fuel::tiers,
         fuelConfig = providers.fuel::config,
         fuelBalance = providers.fuel::balance,
+        instructionsAddition = { data.coachChatPrefs.state.value.addition },
     )
 }
 
@@ -89,12 +95,26 @@ internal fun createCoachChat(
     access = coach::access,
     transport = coach::transportFor,
     model = { coach.settings.state.value.model(it) },
-    parts = {
+    parts = { request ->
         val s = store.state.value
+        val input = chat.contextInput(today())
+        val chatStrings = app.overfit.i18n.chatStringsFor(s.language)
         app.overfit.coach.ChatPromptParts(
             instructions = coach.instructions(s.language),
-            profileBlock = buildProfileBlock(s.profile, s.weights, s.language, today()),
-            context = chat.contextOnly(app.overfit.i18n.chatStringsFor(s.language), today()),
+            profileBlock = chatProfileBlock(
+                include = request.includeProfile,
+                facts = buildProfileBlock(s.profile, s.weights, s.language, today()),
+                athlete = data.coachChatPrefs.state.value.profile,
+                memory = input.memory,
+                language = s.language,
+                unit = s.profile.unit,
+                today = today(),
+            ),
+            context = app.overfit.coach.ChatAttachmentText.build(
+                request.attachments,
+                app.overfit.coach.AttachmentSources(input.workouts, input.templates, s.profile.unit, s.language, clock()),
+                chatStrings,
+            ),
             exerciseList = coach.exerciseList(),
         )
     },
@@ -115,6 +135,33 @@ internal fun createCoachChat(
     scope = data.scope,
     clock = clock,
 )
+
+/**
+ * Profile part of the chat's system prompt. With the profile: the coach profile, name/age/weight (calendar) and the
+ * coach memory; without it (chip removed): only reply language, units and today.
+ */
+internal fun chatProfileBlock(
+    include: Boolean,
+    facts: String,
+    athlete: app.overfit.coach.AthleteProfile,
+    memory: String?,
+    language: app.overfit.domain.Language,
+    unit: app.overfit.domain.WeightUnit,
+    today: LocalDate,
+): String {
+    if (!include) {
+        val units = if (unit == app.overfit.domain.WeightUnit.KG) "metric" else "imperial"
+        val lang = if (language == app.overfit.domain.Language.DE) "German" else "English"
+        return "## Profile\nNot shared in this chat.\nApp language: $lang (answer in the language of the question) · Units: $units · Today: $today"
+    }
+    return buildString {
+        appendLine("## Profile")
+        // Chat: the answer follows the language of the question (base instruction); the app language is only a hint.
+        appendLine(facts.trim().replace(Regex("Reply language: (\\w+)"), "App language: $1 (answer in the language of the question)"))
+        athlete.promptLine()?.let { appendLine(it) }
+        memory?.takeIf { it.isNotBlank() }?.let { appendLine().appendLine("## Coach memory").appendLine(it.trim()) }
+    }.trimEnd()
+}
 
 /** Sample proposal of the chat demo (catalogue exercises, so the import preview finds them). */
 internal fun demoWorkout(name: String) = app.overfit.share.SharedTraining(

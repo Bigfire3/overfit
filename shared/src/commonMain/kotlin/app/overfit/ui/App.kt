@@ -49,7 +49,6 @@ import app.overfit.chat.ChatFeature
 import app.overfit.data.InMemoryKeyValueStore
 import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.FuelSession
-import app.overfit.fuel.isInviteLink
 import app.overfit.i18n.LocalFuelStrings
 import app.overfit.i18n.fuelStringsFor
 import app.overfit.platform.Haptics
@@ -58,9 +57,6 @@ import app.overfit.ui.fuel.FuelScreen
 import app.overfit.ui.fuel.RedeemCodeScreen
 import app.overfit.ui.fuel.LedgerScreen
 import app.overfit.ui.fuel.RecoveryScreen
-import app.overfit.ui.fuel.InviteShowScreen
-import app.overfit.ui.fuel.InviteRedeemScreen
-import app.overfit.ui.fuel.InviteRevealScreen
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.overfit.ui.chat.AiCoachScreen
@@ -147,17 +143,23 @@ import app.overfit.ui.coach.CoachDemoScreen
 import app.overfit.ui.coach.CoachBackup
 import app.overfit.ui.coach.CoachFinishChoice
 import app.overfit.ui.coach.CoachFinishSection
+import app.overfit.i18n.coachChatStringsFor
 import app.overfit.ui.coach.CoachHomeScreen
-import app.overfit.ui.coach.CoachChatScreen
 import app.overfit.ui.coach.CoachStoryScreen
 import app.overfit.ui.coach.StoryTarget
-import app.overfit.ui.coach.CoachTabNav
-import app.overfit.ui.coach.CoachTabScreen
+import app.overfit.ui.coach.chat.ChatOpenRequest
+import app.overfit.ui.coach.chat.CoachChatRequests
+import app.overfit.ui.coach.chat.CoachChatTabScreen
+import app.overfit.ui.coach.chat.CoachHistoryScreen
+import app.overfit.ui.coach.chat.createCoachChatEnv
 import app.overfit.ui.coach.CoachMemoryScreen
 import app.overfit.ui.coach.CoachNav
 import app.overfit.ui.coach.CoachReviewScreen
 import app.overfit.ui.coach.CoachSessionScreen
-import app.overfit.ui.coach.CoachSettingsScreen
+import app.overfit.ui.coach.CoachAccessScreen
+import app.overfit.ui.coach.CoachInstructionsScreen
+import app.overfit.ui.coach.CoachProfileScreen
+import app.overfit.ui.coach.CoachPromptsScreen
 import app.overfit.ui.coach.createCoach
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.overfit.ui.settings.SettingsScreen
@@ -191,7 +193,7 @@ class AppDependencies(
     val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     /** Main-thread scope that lives as long as the app (workout state, rest timer). */
     workoutScope: CoroutineScope = MainScope(),
-    /** credit/invite backend (URL from the build, developer override); defaults to "not configured". */
+    /** credit backend (URL from the build, developer override); defaults to "not configured". */
     val fuel: FuelAccess = FuelAccess(InMemoryKeyValueStore(), "") { error("No backend") },
     /** Small key-value storage for the chat sync state (not secret). */
     val kv: KeyValueStore = InMemoryKeyValueStore(),
@@ -213,6 +215,27 @@ class AppDependencies(
     val chat: ChatFeature = ChatFeature(fuel, data, store, kv, data.scope, clock, memory = { coach.memoryText })
     /** Coach chat in the Coach tab (own key or Fuel, demo without access). */
     val coachChat: app.overfit.coach.CoachChatService = app.overfit.ui.coach.createCoachChat(store, data, coach, chat, today, clock)
+    /** Next chat the Coach tab opens (CoachChatRoute, automatic review after a training). */
+    val coachChatRequests = CoachChatRequests()
+
+    /** Data of the Coach tab chat; built once (its model/cost flows live in the app scope). */
+    val coachChatEnv: app.overfit.ui.coach.chat.CoachChatEnv by lazy { createCoachChatEnv(this) }
+
+    /**
+     * The review after a training (automatic, or "Send to coach" on a training): a new chat with the training attached
+     * and the question "Review my training", sent right away; the Coach tab opens it next.
+     */
+    fun startTrainingReviewChat(sessionId: String) {
+        data.scope.launch {
+            val record = data.workouts.record(sessionId) ?: return@launch
+            val s = coachChatStringsFor(store.state.value.language)
+            val (chatId, _) = coachChat.send(
+                null,
+                app.overfit.coach.ChatSendRequest(s.reviewMyTraining, listOf(app.overfit.coach.ChatAttachment.Training(sessionId, record.workout.name, record.workout.startedAt))),
+            )
+            coachChatRequests.open(ChatOpenRequest(chatId = chatId))
+        }
+    }
 
     init {
         // Every change of the coach memory (coach review, edit, delete) is synced to the connected chats.
@@ -253,9 +276,13 @@ class AppDependencies(
     init {
         // Coach (phase 4): choice at the end of the finish flow, review queued on "Save", memory/reviews in the backup.
         val coachChoice = CoachFinishChoice()
-        finishCoachSection = { id -> CoachFinishSection(coach, coachChoice, id) }
-        workoutSavedListeners += { id -> if (coachChoice.send && coach.access() is app.overfit.coach.CoachAccess.Ready) coach.startSessionReview(id) }
-        backupContributors += CoachBackup(coach)
+        finishCoachSection = { id -> CoachFinishSection(coach, data.coachChatPrefs, coachChoice, id) }
+        workoutSavedListeners += { id ->
+            if (coachChoice.send && data.coachChatPrefs.state.value.autoReview && coach.access() is app.overfit.coach.CoachAccess.Ready) {
+                startTrainingReviewChat(id)
+            }
+        }
+        backupContributors += CoachBackup(coach, data.coachChatPrefs)
         backupContributors += app.overfit.ui.coach.CoachChatBackup(coachChat)
         coachChat.recover()
     }
@@ -298,26 +325,31 @@ class AppDependencies(
 @Serializable data object CoachStoryRoute
 /** Coach chat; [chatId] empty = new chat, [draft] prefills the input ("Use in chat"). */
 @Serializable data class CoachChatRoute(val chatId: String = "", val draft: String = "")
+/** Earlier coach chats (from the Coach tab header). */
+@Serializable data object CoachHistoryRoute
 @Serializable data object CoachReviewsRoute
-@Serializable data object CoachSettingsRoute
+/** Settings → Coach → AI access / default model (model picker as a page). */
+@Serializable data object CoachAccessRoute
+@Serializable data object CoachProfileRoute
+@Serializable data object CoachInstructionsRoute
+@Serializable data object CoachPromptsRoute
 @Serializable data class CoachSessionRoute(val sessionId: String)
 @Serializable data class CoachReviewRoute(val reviewId: String)
 @Serializable data class CoachDemoRoute(val sessionId: String)
 @Serializable data object AboutRoute
 @Serializable data object FuelRoute
 @Serializable data object LedgerRoute
+/** Every AI request ("Abrechnung"): time, purpose, model, tokens, cost, status. */
+@Serializable data object RequestLogRoute
 @Serializable data object RedeemCodeRoute
 @Serializable data object RecoveryRoute
-@Serializable data object InviteShowRoute
-@Serializable data class InviteRedeemRoute(val code: String = "")
-@Serializable data class InviteRevealRoute(val reviews: Int, val inviterName: String = "")
 @Serializable data object ImportRoute
 @Serializable data class ShareRoute(val templateId: Long)
 @Serializable data class ExerciseDetailRoute(val id: String, val readOnly: Boolean = false)
 /** Finish flow right after "Finish": summary, feeling, note, photos, coach slot. */
 @Serializable data class FinishRoute(val workoutId: String)
 /** A calendar day (ISO date, e.g. 2026-11-03): its photos and trainings. */
-@Serializable data class DayRoute(val date: String)
+@Serializable data class DayRoute(val date: String, val focusWeight: Boolean = false)
 /** One finished training (from its calendar day or a photo). */
 @Serializable data class WorkoutDetailRoute(val workoutId: String)
 /** Edit a finished training afterwards. */
@@ -362,6 +394,9 @@ fun OverfitApp(deps: AppDependencies) {
     val templates by deps.data.templates.templates.collectAsStateWithLifecycle(initialValue = null)
     val picked = remember { PickedExercises() }
     val editorSeeds = remember { EditorSeedHolder() }
+
+    /** "Apply" on a coach proposal: same path as an imported workout (the import screen picks it up from the inbox). */
+    val applyCoachWorkout: (String) -> Unit = { json -> deps.inbox.offer(json) }
     val workoutState by deps.workout.state.collectAsStateWithLifecycle()
     val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox, deps.data.scope) {
         val s = deps.store.state.value
@@ -373,6 +408,8 @@ fun OverfitApp(deps: AppDependencies) {
     // before the first screen (see [overfitImageLoader]).
     // App scope: the first saved workout changes the screen, a composition scope would cancel the seeding half-way.
     LaunchedEffect(Unit) { deps.data.seedCatalog(); deps.data.scope.launch { deps.data.seedSamplesOnce() } }
+    // Body weight: take over the profile list once, then mirror the table into the profile (AI context reads it there).
+    LaunchedEffect(deps) { app.overfit.data.syncProfileWeights(deps.data, deps.store, deps.kv) }
     // KI-Chat: back in the foreground → send what is left and fetch the inbox; to the background → send a running workout now.
     // Queued coach requests go out on app start and whenever the app comes back to the foreground.
     LifecycleResumeEffect(deps) {
@@ -399,8 +436,9 @@ fun OverfitApp(deps: AppDependencies) {
                     openSession = { nav.navigate(CoachSessionRoute(it)) },
                     demo = { nav.navigate(CoachDemoRoute(it)) },
                     memory = { nav.navigate(CoachMemoryRoute) },
-                    settings = { nav.navigate(CoachSettingsRoute) },
+                    settings = { nav.navigate(CoachInstructionsRoute) },
                     openTemplate = { nav.navigate(WorkoutPlanRoute(it)) },
+                    reviewInChat = { id -> deps.startTrainingReviewChat(id); nav.selectTab(Tab.COACH) },
                 )
             }
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
@@ -421,17 +459,11 @@ fun OverfitApp(deps: AppDependencies) {
             }
             // Links, files and scans from outside open the import screen (not during onboarding).
             LaunchedEffect(incoming, state.onboardingDone) {
-                // An invite link (QR scanned with the camera app) goes to "redeem invite", not to the training import.
                 val link = incoming
                 // Back from the web purchase page (overfit://guthaben): credit screen, which reloads the balance.
                 if (link != null && state.onboardingDone && app.overfit.fuel.isCreditReturnLink(link)) {
                     deps.inbox.consume()
                     nav.navigate(FuelRoute) { launchSingleTop = true }
-                    return@LaunchedEffect
-                }
-                if (link != null && state.onboardingDone && isInviteLink(link)) {
-                    deps.inbox.consume()
-                    nav.navigate(InviteRedeemRoute(link)) { launchSingleTop = true }
                     return@LaunchedEffect
                 }
                 if (incoming != null && state.onboardingDone &&
@@ -472,6 +504,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                         ) {
                             deps.store.logWeight(it, deps.today())
+                            val kg = it
+                            deps.data.scope.launch { deps.data.bodyWeights.set(deps.today(), kg) }
                             nav.navigate(AiRoute)
                         }
                     }
@@ -598,10 +632,17 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<DayRoute> { entry ->
-                        val date = LocalDate.parse(entry.toRoute<DayRoute>().date)
+                        val route = entry.toRoute<DayRoute>()
+                        val date = LocalDate.parse(route.date)
                         val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
                         val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
+                        val weights by deps.data.bodyWeights.entries.collectAsStateWithLifecycle(initialValue = null)
                         DayScreen(
+                            weights = weights,
+                            focusWeight = route.focusWeight,
+                            // App scope: leaving the day right after typing must not drop the value.
+                            onSetWeight = { kg -> deps.data.scope.launch { deps.data.bodyWeights.set(date, kg) } },
+                            onDeleteWeight = { deps.data.scope.launch { deps.data.bodyWeights.delete(date) } },
                             date = date,
                             photos = photos,
                             history = history,
@@ -758,7 +799,11 @@ fun OverfitApp(deps: AppDependencies) {
                         val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
                         val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
                         val viewPref = remember { app.overfit.ui.photos.DiaryViewPref(deps.kv) }
+                        val weights by deps.data.bodyWeights.entries.collectAsStateWithLifecycle(initialValue = null)
+                        var showMuscles by rememberSaveable { mutableStateOf(false) }
                         PhotosScreen(
+                            weights = weights,
+                            onWeightToday = { nav.navigate(DayRoute(deps.today().toString(), focusWeight = true)) },
                             photos = photos,
                             history = history,
                             language = state.language,
@@ -768,7 +813,21 @@ fun OverfitApp(deps: AppDependencies) {
                             unit = state.profile.unit,
                             listView = viewPref.list,
                             onListViewChange = { viewPref.list = it },
+                            onMuscles = { showMuscles = true },
                         )
+                        if (showMuscles) {
+                            val muscleSets by deps.data.workouts.muscleSets.collectAsStateWithLifecycle(initialValue = null)
+                            val periodPref = remember { app.overfit.ui.muscles.MusclePeriodPref(deps.kv) }
+                            var period by remember { mutableStateOf(periodPref.period) }
+                            app.overfit.ui.muscles.MuscleMapSheet(
+                                rows = muscleSets,
+                                period = period,
+                                today = deps.today(),
+                                weekStart = app.overfit.domain.DiaryCalendar.weekStart(state.language),
+                                onPeriod = { period = it; periodPref.period = it },
+                                onDismiss = { showMuscles = false },
+                            )
+                        }
                     }
                     composable<PhotoViewerRoute> { entry ->
                         val id = entry.toRoute<PhotoViewerRoute>().photoId
@@ -819,14 +878,24 @@ fun OverfitApp(deps: AppDependencies) {
                             store = deps.store,
                             providers = deps.providers,
                             today = deps.today(),
-                            onConnect = { nav.navigate(ConnectRoute) },
-                            onCoachMemory = { nav.navigate(CoachMemoryRoute) },
-                            onCoach = { nav.selectTab(Tab.COACH) },
                             onAbout = { nav.navigate(AboutRoute) },
                             fuelSession = deps.fuelSession,
-                            onFuel = { nav.navigate(FuelRoute) },
-                            onAiCoach = { nav.navigate(AiCoachRoute) },
-                            onChatNotes = { nav.navigate(ChatNotesRoute) },
+                            coach = deps.coach,
+                            coachPrefs = deps.data.coachChatPrefs,
+                            chatFeature = deps.chat,
+                            coachNav = app.overfit.ui.settings.CoachSettingsNav(
+                                access = { nav.navigate(CoachAccessRoute) },
+                                fuel = { nav.navigate(FuelRoute) },
+                                profile = { nav.navigate(CoachProfileRoute) },
+                                instructions = { nav.navigate(CoachInstructionsRoute) },
+                                memory = { nav.navigate(CoachMemoryRoute) },
+                                reviews = { nav.navigate(CoachReviewsRoute) },
+                                requestLog = { nav.navigate(RequestLogRoute) },
+                                prompts = { nav.navigate(CoachPromptsRoute) },
+                                chatProvider = { nav.navigate(ChatProviderRoute(it.name)) },
+                                chatNotes = { nav.navigate(ChatNotesRoute) },
+                                story = { nav.navigate(CoachStoryRoute) },
+                            ),
                             restAlerts = deps.restAlerts,
                             share = share,
                             exportingBackup = exportingBackup,
@@ -843,6 +912,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onImportBackup = pickBackup,
                             onReset = {
                                 deps.store.resetAll()
+                                deps.providers.fuel.resetAll()
                                 deps.data.scope.launch { deps.workout.discard(keepStructure = false); deps.data.resetAll() }
                                 nav.navigate(NameRoute) { popUpTo(0) { inclusive = true } }
                             },
@@ -866,7 +936,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onOwnKey = { nav.navigate(ConnectRoute) },
                             onFuel = { nav.navigate(FuelRoute) },
                             onProvider = { nav.navigate(ChatProviderRoute(it.name)) },
-                            onCoachSettings = { nav.navigate(CoachSettingsRoute) },
+                            onCoachSettings = { nav.navigate(CoachInstructionsRoute) },
                             onDisconnect = deps.store::disconnectAi,
                         )
                     }
@@ -939,41 +1009,71 @@ fun OverfitApp(deps: AppDependencies) {
                                 nav.navigate(CoachStoryRoute)
                             }
                         }
-                        CoachTabScreen(
-                            coach = deps.coach,
+                        val coachEnv = deps.coachChatEnv
+                        val openRequest by deps.coachChatRequests.pending.collectAsStateWithLifecycle()
+                        var modelSheet by rememberSaveable { mutableStateOf(false) }
+                        var creditPopup by rememberSaveable { mutableStateOf(false) }
+                        val fuelActive = state.providerId == ProviderId.FUEL
+                        Box(Modifier.fillMaxSize()) {
+                            CoachChatTabScreen(
+                                env = coachEnv,
+                                openRequest = openRequest,
+                                onOpenRequestConsumed = deps.coachChatRequests::consumed,
+                                onHistory = { nav.navigate(CoachHistoryRoute) },
+                                onStory = { nav.navigate(CoachStoryRoute) },
+                                onModelChip = { modelSheet = true },
+                                onApplyWorkout = { applyCoachWorkout(it) },
+                                creditChip = { app.overfit.ui.coach.CreditChip(deps.fuelSession, fuelActive, onClick = { creditPopup = true }) },
+                            )
+                            val close = LocalStrings.current.back
+                            app.overfit.ui.components.BottomSheet(modelSheet, onDismiss = { modelSheet = false }, closeLabel = close) {
+                                app.overfit.ui.coach.ModelPicker(state, deps.store, deps.providers, deps.coach, onApplied = { modelSheet = false }, onSurface = true)
+                            }
+                            app.overfit.ui.components.CenterPopup(creditPopup, onDismiss = { creditPopup = false }, closeLabel = close) {
+                                app.overfit.ui.coach.CreditPopupContent(
+                                    session = deps.fuelSession,
+                                    dao = deps.data.database.aiRequestDao(),
+                                    onOpenFuel = { creditPopup = false; nav.navigate(FuelRoute) },
+                                    onAllRequests = { creditPopup = false; nav.navigate(RequestLogRoute) },
+                                    onClose = { creditPopup = false },
+                                    distribution = deps.distribution,
+                                )
+                            }
+                        }
+                    }
+                    composable<CoachHistoryRoute> {
+                        CoachHistoryScreen(
                             chat = deps.coachChat,
-                            chatFeature = deps.chat,
-                            state = state,
-                            providers = deps.providers,
-                            fuelSession = deps.fuelSession,
-                            prompts = { coachPrompts(deps, share) },
-                            copy = deps.share::copyText,
-                            nav = CoachTabNav(
-                                coach = coachNav,
-                                openChat = { id, draft -> nav.navigate(CoachChatRoute(id, draft)) },
-                                allReviews = { nav.navigate(CoachReviewsRoute) },
-                                access = { nav.navigate(AiCoachRoute) },
-                                chatProvider = { nav.navigate(ChatProviderRoute(it.name)) },
-                                chatNotes = { nav.navigate(ChatNotesRoute) },
-                                story = { nav.navigate(CoachStoryRoute) },
-                            ),
+                            onOpen = { id ->
+                                deps.coachChatRequests.open(ChatOpenRequest(chatId = id))
+                                nav.popBackStack()
+                            },
+                            onBack = nav::popBackStack,
                         )
                     }
                     composable<CoachReviewsRoute> { CoachHomeScreen(deps.coach, coachNav) }
                     composable<CoachChatRoute> { entry ->
+                        // No screen of its own any more: hands the chat to the Coach tab and switches there.
                         val route = entry.toRoute<CoachChatRoute>()
-                        CoachChatScreen(
-                            chat = deps.coachChat,
-                            chatId = route.chatId,
-                            draft = route.draft,
-                            photos = deps.data.workouts.photos,
-                            // Same import preview as a link: the import screen picks it up from the inbox.
-                            onImportWorkout = { deps.inbox.offer(it) },
-                            onAccess = { nav.navigate(AiCoachRoute) },
+                        LaunchedEffect(route) {
+                            deps.coachChatRequests.open(ChatOpenRequest(chatId = route.chatId, draft = route.draft))
+                            nav.popBackStack()
+                            nav.selectTab(Tab.COACH)
+                        }
+                    }
+                    composable<CoachAccessRoute> {
+                        CoachAccessScreen(state, deps.store, deps.providers, deps.coach, onBack = nav::popBackStack)
+                    }
+                    composable<CoachProfileRoute> { CoachProfileScreen(state, deps.data.coachChatPrefs, onBack = nav::popBackStack) }
+                    composable<CoachInstructionsRoute> { CoachInstructionsScreen(deps.coach, deps.data.coachChatPrefs, onBack = nav::popBackStack) }
+                    composable<CoachPromptsRoute> {
+                        CoachPromptsScreen(
+                            prompts = { coachPrompts(deps, share) },
+                            copy = deps.share::copyText,
+                            onUseInChat = { nav.navigate(CoachChatRoute("", it)) },
                             onBack = nav::popBackStack,
                         )
                     }
-                    composable<CoachSettingsRoute> { CoachSettingsScreen(deps.coach, onBack = nav::popBackStack) }
                     composable<CoachSessionRoute> { entry ->
                         CoachSessionScreen(deps.coach, entry.toRoute<CoachSessionRoute>().sessionId, state.profile.unit, state.language, coachNav)
                     }
@@ -990,38 +1090,24 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                             onLedger = { nav.navigate(LedgerRoute) },
                             onRecovery = { nav.navigate(RecoveryRoute) },
-                            onInviteShow = { nav.navigate(InviteShowRoute) },
-                            onInviteRedeem = { nav.navigate(InviteRedeemRoute()) },
                             fuelActive = state.providerId == ProviderId.FUEL,
                             onRedeemCode = { nav.navigate(RedeemCodeRoute) },
                             distribution = deps.distribution,
+                            onRequestLog = { nav.navigate(RequestLogRoute) },
+                        )
+                    }
+                    composable<RequestLogRoute> {
+                        app.overfit.ui.fuel.RequestLogScreen(
+                            dao = deps.data.database.aiRequestDao(),
+                            session = deps.fuelSession,
+                            fuelActive = state.providerId == ProviderId.FUEL,
+                            clock = deps.clock,
+                            onBack = nav::popBackStack,
                         )
                     }
                     composable<RedeemCodeRoute> { RedeemCodeScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<LedgerRoute> { LedgerScreen(deps.fuelSession, onBack = nav::popBackStack) }
                     composable<RecoveryRoute> { RecoveryScreen(deps.fuelSession, onBack = nav::popBackStack, onRestored = {}) }
-                    composable<InviteShowRoute> { InviteShowScreen(deps.fuelSession, onBack = nav::popBackStack) }
-                    composable<InviteRedeemRoute> { entry ->
-                        InviteRedeemScreen(
-                            canScan = deps.share.canScanInApp,
-                            initialCode = entry.toRoute<InviteRedeemRoute>().code,
-                            session = deps.fuelSession,
-                            onBack = nav::popBackStack,
-                            onRedeemed = { reviews, name ->
-                                nav.navigate(InviteRevealRoute(reviews, name.orEmpty())) { popUpTo<InviteRedeemRoute> { inclusive = true } }
-                            },
-                        )
-                    }
-                    composable<InviteRevealRoute> { entry ->
-                        val route = entry.toRoute<InviteRevealRoute>()
-                        InviteRevealScreen(
-                            reviews = route.reviews,
-                            inviterName = route.inviterName.ifEmpty { null },
-                            haptics = deps.haptics,
-                            vibration = state.settings.vibration,
-                            onClose = nav::popBackStack,
-                        )
-                    }
                 }
             }
             }
@@ -1082,8 +1168,11 @@ private fun AppScaffold(
             })
         }
         // A running workout that is not on screen (minimized) sits above the tab bar on every main screen.
-        if (current != null && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
-        if (current != null) {
+        // While the story is still on screen (last frames of closing), the bars stay hidden: they appear in the same
+        // frame the story disappears, never underneath it first.
+        val storyOnScreen = screens.any { it.destination.hasRoute(CoachStoryRoute::class) }
+        if (current != null && !storyOnScreen && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
+        if (current != null && !storyOnScreen) {
             TabBar(current) { tab -> nav.selectTab(tab) }
         }
     }

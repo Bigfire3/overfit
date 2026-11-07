@@ -7,7 +7,7 @@ const reply = (usage: object = { input_tokens: 1000, output_tokens: 500 }) =>
     headers: { 'content-type': 'application/json' },
   });
 
-// Alte App-Versionen schicken die Modell-ID; sie entspricht der Stufe `pro`.
+// Alte App-Versionen schicken die Modell-ID; sie entspricht der Stufe `standard` (Claude Sonnet 5.5).
 const body = (extra: object = {}) => ({
   model: 'claude-sonnet-5-5',
   max_tokens: 1000,
@@ -21,9 +21,8 @@ beforeEach(() => {
   const real = globalThis.fetch;
   vi.stubGlobal('fetch', (input: any, init?: any) => {
     const url = String(input instanceof Request ? input.url : input);
+    // Alle Stufen laufen über Anthropic; die Ausweich-Stufe (lite) landet also beim selben Mock. Stufen-Tests: tiers.test.ts
     if (url.startsWith('https://api.anthropic.com')) return upstream(input, init);
-    // Ausweich-Stufe (Gemini) ist in diesen Tests ebenfalls ausgefallen; Stufen-Tests: tiers.test.ts
-    if (url.startsWith('https://generativelanguage.googleapis.com')) return Promise.resolve(new Response('down', { status: 503 }));
     return real(input, init);
   });
 });
@@ -63,18 +62,20 @@ describe('POST /v1/messages', () => {
   });
 
   it('Upstream-Fehler gibt die Reservierung vollständig frei', async () => {
-    upstream.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'overloaded' } }), { status: 529 }));
+    // Jede Antwort frisch (ein Response-Body lässt sich nur einmal lesen; standard weicht auf lite aus, das hier ebenfalls ausfällt).
+    upstream.mockImplementation(async () => new Response(JSON.stringify({ error: { message: 'overloaded' } }), { status: 529 }));
     const c = await Client.create();
     const f = await fund(c);
     const r = await c.call('POST', '/v1/messages', body());
     expect(r.status).toBe(502);
     expect(r.body.error.code).toBe('upstream_unavailable');
+    expect(upstream).toHaveBeenCalledTimes(2);
     expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(f.balanceMicro);
-    // Netzwerkfehler bei pro → Ausweichen auf standard, das hier ebenfalls ausfällt (503) → 502
+    // Netzwerkfehler bei standard → Ausweichen auf lite, ebenfalls Netzwerkfehler → 504
     upstream.mockRejectedValue(new Error('network'));
-    expect((await c.call('POST', '/v1/messages', body())).status).toBe(502);
+    expect((await c.call('POST', '/v1/messages', body())).status).toBe(504);
     expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(f.balanceMicro);
-    upstream.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'bad' } }), { status: 400 }));
+    upstream.mockImplementation(async () => new Response(JSON.stringify({ error: { message: 'bad' } }), { status: 400 }));
     const r3 = await c.call('POST', '/v1/messages', body());
     expect(r3.body.error.code).toBe('upstream_rejected');
     expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(f.balanceMicro);

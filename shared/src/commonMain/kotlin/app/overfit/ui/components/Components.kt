@@ -850,7 +850,8 @@ fun SwitchRow(label: String, checked: Boolean, modifier: Modifier = Modifier, on
         ),
     ) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            // Vertical padding inside the 56 dp minimum: a label over several lines keeps its distance to the edges.
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = Space.s),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {

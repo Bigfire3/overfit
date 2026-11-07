@@ -19,16 +19,7 @@
   // Alle Beträge in Mikro-Euro (1 € = 1_000_000). Aufschläge in Basispunkten (100 = 1 %).
   "vars": {
     "MARKUP_BP": "2800",
-    "INVITE_STARTER_REVIEWS": "5",
-    "INVITE_REWARD_REVIEWS": "5",
-    "INVITE_TOKEN_TTL_SEC": "45",
-    "INVITE_MONTHLY_LIMIT_PER_INVITER": "10",
-    "INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS": "1000",
-    "INVITE_GIFT_MONTHLY_COST_CAP_MICRO": "50000000",
-    "INVITE_GIFT_MAX_COST_MICRO": "250000",
-    "INVITE_EXPIRY_DAYS": "180",
     "MAX_TOKENS_CAP": "8192",
-    "ATTESTATION_MODE": "required",
     "PURCHASE_MODE": "required"
   }
 }

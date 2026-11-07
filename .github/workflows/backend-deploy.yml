@@ -1,6 +1,6 @@
 name: Backend deployen
 
-# Deploy-Knopf für das Cloudflare-Backend (Guthaben, Einladungen, KI-Chat): Actions → „Backend deployen“ → Run workflow.
+# Deploy-Knopf für das Cloudflare-Backend (Guthaben, KI-Chat): Actions → „Backend deployen“ → Run workflow.
 # Anleitung im Browser: backend/README.md → „Deployment ohne Terminal“.
 # Alles ist idempotent: D1-Datenbank, R2-Bucket und AI Gateway werden nur angelegt, wenn sie fehlen; Migrationen laufen nur, wenn neu.
 
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Betrieb: test (Testserver, keine Geräteprüfung, Test-Guthaben) oder production (echt, mit Store-Prüfung)'
+        description: 'Betrieb: test (Testserver, Test-Guthaben per credit_eur) oder production (echt, mit Store-Prüfung)'
         type: choice
         options: [test, production]
         default: test
@@ -16,6 +16,11 @@ on:
         description: 'Nur test: Test-Guthaben in € allen Konten gutschreiben (0 = nichts; höchstens 10 € je Lauf)'
         type: string
         default: '0'
+      llm:
+        description: 'KI-Anbieter fürs Guthaben (backend/llm-routing.jsonc): wie-bisher = nichts ändern'
+        type: choice
+        options: [wie-bisher, claude, openai, gemini, gratis, gemischt, openrouter]
+        default: wie-bisher
   # Automatisch nach Änderungen am Backend, aber nur wenn die Repo-Variable BACKEND_DEPLOY_MODE (test | production)
   # gesetzt ist und die Cloudflare-Secrets existieren. Sonst passiert nichts.
   push:
@@ -42,22 +47,24 @@ jobs:
       MODE: ${{ inputs.mode || vars.BACKEND_DEPLOY_MODE }}
       EVENT: ${{ github.event_name }}
       CURRENT_URL: ${{ vars.OVERFIT_BACKEND_URL }}
-      # Worker-Secrets (mindestens GEMINI_API_KEY oder ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # KI-Anbieter (docs/anbieter-umstellen.md): Schlüssel je Anbieter; welche nötig sind, hängt von der Voreinstellung ab.
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      INVITE_SIGNING_KEY: ${{ secrets.INVITE_SIGNING_KEY }}
-      # Früherer Name (vor Session AD); wird übernommen, falls INVITE_SIGNING_KEY fehlt.
-      LEGACY_INVITE_SIGNING_KEY: ${{ secrets.SPOT_SIGNING_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      # Voreinstellung: Auswahlliste beim Start (wird im Worker gespeichert), sonst Repo-Variable LLM_PRESET, sonst wie bisher.
+      LLM_PRESET_INPUT: ${{ inputs.llm }}
+      LLM_PRESET_VAR: ${{ vars.LLM_PRESET }}
+      # Optional: Token fürs AI Gateway (neue Gateways verlangen eins); ohne gehen Anfragen direkt an den Anbieter.
+      AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
       SYNC_ENCRYPTION_KEY: ${{ secrets.SYNC_ENCRYPTION_KEY }}
       ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
       GOOGLE_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
       GOOGLE_PLAY_PACKAGE_NAME: ${{ secrets.GOOGLE_PLAY_PACKAGE_NAME }}
-      PLAY_INTEGRITY_SERVICE_ACCOUNT: ${{ secrets.PLAY_INTEGRITY_SERVICE_ACCOUNT }}
       APPLE_IAP_KEY: ${{ secrets.APPLE_IAP_KEY }}
       APPLE_IAP_KEY_ID: ${{ secrets.APPLE_IAP_KEY_ID }}
       APPLE_IAP_ISSUER_ID: ${{ secrets.APPLE_IAP_ISSUER_ID }}
       APPLE_BUNDLE_ID: ${{ secrets.APPLE_BUNDLE_ID }}
-      APPLE_APP_ATTEST_TEAM_ID: ${{ secrets.APPLE_APP_ATTEST_TEAM_ID }}
       # Web-Kauf über Stripe (optional; fehlt einer, bleibt der Web-Kauf aus). Testbetrieb: sk_test_…, Produktion: sk_live_….
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
@@ -126,6 +133,7 @@ jobs:
         if: steps.pre.outputs.run == 'true'
         run: |
           npm ci
+          node scripts/build-routing.mjs
           npm run typecheck
           npm test
 
@@ -159,7 +167,7 @@ jobs:
             } | tee -a "$GITHUB_STEP_SUMMARY"
             exit 1
           }
-          # Workers AI (Stufe lite, Binding beim Deploy)
+          # Workers AI (Voreinstellung „gratis“, Binding beim Deploy)
           CODE=$(cf "$API/ai/models/search?per_page=1") || CODE=000
           case "$CODE" in
             200) echo "Workers AI: Zugriff in Ordnung." ;;
@@ -247,8 +255,6 @@ jobs:
           npx wrangler secret list --format json -c wrangler.generated.jsonc > "$RUNNER_TEMP/existing.json" 2>/dev/null || echo '[]' > "$RUNNER_TEMP/existing.json"
           node scripts/deploy-secrets.mjs "$MODE" "$RUNNER_TEMP/existing.json" "$RUNNER_TEMP/secrets.json" "$GITHUB_STEP_SUMMARY"
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json" -c wrangler.generated.jsonc
-          # Alten Secret-Namen im Worker aufräumen (seit Session AD heißt er INVITE_SIGNING_KEY).
-          if grep -q '"SPOT_SIGNING_KEY"' "$RUNNER_TEMP/existing.json"; then npx wrangler secret delete SPOT_SIGNING_KEY --force -c wrangler.generated.jsonc || true; fi
           if [ -f "$RUNNER_TEMP/secrets.json.admin" ]; then echo "ADMIN_SECRET_FILE=$RUNNER_TEMP/secrets.json.admin" >> "$GITHUB_ENV"; fi
           rm -f "$RUNNER_TEMP/secrets.json"
 
@@ -267,7 +273,10 @@ jobs:
           TIERS=$(echo "$CFG" | jq -r '[.tiers | to_entries[] | select(.value.available) | .key] | join(", ")')
           [ -n "$TIERS" ] || { echo "::error::Keine KI-Stufe verfügbar: $CFG"; exit 1; }
           echo "Health und Config in Ordnung (mode=$MODE, Stufen: $TIERS)."
-          echo "- Verfügbare KI-Stufen: $TIERS" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "- KI-Voreinstellung im Betrieb: **$(echo "$CFG" | jq -r '.preset // "?"')**"
+            echo "$CFG" | jq -r '.tiers | to_entries[] | "  - \(.key): " + (if .value.available then "\(.value.label)" + (if .value.fallback then ", Ausweichen: \(.value.fallback.displayName) (\(.value.fallback.vendor))" else "" end) else "nicht verfügbar" end)'
+          } >> "$GITHUB_STEP_SUMMARY"
           WEB=$(echo "$CFG" | jq -c '.webPurchase // {}')
           {
             echo
@@ -298,16 +307,21 @@ jobs:
         run: |
           MICRO=$(awk -v e="$CREDIT_EUR" 'BEGIN { if (e !~ /^[0-9]+([.][0-9]+)?$/ || e + 0 > 10) exit 1; printf "%d", e * 1000000 }') || { echo "::error::credit_eur muss eine Zahl bis 10 sein"; exit 1; }
           [ -n "${ADMIN_SECRET_FILE:-}" ] || { echo "::error::Kein ADMIN_SECRET vorhanden"; exit 1; }
-          RES=$(curl -sS -w '\n%{http_code}' -X POST "$URL/v1/admin/credit" \
-            -H "authorization: Bearer $(cat "$ADMIN_SECRET_FILE")" -H 'content-type: application/json' \
-            -d "{\"amountMicro\": $MICRO, \"all\": true}")
-          CODE=$(echo "$RES" | tail -1); BODY=$(echo "$RES" | head -n -1)
+          # Ein eben gesetztes ADMIN_SECRET braucht ein paar Sekunden, bis es überall gilt: bei 401 kurz warten und erneut.
+          for i in $(seq 1 12); do
+            RES=$(curl -sS -w '\n%{http_code}' -X POST "$URL/v1/admin/credit" \
+              -H "authorization: Bearer $(cat "$ADMIN_SECRET_FILE")" -H 'content-type: application/json' \
+              -d "{\"amountMicro\": $MICRO, \"all\": true}")
+            CODE=$(echo "$RES" | tail -1); BODY=$(echo "$RES" | head -n -1)
+            [ "$CODE" = 401 ] || break
+            echo "Admin-Geheimnis noch nicht aktiv ($i/12) …"; sleep 5
+          done
           [ "$CODE" = 200 ] || { echo "::error::Gutschrift fehlgeschlagen ($CODE): $BODY"; exit 1; }
           {
             echo "### Test-Guthaben"
             echo
             echo "$CREDIT_EUR € auf alle bestehenden Konten gebucht: $(echo "$BODY" | jq -r '"\(.credited) von \(.accounts) Konten, zusammen \(.totalMicro / 1000000) € (Obergrenze insgesamt \(.capMicro / 1000000) €)"')."
-            echo "Die Konten entstehen, sobald die App zum ersten Mal das Guthaben öffnet (neue Konten bekommen 1 € automatisch)."
+            echo "Die Konten entstehen, sobald die App zum ersten Mal das Guthaben öffnet. Neue Konten starten mit 0 €; Guthaben läuft nie ab."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -338,10 +352,10 @@ jobs:
             fi
             echo
             if [ "$MODE" = "test" ]; then
-              echo "**Testbetrieb:** keine Geräteprüfung, neue Konten bekommen 1 € Test-Guthaben, niedrige Limits, die App zeigt „Testserver“ unter Guthaben. Mehr Test-Guthaben: diesen Workflow mit \`credit_eur\` starten."
+              echo "**Testbetrieb:** neue Konten starten mit 0 € (Test-Guthaben mit diesem Workflow und \`credit_eur\`), niedrige Limits, die App zeigt „Testserver“ unter Guthaben. Mehr Test-Guthaben: diesen Workflow mit \`credit_eur\` starten."
               echo "Für den echten Betrieb später mit \`mode = production\` deployen (eigener Worker und eigene Datenbank, die Adresse ändert sich dann)."
             else
-              echo "**Produktion:** Käufe und die Geräteprüfung für Einladungen brauchen die Store-Prüfer (Play/Apple), solange sind Käufe und Einladungen hier abgeschaltet (siehe backend/README.md)."
+              echo "**Produktion:** Store-Käufe brauchen die Store-Prüfer (Play/Apple), solange sind sie hier abgeschaltet (siehe backend/README.md)."
             fi
             echo
             echo "Beim nächsten Mal dauert dieser Lauf kürzer: Datenbank und Bucket sind da, nur Migrationen und Code werden aktualisiert."

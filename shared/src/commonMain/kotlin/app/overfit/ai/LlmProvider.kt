@@ -13,8 +13,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
+import app.overfit.data.KeyValueStore
 import app.overfit.fuel.FuelConfig
 import app.overfit.fuel.FuelTierInfo
+import app.overfit.fuel.ModelNames
+import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -114,7 +117,11 @@ const val GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta
  * "Validating" means: the backend is configured and reachable with this device's identity. The coach (phase 4)
  * sends its requests with [messages].
  */
-class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
+class FuelProvider(
+    /** Keeps the last loaded `/v1/config` (offline fallback, model names after a restart); null = memory only. */
+    private val kv: KeyValueStore? = null,
+    private val service: () -> FuelService?,
+) : LlmProvider {
     override val id = ProviderId.FUEL
     override val label = "Guthaben"
     override val keyUrl = ""
@@ -139,17 +146,44 @@ class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
 
     private var cached: Triple<FuelService, FuelConfig, TimeMark>? = null
 
-    /** `/v1/config` of the backend (cached for 10 minutes). Null = unknown (no backend, no network). */
+    init {
+        // Names of the models the server used last time, so old answers and bookings show them before it answers.
+        stored()?.let { ModelNames.register(it) }
+    }
+
+    private fun stored(): FuelConfig? = kv?.get(CONFIG_KEY)?.let { raw ->
+        runCatching { storeJson.decodeFromString(FuelConfig.serializer(), raw) }.getOrNull()
+    }
+
+    /**
+     * `/v1/config` of the backend (cached for 10 minutes). When the server cannot be reached, the last config that
+     * loaded (stored in [kv]) answers instead. Null = unknown (no backend, or never loaded). Demo configs are not stored.
+     */
     suspend fun config(): FuelConfig? {
         val s = service() ?: return null
         cached?.let { (svc, cfg, mark) -> if (svc === s && mark.elapsedNow() < 10.minutes) return cfg }
         return try {
-            s.config().also { cached = Triple(s, it, TimeSource.Monotonic.markNow()) }
+            s.config().also { cfg ->
+                cached = Triple(s, cfg, TimeSource.Monotonic.markNow())
+                ModelNames.register(cfg)
+                if (!s.isDemo) kv?.put(CONFIG_KEY, storeJson.encodeToString(FuelConfig.serializer(), cfg))
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            null
+            if (s.isDemo) null else stored()
         }
+    }
+
+    /** Forgets the cached config, e.g. after the backend said a tier is not available (keys changed on the server). */
+    fun invalidateConfig() {
+        cached = null
+    }
+
+    /** "Delete all data": also drops the stored config. */
+    fun resetAll() {
+        cached = null
+        kv?.remove(CONFIG_KEY)
     }
 
     /** Current credit in µ€ (null = unknown). */
@@ -175,16 +209,23 @@ class FuelProvider(private val service: () -> FuelService?) : LlmProvider {
         val tiers = tiers() ?: return wanted
         if (tiers.isEmpty()) return LEGACY_MODEL
         val order = when (wanted) {
-            TIER_LITE -> listOf(TIER_LITE, TIER_STANDARD, TIER_PRO)
-            TIER_PRO -> listOf(TIER_PRO, TIER_STANDARD)
-            else -> listOf(TIER_STANDARD, TIER_PRO)
+            TIER_LITE -> listOf(TIER_LITE, TIER_STANDARD)
+            TIER_PRO -> listOf(TIER_PRO, TIER_STANDARD, TIER_LITE)
+            // Never silently up to the expensive model.
+            else -> listOf(TIER_STANDARD, TIER_LITE)
         }
         return order.firstOrNull { tiers[it]?.available == true } ?: wanted
     }
 
     /** Sends an Anthropic Messages request through Fuel; the result carries cost and new balance. */
     suspend fun messages(bodyJson: String): FuelMessageResult =
-        (service() ?: throw FuelException("not_configured", 503)).messages(bodyJson)
+        (service() ?: throw FuelException("not_configured", 503)).messages(bodyJson).also { ModelNames.register(it) }
+
+    companion object {
+        /** Last loaded `/v1/config` as JSON (not personal; removed by "delete all data"). */
+        const val CONFIG_KEY = "overfit.fuel.config.v1"
+        private val storeJson = Json { ignoreUnknownKeys = true }
+    }
 }
 
 /** Fuel tiers (backend/src/providers.ts). */
@@ -194,9 +235,14 @@ const val TIER_LITE = "lite"
 /** The only model of backends before the tiers. */
 private const val LEGACY_MODEL = "claude-sonnet-5-5"
 
-class Providers(val http: HttpClient, fuelService: () -> FuelService? = { null }) {
+class Providers(
+    val http: HttpClient,
+    /** Where the credit config is kept for offline use; null = memory only (tests). */
+    kv: KeyValueStore? = null,
+    fuelService: () -> FuelService? = { null },
+) {
     /** Providers that need the user's own key. */
     val all: List<LlmProvider> = listOf(OpenRouterProvider(http), AnthropicProvider(http), OpenAiProvider(http), GeminiProvider(http))
-    val fuel = FuelProvider(fuelService)
+    val fuel = FuelProvider(kv, fuelService)
     fun get(id: ProviderId): LlmProvider = if (id == ProviderId.FUEL) fuel else all.first { it.id == id }
 }

@@ -87,6 +87,11 @@ class AppStore(
     fun setUnit(unit: WeightUnit) = edit { it.copy(profile = it.profile.copy(unit = unit)) }
     fun logWeight(kg: Double, date: LocalDate) =
         edit { it.copy(weights = upsertWeight(it.weights, WeightEntry(date.toString(), kg))) }
+    /** Mirror of the body-weight table ([BodyWeightRepository] is the source of truth). */
+    fun mirrorWeights(entries: List<WeightEntry>) {
+        val sorted = entries.sortedBy { it.date }
+        if (sorted != _state.value.persisted.weights) edit { it.copy(weights = sorted) }
+    }
     fun setLanguage(language: Language) = edit { it.copy(settings = it.settings.copy(language = language)) }
     fun setDefaultRest(sec: Int) =
         edit { it.copy(settings = it.settings.copy(defaultRestSec = sec.coerceIn(0, MAX_REST_SEC))) }
@@ -120,6 +125,7 @@ class AppStore(
     fun resetAll() {
         runCatching { secrets.delete() }
         kv.remove(KEY)
+        kv.remove(KEY_COACH_STORY_SEEN) // after "delete all data" the story comes again on the first Coach visit
         _state.value = AppState(initial(), hasApiKey = false)
     }
 

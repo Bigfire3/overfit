@@ -1,8 +1,10 @@
 import { ApiError } from './errors';
 import type { Config, Device, Env } from './types';
-import { availableMicro, giftedCostSince, grantReviewStatements, monthStart, release, reserve, reserveReview, returnReview, settle, settleReview, now } from './ledger';
+import { availableMicro, release, reserve, settle } from './ledger';
 import { costMicro } from './money';
-import { type Tier, callTier, outputLimit, tierAvailable, tierForModel, TIER_NAMES, TIERS, UpstreamError } from './providers';
+import { type ModelDef, callModel, outputLimit, tierForModel, TIER_NAMES, UpstreamError } from './providers';
+import { routes } from './routing';
+import { logRequest, purposeOf } from './requests';
 
 const enc = new TextEncoder();
 
@@ -37,14 +39,16 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
   } catch {
     throw new ApiError(400, 'invalid_request', 'Body muss ein JSON-Objekt sein');
   }
-  // Overfit-eigene Angaben (`overfit.purpose`: review | chat | other) gehen nie an den KI-Anbieter.
-  const purpose = (body.overfit as { purpose?: unknown } | undefined)?.purpose;
+  // Overfit-eigene Angaben (`overfit.purpose`: review | chat | autofill | plan | other) gehen nie an den KI-Anbieter.
+  const purpose = purposeOf((body.overfit as { purpose?: unknown } | undefined)?.purpose);
+  const t0 = Date.now();
+  const ts = Math.floor(t0 / 1000);
   if ('overfit' in body) {
     const { overfit: _, ...rest } = body;
     body = rest;
   }
   // `model` ist eine Stufe (standard | pro | lite); alte App-Versionen schicken die Modell-ID (→ deren Stufe).
-  const tier = typeof body.model === 'string' ? tierForModel(body.model) : null;
+  const tier = typeof body.model === 'string' ? tierForModel(body.model, env) : null;
   if (!tier) throw new ApiError(400, 'model_not_allowed', 'Stufe nicht erlaubt', { allowed: TIER_NAMES });
   const maxTokens = body.max_tokens;
   if (!Number.isInteger(maxTokens) || (maxTokens as number) < 1 || (maxTokens as number) > cfg.maxTokensCap) {
@@ -55,126 +59,128 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     throw new ApiError(400, 'invalid_request', 'messages fehlt');
   }
   const images = countImages(body.messages);
-  if (images > 0 && !TIERS[tier].images) {
-    throw new ApiError(400, 'images_not_supported', `Die Stufe ${tier} verarbeitet keine Bilder`, { tier });
-  }
-  if (!tierAvailable(env, tier)) {
-    const available = TIER_NAMES.filter((t) => tierAvailable(env, t));
+  const all = routes(env).tiers;
+  const route = all[tier];
+  if (!route.primary) {
+    const available = TIER_NAMES.filter((t) => all[t].primary);
     if (available.length === 0) throw new ApiError(503, 'not_configured', 'Coach-Dienst nicht konfiguriert');
     throw new ApiError(503, 'tier_unavailable', `Stufe ${tier} ist nicht verfügbar`, { tier, available });
   }
+  // Abgerechnet wird nach dem Modell der Stufe (requested). Kann es keine Fotos, antwortet gleich das Ausweich-Modell, falls das Fotos kann.
+  const requested: ModelDef = route.primary;
+  let first: ModelDef = requested;
+  let second: ModelDef | null = route.fallback;
+  if (images > 0 && !requested.images) {
+    if (!route.fallback?.images) throw new ApiError(400, 'images_not_supported', `Die Stufe ${tier} verarbeitet keine Bilder`, { tier });
+    first = route.fallback;
+    second = null;
+  }
+  if (images > 0 && second && !second.images) second = null;
 
-  const price = cfg.prices[TIERS[tier].model];
+  const price = cfg.prices[requested.id];
   const maxPrice = { ...price, in: Math.max(price.in, price.cacheWrite) };
-  const hold = costMicro(
-    { input_tokens: estimateInputTokens(body, cfg), output_tokens: outputLimit(tier, maxTokens as number, cfg) },
-    maxPrice,
-    cfg.markupBp,
-  );
-  // Coach-Auswertung mit dem günstigsten Bildmodell: zuerst eine geschenkte Auswertung (Einladungsbonus) verbrauchen.
-  const giftId = purpose === 'review' ? await reserveGift(env, cfg, device.accountId, tier, hold) : null;
-  const holdId = giftId ? null : await reserve(env, device.accountId, hold);
-  if (!giftId && !holdId) {
+  // Reserve für den teuersten möglichen Verlauf: Preis der Stufe (mehr wird nie berechnet) × größter Ausgabe-Raum der Kandidaten.
+  const maxOut = Math.max(...[first, second].filter((m): m is ModelDef => !!m).map((m) => outputLimit(m, maxTokens as number, cfg)));
+  const hold = costMicro({ input_tokens: estimateInputTokens(body, cfg), output_tokens: maxOut }, maxPrice, cfg.markupBp);
+  const holdId = await reserve(env, device.accountId, hold);
+  const log = { accountId: device.accountId, ts, purpose, tier, requestedModel: requested.id, requestedProvider: requested.provider, photo: images > 0 };
+  if (!holdId) {
+    const requestId = await logRequest(env, { ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: 'insufficient_funds' });
     throw new ApiError(402, 'insufficient_funds', 'Guthaben reicht nicht', {
+      requestId,
       requiredMicro: hold,
       availableMicro: await availableMicro(env, device.accountId),
     });
   }
 
-  // Erst die angefragte Stufe, bei Ausfall einmal die Ausweich-Stufe (falls verfügbar und noch Zeit übrig ist).
+  // Erst das Modell der Stufe, bei Ausfall einmal das Ausweich-Modell (auch bei einem anderen Anbieter, falls bereit und noch Zeit ist).
   const started = Date.now();
-  const opts = (timeoutMs: number) => ({ timeoutMs, hasImages: images > 0, tier });
-  let served: Tier = tier;
+  const opts = (timeoutMs: number, fallback: boolean) => ({ timeoutMs, hasImages: images > 0, tier, fallback });
+  let served: ModelDef = first;
+  let firstFailure = null as UpstreamError | null;
+  const substituted = first !== requested;
   let result;
   try {
     try {
-      result = await callTier(env, cfg, tier, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, cfg.upstreamBudgetMs)));
+      result = await callModel(env, cfg, first, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, cfg.upstreamBudgetMs), substituted));
     } catch (e) {
-      const fb = TIERS[tier].fallback;
       const left = cfg.upstreamBudgetMs - (Date.now() - started);
-      if (!(e instanceof UpstreamError) || !e.unavailable || !fb || !tierAvailable(env, fb) || left < 15_000) throw e;
-      if (images > 0 && !TIERS[fb].images) throw e;
-      console.warn('fallback', tier, '→', fb, e.status, e.message);
-      served = fb;
-      result = await callTier(env, cfg, fb, body, maxTokens as number, { ...opts(Math.min(cfg.upstreamTimeoutMs, left)), fallback: true });
+      if (!(e instanceof UpstreamError) || !e.unavailable || !second || left < 15_000) throw e;
+      console.warn('fallback', tier, first.id, '→', second.id, e.status, e.message);
+      firstFailure = e;
+      served = second;
+      result = await callModel(env, cfg, second, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, left), true));
     }
   } catch (e) {
-    if (holdId) await release(env, holdId);
-    if (giftId) await returnReview(env, giftId);
+    await release(env, holdId);
+    const code = !(e instanceof UpstreamError) ? 'internal_error' : e.timeout || e.status === 0 || e.unavailable ? 'upstream_unavailable' : 'upstream_rejected';
+    const requestId = await logRequest(env, {
+      ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: code,
+      fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: failureLabel(firstFailure) ?? (substituted ? NO_IMAGES : null),
+    });
     if (!(e instanceof UpstreamError)) throw e;
     if (e.timeout || e.status === 0) {
-      throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status });
+      throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status, requestId });
     }
     if (!e.unavailable) {
       throw new ApiError(400, 'upstream_rejected', e.message || 'KI-Anbieter hat die Anfrage abgelehnt, nichts abgebucht', {
         upstreamStatus: e.status,
+        requestId,
       });
     }
-    throw new ApiError(502, 'upstream_unavailable', e.message || 'KI-Anbieter nicht verfügbar, nichts abgebucht', { upstreamStatus: e.status });
+    throw new ApiError(502, 'upstream_unavailable', e.message || 'KI-Anbieter nicht verfügbar, nichts abgebucht', { upstreamStatus: e.status, requestId });
   }
 
-  const servedModel = TIERS[served].model;
   const usage = result.usage;
-  // Abgerechnet wird höchstens der Preis der angefragten Stufe (Ausweichen auf eine teurere Stufe trägt die Marge).
-  // Ohne Nutzungsangabe sicherheitshalber der reservierte Höchstbetrag.
-  const cost = usage
-    ? Math.min(costMicro(usage, cfg.prices[servedModel], cfg.markupBp), costMicro(usage, price, cfg.markupBp))
-    : hold;
+  const fallback = served !== requested;
+  const reason = failureLabel(firstFailure) ?? (substituted ? NO_IMAGES : null);
+  // Abgerechnet wird aus den echten Token, und zwar zum günstigeren Preis von Stufen-Modell und antwortendem Modell
+  // (Ausweichen auf ein teureres Modell trägt die Marge). Ohne Nutzungsangabe sicherheitshalber der reservierte Höchstbetrag.
+  const servedPrice = cfg.prices[served.id];
+  const cost = usage ? Math.min(costMicro(usage, servedPrice, cfg.markupBp), costMicro(usage, price, cfg.markupBp)) : hold;
   const entry = {
-    model: servedModel,
+    model: served.id,
     tier,
     input: usage?.input_tokens ?? 0,
     cacheRead: usage?.cache_read_input_tokens ?? 0,
     cacheWrite: usage?.cache_creation_input_tokens ?? 0,
     output: usage?.output_tokens ?? 0,
-    // Ohne Nutzungsangabe bei einer geschenkten Auswertung: die reservierten Höchstkosten (fürs Monatsbudget).
-    providerCostMicro: usage ? costMicro(usage, cfg.prices[servedModel], 0) : giftId ? Math.ceil(hold / (1 + cfg.markupBp / 10_000)) : null,
-    fallback: served !== tier,
+    providerCostMicro: usage ? costMicro(usage, servedPrice, 0) : null,
+    fallback,
     photo: images > 0,
+    requestedModel: requested.id,
   };
-  let charged = 0;
-  if (giftId) await settleReview(env, device.accountId, giftId, entry);
-  else charged = await settle(env, device.accountId, holdId!, hold, cost, entry);
-  await rewardInviter(env, cfg, device.accountId);
+  const charged = await settle(env, device.accountId, holdId, hold, cost, entry);
+  const requestId = await logRequest(env, {
+    ...log, durationMs: Date.now() - t0, status: 'ok', model: served.id, provider: served.provider,
+    fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: reason,
+    input: entry.input, cacheRead: entry.cacheRead, cacheWrite: entry.cacheWrite, output: entry.output, chargedMicro: charged,
+  });
   const balance = await availableMicro(env, device.accountId);
   return Response.json(
     {
       ...result.body,
-      overfit: { costMicro: charged, balanceMicro: balance, giftReview: !!giftId, currency: 'EUR', tier, servedTier: served, model: servedModel, modelName: TIERS[served].displayName, vendor: TIERS[served].vendor, requestedModel: TIERS[tier].model, requestedModelName: TIERS[tier].displayName, requestedVendor: TIERS[tier].vendor, fallback: served !== tier },
+      overfit: {
+        costMicro: charged, balanceMicro: balance, currency: 'EUR', tier, servedTier: fallback ? (TIER_NAMES.find((t) => all[t].primary?.id === served.id) ?? tier) : tier,
+        model: served.id, modelName: served.displayName, vendor: served.vendor, provider: served.provider,
+        requestedModel: requested.id, requestedModelName: requested.displayName, requestedVendor: requested.vendor, requestedProvider: requested.provider,
+        fallback, fallbackReason: reason, purpose, requestId,
+      },
     },
     { headers: { 'x-overfit-cost-micro': String(charged), 'x-overfit-balance-micro': String(balance) } },
   );
 }
 
-/**
- * Geschenkte Auswertung reservieren, wenn die Anfrage dafür in Frage kommt: Stufe standard (günstigstes Bildmodell),
- * reservierte Höchstkosten zum Anbieterpreis höchstens `inviteGiftMaxCostMicro`, und das Monatsbudget der echten
- * KI-Kosten für Geschenktes ist nicht ausgeschöpft. Sonst null (dann zahlt das Guthaben).
- */
-async function reserveGift(env: Env, cfg: Config, accountId: string, tier: Tier, holdMicro: number): Promise<string | null> {
-  if (tier !== 'standard') return null;
-  // Der Hold enthält den Aufschlag; die Anbieterkosten sind Hold ÷ (1 + Aufschlag).
-  const maxProviderCost = Math.ceil(holdMicro / (1 + cfg.markupBp / 10_000));
-  if (maxProviderCost > cfg.inviteGiftMaxCostMicro) return null;
-  const spent = await giftedCostSince(env, monthStart());
-  if (spent + maxProviderCost > cfg.inviteGiftMonthlyCostCapMicro) return null;
-  return reserveReview(env, accountId);
-}
+/** Grund, wenn ein Foto-Auftrag gleich beim Ausweich-Modell landet (das Modell der Stufe kann keine Bilder). */
+const NO_IMAGES = 'keine Bilder';
 
-/** Erste erfolgreiche Coach-Anfrage eines eingeladenen Kontos → geschenkte Auswertungen für den Einladenden (einmalig). */
-async function rewardInviter(env: Env, cfg: Config, redeemerAccountId: string): Promise<void> {
-  const red = await env.DB.prepare(
-    'SELECT id, inviter_account_id FROM invite_redemptions WHERE redeemer_account_id = ? AND rewarded_at IS NULL',
-  )
-    .bind(redeemerAccountId)
-    .first<{ id: string; inviter_account_id: string }>();
-  // Nie an sich selbst (z. B. nach einem Kontoumzug ins einladende Konto).
-  if (!red || cfg.inviteRewardReviews <= 0 || red.inviter_account_id === redeemerAccountId) return;
-  const t = now();
-  const [lot, entry] = grantReviewStatements(env, red.inviter_account_id, 'invite_reward', cfg.inviteRewardReviews, t + cfg.inviteExpiryDays * 86400, red.id);
-  // Gutgeschrieben wird nur, wenn dieser Aufruf die Markierung „belohnt“ gesetzt hat (kein doppeltes Gutschreiben bei
-  // parallelen Anfragen): die Batch läuft als Transaktion, ein zweiter Aufruf scheitert an der Markierung und bricht ab.
-  const mark = await env.DB.prepare('UPDATE invite_redemptions SET rewarded_at = ? WHERE id = ? AND rewarded_at IS NULL').bind(t, red.id).run();
-  if (mark.meta.changes === 0) return;
-  await env.DB.batch([lot, entry]);
+/**
+ * Kurzer, inhaltsfreier Grund, warum das zuerst versuchte Modell nicht antwortete. Bewusst ohne den Fehlertext des Anbieters:
+ * der könnte Teile der Anfrage wiederholen, und das Protokoll speichert nie Inhalte.
+ */
+function failureLabel(e: UpstreamError | null): string | null {
+  if (!e) return null;
+  if (e.timeout) return 'Zeitüberschreitung';
+  if (e.status === 0) return 'nicht erreichbar';
+  return `HTTP ${e.status}`;
 }

@@ -1,26 +1,15 @@
 package app.overfit.fuel
 
-/** Creates the proof for invite redemption on this device (Play Integrity / App Attest). */
-interface Attestor {
-    /** Null = this device cannot attest (e.g. simulator, no Play services); the redeem then ends in `attestation_unavailable`. */
-    suspend fun attest(challenge: String): Attestation?
-}
-
-object NoAttestor : Attestor {
-    override suspend fun attest(challenge: String): Attestation? = null
-}
-
-/** What the credit/invite screens need; implemented by the real client ([FuelApi]) and by the offline demo. */
+/** What the credit screens need; implemented by the real client ([FuelApi]) and by the offline demo. */
 interface FuelService {
     val isDemo: Boolean
     suspend fun config(): FuelConfig
     suspend fun account(): FuelAccount
-    suspend fun setDisplayName(name: String?): String?
     suspend fun ledger(before: Long? = null, limit: Int = 50): LedgerPage
+    /** Request log of the account (newest first); every AI request through the credit, also failed ones. */
+    suspend fun requests(before: Long? = null, limit: Int = 50): ServerRequestPage = ServerRequestPage()
     suspend fun createRecoveryCode(): String
     suspend fun restore(code: String): FuelAccount
-    suspend fun inviteToken(): InviteToken
-    suspend fun redeemInvite(token: String): InviteRedeemResult
     /** Sends an Anthropic-style Messages request through Fuel (used by the coach in phase 4). */
     suspend fun messages(bodyJson: String): FuelMessageResult
     /** Short-lived, single-use link to the web purchase page for this account (opened in the browser). */

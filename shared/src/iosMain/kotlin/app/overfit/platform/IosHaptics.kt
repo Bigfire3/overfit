@@ -2,8 +2,6 @@ package app.overfit.platform
 
 import platform.UIKit.UIImpactFeedbackGenerator
 import platform.UIKit.UIImpactFeedbackStyle
-import platform.UIKit.UINotificationFeedbackGenerator
-import platform.UIKit.UINotificationFeedbackType
 import platform.darwin.DISPATCH_TIME_NOW
 import platform.darwin.dispatch_after
 import platform.darwin.dispatch_get_main_queue
@@ -20,13 +18,6 @@ class IosHaptics : Haptics {
                 later(220) { impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleHeavy) }
                 later(440) { impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleHeavy) }
             }
-            HapticPattern.Reveal -> {
-                // Heartbeat: lighter, then stronger beat.
-                impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleMedium)
-                later(170) { impact(UIImpactFeedbackStyle.UIImpactFeedbackStyleHeavy) }
-            }
-            HapticPattern.RevealFinish ->
-                UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
         }
     }
 

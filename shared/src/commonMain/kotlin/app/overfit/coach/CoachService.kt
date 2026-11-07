@@ -68,6 +68,8 @@ class CoachService(
     private val fuelConfig: suspend () -> app.overfit.fuel.FuelConfig? = { null },
     private val fuelBalance: suspend () -> Long? = { null },
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+    /** "Deine Ergänzung" (coach instructions setting), appended to every system prompt. */
+    private val instructionsAddition: () -> String = { "" },
 ) {
     private val mutex = Mutex()
 
@@ -308,7 +310,7 @@ class CoachService(
         return CoachContext(
             kind = kind,
             language = p.language,
-            instructions = s.instructions ?: defaultInstructions(p.language),
+            instructions = instructions(p.language),
             profileBlock = p.block,
             memory = dao.currentMemory()?.text,
             exerciseList = list,
@@ -331,7 +333,11 @@ class CoachService(
     }
 
     /** Coach role and rules: the user's own instructions or the default in [language]. */
-    fun instructions(language: Language): String = settings.state.value.instructions ?: defaultInstructions(language)
+    /** The Overfit base instruction (read-only in the settings since the chat redesign). */
+    fun baseInstructions(language: Language): String = settings.state.value.instructions ?: defaultInstructions(language)
+
+    /** Base instruction plus the user's addition: the role part of every system prompt (reviews and chat). */
+    fun instructions(language: Language): String = composeInstructions(baseInstructions(language), instructionsAddition())
 
     private suspend fun CoachDao.finishedOrAny(id: String): SessionRecord? = session(id)?.toRecord()
 

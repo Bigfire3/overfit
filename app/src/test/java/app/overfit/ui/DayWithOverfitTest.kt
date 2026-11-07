@@ -66,7 +66,7 @@ import java.io.File
 /**
  * "Ein Tag mit Overfit": one long walk through the app as a user would use it – onboarding, the Push/Pull/Legs
  * samples, sharing and re-importing, a workout with rest timer, edits, an app restart in the middle,
- * the AI template, credit/invite demo, "copy context", language, theme and "delete all data".
+ * the AI template, credit demo, "copy context", language, theme and "delete all data".
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
@@ -315,33 +315,22 @@ class DayWithOverfitTest {
         // The calendar day shows the photo
         tab("Kalender")
         compose.waitUntil(10_000) {
-            compose.onAllNodes(hasContentDescription("Tag ${realToday().dayOfMonth}, 1 Foto")).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodes(hasContentDescription("Tag ${realToday().dayOfMonth}, 1 Foto", substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
 
-        // --- Coach: the review request waits offline, goes out on the next app start ---------
-        compose.openCalendarDay(realToday().dayOfMonth)
-        waitFor("Push")
-        compose.onAllNodes(hasText("Push"))[0].performClick()
-        waitFor("Coach-Auswertung")
-        click("Coach-Auswertung")
-        waitFor("Wartet auf Verbindung")
+        // --- Coach: "Save" started the automatic review as a new chat (training attached, "Werte mein Training aus").
+        // Offline the answer fails; "Erneut versuchen" sends it once the network is back.
+        tab("Coach")
+        waitFor("Werte mein Training aus")
+        waitFor("Erneut versuchen")
         online = true
-        process++ // app restart → the queue is processed
-        compose.waitForTrainingTab()
-        compose.openCalendarDay(realToday().dayOfMonth)
-        waitFor("Push")
-        compose.onAllNodes(hasText("Push"))[0].performClick()
-        waitFor("Coach-Auswertung")
-        click("Coach-Auswertung")
-        waitFor("8/10")
-        waitFor("Mehr schlafen")
-        waitFor("Alle annehmen")
-        click("Alle annehmen")
-        waitFor("Plan übernommen. Das Workout ist angepasst.")
-        compose.waitUntilState(10_000) {
-            templates().any { t -> runBlocking { data.templates.get(t.id) }?.exercises?.any { e -> e.sets.firstOrNull()?.weightKg == 62.5 } == true }
-        }
-        back(); back()
+        click("Erneut versuchen")
+        waitFor("Hier ist ein Vorschlag für morgen.")
+        val reviewPrompt = coachTransport.prompts.last()
+        assertTrue(reviewPrompt.dynamicSystem, reviewPrompt.dynamicSystem.contains("## Attached training"))
+        assertEquals("Werte mein Training aus", reviewPrompt.user)
+        compose.onNodeWithTag("coach:new").performClick() // the chat part further down starts a fresh chat
+        waitFor("Wie lief mein Training?")
 
         // --- AI template: copy the prompt, import a sample answer from the clipboard --------
         tab("Workouts")
@@ -357,46 +346,31 @@ class DayWithOverfitTest {
         click("Speichern")
         compose.waitUntilState(10_000) { templates().any { it.name == "Oberkörper A" } }
 
-        // --- Profile: Fuel demo + invite reveal, KI-Coach context ------------------
+        // --- Profile: Fuel demo (balance, ledger), KI-Coach context ------------------
         tab("Profil")
-        click("startet bald")
+        // "startet bald" is also the state of the AI chat connections in the settings: open credit by its label.
+        click("Guthaben")
         waitFor("Guthaben startet bald")
         click("Demo ansehen")
         waitFor("4,20 € Guthaben")
-        waitFor("5 geschenkte Auswertungen")
-        click("Freunde einladen")
-        waitFor("Neuer Code in", substring = true)
+        assertTrue(compose.onAllNodes(hasText("einlad", substring = true, ignoreCase = true)).fetchSemanticsNodes().isEmpty())
+        click("Buchungen")
+        waitFor("Claude Sonnet 5.5 (Anthropic)", substring = true)
         back()
-        click("Einladung einlösen")
-        compose.onNodeWithText("Link oder Code").performTextInput("overfit://invite#demo-invite-token-1")
-        click("Einlösen")
-        waitFor("Einladung von Fabian")
-        waitFor("Coach-Auswertungen geschenkt")
-        assertTrue(HapticPattern.Reveal in haptics.played)
-        waitFor("Tippen zum Schließen")
-        click("Tippen zum Schließen")
         waitFor("4,20 € Guthaben")
 
-        // Coach tab → prompts show their text → copy context: contains the profile and the finished workout
+        // Coach tab = chat: ask (profile and the last training go along), the answer proposes a workout,
+        // "Übernehmen" opens the import preview. (The prompts with "Copy context" moved to the coach settings.)
         tab("Coach")
-        waitFor("Prompts & Vorlagen", substring = true)
-        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasTestTag("prompt:Kontext kopieren")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("prompt:Kontext kopieren").performScrollTo().assertExists()
-        compose.onNodeWithTag("prompt-copy:Kontext kopieren").performScrollTo().performClick()
-        val ctx = share.clipboard.orEmpty()
-        assertTrue(ctx, ctx.contains("Fabi"))
-        assertTrue(ctx, ctx.contains("Push"))
-        assertTrue(ctx, ctx.contains("Bench Press"))
-
-        // Coach chat: ask, the answer proposes a workout, "Use workout" opens the import preview
-        compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:tabInput"))).performScrollTo().performTextInput("Was soll ich morgen trainieren?")
-        click("Senden")
+        waitFor("Wie lief mein Training?")
+        compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:input"))).performTextInput("Was soll ich morgen trainieren?")
+        compose.onNodeWithTag("coach:send").performClick()
         waitFor("Hier ist ein Vorschlag für morgen.")
         waitFor("Workout-Vorschlag: Coach Push")
         val chatPrompt = coachTransport.prompts.last()
         assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Fabi"))
         assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Bench Press"))
-        click("Workout übernehmen")
+        compose.onNodeWithTag("chat:apply").performClick()
         waitFor("Speichern")
         waitFor("Coach Push")
         click("Speichern")

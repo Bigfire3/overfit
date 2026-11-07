@@ -20,7 +20,6 @@ import app.overfit.data.InMemorySecretStore
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.domain.Language
 import app.overfit.domain.WeightUnit
-import app.overfit.platform.HapticPattern
 import app.overfit.platform.RecordingHaptics
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -33,7 +32,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Profile → Fuel → "Demo ansehen" → balance, invite (QR), redeem → reveal. No server, no real data. */
+/** Profile → Fuel → "Demo ansehen" → balance, packages, ledger. No server, no real data. */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
 class FuelDemoTest {
@@ -63,7 +62,8 @@ class FuelDemoTest {
             )
         }
         compose.onNodeWithText("Profil").performClick()
-        compose.onNodeWithText("startet bald").performScrollTo().performClick()
+        // "startet bald" is also the state of the AI chat connections in the coach settings: open the credit row by its label.
+        compose.onNodeWithText("Guthaben", useUnmergedTree = true).performScrollTo().performClick()
 
         // Not configured: explanation + demo
         compose.onNodeWithText("Guthaben startet bald").assertExists()
@@ -72,42 +72,30 @@ class FuelDemoTest {
         // Demo balance and packages
         try { compose.waitUntil(5_000) { shown("4,20 € Guthaben") } } catch (e: Throwable) { throw AssertionError(compose.onRoot().printToString(), e) }
         compose.onNodeWithText("Demo – lokale Beispieldaten, nichts davon ist echt.").assertExists()
-        // Credit is "X € Guthaben"; gifted reviews are their own counter; bought vs. gifted, gifted first.
-        compose.onNodeWithText("5 geschenkte Auswertungen").assertExists()
-        compose.onNodeWithText("Gekauft: 3,20 € Guthaben · geschenkt: 1,00 € Guthaben").assertExists()
-        compose.onNodeWithText("Geschenktes wird zuerst verbraucht.").assertExists()
-        compose.onNodeWithText("Geschenkte Auswertungen gelten für Coach-Auswertungen mit Gemini 3.6 Flash", substring = true).assertExists()
+        // Credit is "X € Guthaben"; nothing gifted, nothing expires, no invitations.
+        assertTrue(!shown("geschenkt", substring = true) && !shown("gültig bis", substring = true))
         // Store packages show both values: credit and the higher store price.
         compose.onNodeWithText("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)").performScrollTo().assertExists()
         compose.onNodeWithText("28 % Aufschlag", substring = true).assertExists()
         assertTrue(shown("Bald im Store"))
+        assertTrue(!shown("Einladung", substring = true) && !shown("einladen", substring = true))
 
         // Ledger
         compose.onNodeWithText("Buchungen").performScrollTo().performClick()
         compose.waitUntil(5_000) { shown("Coach-Auswertung") }
-        // Real model names instead of tier names; a replacement model is said openly.
-        assertTrue(shown("Gemini 3.6 Flash (Google)", substring = true))
-        compose.onNodeWithText("Ersatzmodell, berechnet wurde der Preis von Gemini 3.6 Flash").performScrollTo().assertExists()
+        // Real model names instead of tier names: all credit tiers are Claude.
+        assertTrue(shown("Claude Sonnet 5.5 (Anthropic)", substring = true))
+        assertTrue(shown("Claude Opus 5.5 (Anthropic)", substring = true))
+        assertTrue(shown("Claude Haiku 5.5 (Anthropic)", substring = true))
+        assertTrue(!shown("Gemini", substring = true))
+        // A replacement model is said openly, with the chosen Claude model (not an old Gemini name).
+        compose.onNodeWithText("Ersatzmodell, berechnet wurde der Preis von Claude Opus 5.5").performScrollTo().assertExists()
         assertTrue(!shown("Standard", substring = true) && !shown("Lite", substring = true))
-        // Every booking says whether it was paid, gifted or used; gifted reviews show as a count.
-        compose.onNodeWithText("+5 Auswertungen").performScrollTo().assertExists()
+        // Every booking says whether it was paid or used.
         assertTrue(shown("bezahlt ·", substring = true))
-        assertTrue(shown("geschenkt ·", substring = true))
         assertTrue(shown("verbraucht ·", substring = true))
-        assertTrue(shown("+3,20 € Guthaben"))
+        assertTrue(shown("+4,22 € Guthaben"))
         compose.onNodeWithContentDescription("Zurück").performClick()
-
-        // invite screen shows a rotating code
-        compose.onNodeWithText("Freunde einladen").performScrollTo().performClick()
-        compose.waitUntil(5_000) { shown("Neuer Code in", substring = true) }
-        assertTrue(shown("Ihr bekommt beide 5 Coach-Auswertungen geschenkt", substring = true))
-        compose.onNodeWithContentDescription("Zurück").performClick()
-
-        // Redeem (paste) → reveal
-        compose.onNodeWithText("Einladung einlösen").performScrollTo().performClick()
-        compose.onNodeWithText("Link oder Code").performTextInput("overfit://invite#demo-invite-token-1")
-        compose.onNodeWithText("Einlösen").performClick()
-        compose.waitUntil(10_000) { shown("Einladung von Fabian") }
-        assertTrue(HapticPattern.Reveal in haptics.played)
+        compose.waitUntil(5_000) { shown("Wiederherstellungscode") }
     }
 }

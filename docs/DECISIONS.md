@@ -1226,6 +1226,23 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - Kontrast (`ButtonContrastTest`): Schwarz auf Weiß, Weiß auf Dunkelgrau (auch im Panel), Weiß auf `armedFill` je ≥ 4,5:1. Belege `docs/screenshots/buttons/vorher|nachher/`.
 - Gegencheck-Befunde: Karten 0,98 und Icons 0,88 sind bewusst (große Fläche wirkt bei 0,96 zu wuchtig, kleines Icon sieht bei 0,96 nicht gedrückt aus). Zeilen in Panels (`pressableRow`) behalten die graue Druckfläche ohne Scale, weil sich eine Zeile innerhalb der Trennlinien nicht verkleinern soll. Tippflächen aller Galerie-Knöpfe ≥ 48 dp sind per Test abgesichert (`ButtonShotTest`).
 
+## KI-Auswertung auf dem Testserver repariert (Hotfix KI, 6.11.2026)
+Befund (Ende-zu-Ende gegen `overfit-backend-test`, frisches Gerät, 1 € Test-Guthaben): `standard` → `503 tier_unavailable` (kein
+`GEMINI_API_KEY`), `pro` → `400 upstream_rejected` mit HTTP 401, `lite` → `502` (Workers AI: `llama-3.1-8b-instruct` am 30.5.2026
+abgekündigt). Die App wich korrekt von `standard` auf `pro` aus und zeigte dann „Der Anbieter hat die Anfrage abgelehnt. Prüfe das
+Modell in den Coach-Einstellungen.“ – für Guthaben-Nutzer nicht lösbar.
+- Ursache des 401: Cloudflare legt neue AI Gateways seit 2026 immer mit Pflicht-Authentifizierung an (nicht abschaltbar). Der Worker
+  schickte Anthropic-/Gemini-Anfragen über `getUrl` ohne `cf-aig-authorization`. Lösung: Gateway nur mit optionalem Secret
+  `AI_GATEWAY_TOKEN`, sonst direkt zum Anbieter; lehnt das Gateway trotz Token ab (401/403), einmal direkt. Workers AI bleibt über
+  das Binding im Gateway (braucht kein Token). Verworfen: Deploy-Token im Worker wiederverwenden (zu viele Rechte).
+- 401/403 vom Anbieter oder Gateway ist ein Betreiberfehler, kein Fehler der Anfrage: gilt als Ausfall (Ausweich-Stufe, sonst
+  `502 upstream_unavailable`, nichts abgebucht). Cloudflare-Fehler (`error: [{ message }]`) landen jetzt im Fehlertext.
+- `lite` = `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (laut Cloudflare mit JSON-Modus, keine Abkündigung angekündigt; die kleinen
+  Llama-3.1/3.2-Modelle werden am 15.11.2026 abgekündigt). Teurer als vorher (0,293 $ / 2,253 $), aber weiter billiger als Gemini Flash.
+  Der Parser versteht zusätzlich das OpenAI-Format (`choices`) neuerer Workers-AI-Modelle.
+- App: `tier_unavailable` (veraltete Config im Cache) → Config neu laden, einmal mit verfügbarer Stufe wiederholen. Server-Einrichtungs-
+  fehler (`not_configured`, `tier_unavailable`, Anbieter-401/403) zeigen „Der Anbieter ist gerade nicht erreichbar.“ mit „Erneut
+  versuchen“ statt „Kein KI-Zugang“ bzw. „Prüfe das Modell“.
 ## Fokus, Stift-Icon, Rot/Grün, Story-Balken (6.11.)
 - Fabian: „Wenn Textfelder verlassen werden, soll der Cursor verschwinden. Workouts möchte ich rechts oben über ein Stift Icon bearbeiten können. Nur Delete Buttons sollen rot werden. Finish soll grün werden. Die Story-Balken laufen nicht mit.“
 - **Cursor:** Zentral (geleert beim Loslassen, nicht beim Aufsetzen: Schließt die Tastatur, verschiebt sich das Layout sonst unter dem Finger und der Tipp auf den Knopf geht verloren; Sonnet-Gegencheck) in `OverfitTheme` (`clearFocusOutsideTextInput`, `ui/components/FocusClearing.kt`). Jede `BasicTextField` trägt `Modifier.textInputArea()` (setzt in der Initial-Phase ein Flag „Touch begann im Feld“). Die Wurzel prüft in der Final-Phase: Touch ohne Flag (leere Fläche, Liste, anderer Knopf, der seinen Tipp trotzdem bekommt) → `clearFocus()`. Scrollen: beginnt der Finger im Feld und bewegt sich vor Ablauf des Long-Press-Timeouts über die Touch-Slop, wird ebenfalls geleert (danach nicht mehr, damit Textauswahl per Long-Press funktioniert). Zurück bei offener Tastatur: Wechsel `isImeVisible` true → false leert den Fokus (sonst blinkt der Cursor ohne Tastatur weiter). Der Fokus-Fänger aus PR #69 bleibt davor, sonst springt der Fokus nach `clearFocus()` aufs erste Feld. Neue Felder müssen `textInputArea()` setzen. Tests `FocusClearTest` (Tipp daneben, Tipp aufs Feld, anderer Knopf, Scrollen).
@@ -1286,3 +1303,196 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - Unbekannte Übungen bekommen im Editor eine temporäre ID (`import:<name>`) und werden erst beim Speichern als eigene Übungen angelegt (nur die, die noch im Workout sind). Ihr Bild ist bis dahin nicht antippbar (keine Details möglich). Hinweis „Wird neu angelegt: …“ als `Hint` oben.
 - Die Klemmung negativer Gewichte beim Einlesen (`≥ 0`) wurde in der Vorschau nie angezeigt, daher gibt es dafür auch jetzt keinen Hinweis.
 - Coach-Vorschläge: Nachricht des Coachs und Unterschiede zum alten Workout erscheinen als Hints oben, „Verwerfen“ als kleiner Knopf oben. Ersetzt ein Vorschlag ein Workout, überschreibt „Speichern“ dieses; die Wahl „Als neues Workout“ entfällt (Entscheidung: ein Weg weniger, Kopie lässt sich über Teilen/Neu anlegen erreichen).
+
+## Guthaben nur mit Claude, Anfrage-Protokoll „Abrechnung“ (7.11.2026)
+Fabian: „möglichst alle Modelle von Claude nutzen … nicht überall ein API-Token erzeugen … für günstige Anfragen Haiku“ und „in der App
+möglichst genau sehen, wo, wann, was angefragt wurde“.
+- **Stufen:** `lite` = Claude Haiku 5.5, `standard` = Claude Sonnet 5.5 (Voreinstellung für Auswertung und Chat), `pro` = Claude Opus 5.5.
+  Der Server braucht nur noch `ANTHROPIC_API_KEY`; Gemini und Workers AI sind aus dem Guthaben-Weg entfernt (Code gelöscht, Preise bleiben
+  für alte Buchungen, alte Modell-IDs werden auf Stufen abgebildet). Der Weg „eigener Schlüssel“ ist unverändert (Gemini, OpenAI, OpenRouter).
+- **Preise** aus der Preisliste von Anthropic (über den claude-api-Skill geprüft, Stand 7.11.): Haiku 0,10 $/0,50 $, Sonnet 2 $/10 $,
+  Opus 4 $/20 $ je MTok, Cache-Lesen 0,01/0,20/0,20 $, Cache-Schreiben 1,25 × Eingabe. `MARKUP_BP` bleibt 2800.
+- **Ausweichen:** lite → standard, standard → lite, pro → standard. Nie ungefragt zu Opus. Berechnet wird wie bisher höchstens der Preis
+  der gewählten Stufe; ein Fehlversuch kostet nichts. Die App wählt bei fehlender Stufe ebenso nie die teurere (standard → lite, lite → standard).
+- **Einladungsbonus:** zunächst auf Haiku umgestellt, am selben Tag auf Fabians Wunsch ganz entfernt (Abschnitt „Einladungen entfernt“).
+- **Gespeicherte Modellwahl:** `pro` hieß bis jetzt Claude Sonnet. Damit niemand plötzlich Opus-Preise zahlt, wird ein gespeichertes `pro`
+  einmalig zu `standard` (= wieder Sonnet), auch beim Wiederherstellen alter Backups (`CoachSettings.claudeTiers`). Die Modellwahl bietet
+  jetzt alle drei Modelle an.
+- **Anfrage-Protokoll:** Server-Tabelle `requests` (Migration 0008), geschrieben für jede Anfrage nach der Body-Prüfung, auch bei
+  `insufficient_funds` und Anbieter-Fehlern; nur Metadaten (Zeit, Dauer, Zweck, Stufe, zuerst versuchtes und antwortendes Modell, Ausfall des
+  ersten Versuchs, Token, berechneter Betrag, geschenkt, Foto ja/nein). `GET /v1/account/requests`. Die Antwort von `/v1/messages` nennt die
+  Protokoll-ID (`requestId`), Fehler in `details.requestId`, so dass App und Server einen Eintrag nur einmal zeigen.
+  App: Room-Tabelle `ai_request` (DB v11, AutoMigration 10→11 nach `body_weight` v10, Migrationstest), geschrieben von `LoggingTransport` um jeden Transport, also auch
+  mit eigenem Schlüssel (dann rein lokal, ohne Kosten, mit Token aus der Antwort des Anbieters; keine Backend-Anfrage). Für Guthaben holt die
+  Ansicht „Abrechnung“ zusätzlich das Server-Protokoll (auch Anfragen anderer Geräte des Kontos) und führt Einträge über `serverId` zusammen.
+  Zweck kommt aus `CoachPrompt.purpose` (review, chat, autofill, plan, other). Verworfen: Protokoll im Geld-Ledger (Fehlversuche ohne Betrag
+  hätten Summen und Admin-Auswertung verfälscht).
+- **Cloudflare:** Workers AI wird nicht mehr aufgerufen (keine Kosten). Das AI Gateway ist kostenlos und nur noch mit `AI_GATEWAY_TOKEN`
+  im Weg; ohne Token geht alles direkt an Anthropic. Das Binding `AI` bleibt nur für die Gateway-URL. Kein Zahlungsmittel bei Cloudflare nötig.
+- **Offen:** `effort: medium` geht an alle drei Modelle; laut Anthropic unterstützt Haiku 5.5 `effort` (Standard `medium`), geprüft im
+  E2E-Test nach dem Deploy. Die Spalte `fallback_reason` hält bei Fehlschlägen ohne Ausweichen den Fehlertext des letzten Versuchs.
+
+## Einladungen, Startguthaben und Verfall entfernt (7.11.2026)
+Fabian (Owner), wörtlich: „Dieses Freunde werben und diesen 1 Euro geschenkt bekommen, das ist mir am Anfang jetzt erstmal zu viel
+Heckmeck. Entferne das mal komplett aus der App. Da soll nichts mehr zu finden sein in der App, irgendwas über dieses Referral-Programm.
+… mir das auch zu undurchsichtig und ich mag es auch nicht, wenn Guthaben so abläuft.“ Entschieden, nicht verhandelbar.
+- **Backend:** `/v1/invite/*` antwortet 404, `/v1/config` ohne `invite`, `/v1/account` ohne `giftReviews` und `invite`, `/v1/messages` ohne
+  `giftReview`. Kein Startguthaben (auch nicht im Testbetrieb, neue Konten 0 €), nichts verfällt (Migration 0009, `expiring` immer leer).
+  Keine Geräteprüfung mehr (Play Integrity / App Attest gab es nur für Einladungen). **Die D1-Tabellen bleiben** (`invite_tokens_used`,
+  `invite_redemptions`, `review_gifts`, alte Buchungen): nicht destruktiv, keine Datenverluste, nur ungenutzt.
+- **App (Android und iOS):** entfernt sind „Freunde einladen“ (QR mit rotierendem Code, Name für Freunde), „Einladung einlösen“ (Scan,
+  Einfügen), der Deep-Link `overfit://invite#…` (ein alter Link landet jetzt wie jeder fremde Text im Import und wird dort abgelehnt; das
+  Schema `overfit://` bleibt für Trainings und `overfit://guthaben`), die Reveal-Animation samt Haptik-Mustern `Reveal`/`RevealFinish`,
+  geschenkte Auswertungen (Zähler, Verfallsdaten, Hinweis auf das Modell, „geschenkte Auswertung“ unter der Antwort, „geschenkt“ in der
+  Abrechnung), die Aufteilung „Gekauft/geschenkt“ und die Zeile „gültig bis“, die Erwähnung in der Coach-Story und im „Startet bald“-Text,
+  `FuelService.inviteToken/redeemInvite/setDisplayName`, `Attestor`/`AndroidAttestor`/`IosAttestor`, die Modelle `InviteConfig`,
+  `InviteToken`, `InviteChallenge`, `InviteRedeemResult`, `GiftReviews`, `ExpiringItem`, `InviteStatus`, alle zugehörigen Texte (DE+EN)
+  und die Abhängigkeit `com.google.android.play:integrity`. Das Profil-Feld `displayName` nutzt die App nicht mehr (es war nur der Name
+  für Einladungen); der Endpunkt `PUT /v1/account/profile` bleibt im Backend unangetastet.
+- **Alte Konten:** Ein altes Backend, das noch `invite`/`giftReviews`/`expiring` schickt, stört nicht (`ignoreUnknownKeys`). Buchungen
+  alter Typen (`invite_bonus`, `invite_reward`, `test_credit`, …) zeigt die Buchungsliste neutral als „Gutschrift“, negative als
+  „Ausbuchung“; die Kategorien heißen „gutgeschrieben“ bzw. „ausgebucht“ statt „geschenkt“/„verfallen“. Das Feld `reviews` wird ignoriert.
+  Die lokale Spalte `ai_request.gift` bleibt (keine Migration), wird aber nicht mehr gesetzt oder angezeigt.
+- **Preise:** Aufschlag bleibt 28 %. Die bisherige Rücklage von 10 % vom Netto für Geschenktes bleibt in der Rechnung als konservative
+  Rücklage für Kulanz-Gutschriften und Ausfälle (Chargebacks), damit `backend/test/pricing.test.ts` und die Tabellen gleich bleiben. Ob der
+  Aufschlag dadurch sinken kann, ist eine Geldfrage für Fabian (offen).
+- **Dokumentation:** SPEC (Phase 9 gestrichen), monetization.md, backend-api.md, backend/README.md, PROGRESS.md und die Preisseite
+  `web/preise/` sind angepasst. Die Kaufseite (`web/guthaben/`) bietet weiter Guthaben-Codes „als Geschenk“ an: das ist ein gekaufter Code,
+  kein Empfehlungsprogramm, und bleibt.
+## Muskel-Heatmap „Trainierte Muskeln“ (7.11.)
+- **Auftrag (Fabian):** Ansicht wie „Training Frequency“ einer anderen App (Vorder-/Rückansicht, Muskeln nach Trainingshäufigkeit eingefärbt, Zeitraumwahl), „auch im Calendar irgendwo vielleicht als popup“. Nicht deren Design oder Grafik übernommen.
+- **Grafik – Herkunft und Lizenz:** Eigene, schlichte, stilisierte Figur, für Overfit selbst gezeichnet (Polygone in Figur-Einheiten 100 × 180, linke Hälfte gespiegelt, Ecken beim Zeichnen gerundet). Keine fremde Vorlage, kein Download, keine Lizenzpflicht, daher kein Eintrag in „Über Overfit“/LICENSE. Liegt als Compose-Daten in `ui/muscles/BodyShapes.kt` (kein Netz zur Laufzeit). Muskeln sind durch schmale Lücken getrennt, nicht durch Linien (Regel „keine Rahmen“).
+- **Regionen = Katalog-Muskelgruppen:** Der Katalog kennt nur „Schultern“ (nicht vorn/seitlich/hinten) und „Bauch & Core“ (inkl. seitlichem Bauch). Die Figur zeigt deshalb Schulter vorne und hinten bzw. gerade und schräge Bauchmuskeln als dieselbe Gruppe. Gezeigt: Brust, Schultern, Bizeps, Trizeps, Unterarme, Bauch & Core, Nacken, oberer Rücken/Trapez, Latissimus, unterer Rücken, Gesäß, Abduktoren, Adduktoren, Oberschenkel vorn, Beinbeuger, Waden. „Beine allgemein“ zählt für Oberschenkel vorn, Beinbeuger, Gesäß und Waden; Ausdauer und Mobilität haben keine Region und werden ignoriert. Feinere Schulterköpfe bräuchten neue Katalog-Schlüssel (eigene Aufgabe).
+- **Zählung:** abgehakte Sätze aus beendeten Trainings, je Übung: primäre Muskeln voll, sekundäre halb (Muskel in beiden Listen zählt nur primär). Quelle eine neue DAO-Abfrage (`observeMuscleSets`, Join auf `exercise`, keine Migration). Eigene Übungen zählen mit ihren eingetragenen Muskeln.
+- **Stufen:** 0 = untrainiert (dunkelgrau `#48484A`, etwas heller als die Neutralteile), 1–4 nach Vierteln des am meisten trainierten Muskels im Zeitraum (oberste Stufe Weiß). Relativ statt absoluter Satzzahlen, damit Woche und Gesamt gleich gut lesbar sind. Legende „Viel ▬ Wenig“ als fünf Stufen-Flächen.
+- **Zeiträume:** Kalenderzeiträume (Diese Woche ab Wochenstart der Sprache wie im Kalender: DE Montag, EN Sonntag; Dieser Monat; Dieses Jahr; Gesamt), maßgeblich ist der Trainingsbeginn. Gewählter Zeitraum wird gemerkt (`muscles.period`), Standard „Diese Woche“.
+- **Popup als Ausnahme:** CLAUDE.md sagt „keine Popups“, Fabian wünscht aber ausdrücklich ein Popup. Umsetzung als Bottom-Sheet (Compose `Dialog`, Fläche `surface`, oben rund, ohne Rand): ✕, Zurück, Tipp über das Sheet oder Herunterziehen schließen. Öffnen über ein neues Körper-Icon in der Kalender-Titelzeile.
+- **Antippen:** Tipp auf einen Muskel zeigt darunter „Brust · 6 Sätze + 4 Sätze mittrainiert“ (direkte und mittrainierte Sätze getrennt statt „7,5 Sätze“), die übrigen Muskeln werden kurz blasser (Hervorhebung ohne Umriss). Erneuter Tipp hebt die Auswahl auf. Kleine Flächen (Adduktoren) treffen auch bei knappem Daneben-Tippen (nächste Region im Umkreis).
+- **Trainingsdetail:** Abschnitt „Trainierte Muskeln“ für genau dieses Training (ohne Zeitraumwahl), Stufen relativ zum stärksten Muskel des Trainings. Ohne abgehakte Sätze entfällt der Abschnitt.
+- **Tests:** `MuscleMapTest` (shared: primär/sekundär, Beine, Zeitraumgrenzen Woche/Monat/Jahr inkl. Wochenstart, Stufen), `MuscleMapTest` (App, Robolectric: Sheet öffnen/schließen per ✕ und Tipp daneben, Zeitraumwechsel und Merken, Tipp auf Muskel, Trainingsdetail), `MuscleMapShotTest` (Screenshots).
+
+## Story schließt sofort, „?“-Badge weg, Story nach Daten löschen (7.11.)
+- „?“-Badge am Übungsbild im Workout-Editor (ExerciseThumb) entfernt; das Bild bleibt tippbar (Übungsdetails). Kein Icon-Fallback „?“ in LineIcon vorhanden (andere „?“ im Code sind nur Platzhalter in Texten).
+- Ursache Ruckeln: Story-Route ist kein Tab, die Tab-Leiste kam erst nach dem Fade zurück. `ScreenMotion`: Wechsel Story → Tab ist instant (keine Animation), Leiste und Coach-Seite im selben Frame.
+- Ursache Story fehlte: `resetAll()` (Alle Daten löschen) ließ `overfit.coachStorySeen` stehen. Jetzt entfernt, Story kommt beim nächsten ersten Coach-Besuch wieder.
+- Nachtrag: Tab- und Mini-Workout-Leiste bleiben versteckt, solange die Story noch in `visibleEntries` ist (ca. 3 Frames nach dem Schließen), damit sie nicht zuerst unter der Story auftauchen.
+- **Gegencheck (Sonnet, effort high) zu PR #91:** behoben: Protokoll und Antwort speichern als Ausfallgrund nur noch „HTTP 529“ /
+  „Zeitüberschreitung“, nie den Fehlertext des Anbieters (könnte Teile der Anfrage wiederholen; Test mit geheimem Prompt);
+  Ausweich-Text „berechnet zum Preis des günstigeren der beiden Modelle“; README-Rest. Bewusst so gelassen: alte App-Versionen mit
+  gespeichertem `pro` bekommen jetzt Opus (abgerechnet wird, was angezeigt wird; die einzige installierte App ist Fabians, die per
+  Update migriert). Migration 0009 macht auch schon abgelaufene Restposten alter Testkonten wieder nutzbar (gewollt: „Guthaben läuft nie
+  ab“). Haiku über 100 000 Eingabe-Token (0,50 $/2,50 $) kommt bei Overfit nicht vor.
+
+## Körpergewicht im Kalender, Zukunftsmonate, „Heute“-Knopf (7.11.)
+- **Auftrag (Fabian):** Gewicht tracken, eingebaut in die Kalenderseite; im Kalender auch zukünftige Monate sehen; ein Knopf, der zum heutigen Tag springt.
+- **Datenmodell:** neue Tabelle `body_weight` (DB v10, AutoMigration 9→10, reine Ergänzung, Migrationstest): `date` (ISO, Primärschlüssel → höchstens ein Eintrag je Tag, Upsert ersetzt), `weightKg` (immer kg, Anzeige in der Profil-Einheit kg/lb), `measuredAt` (Zeitpunkt der Eingabe, optional), `updatedAt`.
+- **Bisherige Gewichtsliste im Profil:** Das Onboarding speicherte das Gewicht schon in `PersistedState.weights`. Die Tabelle ist jetzt die Quelle der Wahrheit; beim ersten Start übernimmt `syncProfileWeights` die Profil-Liste einmal (Flag im KeyValueStore, an einem Tag gewinnt der Tabellenwert) und hält `weights` danach als **Spiegel** der Tabelle. So lesen Coach (eigener Schlüssel und Guthaben), „Kontext kopieren“, KI-Vorlage und Chat-Sync das Gewicht unverändert über `aiProfileFacts` – die Datenschutzregeln mit eigenem Schlüssel bleiben dieselben (es geht nur das, was schon vorher ging, plus der Trend).
+- **Coach-Kontext:** `aiProfileFacts` hängt „Weight trend: -1.5 kg over 32 days“ (DE „Gewichtstrend … in … Tagen“) an: ältester gegen neuesten Eintrag der letzten 8 Wochen vor dem letzten Wert, nur ab 2 Einträgen mit mindestens 7 Tagen Abstand. ASCII-Vorzeichen, damit jedes Modell es gleich liest.
+- **Kalender-Tab:** Oben eine `FloatingCard` mit letztem Wert („Heute“ bzw. „Stand <Datum>“), „±x kg zur Vorwoche“ (Vergleich mit dem neuesten Eintrag 7–14 Tage vor dem letzten; älter zählt nicht als „Vorwoche“) und Mini-Verlauf (Linie, x nach Datum über 56 Tage, Punkt am neuesten Wert, nur Vordergrundfarbe). Ohne Eintrag: „Gewicht eintragen“ mit Plus. Tipp → Tagesansicht von heute, Feld fokussiert. Die Karte steht fest über dem Kalender (nicht im scrollenden Bereich), damit der Schnell-Eintrag immer erreichbar ist.
+- **Markierung:** kurzer grauer Strich direkt unter der Tageszahl (anfangs am Zellenende – wirkte, als gehöre er zum Tag darunter). Unterscheidet sich klar von Punkt (Training) und Ring (Sauna). Legende zeigt ihn, sobald ein Gewichtstag existiert (Sauna-Eintrag nur noch, wenn es Sauna gibt). Liste: Tage nur mit Gewicht sind eigene Karten („Körpergewicht“, Wert darunter), sonst „Gewicht 82,4 kg“ in der Infozeile. Der Leerhinweis des Kalenders („Noch keine Trainings oder Fotos“) bleibt bei reinem Gewicht stehen, weil er stimmt.
+- **Tagesansicht:** Abschnitt „Körpergewicht“ oben, `SetField` (gleiches Feld wie Sätze, Cursor-Regeln über `textInputArea`), Platzhalter = letzter Wert davor. Gespeichert wird bei jeder gültigen Eingabe (25–350 kg wie im Onboarding) im App-Scope, damit Zurück direkt nach dem Tippen nichts verliert; zu kleine Zwischenwerte beim Tippen („8“ auf dem Weg zu „82“) werden still übergangen, nur über dem Maximum erscheint ein Hinweis. Verlässt man ein leeres/ungültiges Feld, steht wieder der gespeicherte Wert da – Löschen geht nur über den Mülleimer (Doppeltipp, rot).
+- **Zukunftsmonate:** `DiaryCalendar.months(…, ahead = 12)`: 12 Monate über dem aktuellen (Liste bleibt neueste oben, also nach oben scrollen = Zukunft); der Kalender startet auf dem aktuellen Monat. Künftige Tage sind ausgegraut (40 % Deckkraft) und nicht antippbar.
+- **„Heute“-Knopf:** Icon `Icon.Today` (Ortungs-Symbol: Ring, Mittelpunkt, vier Striche – „zurück zu mir“) in der Titelzeile vor Muskel-Icon und Ansicht-Umschalter, nur sichtbar, wenn der aktuelle Monat nicht oben steht (Raster) bzw. die Liste nicht am Anfang ist; Tipp scrollt animiert zurück. Anfangs als Text-Knopf „Heute“; mit dem Muskel-Icon (PR #90) passte die Zeile bei 360 dp nicht mehr (schon „Vergleichen“ + Muskel + Umschalter schob den Umschalter hinaus). Deshalb sind „Heute“ und „Vergleichen“ (`Icon.Compare`, zwei Bilder nebeneinander) jetzt Icons à 48 dp, höchstens drei gleichzeitig: solange „Heute“ sichtbar ist, wartet „Vergleichen“.
+- **Backup:** neues Feld `bodyWeights` (Datum, kg, Zeitpunkt). Version bleibt (ältere Apps ignorieren das Feld und bekommen die Werte über `state.weights`, das weiterhin mitgeschrieben wird). Alte Backups ohne `bodyWeights` füllen die Tabelle aus `state.weights`.
+- „Alle Daten löschen“ leert auch `body_weight`.
+- **Sonnet-Gegencheck (Befunde und Umgang):**
+  - Behoben: Bei 360 dp passten „Heute“, „Vergleichen“ und der Ansicht-Umschalter nicht nebeneinander, der Umschalter fiel heraus. Solange „Heute“ sichtbar ist, wartet „Vergleichen“ (ein Tipp auf „Heute“ holt es zurück; eine laufende Auswahl bleibt beim Scrollen). Test dazu.
+  - Behoben: Das Feld wurde nach jedem Speichern mit dem gerundeten Wert überschrieben (lb: „180“ → „179,9“ mitten im Tippen). Jetzt folgt es dem gespeicherten Wert nur ohne Fokus; gespeichert wird auf 0,01 kg, damit ein lb-Wert unverändert zurückkommt. Test mit Rückschreiben.
+  - Behoben: Ersetzen der Gewichte beim Restore läuft in einer Transaktion. Künftige Tage sind auch im Vergleichsmodus ausgegraut (Deckkraft 50 % statt 40 %, besser lesbar). Die Karte ignoriert Einträge mit Datum nach heute (nur über ein bearbeitetes Backup möglich).
+  - Bewusst so: Onboarding schreibt Profil und Tabelle (der Spiegel gleicht sofort ab, der Profilwert ist für die nächsten Schritte direkt da). Der Kalender startet auf dem Monat beim Öffnen; über Mitternacht hinweg rechnet „Heute“ mit dem neuen Datum.
+
+## Grüne Satzzeile, hervorgehobene Felder, Cursor ans Ende (7.11.)
+- **Ganze Zeile grün:** Ein abgehakter Satz im laufenden Training (und beim nachträglichen Bearbeiten, gleiche Komponente `WorkoutSetRow`) füllt die ganze Zeile mit `Colors.confirmFill` (Fabian: „gesamte Zeile grün“). Der Haken-Kreis ist darauf hellgrün durchscheinend mit weißem Haken statt eigenem Grün; Nummer und Werte weiß. Vorgabewerte (Platzhalter) auf Grün in Weiß 70 % statt Grau. Ausnahme vom Schwarz-Weiß-Prinzip, da Grün = abgeschlossen (wie „Beenden“).
+- **Felder hervorgehoben:** neues Token `Colors.inputFill` = Weiß 12 % (durchscheinend), damit das Feld auf jeder Zeilenfläche (grau `surfacePressed` oder grün) etwas heller ist. Vorher hatten Feld und Zeile dieselbe Farbe und das Feld war unsichtbar. Gilt zentral in `SetField`, also im Training, im Workout-Editor und beim nachträglichen Bearbeiten. Offene Zeilen bleiben `surfacePressed` im `surface`-Block (wie bisher; das Briefing nannte „surface“, die Zeile liegt aber in einem `surface`-Block und wäre dann unsichtbar). Kein Rand.
+- **Cursor ans Ende:** `SetField` hält intern ein `TextFieldValue`. Bei Fokusgewinn (Tipp oder Weiter) setzt ein `LaunchedEffect(focused)` den Cursor ans Textende. Der Effekt läuft nach dem Tipp, der den Cursor an die Tippstelle setzt, überschreibt ihn also zuverlässig. Ein weiterer Tipp in das schon fokussierte Feld setzt den Cursor normal (Korrektur in der Mitte bleibt möglich). Andere Textfelder (Name, Notizen, Einstellungen) sind unverändert, da es um die Satz-Eingabe ging.
+
+## Anbieter umschaltbar: Routing-Tabelle statt fester Claude-Stufen (7.11.2026)
+Fabian: „Ich möchte im Backend einfach zwischen den LLM Providern umstellen können.“ Ohne Codeänderung, auch vom Handy.
+- **Eine Datei, `backend/llm-routing.jsonc`:** `models` (Modell-ID → Anbieter, Anzeigename, Anbietername, Bilder ja/nein, „denkt mit“,
+  Preise in USD/MTok mit optionalem `since`, Wechselkurs `usdToEur`) und `presets` (Stufe → Modell + Ausweich-Modell). Voreinstellungen:
+  `claude` (Standard, bisheriger Stand), `openai`, `gemini`, `gratis` (Workers AI), `gemischt`, `openrouter`. Modell-Katalog und Zuordnung
+  getrennt, damit jeder Preis nur einmal steht. JSONC mit ganzen Kommentarzeilen (wie `wrangler.jsonc`), damit die Datei für Fabian
+  erklärt ist; `scripts/build-routing.mjs` erzeugt daraus `src/routing.gen.json` automatisch vor Test, Typprüfung, Dev und Deploy (nicht
+  eingecheckt, so kann eine Bearbeitung im Browser nie eine veraltete Kopie hinterlassen). `parseRouting` prüft alles und meldet alle
+  Fehler auf einmal; ein Fehler bricht Tests und Deploy ab, nie still zur Laufzeit.
+- **Umschalten:** Workflow „Backend deployen“ hat die Auswahlliste „KI-Anbieter“ (`wie-bisher` + alle Voreinstellungen), in der
+  GitHub-App bedienbar. Die Wahl wird im Worker als Secret `LLM_PRESET` gespeichert, nicht als Variable: Variablen überschreibt jeder
+  Deploy, ein automatischer Deploy nach einem Merge würde die Wahl sonst zurückdrehen. Reihenfolge: Auswahl → Repo-Variable
+  `LLM_PRESET` → im Worker gespeichert → `default` der Datei. Verworfen: Umschalten zur Laufzeit über einen Admin-Endpunkt (bräuchte
+  ein Geheimnis auf dem Handy und eine eigene Oberfläche; der Workflow-Knopf existiert schon).
+- **Fehlender Schlüssel:** Eine Voreinstellung ist vollständig, wenn das erste Modell jeder Stufe einen Schlüssel hat (Workers AI immer,
+  über das Binding). Unvollständig → Worker nimmt die erste vollständige aus `fallbackOrder` (`/v1/config.preset` zeigt die wirksame),
+  der Deploy schreibt eine gelbe Warnung mit dem fehlenden Secret-Namen; keine vollständige → Deploy bricht mit Anleitung ab. Die
+  Regel steht doppelt (Worker `src/routing.ts`, Deploy `scripts/deploy-secrets.mjs`), ein Test vergleicht beide für alle 16
+  Schlüssel-Kombinationen × alle Voreinstellungen. Ohne jeden Schlüssel bleibt `gratis` (Workers AI) übrig: lieber ein kostenloses
+  Modell mit Warnung als ein Server ohne KI.
+- **Adapter (`src/providers.ts`):** Anthropic (Body durchgereicht wie bisher), OpenAI und OpenRouter (Chat Completions: System als
+  `developer`/`system`, Bilder als Data-URL, Structured Output über `response_format` json_schema mit `strict: false`, weil das
+  App-Schema nicht alle strict-Regeln erfüllt; GPT-5 mit `max_completion_tokens` und `reasoning_effort`, ohne Temperatur), Gemini
+  (aus der Git-Historie vor 573c0ab zurückgeholt: generateContent, `responseJsonSchema`, Denk-Token als Ausgabe), Workers AI (Binding,
+  nur Text, JSON-Modus; Gateway nur mit `AI_GATEWAY_TOKEN` wie bei den anderen). Antwort immer Anthropic-Format, Token auf
+  Eingabe/Cache-Lesen/Ausgabe umgerechnet. Fehler einheitlich `UpstreamError` (Ausfall: Netzwerk, Zeit, 5xx, 429, 408, 401, 403 →
+  Ausweichen; sonst Ablehnung). „Denkende“ Modelle bekommen den doppelten Ausgabe-Raum (wie früher Gemini).
+- **Abrechnung:** unverändert aus den echten Token, Preis des antwortenden Modells, Aufschlag `MARKUP_BP`; beim Ausweichen (einmal,
+  auch über Anbietergrenzen) das günstigere von Stufen-Modell und antwortendem Modell. Die Reserve deckt den größten Ausgabe-Raum
+  beider Kandidaten zum Preis der Stufe. Kann das Stufen-Modell keine Fotos (Workers AI), antwortet bei Foto-Anfragen gleich das
+  Ausweich-Modell (Protokoll: Ausweichen, Grund „keine Bilder“), bezahlt wird ebenso das günstigere; kann es keins, `400 images_not_supported`.
+  Protokoll `requests` speichert `requested_provider` und `provider` (D1-Migration 0010). `servedTier` bleibt für alte Apps erhalten.
+- **App:** Namen und Preise kommen aus `/v1/config` (`tiers`, neu `preset`, `provider`, `fallback` als Objekt, `modelNames` für alle
+  bekannten Modelle); die letzte Antwort wird gespeichert und genutzt, wenn der Server nicht erreichbar ist. Die feste Namenstabelle
+  bleibt nur als letzter Rückfall. Mit eigenem Schlüssel ändert sich nichts (`OwnKeyPrivacyTest`).
+- **Preise (Stand 7.11., vor Produktion prüfen):** OpenAI GPT-5 mini 0,25 $/2 $ (Cache 0,025 $), GPT-5 1,25 $/10 $ (Cache 0,125 $),
+  laut developers.openai.com; Workers AI Llama 4 Scout 0,27 $/0,85 $ laut Cloudflare-Preisseite; Gemini und Llama 3.3 wie früher.
+  OpenRouter mit den Anthropic-Listenpreisen (OpenRouter selbst nimmt eine Gebühr beim Aufladen, die trägt die Marge).
+- **Offen (Geld, für Fabian):** (1) `gratis` berechnet Nutzern den Workers-AI-Listenpreis, obwohl der Betreiber bis 10 000 Neurons/Tag
+  nichts zahlt; Preis 0 wäre ein Eintrag in der Datei. (2) Ohne Workers-Paid-Tarif liefert Workers AI nach dem Tageskontingent Fehler,
+  dann antwortet das Ausweich-Modell (Haiku, teurer für den Betreiber, Nutzer zahlt den Llama-Preis). (3) `openai` nutzt GPT-5 auch für
+  `pro` (kein eigenes, teureres Modell gewählt; bewusst ohne ungeprüfte Modell-IDs). (4) `gemini` hat nur ein Modell, also kein
+  Ausweichen.
+- **Sonnet-Gegencheck (Befunde und Umgang):**
+  - Behoben: `/v1/config` schickte für eine Stufe ohne bereites Modell `price: null`/`provider: null`; die App (auch ältere) parst beides nicht
+    nullable, die ganze Config wäre gescheitert. Jetzt Nullpreis und leerer String, Test.
+  - Behoben: Ohne Schlüssel blieb wegen `gratis` immer eine „vollständige“ Voreinstellung, der versprochene Abbruch kam nie. Jetzt bricht
+    der **Produktions**-Deploy ab, statt ungefragt auf `gratis` zurückzufallen; im Testbetrieb bleibt der Rückfall mit Warnung. Doku angepasst.
+  - Behoben: HTTP 404 (falsche/abgekündigte Modell-ID in der Datei) und 402 (Anbieter-Konto leer, OpenRouter) gelten jetzt als Ausfall →
+    Ausweichen statt `upstream_rejected` für jeden Nutzer.
+  - Behoben: docs/backend-api.md beschreibt die neuen Felder; Test gleicht die Auswahlliste im Workflow mit den Voreinstellungen ab;
+    Doku sagt deutlich, dass die Repo-Variable eine Listen-Auswahl bei jedem automatischen Deploy überschreibt.
+  - Bewusst so: Die gespeicherte Config hängt nicht an der Backend-URL (Wechsel Test → Produktion ohne Netz zeigt kurz alte Namen/Preise,
+    beim nächsten Laden ersetzt); OpenRouter-Cache-Schreiben wird nicht getrennt gezählt (Overfit schickt dort kein `cache_control`);
+    alte App-Versionen zeigen bei neuen Modellen die Modell-ID statt des Namens (neue App liest `modelNames`).
+## Coach-Tab als Chat (Session Coach-Chat, 7.11.)
+Umsetzung des von Fabian freigegebenen Entwurfs (7 Bildschirme). Annahmen und Entscheidungen:
+- **Kontext nur, was mitgeschickt wird:** Der Chat schickt nicht mehr den ganzen Trainingsstand („Kontext kopieren“-Text) mit, sondern
+  das Profil (Chip „Profil“, standardmäßig an; × gilt für den Chat und wird in `coach_chat.profileOff` gespeichert) und die Anhänge.
+  Profil = Coach-Profil (Ziel, Erfahrung, Tage/Woche, Größe, Equipment, Einschränkungen), Name/Alter/Gewicht aus dem Kalender und das
+  Coach-Gedächtnis. Ohne Profil gehen nur App-Sprache, Einheiten und das Datum mit. Anhänge aller Fragen eines Chats bleiben im
+  System-Prompt (Folgefragen beziehen sich darauf), Fotos gehen nur mit der Frage, an der sie hängen. Ohne Anhang steht im Prompt, dass
+  nichts weiter angehängt ist und der Coach um „+“ bitten soll (passt zur Grundanweisung „nur mitgeschickte Daten, nichts erfinden“).
+- **Antwortsprache:** Grundanweisung „Antworte in der Sprache der Frage“; im Profilblock des Chats wird „Reply language“ zu „App language
+  … (answer in the language of the question)“. Auswertungen (ohne Frage) behalten die App-Sprache.
+- **Grundanweisung:** neuer Personal-Trainer-Text (DE/EN), die bisherigen Steigerungs-, Stagnations- und Calisthenics-Regeln stehen darin
+  weiter; Format- und Übungsregeln (`CoachChatSchema.RULES`, Beispiel, Übungsliste, `OUTPUT_RULES` der Auswertung) sind unverändert.
+  „Deine Ergänzung“ (eigener Speicher `overfit.coachChat.v1`) wird an jede Anfrage angehängt (Chat und Auswertung, jedes Modell, eigener
+  Schlüssel und Guthaben). Wer früher die ganze Anweisung bearbeitet hatte: Der Text wandert einmalig in die Ergänzung, damit nichts
+  verloren geht und trotzdem die neue Grundanweisung gilt.
+- **Schlüssel testen:** kostenlos über die Modell-Liste des Anbieters, direkt vom Gerät (Anthropic/OpenAI `GET /v1/models`, Google
+  `GET /v1beta/models` mit `x-goog-api-key`, nur Modelle mit `generateContent`, ohne `models/`-Präfix). OpenRouters Modell-Liste ist
+  öffentlich und sagt nichts über den Schlüssel: Dort prüft zuerst `GET /api/v1/key` den Schlüssel, dann kommt die Liste. OpenAI-Liste
+  ohne Audio/Bild/Embedding-Modelle. 402 = gültig, aber kein Guthaben beim Anbieter.
+- **Chat-Verlauf nur lokal:** Tabellen `coach_chat`/`coach_chat_message` (seit v6) bleiben auf dem Gerät (und im eigenen Backup); v12 ergänzt
+  `profileOff`, `attachments` (JSON), `providerId`, `model` (reine Ergänzung, AutoMigration, Test `migration11to12…`).
+- **Auswertung als Chat, ohne Warteschlange:** Die Auswertung nach dem Training ist ein Chat (neuer Chat, Training angehängt, „Werte mein
+  Training aus“, sofort gesendet, wenn die Einstellung an ist und KI-Zugang besteht; „Später“ im Abschluss überspringt sie einmal). Ohne
+  Netz wartet sie nicht mehr in der Warteschlange der alten Auswertung, sondern die Antwort zeigt den Fehlergrund und „Erneut versuchen“
+  (bewusst: ein Chat soll nicht später ungefragt Geld ausgeben). Alte strukturierte Auswertungen bleiben unter Einstellungen → Coach →
+  Auswertungen lesbar, inklusive „Alle annehmen“ für den Plan.
+- **Modell-Chip ändert den Zugang global:** Modell-Sheet im Chat und „KI-Zugang/Standardmodell“ in den Einstellungen sind dieselbe Auswahl
+  (eine Wahrheit, kein Modell pro Chat). Guthaben-Chip nur, wenn Guthaben der Zugang ist (mit eigenem Schlüssel keine Backend-Anfrage).
+  Preise im Guthaben-Teil des Sheets lädt die App erst, wenn Guthaben schon der Zugang ist oder die Person selbst auf „Overfit-Guthaben“
+  tippt (Opt-in wie „Guthaben ansehen“).
+- **Gegencheck (Sonnet, effort high):** behoben: Ergänzung fehlte bei Auswertungen; Chat-Daten wurden bei jedem Tab-Besuch neu gebaut
+  (Collector-Leck); Backup ohne Coach-Profil/Ergänzung; „Push · heute“ blieb im Verlauf stehen (Datum wird jetzt beim Anzeigen berechnet);
+  OpenRouter-Vorschläge zeigten nur exotische Modelle; Migration der alten Anweisung konnte lange Texte abschneiden. Weitere UI-Punkte
+  (gelöschter offener Chat, Entwurf überschreibt Getipptes, Foto-Obergrenze, Fehlergrund, Häkchen-Farbe, pressScale, Trennlinien,
+  Aufladen-Knöpfe, Größen-Prüfung, Tests für Prompts/„Im Chat nutzen“/Backup) im selben PR.

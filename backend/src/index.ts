@@ -13,10 +13,11 @@ import {
   setProfile,
 } from './account';
 import { handleMessages } from './messages';
-import { DEFAULT_TIER, TIER_NAMES, TIERS, USAGE_PROFILES, tierAvailable } from './providers';
+import { DEFAULT_TIER, TIER_NAMES, USAGE_PROFILES, modelNames } from './providers';
+import { routes } from './routing';
+import { requestsPage } from './requests';
 import { handleAdminCredit, handleAdminUsage } from './admin';
 import { handleVerifyPurchase } from './purchases';
-import { createChallenge, createInviteToken, redeemInvite } from './invite';
 import { packageCreditMicro } from './money';
 import { createWebLink, handlePaymentWebhook, redeemCode, webCheckout, webOrder, webPurchaseConfig, webSession } from './web';
 import { authServerMetadata, authorizeGet, authorizePost, protectedResourceMetadata, registerClient, revoke, token } from './chat/oauth';
@@ -91,6 +92,7 @@ const CHAT_ROUTES = ['/v1/chat', '/v1/chat/enable', '/v1/chat/disable', '/v1/cha
 const PHOTO_ROUTE = /^\/v1\/chat\/photos\/([A-Za-z0-9_.:-]{1,80})$/;
 
 function publicConfig(env: Env, cfg: Config) {
+  const r = routes(env);
   return {
     /** `test` = Testbetrieb (keine Geräteprüfung, Test-Guthaben); die App zeigt dann einen Hinweis. */
     mode: cfg.testMode ? 'test' : 'production',
@@ -99,24 +101,32 @@ function publicConfig(env: Env, cfg: Config) {
     markupBp: cfg.markupBp,
     models: Object.fromEntries(Object.entries(cfg.prices).map(([m, p]) => [m, p])),
     maxTokensCap: cfg.maxTokensCap,
-    /** KI-Stufen: die App schickt den Namen als `model`; Preise in µ€/MTok ohne Aufschlag. */
+    /** KI-Stufen: die App schickt den Namen als `model`; Preise in µ€/MTok ohne Aufschlag. Welche Modelle dahinter stecken, steht in llm-routing.jsonc. */
     defaultTier: DEFAULT_TIER,
+    preset: r.preset.name,
     tiers: Object.fromEntries(
-      TIER_NAMES.map((t) => [
-        t,
-        {
-          available: tierAvailable(env, t),
-          model: TIERS[t].model,
-          displayName: TIERS[t].displayName,
-          vendor: TIERS[t].vendor,
-          label: `${TIERS[t].displayName} (${TIERS[t].vendor})`,
-          thinkingTokens: TIERS[t].thinkingTokens,
-          images: TIERS[t].images,
-          fallback: TIERS[t].fallback,
-          price: cfg.prices[TIERS[t].model],
-        },
-      ]),
+      TIER_NAMES.map((t) => {
+        const { primary: m, fallback: fb } = r.tiers[t];
+        return [
+          t,
+          {
+            available: !!m,
+            model: m?.id ?? '',
+            provider: m?.provider ?? '',
+            displayName: m?.displayName ?? '',
+            vendor: m?.vendor ?? '',
+            label: m ? `${m.displayName} (${m.vendor})` : '',
+            thinkingTokens: m?.thinkingTokens ?? 0,
+            images: !!m && (m.images || !!fb?.images),
+            fallback: fb ? { model: fb.id, provider: fb.provider, displayName: fb.displayName, vendor: fb.vendor } : null,
+            // Immer ein Preisobjekt: ältere Apps lesen `price` nicht nullable.
+            price: m ? cfg.prices[m.id] : { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 },
+          },
+        ];
+      }),
     ),
+    /** Namen aller bekannten Modelle (auch früherer), damit die App Protokoll und Buchungen benennen kann. */
+    modelNames: modelNames(),
     /** Typische Token-Mengen je Aufgabe (gemessen, DECISIONS.md „Kostenschätzung“) für die Kostenanzeige der App. */
     usageProfiles: USAGE_PROFILES,
     packages: Object.entries(cfg.packages).map(([productId, p]) => ({
@@ -126,15 +136,6 @@ function publicConfig(env: Env, cfg: Config) {
     })),
     /** Guthaben im Web kaufen (Merchant of Record); `testMode` = Sandbox, keine echte Zahlung. */
     webPurchase: webPurchaseConfig(env, cfg),
-    /** Einladung: beide bekommen geschenkte Coach-Auswertungen (nur Stufe `giftTier`), kein Euro-Guthaben. */
-    invite: {
-      starterReviews: cfg.inviteStarterReviews,
-      rewardReviews: cfg.inviteRewardReviews,
-      giftTier: 'standard',
-      tokenTtlSec: cfg.inviteTokenTtlSec,
-      monthlyLimitPerInviter: cfg.inviteMonthlyLimitPerInviter,
-      expiryDays: cfg.inviteExpiryDays,
-    },
   };
 }
 
@@ -189,8 +190,8 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     return Response.json({ deviceId, ...(await accountSummary(env, cfg, device.accountId)) }, { status: r.created ? 201 : 200 });
   }
 
-  const routes = ['/v1/account', '/v1/account/profile', '/v1/account/ledger', '/v1/messages', '/v1/purchases/verify',
-    '/v1/invite/token', '/v1/invite/challenge', '/v1/invite/redeem', '/v1/recovery/code', '/v1/recovery/restore',
+  const routes = ['/v1/account', '/v1/account/profile', '/v1/account/ledger', '/v1/account/requests', '/v1/messages', '/v1/purchases/verify',
+    '/v1/recovery/code', '/v1/recovery/restore',
     '/v1/purchase/web-link', '/v1/purchases/web-link', '/v1/codes/redeem'];
   const photo = PHOTO_ROUTE.exec(path);
   if (!routes.includes(path) && !CHAT_ROUTES.includes(path) && !photo) throw new ApiError(404, 'not_found', 'Unbekannter Endpunkt');
@@ -241,6 +242,9 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     case '/v1/account/ledger':
       if (method !== 'GET') throw wrongMethod();
       return Response.json(await ledgerPage(env, device.accountId, url));
+    case '/v1/account/requests':
+      if (method !== 'GET') throw wrongMethod();
+      return Response.json(await requestsPage(env, device.accountId, url));
     case '/v1/messages':
       if (method !== 'POST') throw wrongMethod();
       await rateLimit(env, `msg:${device.id}`, cfg.rlMessagesPerMin, 60);
@@ -259,18 +263,6 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
       await sensitive();
       await rateLimit(env, `codeip:${clientIp(req)}`, cfg.rlSensitivePerHour * 3, 3600);
       return Response.json(await redeemCode(env, device, json(body)));
-    case '/v1/invite/token':
-      if (method !== 'POST') throw wrongMethod();
-      return Response.json(await createInviteToken(env, cfg, device));
-    case '/v1/invite/challenge':
-      if (method !== 'POST') throw wrongMethod();
-      await sensitive();
-      return Response.json(await createChallenge(env, cfg, device));
-    case '/v1/invite/redeem':
-      if (method !== 'POST') throw wrongMethod();
-      await sensitive();
-      await rateLimit(env, `inviteip:${clientIp(req)}`, cfg.rlSensitivePerHour * 3, 3600);
-      return Response.json(await redeemInvite(env, cfg, device, json(body)));
     case '/v1/recovery/code':
       if (method !== 'POST') throw wrongMethod();
       return Response.json(await createRecoveryCode(env, device));

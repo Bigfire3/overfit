@@ -341,6 +341,140 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migration9to10KeepsDataAndAddsEmptyBodyWeightTable() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v9 = helper.createDatabase(9)
+        v9.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt, sauna) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1000, 5000, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 5000, 1)",
+        )
+        v9.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p1', NULL, 'p1.jpg', 4000, 0)")
+        v9.close()
+
+        // Validates the migrated schema against schemas/.../10.json.
+        val v10 = helper.runMigrationsAndValidate(10, OverfitDatabase.MIGRATIONS.toList())
+        try {
+            assertEquals(1L, v10.count("workout_session"))
+            assertEquals(1L, v10.count("workout_photo"))
+            assertEquals(0L, v10.count("body_weight"))
+        } finally {
+            v10.close()
+        }
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            assertEquals(true, db.workoutDao().allFinished().single().session.sauna)
+            val dao = db.bodyWeightDao()
+            dao.upsert(BodyWeightEntity("2026-11-07", 82.4, 1000, 1000))
+            // Same day again: replaces, never a second row.
+            dao.upsert(BodyWeightEntity("2026-11-07", 82.0, 2000, 2000))
+            assertEquals(listOf(82.0), dao.all().map { it.weightKg })
+            dao.delete("2026-11-07")
+            assertEquals(0, dao.all().size)
+        } finally {
+            db.close()
+        }
+    }
+
+    /** v10 → v11: new request log `ai_request` (pure addition); workouts and body weights stay; the log can be written and read. */
+    @Test
+    fun migration10to11KeepsDataAndAddsEmptyRequestLog() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v10 = helper.createDatabase(10)
+        v10.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt, sauna) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', 1000, 5000, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 5000, 0)",
+        )
+        v10.close()
+        // Validates the migrated schema against schemas/.../11.json.
+        val v11 = helper.runMigrationsAndValidate(11, OverfitDatabase.MIGRATIONS.toList())
+        try {
+            assertEquals(1L, v11.count("workout_session"))
+            assertEquals(0L, v11.count("ai_request"))
+        } finally {
+            v11.close()
+        }
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            assertEquals("Push", db.workoutDao().get("w1")!!.session.name)
+            val log = db.aiRequestDao()
+            log.upsert(AiRequestEntity("r1", 2000, 1200, "FUEL", "review", "claude-sonnet-5-5", "claude-sonnet-5-5", "OK", inputTokens = 900, outputTokens = 100, costMicro = 3000, serverId = 9))
+            assertEquals(3000L, log.byServerId(9)!!.costMicro)
+            assertEquals(listOf("r1"), log.observeRecent().first().map { it.id })
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
+     * v11 → v12 (coach chat redesign): coach_chat.profileOff (default 0) and coach_chat_message.attachments / providerId /
+     * model (nullable). Existing chats and messages stay unchanged and read as "profile on, no attachments".
+     */
+    @Test
+    fun migration11to12KeepsChatsAndAddsAttachmentColumns() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v11 = helper.createDatabase(11)
+        v11.execSQL("INSERT INTO coach_chat (id, title, createdAt, updatedAt) VALUES ('c1', 'Frage', 10, 10)")
+        v11.execSQL(
+            "INSERT INTO coach_chat_message (id, chatId, fromUser, text, status, createdAt, workoutJson, photoIds, costMicro, servedModel, fallbackFrom, errorKind, demo) " +
+                "VALUES ('m1', 'c1', 1, 'Wie lief es?', 'DONE', 11, NULL, 'p1', NULL, NULL, NULL, NULL, 0)",
+        )
+        v11.close()
+        helper.runMigrationsAndValidate(12, OverfitDatabase.MIGRATIONS.toList()).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val dao = db.coachChatDao()
+            assertEquals(false, dao.chat("c1")!!.profileOff)
+            val old = dao.messages("c1").single()
+            assertEquals("Wie lief es?", old.text)
+            assertEquals("p1", old.photoIds)
+            assertEquals(null, old.attachments)
+            dao.upsertChat(dao.chat("c1")!!.copy(profileOff = true))
+            dao.upsertMessage(
+                CoachChatMessageEntity(
+                    "m2", "c1", fromUser = false, text = "Gut", status = "DONE", createdAt = 12,
+                    attachments = "[]", providerId = "ANTHROPIC", model = "claude-sonnet-5-5",
+                ),
+            )
+            assertEquals(true, dao.chat("c1")!!.profileOff)
+            val fresh = dao.messages("c1").first { it.id == "m2" }
+            assertEquals("claude-sonnet-5-5", fresh.model)
+            assertEquals("ANTHROPIC", fresh.providerId)
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

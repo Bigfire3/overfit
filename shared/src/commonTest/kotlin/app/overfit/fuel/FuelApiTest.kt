@@ -23,13 +23,13 @@ private class FakeKey : DeviceKey {
 }
 
 private val json = headersOf(HttpHeaders.ContentType, "application/json")
+// Contains fields an older backend still sends (expiring, invite): ignored.
 private const val ACCOUNT = """{"accountId":"a1","balanceMicro":4200000,"expiring":[{"amountMicro":1000000,"expiresAt":1777777777}],"displayName":"Fabian","hasRecoveryCode":false,"invite":{"invitedThisMonth":2,"monthlyLimit":10,"redeemedStarter":false}}"""
 private fun err(code: String, details: String = "{}") = """{"error":{"code":"$code","message":"m","details":$details}}"""
 
 class FuelApiTest {
     private fun api(
         key: FakeKey = FakeKey(),
-        attestor: Attestor = NoAttestor,
         log: MutableList<HttpRequestData> = mutableListOf(),
         handler: suspend (HttpRequestData) -> Pair<HttpStatusCode, String>,
     ): FuelApi {
@@ -39,7 +39,7 @@ class FuelApiTest {
             val (status, body) = handler(req)
             respond(body, status, json)
         }
-        return FuelApi(HttpClient(engine), "https://fuel.test/", RequestSigner(key), attestor, nowSec = { 1_762_128_000 }, nonce = { "nonce-${++n}-aaaaaaaaaaaaaaaa" })
+        return FuelApi(HttpClient(engine), "https://fuel.test/", RequestSigner(key), nowSec = { 1_762_128_000 }, nonce = { "nonce-${++n}-aaaaaaaaaaaaaaaa" })
     }
 
     @Test
@@ -52,7 +52,6 @@ class FuelApiTest {
         val a = api.account()
         api.account()
         assertEquals(4_200_000, a.balanceMicro)
-        assertEquals("Fabian", a.displayName)
         assertEquals(listOf("/v1/devices", "/v1/account", "/v1/account"), log.map { it.url.encodedPath })
         val get = log[1]
         assertEquals(deviceIdOf(key.publicPoint()), get.headers[FuelHeaders.DEVICE])
@@ -124,54 +123,6 @@ class FuelApiTest {
         val sent = log.last()
         assertEquals(body, sent.body.toByteArray().decodeToString()) // byte-identical to what was hashed
         assertTrue(sent.headers[FuelHeaders.SIGNATURE] != null)
-    }
-
-    @Test
-    fun inviteRedeemUsesChallengeAndAttestation() = runTest {
-        val log = mutableListOf<HttpRequestData>()
-        val attestor = object : Attestor { override suspend fun attest(challenge: String) = Attestation("google", "tok-for-$challenge") }
-        val api = api(attestor = attestor, log = log) { req ->
-            when (req.url.encodedPath) {
-                "/v1/devices" -> HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
-                "/v1/invite/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1","expiresAt":1}"""
-                else -> HttpStatusCode.OK to """{"grantedReviews":5,"expiresAt":5,"inviter":{"displayName":"Fabian"},"balanceMicro":0,"giftReviews":{"remaining":5,"expiring":[{"count":5,"expiresAt":5}]}}"""
-            }
-        }
-        val r = api.redeemInvite("tokenvalue123")
-        assertEquals(5, r.grantedReviews)
-        assertEquals(5, r.giftReviews.remaining)
-        assertEquals("Fabian", r.inviter.displayName)
-        assertEquals(
-            """{"token":"tokenvalue123","attestation":{"platform":"google","token":"tok-for-ch1","challenge":"ch1"}}""",
-            log.last().body.toByteArray().decodeToString(),
-        )
-    }
-
-    @Test
-    fun inviteRedeemWithoutAttestationIsUnavailable() = runTest {
-        val api = api { req ->
-            when (req.url.encodedPath) {
-                "/v1/invite/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1"}"""
-                else -> HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
-            }
-        }
-        assertEquals("attestation_unavailable", assertFailsWith<FuelException> { api.redeemInvite("tokenvalue123") }.code)
-    }
-
-    @Test
-    fun inviteRedeemOnTheTestServerUsesATestTokenBoundToTheDevice() = runTest {
-        val log = mutableListOf<HttpRequestData>()
-        val api = api(log = log) { req ->
-            when (req.url.encodedPath) {
-                "/v1/invite/challenge" -> HttpStatusCode.OK to """{"challenge":"ch1"}"""
-                "/v1/config" -> HttpStatusCode.OK to """{"mode":"test"}"""
-                "/v1/invite/redeem" -> HttpStatusCode.OK to """{"grantedReviews":5,"expiresAt":5,"inviter":{"displayName":null},"balanceMicro":0}"""
-                else -> HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
-            }
-        }
-        api.redeemInvite("tokenvalue123")
-        val body = log.last().body.toByteArray().decodeToString()
-        assertTrue(body.contains("\"token\":\"test:"), body)
     }
 
     @Test

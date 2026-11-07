@@ -18,7 +18,7 @@ export const NAMES = {
   test: { worker: 'overfit-backend-test', db: 'overfit-test', bucket: 'overfit-chat-photos-test', gateway: 'overfit-test' },
 };
 
-/** Zusätzliche `vars` je Modus. Testbetrieb: niedrige Limits, kein Dev-Modus, Geräteprüfung bleibt „required“ (der Test-Prüfer greift über DEPLOY_MODE). */
+/** Zusätzliche `vars` je Modus. Testbetrieb: niedrige Limits, kein Dev-Modus, kein Startguthaben (Test-Guthaben nur per `credit_eur`). */
 export const MODE_VARS = {
   production: { DEPLOY_MODE: 'production' },
   test: {
@@ -26,10 +26,6 @@ export const MODE_VARS = {
     MAX_TOKENS_CAP: '2048',
     RL_MESSAGES_PER_MIN: '5',
     RL_REGISTER_PER_HOUR_IP: '10',
-    INVITE_MONTHLY_LIMIT_PER_INVITER: '3',
-    INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS: '200',
-    INVITE_GIFT_MONTHLY_COST_CAP_MICRO: '10000000',
-    TEST_STARTER_MICRO: '1000000',
     TEST_CREDIT_CAP_MICRO: '20000000',
   },
 };
@@ -65,7 +61,7 @@ export function buildConfig(mode, databaseId, base = readJsonc(join(root, 'wrang
   cfg.main = join(root, 'src/index.ts');
   cfg.d1_databases = [{ ...base.d1_databases[0], database_name: n.db, database_id: databaseId, migrations_dir: join(root, 'migrations') }];
   cfg.r2_buckets = [{ ...base.r2_buckets[0], bucket_name: n.bucket }];
-  // Workers AI (Stufe `lite`) und AI-Gateway-URLs; nur im Deploy, damit lokale Tests kein Cloudflare-Konto brauchen.
+  // Workers AI (Voreinstellung „gratis“) und AI-Gateway-URLs; nur im Deploy, damit lokale Tests kein Cloudflare-Konto brauchen.
   cfg.ai = { binding: 'AI' };
   cfg.vars = { ...base.vars, ...MODE_VARS[mode], AI_GATEWAY_ID: n.gateway, ...webVars(mode, env) };
   return cfg;

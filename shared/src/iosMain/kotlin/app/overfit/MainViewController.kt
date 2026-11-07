@@ -8,7 +8,6 @@ import app.overfit.data.db.buildDatabase
 import app.overfit.fuel.FuelAccess
 import app.overfit.fuel.FuelApi
 import app.overfit.fuel.RequestSigner
-import app.overfit.platform.IosAttestor
 import app.overfit.platform.IosDeviceKey
 import app.overfit.platform.IosHaptics
 import app.overfit.platform.IosPhotoFiles
@@ -36,7 +35,7 @@ fun MainViewController(): UIViewController {
     app.overfit.ui.components.installOverfitImageLoader()
     val version = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "?"
     val build = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleVersion") as? String ?: "?"
-    // Set at build time (xcodebuild OVERFIT_BACKEND_URL=… → Info.plist); empty = credit/invite not configured.
+    // Set at build time (xcodebuild OVERFIT_BACKEND_URL=… → Info.plist); empty = credit not configured.
     val backendUrl = NSBundle.mainBundle.objectForInfoDictionaryKey("OverfitBackendUrl") as? String ?: ""
     val launch = LaunchOptions.current()
     val kv = if (launch.uiTest) {
@@ -45,10 +44,10 @@ fun MainViewController(): UIViewController {
     } else {
         IosKeyValueStore()
     }
-    val fuelAccess = FuelAccess(kv, backendUrl) { url -> FuelApi(createHttpClient(), url, RequestSigner(IosDeviceKey()), IosAttestor()) }
+    val fuelAccess = FuelAccess(kv, backendUrl) { url -> FuelApi(createHttpClient(), url, RequestSigner(IosDeviceKey())) }
     val deps = AppDependencies(
         store = AppStore(kv, KeychainSecretStore(service = if (launch.uiTest) LaunchOptions.UI_TEST_SUITE else "app.overfit"), deviceDefaults()),
-        providers = Providers(createHttpClient()) { fuelAccess.service() },
+        providers = Providers(createHttpClient(), kv) { fuelAccess.service() },
         data = AppData(
             if (launch.uiTest) buildDatabase("uitest-" + OverfitDatabase.NAME, fresh = !launch.keepData) else buildDatabase(),
             kv,

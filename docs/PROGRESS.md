@@ -12,8 +12,88 @@
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Session Z, seit Session AB über Stripe, Web 1:1, Store-Aufpreis offen, Aufschlag 28 %); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
-| 9 | Einladen per QR mit Startguthaben (NFC später als Spielerei) | App-Seite fertig (QR, Einlösen, Reveal); seit Session AD Bonus als 5 + 5 geschenkte Coach-Auswertungen; Attestierung offen |
+| 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Einladungen, Startguthaben und Verfall entfernt (7.11.2026)
+**Erledigt:** Fabians Entscheidung (Zitat in DECISIONS.md): Das Empfehlungsprogramm ist komplett aus der App (Android und iOS) entfernt:
+„Freunde einladen“, „Einladung einlösen“, QR/Link `overfit://invite`, Reveal-Animation, geschenkte Auswertungen (Zähler, Hinweise,
+„geschenkt“ unter Antworten und in der Abrechnung), Gekauft/geschenkt-Aufteilung, „gültig bis“, Erwähnung in der Coach-Story,
+Geräteprüfung (Play Integrity / App Attest, inkl. Bibliothek). Kein Startguthaben, Guthaben verfällt nie. Alte Buchungen erscheinen
+neutral als „Gutschrift“/„Ausbuchung“. Doku (SPEC, monetization, backend-api, backend/README) und Preisseite angepasst; die D1-Tabellen
+bleiben. Tests: `FuelDemoTest` (neue Demo nur mit Claude, ohne Einladung), `DayWithOverfitTest`, `FuelBasicsTest`, `FuelApiTest`,
+`RequestLogTest`, `CoachTransportTest`, `OwnKeyPrivacyTest`, `WebCreditTest` angepasst; reine Einladungs-Tests entfernt.
+**Offen (Fabian):** Ob der Aufschlag (28 %) sinken soll, nachdem die Rücklage für Geschenktes entfällt (bleibt vorerst als Kulanz-Rücklage).
+Alte GitHub-Secrets `INVITE_SIGNING_KEY`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_APP_ATTEST_TEAM_ID` dürfen gelöscht werden.
+
+### Bitte auf dem Handy testen (Einladungen entfernt)
+1. Profil → Guthaben: nur noch „X € Guthaben“, keine geschenkten Auswertungen, kein „gültig bis“, kein Bereich „Einladungen“.
+2. Profil → Guthaben → Buchungen: alte Einladungs-/Test-Buchungen (falls vorhanden) heißen „Gutschrift“, nirgends „Einladung“.
+3. Coach → „Über den Coach“ → Seite „Mit Guthaben“: kein Wort mehr über Freunde/Einladungsbonus.
+4. Ein alter Einladungs-QR (`overfit://invite#…`) öffnet nichts Besonderes mehr (höchstens die Import-Meldung „kein Training“).
+5. Coach-Antwort mit Guthaben: darunter immer ein Betrag „… € Guthaben“, nie „geschenkte Auswertung“.
+## Muskel-Heatmap „Trainierte Muskeln“ (7.11.)
+**Erledigt:** Kalender → neues Körper-Icon in der Titelzeile öffnet ein Bottom-Sheet „Trainierte Muskeln“: eigene, stilisierte
+Figur vorne und hinten, jeder Muskel je nach Sätzen im Zeitraum von Dunkelgrau (untrainiert) bis Weiß (am meisten), Legende
+„Viel ▬ Wenig“. Zeitraum per Chips: Diese Woche, Dieser Monat, Dieses Jahr, Gesamt (wird gemerkt). Gezählt werden abgehakte
+Sätze beendeter Trainings, primäre Muskeln voll, mittrainierte halb. Tipp auf einen Muskel zeigt „Brust · 6 Sätze + 4 Sätze mittrainiert“.
+Die Trainingsdetail-Ansicht zeigt dieselbe Figur klein für genau dieses Training. Grafik selbst gezeichnet (keine fremde Vorlage),
+keine DB-Migration. Details in DECISIONS.md. Tests: `MuscleMapTest` (shared und App), `MuscleMapShotTest`.
+Screenshots: `docs/screenshots/muskel-heatmap/`.
+**Offen:** Schulter vorne/seitlich/hinten getrennt bräuchte feinere Muskelgruppen im Katalog.
+
+### Bitte auf dem Handy testen (Muskel-Heatmap)
+1. Kalender → Körper-Icon oben rechts: Sheet fährt von unten hoch, „Diese Woche“ ist gewählt, die Muskeln deiner Trainings dieser
+   Woche sind hell, untrainierte dunkelgrau.
+2. Auf einen Muskel tippen (z. B. Brust, Latissimus, Waden hinten): Darunter Name und Sätze; die anderen Muskeln werden blasser.
+   Nochmal tippen hebt es auf.
+3. „Dieser Monat“, „Dieses Jahr“, „Gesamt“ durchschalten: Färbung ändert sich. Sheet schließen (✕, Zurück, über dem Sheet tippen
+   oder nach unten ziehen) und wieder öffnen: Der zuletzt gewählte Zeitraum ist noch aktiv, auch nach App-Neustart.
+4. Kalender → Tag → Training öffnen: Abschnitt „Trainierte Muskeln“ zeigt nur dieses Training, ohne Zeitraum-Chips.
+5. App auf Englisch: „Muscles trained“, „This week …“, Legende „High / Low“.
+
+## Coach-Tab als Chat (Session Coach-Chat, 7.11.)
+**Erledigt:** Der Coach-Tab ist ein Chat nach Fabians Entwurf: drei Vorschläge, Kontext-Chips „Profil“ (immer dabei, × pro Chat)
+und „Letztes Training“ (automatisch), „+“-Sheet (Fotos mit Nummern, Training, Workout, Verlauf 4 Wochen, Übung mit Bestwerten),
+Eingabeblock mit Modell-Chip und geschätzten Kosten, Antworten mit Markdown, Modell und Preis, Workout-Karte „Übernehmen“,
+„Frühere Chats“ (nur auf dem Gerät, löschen per Doppeltipp). Modell-Sheet „Overfit-Guthaben | Eigener Schlüssel“ mit kostenlosem
+Schlüssel-Test über die Modell-Liste des Anbieters, Guthaben-Popup (Kontostand, Aufladen, letzte Abrechnungen). Alles von der alten
+Coach-Seite liegt jetzt unter Einstellungen → Coach (Zugang, Guthaben, Standardmodell, automatische Auswertung, Coach-Profil,
+Coach-Anweisungen mit „Deine Ergänzung“, Gedächtnis, Auswertungen, Abrechnung, Prompts & Verbindungen, Story). Neue
+Grundanweisung (Personal Trainer, antwortet in der Sprache der Frage). Die Auswertung nach dem Training ist ein neuer Chat mit dem
+Training und „Werte mein Training aus“. DB v12 (Chat-Anhänge, Modell, Profil aus; Migration + Test). Details in DECISIONS.md.
+Screenshots: `docs/screenshots/coach-chat/`.
+**Offen:** Kamera-Kachel im „+“-Sheet (braucht Kamera-Zugriff per expect/actual, bis dahin nur Galerie); eine Chat-Frage ohne Netz wartet nicht
+wie früher die Auswertung in einer Warteschlange, sondern zeigt „Erneut versuchen“.
+
+### Bitte auf dem Handy testen (Coach-Chat)
+1. Coach-Tab: „Coach ⓘ“, rechts Liste und Stift; drei graue Vorschläge. Tipp auf einen Vorschlag setzt nur den Text ins Feld.
+2. Nach einem Training: Chips „Profil“ und „Push · heute“ über der Eingabe. Frage senden: Antwort links als Text, darunter Modell
+   und Preis (Guthaben) bzw. „… · eigener Schlüssel“. × am Profil-Chip, neue Frage: Profil geht für diesen Chat nicht mehr mit.
+3. Tipp auf „Profil“: Popup „Dein Profil“ (Ziel, Erfahrung, Tage, Größe, Gewicht aus dem Kalender, Equipment, Einschränkungen) → Speichern.
+4. „+“: Fotos antippen (Nummern 1, 2 …), „Verlauf“ oder ein Training wählen → „N hinzufügen“: Chips erscheinen, gesendete Nachricht
+   zeigt sie als kleine Karten über der Blase.
+5. „Mach mir ein neues Push-Workout“: Karte mit „Übernehmen“ → Workout wird wie ein Import übernommen.
+6. Modell-Chip: Sheet „Overfit-Guthaben | Eigener Schlüssel“. Eigener Schlüssel: Anbieter wählen, Schlüssel einfügen, „Testen“ →
+   „Schlüssel funktioniert · N Modelle gefunden“, Vorschläge antippen, „Übernehmen“. Falscher Schlüssel: verständliche Meldung.
+7. Mit Guthaben: Chip „x,xx €“ oben rechts → Popup mit Kontostand, „läuft nicht ab“, Aufladen, letzten Anfragen, „Alle Anfragen ansehen“.
+   Mit eigenem Schlüssel gibt es den Chip nicht.
+8. Liste-Icon: „Frühere Chats“, Chat öffnen, löschen per Doppeltipp (rot). Stift: neuer Chat.
+9. Einstellungen → Coach: alle Zeilen da; Coach-Anweisungen: Grundanweisung gekürzt, Ergänzung speichern; „Auf Standard zurück“ (Doppeltipp).
+10. Training beenden (automatische Auswertung an): Im Coach-Tab öffnet sich ein Chat „Werte mein Training aus“ mit dem Training.
+    Schalter aus: Abschluss zeigt den Hinweis, kein Chat.
+
+## Hotfix: KI-Auswertung mit Guthaben (6.11.)
+**Erledigt:** Auswertungen über Guthaben scheiterten auf dem Testserver: Gemini Flash ohne Schlüssel, Claude über das (seit 2026 immer
+authentifizierte) Cloudflare AI Gateway mit 401, Lite-Modell bei Cloudflare abgekündigt. Backend geht ohne Gateway-Token direkt zum
+Anbieter, 401/403 weicht auf die andere Stufe aus, Lite = Llama 3.3 70B. App lädt bei `tier_unavailable` die Config neu und zeigt
+Server-Fehler verständlich. Details in DECISIONS.md. Tests: `tiers.test.ts`, `CoachTransportTest`.
+**Offen (Fabian):** GitHub-Secret `GEMINI_API_KEY` (seit 7.11. nicht mehr nötig, Guthaben nur Claude); optional
+`AI_GATEWAY_TOKEN` (Gateway-Protokolle). Repo-Variable `BACKEND_DEPLOY_MODE=test` für Auto-Deploy nach jedem Backend-Merge.
+
+### Bitte auf dem Handy testen (Hotfix KI)
+1. Training beenden → Coach-Auswertung mit Guthaben: Auswertung kommt (zurzeit von Claude Sonnet 5.5, weil Gemini Flash fehlt), Guthaben sinkt um wenige Cent (ca. 3–10 ct).
+2. Profil → Guthaben → Modell: Gemini 3.6 Flash erscheint erst, wenn `GEMINI_API_KEY` gesetzt und der Server neu deployt ist.
 
 ## Letzte Werte im Workout, Trainings umbenennen (7.11.)
 **Erledigt:** In einem gespeicherten Workout klappt ein Tipp auf eine Übung die Karte auf: „Letztes Mal · Datum“ und jeder Satz
@@ -539,7 +619,7 @@ Erledigt: Minimieren-Knopf im Workout (Pfeil runter) und System-Zurück minimier
 5. Minimiert in anderen Tab, Bildschirm sperren, Benachrichtigung tippen → maximiertes Training. App aus den letzten Apps wischen und neu öffnen → Training maximiert
 
 ## Morgen-Testliste für Fabian (3.11.)
-Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Guthaben/Einladungen); die Demo in 36–38 braucht keinen Server.
+Reihenfolge wie ein echter Tag. Die Einzel-Abschnitte weiter unten haben mehr Details. Ohne Backend gehen alle Punkte außer 34–35 (und echtes Guthaben); die Demo in 36–38 braucht keinen Server.
 Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft diese Kette im Emulator durch (ohne Kamera, Notifications, echtes Netz).
 
 **Installieren und starten**
@@ -593,11 +673,10 @@ Der automatische Test „Ein Tag mit Overfit“ (`DayWithOverfitTest`) läuft di
 34. Mit Backend: „KI-Chat verbinden“ → Zustimmen → Kopplungscode, Connector im Chat anlegen, „Plane mir ein Push-Training“ → Eingang auf dem Start-Tab → Vorschau → Übernehmen
 35. „Trennen“ und „KI-Chat trennen“ (zweimal tippen) → Chat hat keinen Zugriff mehr
 
-**Guthaben und Einladungen**
-36. Profil → „Fuel · startet bald“ → „Demo ansehen“: „Fuel · 4,20 €“, Pakete („Bald im Store“), Buchungen, Wiederherstellungscode
-37. „Freunde einladen“ (Profil → Guthaben): QR mit rotierendem Code (`overfit://invite#…`), Name; „Einladung einlösen“: beliebigen Link einfügen → Einlösen → schwarz, zwei Pulse,
-    Zahl zählt 0,00 → 1,00 €, „Einladung von Fabian“, kräftiger Puls; Tippen schließt
-38. „Demo beenden“ → Fuel zeigt wieder „startet bald“. (Echtes Guthaben/Einladungen erst mit Backend, Punkt 1 unten)
+**Guthaben**
+36. Profil → „Guthaben · startet bald“ → „Demo ansehen“: „4,20 € Guthaben“, Pakete („Bald im Store“), Buchungen (nur Claude-Modelle), Wiederherstellungscode
+37. (entfällt: Einladungen sind seit 7.11.2026 entfernt)
+38. „Demo beenden“ → Guthaben zeigt wieder „startet bald“. (Echtes Guthaben erst mit Backend, Punkt 1 unten)
 
 **Backup und Löschen**
 39. Profil → „Backup exportieren“ → in Dateien/Drive sichern (Datei lässt sich als ZIP öffnen, kein API-Key drin)
@@ -611,7 +690,7 @@ Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
    `wrangler.jsonc`), Migrationen (inkl. `0002_chat.sql`), Secrets `ANTHROPIC_API_KEY`, `SPOT_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY`
    (32 Zufallsbytes Base64url, nie ändern), R2 aktivieren + `wrangler r2 bucket create overfit-chat-photos`, `npm run deploy`. Danach
    GitHub → Settings → Secrets and variables → **Variables** → `OVERFIT_BACKEND_URL` = Worker-URL. Ohne das zeigt die App „startet bald“ + Demo
-   (Guthaben, Einladungen, KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
+   (Guthaben und KI-Chat-Verbindung bleiben dann lokal/ohne Server.)
 2. **GitHub Pages aktivieren** (Repo → Settings → Pages → Source „GitHub Actions“; oder Actions → „Web veröffentlichen“ → Run workflow):
    Web-Fallback `https://bigfire3.github.io/overfit/` und Teilen-Seite `/t` für Links ohne App
 3. **KI-Chat-Connectoren eintragen** (nach 1.): Claude → Connectors → Custom Connector, ChatGPT → Entwicklermodus → Connector,
@@ -619,9 +698,9 @@ Vor dem Testen am Handy ist nichts nötig. Sortiert nach Wichtigkeit:
 4. **Zu prüfen (Annahmen von Session G):** Standardmodelle OpenAI `gpt-5` und OpenRouter `anthropic/claude-sonnet-5.5` sind geraten – in
    Profil → KI-Coach → Coach-Einstellungen mit echtem Key ausprobieren und ggf. korrigieren; „Zur Prüfung durch Fabian“ in `docs/DECISIONS.md` lesen
 5. **Datenschutzerklärung vor dem Store-Start** um KI-Chat-Verbindung (Art. 9 DSGVO, Opt-in) und Daten an Chat-Anbieter ergänzen
-6. **Store-Konten (Phase 6/7):** Google-Play-Console und Apple-Developer-Konto, Play Billing / StoreKit, Play Integrity (Cloud-Projekt), App Attest,
+6. **Store-Konten (Phase 6/7):** Google-Play-Console und Apple-Developer-Konto, Play Billing / StoreKit,
    Server-Prüfer in `backend/src/verifiers.ts`. Store-Texte DE/EN liegen als Entwurf in `docs/store/store-listing.md`
-7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Einladungs-Links
+7. **Eigene Domain** (optional, später): Android App Links / iOS Universal Links (`/.well-known/`, Associated Domains), Web-Seite für Links
    ohne installierte App
 8. iOS: Kamera, Fotoauswahl, Dateiauswahl und Haptik sind nur in der iOS-CI gebaut, nicht auf einem echten iPhone getestet
 
@@ -1141,3 +1220,48 @@ Offen / Hinweise:
 3. Import → Zurück → „Nicht gespeichert“ → nochmal Zurück: nichts gespeichert
 4. Unbekannte Übung im JSON: Hinweis oben, nach Speichern als eigene Übung vorhanden
 5. Coach-Vorschlag „Workout übernehmen“ und Posteingang-Vorschlag: öffnet ebenfalls den Editor; „Verwerfen“ oben
+
+## Session AY – Story schließt sofort, „?“ weg (7.11.)
+- Erledigt: „?“ am Übungsbild im Workout-Bearbeiten entfernt; Story schließt (Auto, X, Wischen, Zurück) ohne Animation; Story kommt nach „Alle Daten löschen“ beim ersten Coach-Besuch wieder (Flag wurde nicht zurückgesetzt).
+
+### Bitte auf dem Handy testen (Story, „?“)
+1. Workout → Stift → Bearbeiten: am Übungsbild kein „?“ mehr, Tipp aufs Bild öffnet weiter die Details
+2. Coach → Story bis zur letzten Seite: schließt sofort, Tab-Leiste und Coach-Seite sofort da, kein Hochspringen; ebenso X, Wischen nach unten, Zurück
+3. Profil → Alle Daten löschen → Onboarding → Coach-Tab: Story kommt automatisch; danach nur per Tipp auf „Coach ⓘ“
+
+## Session AZ – Körpergewicht im Kalender, Zukunftsmonate, „Heute“ (7.11.)
+- Erledigt: Gewicht tracken (eigene Tabelle, DB v10, ein Wert pro Tag), Schnell-Karte oben im Kalender mit Wert, Veränderung zur Vorwoche und 8-Wochen-Verlauf, Eintrag/Löschen in der Tagesansicht, Strich im Kalender + Legende, Wert in der Liste, Trend im Coach-Kontext, Backup inklusive. Kalender zeigt 12 Monate in die Zukunft (ausgegraut, nicht antippbar), „Heute“-Knopf springt zurück. Belege `docs/screenshots/gewicht-kalender/`, Details in docs/DECISIONS.md.
+- Offen: nichts.
+
+### Bitte auf dem Handy testen (Gewicht, Kalender)
+1. Kalender-Tab: oben Karte „Körpergewicht“ (bzw. „Gewicht eintragen“); falls im Onboarding ein Gewicht eingegeben wurde, steht es schon da
+2. Karte antippen → Tagesansicht von heute, Tastatur offen; z. B. 82,4 tippen → zurück → Karte zeigt 82,4 kg, heute im Kalender ein kleiner Strich unter der 7, Legende „Gewicht“
+3. Nochmal öffnen, 81,9 eingeben → ersetzt den Wert (kein zweiter Eintrag); Mülleimer: erster Tipp rot, zweiter löscht
+4. Ein paar Tage in der Vergangenheit eintragen (Tag antippen) → Verlauf in der Karte, „… zur Vorwoche“ sobald ein Wert von vor 7–14 Tagen da ist
+5. Kalender nach oben scrollen → Dezember 2026 … November 2027, Tage grau und nicht antippbar; oben rechts erscheint das „Heute“-Symbol (Ring mit Punkt) → Tipp springt zum aktuellen Monat, Symbol verschwindet; ebenso nach unten in die Vergangenheit
+6. Listenansicht: Tage mit Gewicht als Karte bzw. „Gewicht 82,4 kg“ in der Zeile; runterscrollen → „Heute“-Symbol → wieder oben
+7. Titelzeile bei mehreren Fotos: „Vergleichen“ ist jetzt ein Symbol (zwei Rechtecke), daneben Muskel-Symbol und Liste/Kalender; nichts abgeschnitten
+8. Profil auf lb stellen → Werte in lb; Coach fragen: kennt aktuelles Gewicht und Trend
+9. Backup exportieren und wieder einspielen → Gewichte sind wieder da
+
+## Session BA – Satzzeile grün, Felder hervorgehoben, Cursor rechts (7.11.)
+- Erledigt: Abgehakter Satz im Training = ganze Zeile grün mit weißen Werten; Eingabefelder überall (Training, Workout bearbeiten, Training nachträglich bearbeiten) wieder leicht heller als die Zeile; Tipp in ein Satzfeld setzt den Cursor immer ans Ende. Belege `docs/screenshots/workout-gruen/vorher|nachher/`, Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (grüne Zeile, Felder, Cursor)
+1. Training starten → Satz abhaken: ganze Zeile grün, Haken weiß, Felder hellgrün, Zahlen weiß; erneut tippen → wieder grau
+2. Offene Sätze: Felder heller grau als die Zeile, Vorgabewerte grau
+3. In ein Feld mit „25“ ganz links tippen → Cursor steht hinter der 5, Löschtaste löscht die 5
+4. Weiter-Taste springt wie bisher zum nächsten Feld (Cursor am Ende), Fertig und Tipp daneben schließen die Tastatur
+5. Workout → Stift → Bearbeiten und Kalender → Training → Stift: Felder ebenso leicht hervorgehoben, Cursor am Ende
+
+
+## Session BC – KI-Anbieter umschaltbar (7.11.)
+- Erledigt: Guthaben-Stufen (günstig/normal/stark) können jetzt von Anthropic, OpenAI, Google Gemini, Cloudflare Workers AI oder OpenRouter beantwortet werden. Umschalten ohne Code über die Auswahlliste „KI-Anbieter“ im Workflow „Backend deployen“ (Voreinstellungen `claude`, `openai`, `gemini`, `gratis`, `gemischt`, `openrouter` in `backend/llm-routing.jsonc`). Ausweichen auch über Anbietergrenzen, bezahlt wird das günstigere Modell; Protokoll und Buchungen nennen den Anbieter. Die App zeigt Modellnamen und Kosten aus dem Server und merkt sich die letzte Antwort für offline. Anleitung: docs/anbieter-umstellen.md, Details in docs/DECISIONS.md.
+- Offen (Geld): Preis für `gratis` (Nutzer zahlen den Workers-AI-Listenpreis), OpenAI-/Workers-AI-Preise vor Produktion prüfen.
+
+### Bitte auf dem Handy testen (KI-Anbieter)
+1. Neue APK installieren → Coach → Einstellungen → Modell (Guthaben): drei Modelle mit Namen „Claude Haiku 5.5 (Anthropic)“, „Claude Sonnet 5.5 (Anthropic)“, „Claude Opus 5.5 (Anthropic)“ und Kosten je Auswertung, wie bisher
+2. Training beenden → Coach-Auswertung über Guthaben: läuft wie bisher; Profil → Guthaben → Abrechnung: Eintrag mit Modell und Betrag
+3. Optional umschalten: GitHub-App → Actions → „Backend deployen“ → Run workflow → mode `test`, KI-Anbieter `gratis` → nach dem Lauf in der App (App neu starten) zeigt die Modellwahl „Llama 4 Scout (Cloudflare)“; eine Auswertung ohne Foto kommt von Llama, mit Foto antwortet Claude Haiku („Ausweich-Modell“ im Hinweis). Danach wieder `claude` wählen
+4. Flugmodus an, App neu starten → Coach-Einstellungen zeigen weiter die zuletzt geladenen Modellnamen
+5. Mit eigenem API-Schlüssel: nichts ändert sich

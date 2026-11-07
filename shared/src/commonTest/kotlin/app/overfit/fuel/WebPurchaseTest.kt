@@ -38,7 +38,7 @@ class WebPurchaseTest {
         assertTrue(isCreditReturnLink("overfit://guthaben"))
         assertTrue(isCreditReturnLink(" overfit://guthaben?x=1 "))
         assertFalse(isCreditReturnLink("overfit://guthabenX"))
-        assertFalse(isCreditReturnLink("overfit://invite#abc"))
+        assertFalse(isCreditReturnLink("overfit://t#abc"))
         assertFalse(isCreditReturnLink("https://bigfire3.github.io/overfit/guthaben/"))
     }
 

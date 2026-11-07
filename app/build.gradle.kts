@@ -16,7 +16,7 @@ android {
         targetSdk = 37
         versionCode = ciRunNumber
         versionName = "0.1.$ciRunNumber"
-        // credit/invite backend; empty = not configured (the app then shows "coming soon" and the demo). CI variable OVERFIT_BACKEND_URL.
+        // credit backend; empty = not configured (the app then shows "coming soon" and the demo). CI variable OVERFIT_BACKEND_URL.
         buildConfigField("String", "OVERFIT_BACKEND_URL", "\"${System.getenv("OVERFIT_BACKEND_URL").orEmpty().trim()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

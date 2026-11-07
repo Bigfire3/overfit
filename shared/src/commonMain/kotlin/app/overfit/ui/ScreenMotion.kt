@@ -21,7 +21,10 @@ internal object ScreenMotion {
     const val IN_MS = 150
 
     private fun NavDestination.isTab() = Tab.entries.any { hasRoute(it.routeClass) }
-    private fun tabSwitch(from: NavDestination, to: NavDestination) = from.isTab() && to.isTab()
+    private fun NavDestination.isStory() = hasRoute(CoachStoryRoute::class)
+    // Closing the story (auto, X, swipe, back) is instant: tab bar and Coach page appear in the same frame.
+    private fun tabSwitch(from: NavDestination, to: NavDestination) =
+        (from.isTab() && to.isTab()) || (from.isStory() && to.isTab())
 
     fun enter(from: NavDestination, to: NavDestination): EnterTransition =
         if (tabSwitch(from, to)) EnterTransition.None

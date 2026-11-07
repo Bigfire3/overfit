@@ -13,19 +13,29 @@ import kotlin.time.Instant
 internal fun dateOf(epochMs: Long): LocalDate =
     Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(TimeZone.currentSystemDefault()).date
 
-/** One calendar day of the diary: its photos (oldest first) and finished workouts. */
-internal data class DiaryDay(val date: LocalDate, val photos: List<DiaryPhoto>, val workouts: List<HistoryRow>) {
+/** One calendar day of the diary: its photos (oldest first), finished workouts and body weight (kg). */
+internal data class DiaryDay(
+    val date: LocalDate,
+    val photos: List<DiaryPhoto>,
+    val workouts: List<HistoryRow>,
+    val weightKg: Double? = null,
+) {
     val hasPhoto get() = photos.isNotEmpty()
 
     /** Sauna after one of the day's workouts. */
     val sauna get() = workouts.any { it.sauna }
 }
 
-/** Days with a photo or a workout. A photo belongs to the day it was taken. */
-internal fun buildDiaryDays(photos: List<DiaryPhoto>, history: List<HistoryRow>): Map<LocalDate, DiaryDay> {
+/** Days with a photo, a workout or a body weight. A photo belongs to the day it was taken. */
+internal fun buildDiaryDays(
+    photos: List<DiaryPhoto>,
+    history: List<HistoryRow>,
+    weights: List<app.overfit.domain.WeightEntry> = emptyList(),
+): Map<LocalDate, DiaryDay> {
     val p = photos.sortedBy { it.photo.takenAt }.groupBy { dateOf(it.photo.takenAt) }
     val w = history.groupBy { dateOf(it.startedAt) }
-    return (p.keys + w.keys).associateWith { DiaryDay(it, p[it].orEmpty(), w[it].orEmpty()) }
+    val kg = weights.mapNotNull { e -> runCatching { LocalDate.parse(e.date) }.getOrNull()?.let { it to e.kg } }.toMap()
+    return (p.keys + w.keys + kg.keys).associateWith { DiaryDay(it, p[it].orEmpty(), w[it].orEmpty(), kg[it]) }
 }
 
 /**
@@ -50,6 +60,6 @@ class DiaryViewPref(private val kv: app.overfit.data.KeyValueStore) {
     private companion object { const val KEY = "diary.view" }
 }
 
-/** Days with a photo or workout, newest first, grouped by (year, month), for the list view. */
+/** Days with a photo, workout or weight, newest first, grouped by (year, month), for the list view. */
 internal fun diaryListMonths(days: Map<LocalDate, DiaryDay>): List<Pair<Pair<Int, Int>, List<DiaryDay>>> =
     days.values.sortedByDescending { it.date }.groupBy { it.date.year to it.date.monthNumber }.toList()

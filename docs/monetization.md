@@ -11,20 +11,31 @@ Marke: **overfit – personal training for everyone** (siehe DECISIONS.md). Stan
 - Coach-Guthaben in Euro („Guthaben“, EN „Credit“; früher „Fuel“). Kauf **im Web** über Stripe (Fabian verkauft direkt, als Kleinunternehmer nach § 19 UStG ohne USt) oder **in der App** über Google Play Billing bzw. Apple In-App-Kauf. **Preise je Kanal** (Fabians Entscheidung, Session AB): **Web 1:1** (10 € zahlen = 10 € Guthaben), **Store mit offen ausgewiesenem Aufpreis** („5 € Guthaben für 6,99 €“), weil Apple/Google als Verkäufer USt abführen und 15 % Gebühr nehmen. Verbraucht wird überall gleich: Listenpreis × (1 + `MARKUP_BP`). Die Store-Produkt-IDs `overfit.fuel.5` / `.10` bleiben (bei den Stores registriert, nicht sichtbar).
 - Apple verlangt, dass es das Guthaben **parallel als In-App-Kauf** gibt, sobald die App auf externe Kaufwege verweist.
 
-### Modelle und Preise (Session Y: echte Namen, keine Stufen; Session AB: Aufschlag 28 %)
+### Modelle und Preise (seit 7.11.2026 nur Claude; Session Y: echte Namen; Session AB: Aufschlag 28 %)
 Es gibt keine Marketing-Namen wie „Standard“, „Pro“ oder „Lite“. Die App zeigt die Modelle, die wirklich antworten, mit Anbieter, und was sie
 kosten. Abgerechnet wird je Anfrage nach Token zum Listenpreis des Modells plus **28 % Aufschlag** (`MARKUP_BP = 2800`, ein einziger Wert für alle Modelle und Kanäle).
-Der Nutzer wählt das Modell (Coach-Einstellungen → „Modell für deinen Coach“); „Mit KI ausfüllen“ nutzt immer das kleine Modell.
+Fabians Wunsch (7.11.): möglichst alle Claude-Modelle, ohne eigene API-Schlüssel; kurze, günstige Anfragen mit Haiku. Deshalb laufen alle
+Guthaben-Anfragen über **einen** Anthropic-Schlüssel des Betreibers. Der Nutzer wählt das Modell (Coach-Einstellungen → „Modell für deinen Coach“,
+Voreinstellung Claude Sonnet 5.5); „Mit KI ausfüllen“ nutzt immer Claude Haiku 5.5.
 
-| Modell (Anbieter) | Listenpreis je 1 Mio. Token (ein / aus) | Coach-Auswertung* | Chat-Nachricht* | „Mit KI ausfüllen“* |
+| Modell (Anbieter) | Listenpreis je 1 Mio. Token (ein / aus / Cache lesen) | Coach-Auswertung* | Chat-Nachricht* | „Mit KI ausfüllen“* |
 |---|---|---|---|---|
-| Gemini 3.6 Flash (Google), Voreinstellung | 0,75 $ / 3,75 $ (ab 1.1.2027: 1,50 $ / 7,50 $) | ≈ 1,8 ct (ab 2027 ≈ 3,6 ct) | ≈ 1,3 ct | – |
-| Claude Sonnet 5.5 (Anthropic) | 2 $ / 10 $ | ≈ 3,6 ct | ≈ 2,2 ct | – |
-| Llama 3.1 8B (Cloudflare Workers AI) | 0,28 $ / 0,83 $ | – | – | ≈ 0,04 ct (nur dieses Modell) |
+| Claude Haiku 5.5 (Anthropic) | 0,10 $ / 0,50 $ / 0,01 $ | ≈ 0,18 ct | ≈ 0,11 ct | ≈ 0,02 ct (immer dieses Modell) |
+| Claude Sonnet 5.5 (Anthropic), Voreinstellung | 2 $ / 10 $ / 0,20 $ | ≈ 3,6 ct | ≈ 2,2 ct | – |
+| Claude Opus 5.5 (Anthropic) | 4 $ / 20 $ / 0,20 $ | ≈ 7,2 ct | ≈ 4,3 ct | – |
 
-\* berechnet, nicht geraten: Listenpreis × typische Token-Menge × 1,28, bei 0,92 €/$ (z. B. Gemini-Auswertung 13 938 µ€ × 1,28 = 17 841 µ€). Typische Mengen aus den echten Prompts
-(Coach 8 200 ein / 1 400 aus, Chat 6 700 / 500, Ausfüllen 900 / 120; Gemini zählt ca. 1 000 Thinking-Token als Ausgabe dazu),
-Methode in DECISIONS.md „Kostenschätzung“. Die App rechnet die Schätzung aus `/v1/config` (Preise, `markupBp`, `usageProfiles`); unter jeder Antwort steht der echte Preis.
+Quelle: Preisliste von Anthropic (Stand 7.11.2026); Cache schreiben = 1,25 × Eingabe. Haiku-Preis gilt bis 100 000 Token Eingabe (Overfit bleibt weit darunter).
+Bis 7.11.2026: Gemini 3.6 Flash (Voreinstellung), Claude Sonnet 5.5 und Llama über Cloudflare Workers AI; alte Buchungen behalten ihren Preis.
+
+\* berechnet, nicht geraten: Listenpreis × typische Token-Menge × 1,28, bei 0,92 €/$ (z. B. Sonnet-Auswertung 27 968 µ€ × 1,28 = 35 799 µ€). Typische Mengen aus den echten Prompts
+(Coach 8 200 ein / 1 400 aus, Chat 6 700 / 500, Ausfüllen 900 / 120). Claude denkt bei Bedarf (adaptives Thinking, zählt als Ausgabe); bei
+`effort: medium` und kurzen Anfragen gemessen 0 Thinking-Token, bei langen Auswertungen kann die Ausgabe größer sein.
+Methode in DECISIONS.md „Kostenschätzung“. Die App rechnet die Schätzung aus `/v1/config` (Preise, `markupBp`, `usageProfiles`); unter jeder Antwort steht der echte Preis,
+und Profil → Guthaben → **Abrechnung** listet jede einzelne Anfrage (Zeit, Zweck, Modell, Token, Betrag, Status, Ausweichen).
+
+**Ausweichen:** Antwortet das gewählte Modell nicht (Überlastung, Ausfall, Zeitüberschreitung), beantwortet ein anderes Claude-Modell die
+Anfrage (Haiku ↔ Sonnet, Opus → Sonnet). Der fehlgeschlagene Versuch kostet nichts. Berechnet wird für die tatsächlich verbrauchten Token
+der Preis des antwortenden Modells, höchstens aber der des gewählten (antwortet Sonnet statt Haiku, zahlt der Nutzer den Haiku-Preis).
 
 ### Rechnung (Session AB): Web 1:1, Store mit Aufpreis, ein Aufschlag
 Ziel: Jeder Kauf ist **auch bei vollständig verbrauchtem Guthaben mindestens kostendeckend**, plus ein kleiner, offener Gewinn.
@@ -41,7 +52,7 @@ Bis Session AA trug ein einziger Aufschlag (69 %) auch den Store, den teuersten 
 - **Stores:** Apple und Google sind Verkäufer (Kommissionär), führen die USt des Käuferlands ab und nehmen **15 % vom Preis ohne USt**
   (Small-Business-Programme). Fabians Kleinunternehmerstatus ändert daran nichts. Store-Preise sind in allen Euro-Ländern gleich, die
   USt nicht: gerechnet mit **19 % (DE)** und **27 % (höchster EU-Satz)**.
-- **Geschenktes (Startguthaben, Einladungsbonus): 10 % vom Netto** als Rücklage (der Einladungsbonus kostet seit Session AD weit weniger, siehe unten). **Zielgewinn 7 % vom Netto**, Untergrenze **5 %** (im Test festgeschrieben).
+- **Rücklage 10 % vom Netto** für Kulanz-Gutschriften und Ausfälle (Chargebacks). Bis 7.11.2026 deckte sie Geschenktes (Startguthaben, Einladungsbonus); beides ist entfernt, die Rücklage bleibt bewusst konservativ (Aufschlag unverändert 28 %). **Zielgewinn 7 % vom Netto**, Untergrenze **5 %** (im Test festgeschrieben).
 - Guthaben wird vollständig zum Listenpreis × (1 + Aufschlag) verbraucht (ungünstigster Fall), Wechselkurs 0,92 €/$.
 
 **Formel:** Netto = Preis − USt − Gebühr. Gewinn = Netto − Guthaben ÷ (1 + Aufschlag) − 10 % × Netto.
@@ -75,7 +86,7 @@ passen, und den zahlten dann alle, auch im Web. Ein 20-€-Store-Paket ist nicht
 
 **Ergebnis je Kauf bei Aufschlag 28 %, Guthaben voll verbraucht:**
 
-| Kanal | Preis | Guthaben | USt | Gebühr | Netto | Anbieterkosten (Guthaben ÷ 1,28) | Rücklage Einladungsbonus | Gewinn | % vom Netto |
+| Kanal | Preis | Guthaben | USt | Gebühr | Netto | Anbieterkosten (Guthaben ÷ 1,28) | Rücklage (10 %) | Gewinn | % vom Netto |
 |---|---|---|---|---|---|---|---|---|---|
 | Web | 5 € | 5 € | – | 0,38 € | 4,63 € | 3,91 € | 0,46 € | **0,26 €** | 5,5 % |
 | Web | 10 € | 10 € | – | 0,50 € | 9,50 € | 7,81 € | 0,95 € | **0,74 €** | 7,8 % |
@@ -86,7 +97,7 @@ passen, und den zahlten dann alle, auch im Web. Ein 20-€-Store-Paket ist nicht
 | Store (27 %) | 6,99 € | 5 € | 1,49 € | 0,83 € | 4,68 € | 3,91 € | 0,47 € | **0,30 €** | 6,5 % |
 
 Teuerste einzelne Zahlart im Web (Nicht-EWR-Karte + Umrechnung): 5 € → 3,0 %, 10 € → 5,4 %, 50 € → 7,2 %, kein Verlust. Ein Chargeback
-(20 € Gebühr) frisst den Gewinn vieler Käufe; das fängt nur die Summe auf, deshalb bleibt die Rücklage für Startguthaben und Einladungsbonus konservativ.
+(20 € Gebühr) frisst den Gewinn vieler Käufe; das fängt nur die Summe auf, deshalb bleibt die Rücklage konservativ.
 
 Der Test `backend/test/pricing.test.ts` rechnet das mit den Konstanten nach: jedes Web- und Store-Paket ≥ 5 % (Store bei 19 % und 27 % USt),
 keine Zahlart im Verlust, Store-Preise auf x,99 € und jeweils die niedrigste Stufe, die reicht, und der Aufschlag ist der kleinste ganze
@@ -94,51 +105,26 @@ Prozentwert, der alle Web-Pakete trägt.
 
 ### Aufschlag (offen, Transparenz)
 - **28 % Aufschlag** auf den Listenpreis der Anbieter, auf jede Anfrage, für **alle** Modelle und Kanäle gleich. Wofür: **Zahlungsgebühr**
-  (im Web 0,38–1,50 € je Kauf), **Geschenktes** (Startguthaben, Einladungsbonus als Coach-Auswertungen), **Betrieb** und ein kleiner **Gewinn**
+  (im Web 0,38–1,50 € je Kauf), eine **Rücklage** (Kulanz, Chargebacks), **Betrieb** und ein kleiner **Gewinn**
   (5–10 % vom Netto). USt fällt im Web nicht an (Kleinunternehmer); im Store tragen USt und Store-Gebühr der offene Aufpreis.
 - Im Web bleibt das Guthaben 1:1; im Store steht der Aufpreis bei jedem Paket („5 € Guthaben · 6,99 € (inkl. Store-Gebühr)“).
 - Die App sagt das unter „Guthaben“ und verlinkt „Wie setzen sich die Preise zusammen?“ auf `https://bigfire3.github.io/overfit/preise/`
   (DE+EN, je ein Beispiel Web und Store, ohne Werbesprache).
-- **Verfall:** Geschenktes (Startguthaben, Admin-Gutschrift, Einladungsbonus) verfällt nach 180 Tagen (Test-Gutschriften nach 60), gekauftes Guthaben nie.
-- **Gekauft vs. geschenkt:** Der Saldo ist getrennt; Geschenktes wird zuerst verbraucht. Die App zeigt Guthaben immer als „X € Guthaben“,
-  echtes Geld nur als Preis („Preis: 10,00 €“ bzw. „6,99 € (inkl. Store-Gebühr)“). Jede Buchung ist als bezahlt, geschenkt, verbraucht,
-  erstattet oder verfallen markiert.
+- **Kein Verfall, kein Startguthaben, keine Einladungen** (Fabian, 7.11.2026): Guthaben läuft nie ab, neue Konten starten mit 0 €.
+- Die App zeigt Guthaben immer als „X € Guthaben“, echtes Geld nur als Preis („Preis: 10,00 €“ bzw. „6,99 € (inkl. Store-Gebühr)“).
+  Jede Buchung ist als bezahlt, gutgeschrieben, verbraucht, erstattet oder ausgebucht markiert; Buchungen alter Typen (früheres
+  Startguthaben, Einladungsbonus) erscheinen neutral als „Gutschrift“ bzw. „Ausbuchung“.
 - **Ausweichung:** Antwortet ein anderes Modell als das gewählte, zahlt der Nutzer höchstens den Preis des gewählten; ist das Ersatzmodell teurer, trägt die Marge die Differenz (sie kann dann negativ sein). Die App sagt dem Nutzer, welches Modell geantwortet hat.
 - **Auswertung für den Betreiber:** `GET /v1/admin/usage` (docs/backend-api.md, Tabelle mit `scripts/usage-report.mjs`) zeigt je Modell
   Anbieterkosten, Berechnetes und Marge, ohne Inhalte, den Web-Umsatz je Jahr und Land und seit Session AD einen Finanzteil in echten Euro:
   Einnahmen je Kanal (Web/Stripe, Google Play, App Store) brutto und nach Gebühren (geschätzt: Stripe 2,5 % + 0,25 €, Store 15 % auf den
-  Preis ohne 19 % USt), offenes Guthaben gekauft/geschenkt, offene geschenkte Auswertungen, KI-Kosten (davon für geschenkte Auswertungen)
-  und Rohgewinn = Netto-Einnahmen − KI-Kosten. Geschenktes zählt nie als Einnahme.
+  Preis ohne 19 % USt), offenes Guthaben gekauft/gutgeschrieben, KI-Kosten und Rohgewinn = Netto-Einnahmen − KI-Kosten. Gutschriften zählen nie als Einnahme.
 
-### Einladungsbonus: geschenkte Coach-Auswertungen (Session AD)
-Fabians Entscheidung: **der Neue bekommt 5 geschenkte Auswertungen, der Einladende 5**, statt Euro-Guthaben. Auslöser wie bisher: der Freund
-beim Einlösen, der Einladende nach der ersten erfolgreichen Coach-Anfrage des Freundes. Geschenkte Auswertungen sind ein eigener Zähler (kein
-Euro-Betrag), gelten nur für **Coach-Auswertungen mit dem günstigsten Bildmodell (Gemini Flash, Stufe standard)**, werden vor dem Guthaben
-verbraucht und verfallen nach 180 Tagen. Chat und andere Modelle zahlen aus dem Guthaben.
+### Einladungen und Startguthaben: entfernt (7.11.2026)
+Fabian: „Dieses Freunde werben und diesen 1 Euro geschenkt bekommen, das ist mir am Anfang jetzt erstmal zu viel Heckmeck.“ Das
+Empfehlungsprogramm (geschenkte Coach-Auswertungen für Einladende und Eingeladene, Session AD), das Startguthaben und der Verfall sind aus
+App, Backend und Webseite entfernt (DECISIONS.md „Einladungen, Startguthaben und Verfall entfernt“).
 
-**Echte Kosten je Auswertung** (Preistabelle `backend/src/providers.ts`, typische Auswertung 8 200 Token rein, 1 400 raus + 1 000 Thinking):
-
-| | bis 31.12.2026 (0,75 $ / 3,75 $ je MTok) | ab 1.1.2027 (doppelt) |
-|---|---|---|
-| Auswertung ohne Foto | 0,014 € | 0,028 € |
-| Auswertung mit 2 Fotos | 0,016 € | 0,031 € |
-| je erfolgreiche Einladung (5 + 5 Auswertungen) | 0,14–0,16 € | 0,28–0,31 € |
-| Worst Case je Person und Monat: 10 Einladungen × 5 = 50 Auswertungen als Einladender | 0,70–0,79 € | 1,39–1,57 € |
-| dazu deren 10 Freunde × 5 Auswertungen | 0,70–0,79 € | 1,39–1,57 € |
-
-**Grenzen** (alle in `backend/wrangler.jsonc`):
-- QR-Token 45 s und einmalig, Selbsteinladung gesperrt, je Konto und Gerät (Attestierung) eine Einlösung, 10 Einladungen pro Monat und Person.
-- **Globales Monatsbudget in Auswertungen:** `INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS = 1000` (jede Einlösung zählt 5 + 5), also bis zu 100
-  Einladungen im Monat, ≈ 14–31 € echte KI-Kosten.
-- **Harte Kostengrenze:** `INVITE_GIFT_MONTHLY_COST_CAP_MICRO = 50 000 000` (50 €): die echten KI-Kosten aller geschenkten Auswertungen im
-  Kalendermonat. Ist sie erreicht, zahlt das Guthaben, bis der Monat wechselt. Damit sind höchstens ~50 € im Monat möglich, auch wenn
-  Anfragen größer ausfallen als typisch.
-- **Je Anfrage:** Eine Anfrage, deren reservierte Höchstkosten zum Anbieterpreis über `INVITE_GIFT_MAX_COST_MICRO = 250 000` (0,25 €)
-  liegen, zählt nicht als geschenkte Auswertung.
-- **Kontoumzug:** Beim Wiederherstellen per Code verfallen geschenkte Einladungs-Auswertungen (und alte Euro-Einladungsboni) des
-  aufgegebenen Kontos; gekauftes Guthaben wandert mit. Das schließt die Schleife „neu installieren → eigene Einladung einlösen → per Code
-  zurück“. Eine Belohnung geht nie an das eigene Konto.
-- Bestehende Euro-Einladungsboni aus dem Testbetrieb bleiben als geschenktes Guthaben gültig, bis sie verbraucht sind oder verfallen.
 - Preise pflegt der Betreiber in `backend/src/providers.ts`, den Aufschlag in `backend/wrangler.jsonc` (`MARKUP_BP`), die Pakete in `backend/src/config.ts`.
 
 ## Guthaben im Web (Session Z, Testmodus; Stripe und Preise Session AB)
