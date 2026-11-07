@@ -1285,3 +1285,4 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - „?“-Badge am Übungsbild im Workout-Editor (ExerciseThumb) entfernt; das Bild bleibt tippbar (Übungsdetails). Kein Icon-Fallback „?“ in LineIcon vorhanden (andere „?“ im Code sind nur Platzhalter in Texten).
 - Ursache Ruckeln: Story-Route ist kein Tab, die Tab-Leiste kam erst nach dem Fade zurück. `ScreenMotion`: Wechsel Story → Tab ist instant (keine Animation), Leiste und Coach-Seite im selben Frame.
 - Ursache Story fehlte: `resetAll()` (Alle Daten löschen) ließ `overfit.coachStorySeen` stehen. Jetzt entfernt, Story kommt beim nächsten ersten Coach-Besuch wieder.
+- Nachtrag: Tab- und Mini-Workout-Leiste bleiben versteckt, solange die Story noch in `visibleEntries` ist (ca. 3 Frames nach dem Schließen), damit sie nicht zuerst unter der Story auftauchen.

@@ -52,7 +52,6 @@ import app.overfit.ui.components.MenuItem
 import app.overfit.ui.components.MoreMenu
 import app.overfit.ui.components.SetField
 import app.overfit.ui.components.SetRowSurface
-import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
