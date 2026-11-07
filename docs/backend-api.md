@@ -116,16 +116,16 @@ Jeder Fehler: passender HTTP-Status und
 {
   "mode": "production",
   "currency": "EUR", "unit": "micro-euro", "markupBp": 2800, "maxTokensCap": 8192,
-  "models": { "gemini-3.6-flash": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 }, "claude-sonnet-5-5": { … }, "@cf/meta/llama-3.3-70b-instruct-fp8-fast": { … } },
+  "models": { "claude-haiku-5-5": { "in": 92000, "cacheRead": 9200, "cacheWrite": 115000, "out": 460000 }, "claude-sonnet-5-5": { … }, "claude-opus-5-5": { … }, "gemini-3.6-flash": { … } },
   "defaultTier": "standard",
   "tiers": {
-    "standard": { "available": true, "model": "gemini-3.6-flash", "displayName": "Gemini 3.6 Flash", "vendor": "Google", "label": "Gemini 3.6 Flash (Google)", "thinkingTokens": 1000, "images": true, "fallback": "pro", "price": { "in": 690000, "cacheRead": 69000, "cacheWrite": 690000, "out": 3450000 } },
-    "pro": { "available": false, "model": "claude-sonnet-5-5", "images": true, "fallback": "standard", "price": { … } },
-    "lite": { "available": true, "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "images": false, "fallback": "standard", "price": { … } }
+    "standard": { "available": true, "model": "claude-sonnet-5-5", "displayName": "Claude Sonnet 5.5", "vendor": "Anthropic", "label": "Claude Sonnet 5.5 (Anthropic)", "thinkingTokens": 0, "images": true, "fallback": "lite", "price": { … } },
+    "pro": { "available": true, "model": "claude-opus-5-5", "images": true, "fallback": "standard", "price": { … } },
+    "lite": { "available": true, "model": "claude-haiku-5-5", "images": true, "fallback": "standard", "price": { … } }
   },
   "usageProfiles": { "coach": { "inputTokens": 8200, "outputTokens": 1400 }, "chat": { "inputTokens": 6700, "outputTokens": 500 }, "autofill": { "inputTokens": 900, "outputTokens": 120 } },
   "packages": [ { "productId": "overfit.fuel.10", "priceMicro": 10000000, "creditMicro": 7870370 } ],
-  "invite": { "starterReviews": 5, "rewardReviews": 5, "giftTier": "standard", "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
+  "invite": { "starterReviews": 5, "rewardReviews": 5, "giftTier": "lite", "tokenTtlSec": 45, "monthlyLimitPerInviter": 10, "expiryDays": 180 }
 }
 ```
 `mode`: `production` oder `test`. **`test` = Testserver** (`DEPLOY_MODE=test`): keine Geräteprüfung beim Einlösen einer Einladung (Token `test:<geräte-id>`,
@@ -134,8 +134,8 @@ Produktion kennt kein `test:`-Token. Nur der exakte Wert `test` schaltet den Tes
 Modellpreise in µ€ je 1 Mio. Token ohne Aufschlag (für Kostenschätzung in der App), jeweils der heute gültige Preis.
 `displayName`/`vendor`/`label`: echter Modellname und Anbieter für die UI (kein Marketingname). `usageProfiles`: typische Token-Mengen je
 Aufgabe (gemessen, docs/DECISIONS.md „Kostenschätzung“); die App rechnet damit aus Preis, Aufschlag und `thinkingTokens` die geschätzten Kosten.
-`tiers.<stufe>.available`: Stufe ist konfiguriert (`standard` braucht `GEMINI_API_KEY`, `pro` `ANTHROPIC_API_KEY`, `lite` das
-Workers-AI-Binding). Die App bietet nur verfügbare Stufen an. `productId` entspricht der Produkt-ID im Play-/App-Store.
+`tiers.<stufe>.available`: Stufe ist konfiguriert (seit 7.11.2026 alle drei Claude-Stufen genau dann, wenn `ANTHROPIC_API_KEY` gesetzt
+ist; `models` enthält auch die Preise früherer Modelle für alte Buchungen). Die App bietet nur verfügbare Stufen an. `productId` entspricht der Produkt-ID im Play-/App-Store.
 
 ### `GET /v1/admin/usage?from=&to=` (inhaltsfreie Nutzung)
 `Authorization: Bearer <ADMIN_SECRET>` (nur mit gesetztem ADMIN_SECRET, auch in Produktion; sonst 404). `from`/`to` ISO-Datum (`to` exklusiv,
@@ -205,29 +205,27 @@ Das **neue** Gerät registriert sich normal (`POST /v1/devices`, leeres Konto) u
 
 ### `POST /v1/messages`
 Body: Anthropic-Messages-Request (`model`, `max_tokens`, `system`, `messages`, Bilder als Base64, `output_config.format` für Structured
-Output, `output_config.effort`, optional `overfit: { "purpose": "review" | "chat" | "other" }`, wird nie an den Anbieter weitergegeben). **`model` ist eine Stufe:** `standard` (Gemini Flash), `pro` (Claude Sonnet) oder `lite` (kleines Modell
-bei Workers AI, nur Text). Alte App-Versionen schicken `claude-sonnet-5-5` → wird als `pro` behandelt. Einschränkungen: `max_tokens` ≤
-`maxTokensCap`, **kein** `stream`. Limit: 10 Anfragen/Minute je Gerät.
+Output, `output_config.effort`, optional `overfit: { "purpose": "review" | "chat" | "autofill" | "plan" | "other" }` (Unbekanntes → `other`),
+wird nie an den Anbieter weitergegeben). **`model` ist eine Stufe:** `lite` (Claude Haiku 5.5), `standard` (Claude Sonnet 5.5) oder `pro`
+(Claude Opus 5.5). Alte App-Versionen schicken Modell-IDs → deren Stufe (`claude-sonnet-5-5` → `standard`, früher `gemini-3.6-flash` →
+`standard`, Llama-IDs → `lite`). Einschränkungen: `max_tokens` ≤ `maxTokensCap`, **kein** `stream`. Limit: 10 Anfragen/Minute je Gerät.
 
-Abbildung: `pro` geht unverändert an Anthropic (Modell der Stufe, `effort: medium`, wenn nicht gesetzt). `standard` wird auf die native
-Gemini-API übersetzt (`systemInstruction`, `inlineData` für Bilder, `responseJsonSchema` + `responseMimeType: application/json`,
-`thinkingLevel` aus `effort`, sonst `medium`, `maxOutputTokens` = 2 × `max_tokens`, mindestens 4096, weil Gemini Thinking-Token
-mitzählt). `lite` geht über das Workers-AI-Binding (Text-Nachrichten, `response_format: json_schema`); Bilder →
-`400 images_not_supported` ohne Reservierung. Andere Anthropic-Felder (z. B. `tools`) gibt es nur bei `pro`.
+Abbildung: Der Body geht unverändert an Anthropic (`POST /v1/messages`), nur `model` = Modell der Stufe und `effort: medium`, wenn nicht
+gesetzt. Alle Stufen können Bilder. Gemini und Workers AI werden seit 7.11.2026 nicht mehr aufgerufen.
 
 Ablauf: Höchstkosten der angefragten Stufe (geschätzte Eingabe + Ausgabe-Höchstmenge × Ausgabepreis, mit Aufschlag) werden atomar
-reserviert (sonst `402 insufficient_funds`), die Anfrage geht über das Cloudflare AI Gateway an den Anbieter, danach wird nach `usage`
+reserviert (sonst `402 insufficient_funds`), die Anfrage geht an Anthropic (über das Cloudflare AI Gateway nur mit `AI_GATEWAY_TOKEN`), danach wird nach `usage`
 abgerechnet: `ceil((input×in + cache_read×cacheRead + cache_creation×cacheWrite + output×out) / 1e6 × (1 + markup))`, der Rest der
 Reservierung wird freigegeben. Ohne Nutzungsangabe wird die Reservierung berechnet.
 
 **Ausweichen:** Fällt der Anbieter aus (5xx, 429, Zeitüberschreitung, Netzwerk), geht die Anfrage einmal an die Ausweich-Stufe
-(`standard` → `pro`, `pro` → `standard`, `lite` → `standard`), sofern sie konfiguriert ist und Bilder kann. Berechnet wird
+(`lite` → `standard`, `standard` → `lite`, `pro` → `standard`). Berechnet wird
 `min(Kosten zum Preis des genutzten Modells, Kosten zum Preis der angefragten Stufe)` für die tatsächlich verbrauchten Token: nie mehr
 als die angefragte Stufe. 401/403 des Anbieters oder des AI Gateways (Schlüssel/Token des Betreibers) gilt als Ausfall: Ausweichen,
 sonst `502 upstream_unavailable` mit `details.upstreamStatus`. Andere Ablehnungen (4xx außer 408/429) weichen nicht aus (`400 upstream_rejected`). Bei jedem endgültigen Fehler
 wird die Reservierung vollständig freigegeben. Verbrauch → zuerst verfallende Posten (Startguthaben), dann Kauf-Guthaben.
 
-**Geschenkte Auswertungen:** Mit `overfit.purpose = "review"` auf der Stufe `standard` (Gemini Flash) wird zuerst eine geschenkte Coach-Auswertung
+**Geschenkte Auswertungen:** Mit `overfit.purpose = "review"` auf der Stufe `lite` (Claude Haiku 5.5; bis 7.11.2026 `standard` = Gemini Flash) wird zuerst eine geschenkte Coach-Auswertung
 verbraucht (Einladungsbonus), nicht Guthaben. Chat und andere Stufen zahlen immer aus Guthaben. Ist die Reservierung zum Anbieterpreis teurer als
 `INVITE_GIFT_MAX_COST_MICRO` (250 000 µ€) oder das Monatsbudget echter KI-Kosten für Geschenktes (`INVITE_GIFT_MONTHLY_COST_CAP_MICRO`) erreicht,
 zahlt das Guthaben. Bei einem Fehler wird die Auswertung zurückgegeben.
@@ -235,12 +233,22 @@ zahlt das Guthaben. Bei einem Fehler wird die Auswertung zurückgegeben.
 Antwort `200`: Anthropic-Format (`content`, `stop_reason` mit `end_turn` | `max_tokens` | `refusal`, `usage`, `model` = genutztes Modell),
 **plus** Feld `overfit`:
 ```json
-{ "id": "msg_…", "model": "gemini-3.6-flash", "content": [ … ], "stop_reason": "end_turn", "usage": { … },
-  "overfit": { "costMicro": 2609, "balanceMicro": 7863414, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "gemini-3.6-flash", "modelName": "Gemini 3.6 Flash", "vendor": "Google", "requestedModel": "gemini-3.6-flash", "requestedModelName": "Gemini 3.6 Flash", "requestedVendor": "Google", "fallback": false, "giftReview": false } }
+{ "id": "msg_…", "model": "claude-sonnet-5-5", "content": [ … ], "stop_reason": "end_turn", "usage": { … },
+  "overfit": { "costMicro": 2320, "balanceMicro": 997680, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "claude-sonnet-5-5", "modelName": "Claude Sonnet 5.5", "vendor": "Anthropic", "requestedModel": "claude-sonnet-5-5", "requestedModelName": "Claude Sonnet 5.5", "requestedVendor": "Anthropic", "fallback": false, "fallbackReason": null, "purpose": "review", "requestId": 17, "giftReview": false } }
 ```
-`giftReview: true` = als geschenkte Auswertung abgerechnet (`costMicro` dann 0). Dazu Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Guthaben · 7,86 €“ und die Kosten der Auswertung daraus. Bilder
+`giftReview: true` = als geschenkte Auswertung abgerechnet (`costMicro` dann 0). `requestId` = Eintrag im Anfrage-Protokoll (unten); `fallbackReason` = warum das gewählte Modell nicht antwortete (`"HTTP 529: Overloaded"`, nicht berechnet). Fehlerantworten nach der Prüfung des Bodys (`insufficient_funds`, `upstream_*`) tragen `details.requestId`. Dazu Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Guthaben · 7,86 €“ und die Kosten der Auswertung daraus. Bilder
 werden bei der Reservierung pauschal (3000 Token je Bild) gezählt, nicht nach Base64-Länge. Zeitlimit je Anbieter 100 s, für die ganze
 Anfrage samt Ausweichen 140 s. Anfragen mit Bildern bekommen `cf-aig-collect-log-payload: false` (das Gateway speichert keine Inhalte, nur Metadaten). Bei `fallback: true` zeigt die App, welches Modell tatsächlich geantwortet hat (`model`) und dass der Preis von `requestedModel` berechnet wurde.
+
+### `GET /v1/account/requests?limit=50&before=<id>` (Anfrage-Protokoll, signiert)
+Jede Anfrage an `/v1/messages` nach der Prüfung des Bodys, auch fehlgeschlagene (`insufficient_funds`, Anbieter-Fehler), neueste zuerst.
+Nur Metadaten, nie Prompt, Antwort oder Foto. `limit` 1–200. → `{ "entries": [ { "id": 17, "ts": 1762534000, "durationMs": 3968,
+"purpose": "review", "tier": "standard", "status": "ok" | "failed", "errorCode": null, "requestedModel": "claude-sonnet-5-5",
+"model": "claude-sonnet-5-5", "fallback": false, "fallbackFromStatus": null, "fallbackReason": null, "inputTokens": 280,
+"cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 141, "chargedMicro": 2320, "gift": false, "photo": false } ], "next": null }`.
+Beim Ausweichen: `requestedModel` = zuerst versuchtes Modell (nicht berechnet), `model` = Modell, das geantwortet hat (berechnet),
+`fallbackFromStatus`/`fallbackReason` = Ausfall des ersten Versuchs. Bei `failed` steht in `fallbackReason` der Fehlertext des letzten
+Versuchs. Zieht beim Kontoumzug (`/v1/recovery/restore`) mit. Die App zeigt die Liste unter Profil → Guthaben → „Abrechnung“.
 
 ## Kauf
 

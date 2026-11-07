@@ -11,20 +11,31 @@ Marke: **overfit – personal training for everyone** (siehe DECISIONS.md). Stan
 - Coach-Guthaben in Euro („Guthaben“, EN „Credit“; früher „Fuel“). Kauf **im Web** über Stripe (Fabian verkauft direkt, als Kleinunternehmer nach § 19 UStG ohne USt) oder **in der App** über Google Play Billing bzw. Apple In-App-Kauf. **Preise je Kanal** (Fabians Entscheidung, Session AB): **Web 1:1** (10 € zahlen = 10 € Guthaben), **Store mit offen ausgewiesenem Aufpreis** („5 € Guthaben für 6,99 €“), weil Apple/Google als Verkäufer USt abführen und 15 % Gebühr nehmen. Verbraucht wird überall gleich: Listenpreis × (1 + `MARKUP_BP`). Die Store-Produkt-IDs `overfit.fuel.5` / `.10` bleiben (bei den Stores registriert, nicht sichtbar).
 - Apple verlangt, dass es das Guthaben **parallel als In-App-Kauf** gibt, sobald die App auf externe Kaufwege verweist.
 
-### Modelle und Preise (Session Y: echte Namen, keine Stufen; Session AB: Aufschlag 28 %)
+### Modelle und Preise (seit 7.11.2026 nur Claude; Session Y: echte Namen; Session AB: Aufschlag 28 %)
 Es gibt keine Marketing-Namen wie „Standard“, „Pro“ oder „Lite“. Die App zeigt die Modelle, die wirklich antworten, mit Anbieter, und was sie
 kosten. Abgerechnet wird je Anfrage nach Token zum Listenpreis des Modells plus **28 % Aufschlag** (`MARKUP_BP = 2800`, ein einziger Wert für alle Modelle und Kanäle).
-Der Nutzer wählt das Modell (Coach-Einstellungen → „Modell für deinen Coach“); „Mit KI ausfüllen“ nutzt immer das kleine Modell.
+Fabians Wunsch (7.11.): möglichst alle Claude-Modelle, ohne eigene API-Schlüssel; kurze, günstige Anfragen mit Haiku. Deshalb laufen alle
+Guthaben-Anfragen über **einen** Anthropic-Schlüssel des Betreibers. Der Nutzer wählt das Modell (Coach-Einstellungen → „Modell für deinen Coach“,
+Voreinstellung Claude Sonnet 5.5); „Mit KI ausfüllen“ und geschenkte Auswertungen nutzen immer Claude Haiku 5.5.
 
-| Modell (Anbieter) | Listenpreis je 1 Mio. Token (ein / aus) | Coach-Auswertung* | Chat-Nachricht* | „Mit KI ausfüllen“* |
+| Modell (Anbieter) | Listenpreis je 1 Mio. Token (ein / aus / Cache lesen) | Coach-Auswertung* | Chat-Nachricht* | „Mit KI ausfüllen“* |
 |---|---|---|---|---|
-| Gemini 3.6 Flash (Google), Voreinstellung | 0,75 $ / 3,75 $ (ab 1.1.2027: 1,50 $ / 7,50 $) | ≈ 1,8 ct (ab 2027 ≈ 3,6 ct) | ≈ 1,3 ct | – |
-| Claude Sonnet 5.5 (Anthropic) | 2 $ / 10 $ | ≈ 3,6 ct | ≈ 2,2 ct | – |
-| Llama 3.3 70B (Cloudflare Workers AI; bis 6.11.2026 Llama 3.1 8B, abgekündigt) | 0,293 $ / 2,253 $ | – | – | ≈ 0,06 ct (nur dieses Modell) |
+| Claude Haiku 5.5 (Anthropic) | 0,10 $ / 0,50 $ / 0,01 $ | ≈ 0,18 ct | ≈ 0,11 ct | ≈ 0,02 ct (immer dieses Modell) |
+| Claude Sonnet 5.5 (Anthropic), Voreinstellung | 2 $ / 10 $ / 0,20 $ | ≈ 3,6 ct | ≈ 2,2 ct | – |
+| Claude Opus 5.5 (Anthropic) | 4 $ / 20 $ / 0,20 $ | ≈ 7,2 ct | ≈ 4,3 ct | – |
 
-\* berechnet, nicht geraten: Listenpreis × typische Token-Menge × 1,28, bei 0,92 €/$ (z. B. Gemini-Auswertung 13 938 µ€ × 1,28 = 17 841 µ€). Typische Mengen aus den echten Prompts
-(Coach 8 200 ein / 1 400 aus, Chat 6 700 / 500, Ausfüllen 900 / 120; Gemini zählt ca. 1 000 Thinking-Token als Ausgabe dazu),
-Methode in DECISIONS.md „Kostenschätzung“. Die App rechnet die Schätzung aus `/v1/config` (Preise, `markupBp`, `usageProfiles`); unter jeder Antwort steht der echte Preis.
+Quelle: Preisliste von Anthropic (Stand 7.11.2026); Cache schreiben = 1,25 × Eingabe. Haiku-Preis gilt bis 100 000 Token Eingabe (Overfit bleibt weit darunter).
+Bis 7.11.2026: Gemini 3.6 Flash (Voreinstellung), Claude Sonnet 5.5 und Llama über Cloudflare Workers AI; alte Buchungen behalten ihren Preis.
+
+\* berechnet, nicht geraten: Listenpreis × typische Token-Menge × 1,28, bei 0,92 €/$ (z. B. Sonnet-Auswertung 27 968 µ€ × 1,28 = 35 799 µ€). Typische Mengen aus den echten Prompts
+(Coach 8 200 ein / 1 400 aus, Chat 6 700 / 500, Ausfüllen 900 / 120). Claude denkt bei Bedarf (adaptives Thinking, zählt als Ausgabe); bei
+`effort: medium` und kurzen Anfragen gemessen 0 Thinking-Token, bei langen Auswertungen kann die Ausgabe größer sein.
+Methode in DECISIONS.md „Kostenschätzung“. Die App rechnet die Schätzung aus `/v1/config` (Preise, `markupBp`, `usageProfiles`); unter jeder Antwort steht der echte Preis,
+und Profil → Guthaben → **Abrechnung** listet jede einzelne Anfrage (Zeit, Zweck, Modell, Token, Betrag, Status, Ausweichen).
+
+**Ausweichen:** Antwortet das gewählte Modell nicht (Überlastung, Ausfall, Zeitüberschreitung), beantwortet ein anderes Claude-Modell die
+Anfrage (Haiku ↔ Sonnet, Opus → Sonnet). Der fehlgeschlagene Versuch kostet nichts. Berechnet wird für die tatsächlich verbrauchten Token
+der Preis des antwortenden Modells, höchstens aber der des gewählten (antwortet Sonnet statt Haiku, zahlt der Nutzer den Haiku-Preis).
 
 ### Rechnung (Session AB): Web 1:1, Store mit Aufpreis, ein Aufschlag
 Ziel: Jeder Kauf ist **auch bei vollständig verbrauchtem Guthaben mindestens kostendeckend**, plus ein kleiner, offener Gewinn.
@@ -113,18 +124,20 @@ Prozentwert, der alle Web-Pakete trägt.
 ### Einladungsbonus: geschenkte Coach-Auswertungen (Session AD)
 Fabians Entscheidung: **der Neue bekommt 5 geschenkte Auswertungen, der Einladende 5**, statt Euro-Guthaben. Auslöser wie bisher: der Freund
 beim Einlösen, der Einladende nach der ersten erfolgreichen Coach-Anfrage des Freundes. Geschenkte Auswertungen sind ein eigener Zähler (kein
-Euro-Betrag), gelten nur für **Coach-Auswertungen mit dem günstigsten Bildmodell (Gemini Flash, Stufe standard)**, werden vor dem Guthaben
-verbraucht und verfallen nach 180 Tagen. Chat und andere Modelle zahlen aus dem Guthaben.
+Euro-Betrag), gelten nur für **Coach-Auswertungen mit dem günstigsten Modell (seit 7.11.2026 Claude Haiku 5.5, vorher Gemini Flash)**, werden vor dem Guthaben
+verbraucht und verfallen nach 180 Tagen. Chat und andere Modelle zahlen aus dem Guthaben. Wer eine geschenkte Auswertung mit Sonnet oder Opus
+möchte, wählt dafür nicht Haiku: dann zahlt das Guthaben (bewusst: der Bonus soll Fabian kaum etwas kosten).
 
-**Echte Kosten je Auswertung** (Preistabelle `backend/src/providers.ts`, typische Auswertung 8 200 Token rein, 1 400 raus + 1 000 Thinking):
+**Echte Kosten je Auswertung mit Haiku** (Preistabelle `backend/src/providers.ts`, typische Auswertung 8 200 Token rein, 1 400 raus, ohne Aufschlag):
 
-| | bis 31.12.2026 (0,75 $ / 3,75 $ je MTok) | ab 1.1.2027 (doppelt) |
-|---|---|---|
-| Auswertung ohne Foto | 0,014 € | 0,028 € |
-| Auswertung mit 2 Fotos | 0,016 € | 0,031 € |
-| je erfolgreiche Einladung (5 + 5 Auswertungen) | 0,14–0,16 € | 0,28–0,31 € |
-| Worst Case je Person und Monat: 10 Einladungen × 5 = 50 Auswertungen als Einladender | 0,70–0,79 € | 1,39–1,57 € |
-| dazu deren 10 Freunde × 5 Auswertungen | 0,70–0,79 € | 1,39–1,57 € |
+| | Claude Haiku 5.5 (0,10 $ / 0,50 $ je MTok) |
+|---|---|
+| Auswertung ohne Foto | ≈ 0,0014 € |
+| Auswertung mit 2 Fotos | ≈ 0,0017 € |
+| je erfolgreiche Einladung (5 + 5 Auswertungen) | ≈ 0,014–0,017 € |
+| Worst Case je Person und Monat: 10 Einladungen × 5 = 50 Auswertungen als Einladender, dazu deren 10 Freunde × 5 | ≈ 0,14–0,17 € |
+
+Die Kostenbremsen bleiben unverändert (siehe Grenzen); mit Haiku greifen sie praktisch nie.
 
 **Grenzen** (alle in `backend/wrangler.jsonc`):
 - QR-Token 45 s und einmalig, Selbsteinladung gesperrt, je Konto und Gerät (Attestierung) eine Einlösung, 10 Einladungen pro Monat und Person.

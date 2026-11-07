@@ -10,7 +10,6 @@ export const baseEnv = (extra: Partial<Env> = {}): Env =>
     ATTESTATION_MODE: 'mock',
     PURCHASE_MODE: 'mock',
     ANTHROPIC_API_KEY: 'test-key',
-    GEMINI_API_KEY: 'gemini-key',
     RL_DEVICE_PER_MIN: '1000',
     RL_MESSAGES_PER_MIN: '1000',
     RL_SENSITIVE_PER_HOUR: '1000',

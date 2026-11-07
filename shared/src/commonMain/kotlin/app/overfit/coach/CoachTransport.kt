@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -44,14 +45,29 @@ data class CoachReply(
     val refused: Boolean = false,
     /** Credit: paid with a gifted review (invite bonus), nothing taken from the credit. */
     val giftReview: Boolean = false,
+    /** Token usage reported by the provider (null when it reports none). */
+    val usage: TokenUsage? = null,
+    /** Credit: ID of the server's request log entry; why the chosen model did not answer on a fallback. */
+    val serverRequestId: Long? = null,
+    val fallbackReason: String? = null,
 )
+
+/** Tokens of one request; [input] without cached tokens (Anthropic counts cache reads and writes apart). */
+data class TokenUsage(val input: Long, val output: Long, val cacheRead: Long = 0, val cacheWrite: Long = 0)
 
 enum class CoachErrorKind(val retryable: Boolean) {
     NETWORK(true), TIMEOUT(true), RATE_LIMIT(true), SERVER(true),
     NO_ACCESS(false), AUTH(false), NO_FUEL(false), BAD_REQUEST(false), INVALID_ANSWER(false),
 }
 
-class CoachException(val kind: CoachErrorKind, message: String? = null) : Exception(message ?: kind.name)
+class CoachException(
+    val kind: CoachErrorKind,
+    message: String? = null,
+    /** Credit: ID of the server's request log entry for this failed request. */
+    val serverRequestId: Long? = null,
+    /** Credit: the server's error code (e.g. `insufficient_funds`). */
+    val serverCode: String? = null,
+) : Exception(message ?: kind.name)
 
 /** Sends a [CoachPrompt] to one provider. */
 interface CoachTransport {
@@ -139,7 +155,12 @@ fun anthropicReply(body: JsonObject, raw: String): CoachReply {
         if (o["type"]?.jsonPrimitive?.contentOrNull == "text") o["text"]?.jsonPrimitive?.contentOrNull else null
     }.joinToString("")
     val stop = body["stop_reason"]?.jsonPrimitive?.contentOrNull
-    return CoachReply(text, raw, truncated = stop == "max_tokens", refused = stop == "refusal")
+    val u = body["usage"] as? JsonObject
+    fun n(key: String) = (u?.get(key) as? JsonPrimitive)?.longOrNull
+    val usage = n("input_tokens")?.let { input ->
+        TokenUsage(input, n("output_tokens") ?: 0, n("cache_read_input_tokens") ?: 0, n("cache_creation_input_tokens") ?: 0)
+    }
+    return CoachReply(text, raw, truncated = stop == "max_tokens", refused = stop == "refusal", usage = usage)
 }
 
 private fun statusError(status: Int, body: String): CoachException = CoachException(
@@ -275,7 +296,14 @@ open class ChatCompletionsCoach(
             }
             val refusal = (message?.get("refusal") as? JsonPrimitive)?.contentOrNull
             val finish = (choice["finish_reason"] as? JsonPrimitive)?.contentOrNull
-            return CoachReply(text, raw, truncated = finish == "length", refused = !refusal.isNullOrBlank() && text.isBlank())
+            // OpenAI format: prompt_tokens includes cached tokens (prompt_tokens_details.cached_tokens).
+            val u = body["usage"] as? JsonObject
+            val prompt = (u?.get("prompt_tokens") as? JsonPrimitive)?.longOrNull
+            val cached = ((u?.get("prompt_tokens_details") as? JsonObject)?.get("cached_tokens") as? JsonPrimitive)?.longOrNull ?: 0
+            val usage = prompt?.let {
+                TokenUsage((it - cached).coerceAtLeast(0), (u["completion_tokens"] as? JsonPrimitive)?.longOrNull ?: 0, cacheRead = cached)
+            }
+            return CoachReply(text, raw, truncated = finish == "length", refused = !refusal.isNullOrBlank() && text.isBlank(), usage = usage)
         }
     }
 }
@@ -300,7 +328,7 @@ class GeminiCoach(http: HttpClient, apiKey: () -> String?) :
 /** Anthropic body plus Overfit's own `overfit.purpose` (the backend strips it before the provider sees it). */
 fun fuelBody(prompt: CoachPrompt, tier: String, structured: Boolean): JsonObject {
     val base = anthropicBody(prompt, tier, structured)
-    return JsonObject(base + ("overfit" to buildJsonObject { put("purpose", if (prompt.review) "review" else "chat") }))
+    return JsonObject(base + ("overfit" to buildJsonObject { put("purpose", prompt.effectivePurpose.wire) }))
 }
 
 class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
@@ -320,7 +348,7 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
         } catch (e: CancellationException) {
             throw e
         } catch (e: FuelException) {
-            throw CoachException(fuelErrorKind(e), e.message)
+            throw CoachException(fuelErrorKind(e), e.message, e.details["requestId"], e.code)
         } catch (e: Exception) {
             throw CoachException(CoachErrorKind.NETWORK, e.message)
         }
@@ -331,6 +359,8 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
             balanceMicro = result.balanceMicro,
             servedModel = result.servedModel,
             fallbackFrom = result.chosenModel?.takeIf { result.servedModel != null && it != result.servedModel },
+            serverRequestId = result.requestId,
+            fallbackReason = result.fallbackReason,
         )
     }
 

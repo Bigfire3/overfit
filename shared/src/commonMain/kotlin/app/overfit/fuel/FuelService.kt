@@ -17,6 +17,8 @@ interface FuelService {
     suspend fun account(): FuelAccount
     suspend fun setDisplayName(name: String?): String?
     suspend fun ledger(before: Long? = null, limit: Int = 50): LedgerPage
+    /** Request log of the account (newest first); every AI request through the credit, also failed ones. */
+    suspend fun requests(before: Long? = null, limit: Int = 50): ServerRequestPage = ServerRequestPage()
     suspend fun createRecoveryCode(): String
     suspend fun restore(code: String): FuelAccount
     suspend fun inviteToken(): InviteToken

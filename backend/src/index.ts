@@ -13,7 +13,8 @@ import {
   setProfile,
 } from './account';
 import { handleMessages } from './messages';
-import { DEFAULT_TIER, TIER_NAMES, TIERS, USAGE_PROFILES, tierAvailable } from './providers';
+import { DEFAULT_TIER, GIFT_TIER, TIER_NAMES, TIERS, USAGE_PROFILES, tierAvailable } from './providers';
+import { requestsPage } from './requests';
 import { handleAdminCredit, handleAdminUsage } from './admin';
 import { handleVerifyPurchase } from './purchases';
 import { createChallenge, createInviteToken, redeemInvite } from './invite';
@@ -130,7 +131,7 @@ function publicConfig(env: Env, cfg: Config) {
     invite: {
       starterReviews: cfg.inviteStarterReviews,
       rewardReviews: cfg.inviteRewardReviews,
-      giftTier: 'standard',
+      giftTier: GIFT_TIER,
       tokenTtlSec: cfg.inviteTokenTtlSec,
       monthlyLimitPerInviter: cfg.inviteMonthlyLimitPerInviter,
       expiryDays: cfg.inviteExpiryDays,
@@ -189,7 +190,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     return Response.json({ deviceId, ...(await accountSummary(env, cfg, device.accountId)) }, { status: r.created ? 201 : 200 });
   }
 
-  const routes = ['/v1/account', '/v1/account/profile', '/v1/account/ledger', '/v1/messages', '/v1/purchases/verify',
+  const routes = ['/v1/account', '/v1/account/profile', '/v1/account/ledger', '/v1/account/requests', '/v1/messages', '/v1/purchases/verify',
     '/v1/invite/token', '/v1/invite/challenge', '/v1/invite/redeem', '/v1/recovery/code', '/v1/recovery/restore',
     '/v1/purchase/web-link', '/v1/purchases/web-link', '/v1/codes/redeem'];
   const photo = PHOTO_ROUTE.exec(path);
@@ -241,6 +242,9 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     case '/v1/account/ledger':
       if (method !== 'GET') throw wrongMethod();
       return Response.json(await ledgerPage(env, device.accountId, url));
+    case '/v1/account/requests':
+      if (method !== 'GET') throw wrongMethod();
+      return Response.json(await requestsPage(env, device.accountId, url));
     case '/v1/messages':
       if (method !== 'POST') throw wrongMethod();
       await rateLimit(env, `msg:${device.id}`, cfg.rlMessagesPerMin, 60);

@@ -24,9 +24,9 @@ class DemoFuelService(private val nowSec: () -> Long = { 1_762_128_000 }) : Fuel
     override suspend fun config() = FuelConfig(
         markupBp = 2_800,
         tiers = mapOf(
-            "standard" to FuelTierInfo(true, "gemini-3.6-flash", true, TierPrice(690_000, 3_450_000), "Gemini 3.6 Flash", "Google", 1_000),
-            "pro" to FuelTierInfo(true, "claude-sonnet-5-5", true, TierPrice(1_840_000, 9_200_000), "Claude Sonnet 5.5", "Anthropic"),
-            "lite" to FuelTierInfo(true, "@cf/meta/llama-3.3-70b-instruct-fp8-fast", false, TierPrice(269_560, 2_072_760), "Llama 3.3 70B", "Cloudflare"),
+            "standard" to FuelTierInfo(true, "claude-sonnet-5-5", true, TierPrice(1_840_000, 9_200_000), "Claude Sonnet 5.5", "Anthropic"),
+            "pro" to FuelTierInfo(true, "claude-opus-5-5", true, TierPrice(3_680_000, 18_400_000), "Claude Opus 5.5", "Anthropic"),
+            "lite" to FuelTierInfo(true, "claude-haiku-5-5", true, TierPrice(92_000, 460_000), "Claude Haiku 5.5", "Anthropic"),
         ),
         packages = listOf(
             FuelPackage("overfit.fuel.5", 6_990_000, 5_000_000),

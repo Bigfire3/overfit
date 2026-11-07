@@ -162,6 +162,11 @@ class FuelApi(
         return parse(call(HttpMethod.Get, "/v1/account/ledger$query")) { decode(it) }
     }
 
+    override suspend fun requests(before: Long?, limit: Int): ServerRequestPage {
+        val query = buildString { append("?limit=").append(limit); if (before != null) append("&before=").append(before) }
+        return parse(call(HttpMethod.Get, "/v1/account/requests$query")) { decode(it) }
+    }
+
     override suspend fun createRecoveryCode(): String =
         parse(call(HttpMethod.Post, "/v1/recovery/code")) { decode<RecoveryCode>(it).code }
 
@@ -208,6 +213,8 @@ class FuelApi(
             servedModel = meta?.get("model")?.jsonPrimitive?.contentOrNull,
             chosenModel = meta?.get("requestedModel")?.jsonPrimitive?.contentOrNull,
             giftReview = meta?.get("giftReview")?.jsonPrimitive?.booleanOrNull ?: false,
+            requestId = meta?.get("requestId")?.jsonPrimitive?.longOrNull,
+            fallbackReason = meta?.get("fallbackReason")?.jsonPrimitive?.contentOrNull,
         )
     }
 }

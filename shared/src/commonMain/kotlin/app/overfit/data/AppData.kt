@@ -61,6 +61,7 @@ class AppData(
             database.coachDao().deleteAll()
             database.coachDao().deleteMemory()
             database.coachChatDao().deleteAllChats()
+            database.aiRequestDao().clear()
             database.workoutDao().deleteAll()
             database.templateDao().deleteAll()
             database.exerciseDao().deleteAll()

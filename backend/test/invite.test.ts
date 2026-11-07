@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Client, baseEnv, fund } from './helpers';
+import { Client, baseEnv, fund, rawFetch } from './helpers';
 
 async function redeem(inviter: Client, redeemer: Client, opts: { deviceKey?: string; token?: string; platform?: string } = {}) {
   const token = opts.token ?? (await inviter.call('POST', '/v1/invite/token')).body.token;
@@ -10,9 +10,9 @@ async function redeem(inviter: Client, redeemer: Client, opts: { deviceKey?: str
   });
 }
 
-/** Coach-Auswertung über die Stufe standard (Gemini Flash), wie die App sie schickt. */
+/** Coach-Auswertung über die Stufe lite (Claude Haiku 5.5, Stufe der geschenkten Auswertungen), wie die App sie schickt. */
 const review = (extra: object = {}) => ({
-  model: 'standard', max_tokens: 100, overfit: { purpose: 'review' }, messages: [{ role: 'user', content: 'Workout' }], ...extra,
+  model: 'lite', max_tokens: 100, overfit: { purpose: 'review' }, messages: [{ role: 'user', content: 'Workout' }], ...extra,
 });
 const chat = { model: 'standard', max_tokens: 100, overfit: { purpose: 'chat' }, messages: [{ role: 'user', content: 'hi' }] };
 let sentBodies: any[] = [];
@@ -21,18 +21,12 @@ function mockAi() {
   const real = globalThis.fetch;
   vi.stubGlobal('fetch', (i: any, init?: any) => {
     const url = String(i instanceof Request ? i.url : i);
-    if (url.startsWith('https://generativelanguage.googleapis.com')) {
-      sentBodies.push(JSON.parse(String(init?.body ?? '{}')));
-      return Promise.resolve(
-        Response.json({
-          candidates: [{ content: { role: 'model', parts: [{ text: '{"ok":true}' }] }, finishReason: 'STOP' }],
-          usageMetadata: { promptTokenCount: 8000, candidatesTokenCount: 1400, thoughtsTokenCount: 1000 },
-        }),
-      );
-    }
     if (url.startsWith('https://api.anthropic.com')) {
-      sentBodies.push(JSON.parse(String(init?.body ?? '{}')));
-      return Promise.resolve(Response.json({ content: [], usage: { input_tokens: 100, output_tokens: 50 } }));
+      const sent = JSON.parse(String(init?.body ?? '{}'));
+      sentBodies.push(sent);
+      return Promise.resolve(
+        Response.json({ type: 'message', role: 'assistant', model: sent.model, content: [{ type: 'text', text: '{"ok":true}' }], usage: { input_tokens: 8000, output_tokens: 1400 } }),
+      );
     }
     return real(i, init);
   });
@@ -61,6 +55,8 @@ describe('Einladungen', () => {
     expect(m1.body.overfit.giftReview).toBe(true);
     expect(m1.body.overfit.costMicro).toBe(0);
     expect(sentBodies[0].overfit).toBeUndefined(); // nie an den Anbieter
+    expect(sentBodies[0].model).toBe('claude-haiku-5-5');
+    expect(m1.body.overfit).toMatchObject({ tier: 'lite', model: 'claude-haiku-5-5' });
     const fa = await account(friend);
     expect(fa.giftReviews.remaining).toBe(4);
     expect(fa.balanceMicro).toBe(0);
@@ -74,14 +70,22 @@ describe('Einladungen', () => {
     expect(fl.body.entries[0]).toMatchObject({ type: 'usage', amountMicro: 0, reviews: -1, category: 'used' });
   });
 
-  it('Geschenkte Auswertungen gelten nur für Coach-Auswertungen mit Gemini Flash; Chat und Claude zahlen aus dem Guthaben', async () => {
+  it('Geschenkte Auswertungen gelten nur für Coach-Auswertungen mit Claude Haiku (lite); Chat und andere Stufen zahlen aus dem Guthaben', async () => {
     mockAi();
     const inviter = await Client.create();
     const friend = await Client.create();
     await redeem(inviter, friend);
+    expect((await rawFetch('/v1/config', baseEnv())).body.invite.giftTier).toBe('lite');
     expect((await friend.call('POST', '/v1/messages', chat)).status).toBe(402);
+    expect((await friend.call('POST', '/v1/messages', { ...chat, model: 'lite' })).status).toBe(402);
     expect((await friend.call('POST', '/v1/messages', { ...chat, overfit: undefined })).status).toBe(402);
+    expect((await friend.call('POST', '/v1/messages', review({ overfit: { purpose: 'autofill' } }))).status).toBe(402);
+    expect((await friend.call('POST', '/v1/messages', review({ overfit: undefined }))).status).toBe(402);
+    expect((await friend.call('POST', '/v1/messages', review({ model: 'standard' }))).status).toBe(402);
     expect((await friend.call('POST', '/v1/messages', review({ model: 'pro' }))).status).toBe(402);
+    // Alte App-Version mit Gemini-ID → Stufe standard → kein Geschenk mehr
+    expect((await friend.call('POST', '/v1/messages', review({ model: 'gemini-3.6-flash' }))).status).toBe(402);
+    expect(sentBodies).toEqual([]);
     expect((await account(friend)).giftReviews.remaining).toBe(5);
     // Mit Guthaben: Chat kostet Euro, die Auswertung bleibt geschenkt.
     await fund(friend);
@@ -102,12 +106,55 @@ describe('Einladungen', () => {
     await redeem(inviter, friend);
     const real = globalThis.fetch;
     vi.stubGlobal('fetch', (i: any, init?: any) =>
-      String(i instanceof Request ? i.url : i).startsWith('https://generativelanguage.googleapis.com')
-        ? Promise.resolve(new Response('kaputt', { status: 400 }))
+      String(i instanceof Request ? i.url : i).startsWith('https://api.anthropic.com')
+        ? Promise.resolve(Response.json({ error: { message: 'kaputt' } }, { status: 400 }))
         : real(i, init),
     );
     expect((await friend.call('POST', '/v1/messages', review())).status).toBe(400);
     expect((await account(friend)).giftReviews.remaining).toBe(5);
+    // Ausfall auch der Ausweich-Stufe → ebenfalls zurück
+    vi.stubGlobal('fetch', (i: any, init?: any) =>
+      String(i instanceof Request ? i.url : i).startsWith('https://api.anthropic.com')
+        ? Promise.resolve(Response.json({ error: { message: 'overloaded' } }, { status: 529 }))
+        : real(i, init),
+    );
+    expect((await friend.call('POST', '/v1/messages', review())).status).toBe(502);
+    expect((await account(friend)).giftReviews.remaining).toBe(5);
+    expect((await account(friend)).balanceMicro).toBe(0);
+  });
+
+  it('Ausweichen bei geschenkter Auswertung: Haiku fällt aus, Sonnet antwortet, bleibt geschenkt', async () => {
+    const inviter = await Client.create();
+    const friend = await Client.create();
+    await redeem(inviter, friend);
+    const real = globalThis.fetch;
+    vi.stubGlobal('fetch', (i: any, init?: any) => {
+      if (!String(i instanceof Request ? i.url : i).startsWith('https://api.anthropic.com')) return real(i, init);
+      const model = JSON.parse(String(init?.body)).model;
+      return Promise.resolve(
+        model === 'claude-haiku-5-5'
+          ? Response.json({ error: { message: 'overloaded' } }, { status: 529 })
+          : Response.json({ model, content: [], usage: { input_tokens: 100, output_tokens: 50 } }),
+      );
+    });
+    const r = await friend.call('POST', '/v1/messages', review());
+    expect(r.status).toBe(200);
+    expect(r.body.overfit).toMatchObject({ giftReview: true, costMicro: 0, tier: 'lite', servedTier: 'standard', fallback: true });
+    expect((await account(friend)).giftReviews.remaining).toBe(4);
+  });
+
+  it('Kostenbremse je Auswertung: zu teure Anfrage ist kein Geschenk', async () => {
+    mockAi();
+    const e = baseEnv({ INVITE_GIFT_MAX_COST_MICRO: '1' });
+    const inviter = await Client.create(e);
+    const friend = await Client.create(e);
+    await redeem(inviter, friend);
+    expect((await friend.call('POST', '/v1/messages', review())).status).toBe(402);
+    expect((await account(friend)).giftReviews.remaining).toBe(5);
+    await fund(friend);
+    const r = await friend.call('POST', '/v1/messages', review());
+    expect(r.body.overfit).toMatchObject({ giftReview: false });
+    expect(r.body.overfit.costMicro).toBeGreaterThan(0);
   });
 
   it('Monatsgrenze der echten KI-Kosten für Geschenktes: darüber zahlt das Guthaben', async () => {

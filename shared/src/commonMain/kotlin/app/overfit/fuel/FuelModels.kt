@@ -81,6 +81,35 @@ enum class LedgerKind { Paid, Gifted, Used, Refunded, Expired }
 @Serializable
 data class LedgerPage(val entries: List<LedgerEntry> = emptyList(), val next: Long? = null)
 
+/** One entry of the server's request log (`GET /v1/account/requests`): metadata only, never prompt or answer. */
+@Serializable
+data class ServerRequest(
+    val id: Long,
+    /** Unix seconds. */
+    val ts: Long,
+    val durationMs: Long? = null,
+    /** review | chat | autofill | plan | other; null = old app version. */
+    val purpose: String? = null,
+    val tier: String,
+    /** ok | failed */
+    val status: String,
+    val errorCode: String? = null,
+    val requestedModel: String,
+    val model: String? = null,
+    val fallbackFromStatus: Int? = null,
+    val fallbackReason: String? = null,
+    val inputTokens: Long = 0,
+    val cacheReadTokens: Long = 0,
+    val cacheWriteTokens: Long = 0,
+    val outputTokens: Long = 0,
+    val chargedMicro: Long = 0,
+    val gift: Boolean = false,
+    val photo: Boolean = false,
+)
+
+@Serializable
+data class ServerRequestPage(val entries: List<ServerRequest> = emptyList(), val next: Long? = null)
+
 @Serializable
 data class FuelPackage(val productId: String, val priceMicro: Long, val creditMicro: Long)
 
@@ -90,7 +119,7 @@ data class InviteConfig(
     val starterReviews: Int = 5,
     val rewardReviews: Int = 5,
     /** Tier the gifted reviews apply to (the cheapest image model). */
-    val giftTier: String = "standard",
+    val giftTier: String = "lite",
     val tokenTtlSec: Int = 45,
     val monthlyLimitPerInviter: Int = 10,
     val expiryDays: Int = 180,
@@ -197,6 +226,10 @@ data class FuelMessageResult(
     val chosenModel: String? = null,
     /** Paid with a gifted review (invite bonus) instead of credit. */
     val giftReview: Boolean = false,
+    /** ID of the server's request log entry (`/v1/account/requests`). */
+    val requestId: Long? = null,
+    /** Why the chosen model did not answer on a fallback ("HTTP 529: Overloaded"); not charged. */
+    val fallbackReason: String? = null,
 )
 
 /** Proof that the device is genuine (Play Integrity token / App Attest object), bound to a server challenge. */

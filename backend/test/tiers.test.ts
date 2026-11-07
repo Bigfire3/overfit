@@ -1,20 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client, baseEnv, fund, rawFetch } from './helpers';
 import { costMicro } from '../src/money';
-import { currentPrices, TIERS } from '../src/providers';
+import { currentPrices, GIFT_TIER, TIERS, tierForModel, type Tier } from '../src/providers';
 import type { Env } from '../src/types';
 
 const MARKUP = 2800;
-const price = (tier: keyof typeof TIERS) => currentPrices()[TIERS[tier].model];
+const price = (tier: Tier) => currentPrices()[TIERS[tier].model];
+const USAGE = { input_tokens: 1000, output_tokens: 500 };
+const at = (tier: Tier, usage: object = USAGE) => costMicro(usage as never, price(tier), MARKUP);
 
-const geminiReply = (meta: object = { promptTokenCount: 1000, candidatesTokenCount: 300, thoughtsTokenCount: 200 }, finishReason = 'STOP', text = '{"ok":true}') =>
+const HAIKU = 'claude-haiku-5-5';
+const SONNET = 'claude-sonnet-5-5';
+const OPUS = 'claude-opus-5-5';
+
+/** Modell, das der Worker beim Anbieter angefragt hat. */
+const sentModel = (init: any) => JSON.parse(init.body).model as string;
+const anthropicReply = (model = SONNET, usage: object | null = USAGE) =>
   Response.json({
-    candidates: [{ content: { role: 'model', parts: [{ text: 'denke…', thought: true }, { text }] }, finishReason }],
-    usageMetadata: meta,
-    responseId: 'g1',
+    id: 'msg_1', type: 'message', role: 'assistant', model, content: [{ type: 'text', text: `antwort von ${model}` }], stop_reason: 'end_turn',
+    ...(usage ? { usage } : {}),
   });
-const anthropicReply = (usage: object = { input_tokens: 1000, output_tokens: 500 }) =>
-  Response.json({ id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', content: [{ type: 'text', text: 'pro' }], stop_reason: 'end_turn', usage });
+const overloaded = () => Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'overloaded' } }, { status: 529 });
 
 const IMG = { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'QUJD' } };
 const body = (model: string, extra: object = {}) => ({
@@ -29,302 +35,336 @@ const body = (model: string, extra: object = {}) => ({
   ...extra,
 });
 
-let gemini: any;
 let anthropic: any;
-let ai: { run: any; gateway: any };
+let ai: { gateway: any };
 beforeEach(() => {
-  gemini = vi.fn(async () => geminiReply());
-  anthropic = vi.fn(async () => anthropicReply());
-  ai = {
-    run: vi.fn(async () => ({ response: '{"ok":true}', usage: { prompt_tokens: 400, completion_tokens: 100 } })),
-    gateway: vi.fn((id: string) => ({ getUrl: async (p: string) => `https://gateway.test/${id}/${p}` })),
-  };
+  // Jede Antwort frisch erzeugen (ein Response-Body lässt sich nur einmal lesen; Ausweichen fragt denselben Anbieter zweimal).
+  anthropic = vi.fn(async (_url: string, init: any) => anthropicReply(sentModel(init)));
+  ai = { gateway: vi.fn((id: string) => ({ getUrl: async (p: string) => `https://gateway.test/${id}/${p}` })) };
   const real = globalThis.fetch;
   vi.stubGlobal('fetch', (input: any, init?: any) => {
     const url = String(input instanceof Request ? input.url : input);
-    if (url.startsWith('https://generativelanguage.googleapis.com') || url.startsWith('https://gateway.test/overfit/google-ai-studio')) return gemini(url, init);
     if (url.startsWith('https://api.anthropic.com') || url.startsWith('https://gateway.test/overfit/anthropic')) return anthropic(url, init);
+    if (url.startsWith('https://generativelanguage.googleapis.com')) throw new Error('Gemini darf nicht mehr angefragt werden');
     return real(input, init);
   });
 });
 afterEach(() => vi.unstubAllGlobals());
 
+/** Nur die genannten Modelle fallen aus (mit `fail`), die anderen antworten normal. */
+const failFor = (models: string[], fail: () => Promise<Response>) =>
+  anthropic.mockImplementation(async (_url: string, init: any) => (models.includes(sentModel(init)) ? fail() : anthropicReply(sentModel(init))));
+const sentModels = () => anthropic.mock.calls.map((x: any[]) => sentModel(x[1]));
+
 const env = (extra: Partial<Env> = {}) => baseEnv({ AI: ai, ...extra } as Partial<Env>);
 const balance = async (c: Client) => (await c.call('GET', '/v1/account')).body.balanceMicro as number;
 const lastUsage = async (c: Client) => (await c.call('GET', '/v1/account/ledger')).body.entries[0];
+const usageEntries = async (c: Client) => (await c.call('GET', '/v1/account/ledger')).body.entries.filter((e: any) => e.type === 'usage');
 
-describe('Stufe standard (Gemini)', () => {
-  it('bildet Anthropic-Format auf Gemini ab und zurück, rechnet nach Gemini-Preis ab', async () => {
+describe('Alle Stufen sind Claude über Anthropic', () => {
+  it.each([
+    ['lite', HAIKU, 'Claude Haiku 5.5'],
+    ['standard', SONNET, 'Claude Sonnet 5.5'],
+    ['pro', OPUS, 'Claude Opus 5.5'],
+  ] as [Tier, string, string][])('%s → %s, Abrechnung nach dessen Preis', async (tier, model, name) => {
     const c = await Client.create(env());
     const f = await fund(c);
-    const r = await c.call('POST', '/v1/messages', body('standard', { messages: [{ role: 'user', content: [IMG, { type: 'text', text: 'Bild' }] }] }));
+    const r = await c.call('POST', '/v1/messages', body(tier));
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ type: 'message', role: 'assistant', model: 'gemini-3.6-flash', stop_reason: 'end_turn', content: [{ type: 'text', text: '{"ok":true}' }] });
-    expect(r.body.usage).toMatchObject({ input_tokens: 1000, output_tokens: 500 });
-    const expected = costMicro({ input_tokens: 1000, output_tokens: 500 }, price('standard'), MARKUP);
-    expect(r.body.overfit).toMatchObject({ costMicro: expected, tier: 'standard', servedTier: 'standard', model: 'gemini-3.6-flash', fallback: false });
+    expect(r.body.content[0].text).toBe(`antwort von ${model}`);
+    const expected = at(tier);
+    expect(r.body.overfit).toMatchObject({
+      costMicro: expected, tier, servedTier: tier, model, modelName: name, vendor: 'Anthropic', requestedModel: model, fallback: false, giftReview: false,
+    });
     expect(await balance(c)).toBe(f.balanceMicro - expected);
+    expect(await lastUsage(c)).toMatchObject({ type: 'usage', amountMicro: -expected, model, tier, inputTokens: 1000, outputTokens: 500 });
 
-    const [url, init] = gemini.mock.calls[0];
-    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent');
-    expect(init.headers['x-goog-api-key']).toBe('gemini-key');
+    expect(anthropic).toHaveBeenCalledTimes(1);
+    const [url, init] = anthropic.mock.calls[0];
+    expect(url).toBe('https://api.anthropic.com/v1/messages');
+    expect(init.headers['x-api-key']).toBe('test-key');
+    expect(init.headers['anthropic-version']).toBe('2023-06-01');
     const sent = JSON.parse(init.body);
-    expect(sent.systemInstruction.parts[0].text).toBe('Regeln\n\nProfil');
-    expect(sent.contents[0]).toEqual({ role: 'user', parts: [{ inlineData: { mimeType: 'image/jpeg', data: 'QUJD' } }, { text: 'Bild' }] });
-    expect(sent.generationConfig).toMatchObject({ maxOutputTokens: 4096, responseMimeType: 'application/json', responseJsonSchema: { type: 'object' } });
-    expect(anthropic).not.toHaveBeenCalled();
-    expect(await lastUsage(c)).toMatchObject({ type: 'usage', amountMicro: -expected, model: 'gemini-3.6-flash', tier: 'standard', inputTokens: 1000, outputTokens: 500 });
-  });
-
-  it('Cache-Treffer, Abbruch wegen Länge und Ablehnung werden übersetzt', async () => {
-    const c = await Client.create(env());
-    await fund(c);
-    gemini.mockResolvedValueOnce(geminiReply({ promptTokenCount: 5000, cachedContentTokenCount: 4000, candidatesTokenCount: 10 }, 'MAX_TOKENS'));
-    const r = await c.call('POST', '/v1/messages', body('standard'));
-    expect(r.body.stop_reason).toBe('max_tokens');
-    expect(r.body.usage).toMatchObject({ input_tokens: 1000, cache_read_input_tokens: 4000, output_tokens: 10 });
-    expect(r.body.overfit.costMicro).toBe(costMicro({ input_tokens: 1000, cache_read_input_tokens: 4000, output_tokens: 10 }, price('standard'), MARKUP));
-    gemini.mockResolvedValueOnce(Response.json({ promptFeedback: { blockReason: 'SAFETY' }, usageMetadata: { promptTokenCount: 10 } }));
-    const r2 = await c.call('POST', '/v1/messages', body('standard'));
-    expect(r2.body.stop_reason).toBe('refusal');
-    expect(r2.body.content).toEqual([]);
-  });
-});
-
-describe('Stufe pro (Anthropic)', () => {
-  it('schickt den Body mit Modell und effort weiter und rechnet nach Sonnet ab', async () => {
-    const c = await Client.create(env());
-    await fund(c);
-    const r = await c.call('POST', '/v1/messages', body('pro'));
-    expect(r.status).toBe(200);
-    expect(r.body.content[0].text).toBe('pro');
-    expect(r.body.overfit).toMatchObject({ tier: 'pro', model: 'claude-sonnet-5-5', costMicro: 8244 });
-    const sent = JSON.parse(anthropic.mock.calls[0][1].body);
-    expect(sent.model).toBe('claude-sonnet-5-5');
+    expect(sent.model).toBe(model);
+    expect(sent.max_tokens).toBe(1000);
     expect(sent.output_config).toMatchObject({ effort: 'medium', format: { type: 'json_schema' } });
     expect(sent.system[0].cache_control).toEqual({ type: 'ephemeral' });
-    expect(await lastUsage(c)).toMatchObject({ tier: 'pro', model: 'claude-sonnet-5-5' });
   });
-});
 
-describe('Stufe lite (Workers AI)', () => {
-  it('nutzt das AI-Binding mit JSON-Modus und rechnet nach Neurons-Preis ab', async () => {
+  it('Preise: Haiku < Sonnet < Opus; Sonnet wie bisher 8244 µ€ für 1000/500 Token', () => {
+    expect(at('lite')).toBeLessThan(at('standard'));
+    expect(at('standard')).toBeLessThan(at('pro'));
+    expect(at('standard')).toBe(8244);
+  });
+
+  it('effort der App bleibt erhalten', async () => {
+    const c = await Client.create(env());
+    await fund(c);
+    await c.call('POST', '/v1/messages', body('pro', { output_config: { effort: 'high' } }));
+    expect(JSON.parse(anthropic.mock.calls[0][1].body).output_config).toEqual({ effort: 'high' });
+  });
+
+  it('Cache-Token werden zum Preis der Stufe abgerechnet', async () => {
+    const u = { input_tokens: 100, cache_read_input_tokens: 4000, cache_creation_input_tokens: 2000, output_tokens: 10 };
+    anthropic.mockImplementation(async (_u: string, init: any) => anthropicReply(sentModel(init), u));
     const c = await Client.create(env());
     await fund(c);
     const r = await c.call('POST', '/v1/messages', body('lite'));
-    expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', content: [{ type: 'text', text: '{"ok":true}' }], stop_reason: 'end_turn' });
-    const expected = costMicro({ input_tokens: 400, output_tokens: 100 }, price('lite'), MARKUP);
-    expect(r.body.overfit).toMatchObject({ tier: 'lite', costMicro: expected });
-    const [model, inputs] = ai.run.mock.calls[0];
-    expect(model).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
-    expect(inputs.messages).toEqual([{ role: 'system', content: 'Regeln\n\nProfil' }, { role: 'user', content: 'Hallo' }]);
-    expect(inputs.response_format).toEqual({ type: 'json_schema', json_schema: { type: 'object', properties: { ok: { type: 'boolean' } } } });
-    expect(inputs.max_tokens).toBe(1000);
-    expect(await lastUsage(c)).toMatchObject({ tier: 'lite', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' });
+    expect(r.body.overfit.costMicro).toBe(at('lite', u));
+    expect(await lastUsage(c)).toMatchObject({ inputTokens: 100, cacheReadTokens: 4000, cacheWriteTokens: 2000, outputTokens: 10 });
   });
 
-  it('JSON als Objekt wird zu Text; ohne usage wird der reservierte Betrag berechnet', async () => {
+  it('ohne usage in der Antwort wird der reservierte Höchstbetrag berechnet', async () => {
+    anthropic.mockImplementation(async (_u: string, init: any) => anthropicReply(sentModel(init), null));
     const c = await Client.create(env());
     const f = await fund(c);
-    ai.run.mockResolvedValueOnce({ response: { ok: true } });
     const r = await c.call('POST', '/v1/messages', body('lite'));
-    expect(r.body.content[0].text).toBe('{"ok":true}');
-    expect(r.body.overfit.costMicro).toBeGreaterThan(0);
+    expect(r.status).toBe(200);
+    // Mindestens die angefragten Ausgabe-Token zum Haiku-Preis
+    expect(r.body.overfit.costMicro).toBeGreaterThanOrEqual(at('lite', { input_tokens: 0, output_tokens: 1000 }));
     expect(await balance(c)).toBe(f.balanceMicro - r.body.overfit.costMicro);
   });
 
-  it('versteht auch das OpenAI-Format neuerer Workers-AI-Modelle (choices)', async () => {
+  it.each(['lite', 'standard', 'pro'] as Tier[])('Bilder gehen auf Stufe %s unverändert an Claude', async (tier) => {
     const c = await Client.create(env());
     await fund(c);
-    ai.run.mockResolvedValueOnce({ choices: [{ message: { content: '{"ok":true}' } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
-    const r = await c.call('POST', '/v1/messages', body('lite'));
-    expect(r.body.content[0].text).toBe('{"ok":true}');
-    expect(r.body.usage).toMatchObject({ input_tokens: 10, output_tokens: 5 });
+    const content = [IMG, { type: 'text', text: 'Bild' }];
+    const r = await c.call('POST', '/v1/messages', body(tier, { messages: [{ role: 'user', content }] }));
+    expect(r.status).toBe(200);
+    expect(r.body.overfit).toMatchObject({ tier, servedTier: tier, costMicro: at(tier) });
+    expect(JSON.parse(anthropic.mock.calls[0][1].body).messages).toEqual([{ role: 'user', content }]);
   });
 
-  it('weist Bilder ab, ohne zu reservieren oder anzufragen', async () => {
-    const c = await Client.create(env());
+  it('ohne ANTHROPIC_API_KEY ist nichts verfügbar (auch nicht mit Gemini-Key)', async () => {
+    const c = await Client.create(env({ ANTHROPIC_API_KEY: undefined, GEMINI_API_KEY: 'gemini-key' } as Partial<Env>));
     const f = await fund(c);
-    const r = await c.call('POST', '/v1/messages', body('lite', { messages: [{ role: 'user', content: [IMG, { type: 'text', text: 'x' }] }] }));
-    expect(r.status).toBe(400);
-    expect(r.body.error.code).toBe('images_not_supported');
-    expect(ai.run).not.toHaveBeenCalled();
+    for (const t of ['lite', 'standard', 'pro']) {
+      const r = await c.call('POST', '/v1/messages', body(t));
+      expect(r.status).toBe(503);
+      expect(r.body.error.code).toBe('not_configured');
+    }
+    expect(anthropic).not.toHaveBeenCalled();
     expect(await balance(c)).toBe(f.balanceMicro);
   });
+});
 
-  it('ohne AI-Binding nicht verfügbar', async () => {
-    const c = await Client.create(baseEnv());
+describe('Alte Modell-IDs (ältere App-Versionen)', () => {
+  it('werden auf Stufen abgebildet', () => {
+    expect(tierForModel('gemini-3.6-flash')).toBe('standard');
+    expect(tierForModel('@cf/meta/llama-3.3-70b-instruct-fp8-fast')).toBe('lite');
+    expect(tierForModel('@cf/meta/llama-3.1-8b-instruct')).toBe('lite');
+    expect(tierForModel(HAIKU)).toBe('lite');
+    expect(tierForModel(SONNET)).toBe('standard');
+    expect(tierForModel(OPUS)).toBe('pro');
+    expect(tierForModel('pro')).toBe('pro');
+    expect(tierForModel('gpt-x')).toBeNull();
+  });
+
+  it.each([
+    ['gemini-3.6-flash', 'standard', SONNET],
+    ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', 'lite', HAIKU],
+    ['@cf/meta/llama-3.1-8b-instruct', 'lite', HAIKU],
+  ] as [string, Tier, string][])('%s → Stufe %s (%s), Abrechnung nach Claude-Preis', async (legacy, tier, model) => {
+    const c = await Client.create(env());
     await fund(c);
-    const r = await c.call('POST', '/v1/messages', body('lite'));
-    expect(r.status).toBe(503);
-    expect(r.body.error).toMatchObject({ code: 'tier_unavailable', details: { tier: 'lite', available: ['standard', 'pro'] } });
+    const r = await c.call('POST', '/v1/messages', body(legacy));
+    expect(r.status).toBe(200);
+    expect(r.body.overfit).toMatchObject({ tier, model, costMicro: at(tier) });
+    expect(sentModels()).toEqual([model]);
   });
 });
 
 describe('Ausweichen bei Ausfall', () => {
-  it('standard → pro bei 5xx; berechnet höchstens den Standard-Preis', async () => {
-    gemini.mockResolvedValue(Response.json({ error: { message: 'overloaded' } }, { status: 503 }));
+  it('lite → standard bei 5xx; berechnet höchstens den Haiku-Preis', async () => {
+    failFor([HAIKU], async () => overloaded());
     const c = await Client.create(env());
     const f = await fund(c);
-    const r = await c.call('POST', '/v1/messages', body('standard'));
+    const r = await c.call('POST', '/v1/messages', body('lite'));
     expect(r.status).toBe(200);
-    expect(r.body.content[0].text).toBe('pro');
-    const usage = { input_tokens: 1000, output_tokens: 500 };
-    const atStandard = costMicro(usage, price('standard'), MARKUP);
-    expect(atStandard).toBeLessThan(8244);
-    expect(r.body.overfit).toMatchObject({ tier: 'standard', servedTier: 'pro', model: 'claude-sonnet-5-5', fallback: true, costMicro: atStandard });
-    expect(await balance(c)).toBe(f.balanceMicro - atStandard);
-    expect(await lastUsage(c)).toMatchObject({ tier: 'standard', model: 'claude-sonnet-5-5', amountMicro: -atStandard });
+    expect(r.body.content[0].text).toBe(`antwort von ${SONNET}`);
+    expect(sentModels()).toEqual([HAIKU, SONNET]);
+    expect(at('lite')).toBeLessThan(at('standard'));
+    expect(r.body.overfit).toMatchObject({
+      tier: 'lite', servedTier: 'standard', model: SONNET, modelName: 'Claude Sonnet 5.5', requestedModel: HAIKU, requestedModelName: 'Claude Haiku 5.5',
+      fallback: true, costMicro: at('lite'),
+    });
+    expect(await balance(c)).toBe(f.balanceMicro - at('lite'));
+    expect(await lastUsage(c)).toMatchObject({ tier: 'lite', model: SONNET, amountMicro: -at('lite') });
   });
 
-  it('pro → standard bei Zeitüberschreitung; berechnet den günstigeren Preis', async () => {
-    anthropic.mockRejectedValue(new DOMException('timeout', 'TimeoutError'));
+  it('standard → lite bei 429; berechnet den günstigeren Haiku-Preis', async () => {
+    failFor([SONNET], async () => Response.json({ error: { message: 'rate limited' } }, { status: 429 }));
+    const c = await Client.create(env());
+    await fund(c);
+    const r = await c.call('POST', '/v1/messages', body('standard'));
+    expect(r.status).toBe(200);
+    expect(sentModels()).toEqual([SONNET, HAIKU]);
+    expect(r.body.overfit).toMatchObject({ tier: 'standard', servedTier: 'lite', model: HAIKU, fallback: true, costMicro: at('lite') });
+  });
+
+  it('pro → standard bei Zeitüberschreitung; berechnet den Sonnet-Preis', async () => {
+    failFor([OPUS], async () => {
+      throw new DOMException('timeout', 'TimeoutError');
+    });
     const c = await Client.create(env());
     await fund(c);
     const r = await c.call('POST', '/v1/messages', body('pro'));
     expect(r.status).toBe(200);
-    expect(r.body.overfit).toMatchObject({ tier: 'pro', servedTier: 'standard', fallback: true });
-    expect(r.body.overfit.costMicro).toBe(costMicro({ input_tokens: 1000, output_tokens: 500 }, price('standard'), MARKUP));
+    expect(sentModels()).toEqual([OPUS, SONNET]);
+    expect(r.body.overfit).toMatchObject({ tier: 'pro', servedTier: 'standard', model: SONNET, fallback: true, costMicro: at('standard') });
   });
 
-  it('lite → standard, wenn Workers AI ausfällt', async () => {
-    ai.run.mockRejectedValue(new Error('3040: Capacity temporarily exceeded'));
+  it('mit Foto: Ausweich-Stufe kann ebenfalls Bilder', async () => {
+    failFor([HAIKU], async () => new Response('kaputt', { status: 500 }));
     const c = await Client.create(env());
     await fund(c);
-    const r = await c.call('POST', '/v1/messages', body('lite'));
+    const r = await c.call('POST', '/v1/messages', body('lite', { messages: [{ role: 'user', content: [IMG] }] }));
     expect(r.status).toBe(200);
-    expect(r.body.overfit).toMatchObject({ tier: 'lite', servedTier: 'standard', fallback: true });
-    // Nie mehr als der Lite-Preis für dieselben Token
-    expect(r.body.overfit.costMicro).toBe(costMicro({ input_tokens: 1000, output_tokens: 500 }, price('lite'), MARKUP));
+    expect(r.body.overfit).toMatchObject({ servedTier: 'standard', fallback: true });
+    expect(JSON.parse(anthropic.mock.calls[1][1].body).messages[0].content).toEqual([IMG]);
   });
 
-  it('beide Anbieter fallen aus → 502, Reservierung vollständig zurück', async () => {
-    gemini.mockResolvedValue(new Response('kaputt', { status: 500 }));
-    anthropic.mockResolvedValue(Response.json({ error: { message: 'overloaded' } }, { status: 529 }));
+  it('beide Modelle fallen aus → 502, nur ein Ausweichversuch, Reservierung vollständig zurück', async () => {
+    anthropic.mockImplementation(async () => overloaded());
     const c = await Client.create(env());
     const f = await fund(c);
-    const r = await c.call('POST', '/v1/messages', body('standard'));
+    const r = await c.call('POST', '/v1/messages', body('pro'));
     expect(r.status).toBe(502);
     expect(r.body.error.code).toBe('upstream_unavailable');
+    expect(sentModels()).toEqual([OPUS, SONNET]);
     expect(await balance(c)).toBe(f.balanceMicro);
-    expect((await c.call('GET', '/v1/account/ledger')).body.entries.filter((e: any) => e.type === 'usage')).toEqual([]);
+    expect(await usageEntries(c)).toEqual([]);
   });
 
   it('Abbruch (Netzwerk) bei beiden → 504, nichts abgebucht', async () => {
-    gemini.mockRejectedValue(new TypeError('network'));
     anthropic.mockRejectedValue(new TypeError('network'));
     const c = await Client.create(env());
     const f = await fund(c);
     const r = await c.call('POST', '/v1/messages', body('standard'));
     expect(r.status).toBe(504);
+    expect(r.body.error.code).toBe('upstream_unavailable');
+    expect(anthropic).toHaveBeenCalledTimes(2);
     expect(await balance(c)).toBe(f.balanceMicro);
   });
 
   it('Ablehnung (400) weicht nicht aus und bucht nichts ab', async () => {
-    gemini.mockResolvedValue(Response.json({ error: { message: 'schema unsupported' } }, { status: 400 }));
+    anthropic.mockImplementation(async () => Response.json({ type: 'error', error: { message: 'schema unsupported' } }, { status: 400 }));
     const c = await Client.create(env());
     const f = await fund(c);
     const r = await c.call('POST', '/v1/messages', body('standard'));
     expect(r.status).toBe(400);
-    expect(r.body.error).toMatchObject({ code: 'upstream_rejected', message: 'schema unsupported' });
-    expect(anthropic).not.toHaveBeenCalled();
+    expect(r.body.error).toMatchObject({ code: 'upstream_rejected', message: 'schema unsupported', details: { upstreamStatus: 400 } });
+    expect(anthropic).toHaveBeenCalledTimes(1);
     expect(await balance(c)).toBe(f.balanceMicro);
   });
 
-  it('ohne Anthropic-Key kein Ausweichen', async () => {
-    gemini.mockResolvedValue(new Response('x', { status: 503 }));
-    const c = await Client.create(env({ ANTHROPIC_API_KEY: undefined }));
-    await fund(c);
+  it('Zeitbudget aufgebraucht → kein Ausweichen', async () => {
+    failFor([SONNET], async () => overloaded());
+    const c = await Client.create(env({ UPSTREAM_BUDGET_MS: '1000' }));
+    const f = await fund(c);
     expect((await c.call('POST', '/v1/messages', body('standard'))).status).toBe(502);
-    expect(anthropic).not.toHaveBeenCalled();
+    expect(sentModels()).toEqual([SONNET]);
+    expect(await balance(c)).toBe(f.balanceMicro);
   });
 });
 
 describe('AI Gateway', () => {
-  it('leitet alle Anbieter über das Gateway; bei Fotos nur Metadaten, keine Inhalte', async () => {
+  it('mit Token: über das Gateway, mit Metadaten; bei Fotos keine Inhalte', async () => {
     const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit', AI_GATEWAY_TOKEN: 'gw-token' }));
     await fund(c);
-    await c.call('POST', '/v1/messages', body('standard', { messages: [{ role: 'user', content: [IMG] }] }));
-    const [gUrl, gInit] = gemini.mock.calls[0];
-    expect(gUrl).toBe('https://gateway.test/overfit/google-ai-studio/v1beta/models/gemini-3.6-flash:generateContent');
+    expect((await c.call('POST', '/v1/messages', body('standard', { messages: [{ role: 'user', content: [IMG] }] }))).status).toBe(200);
+    const [pUrl, pInit] = anthropic.mock.calls[0];
+    expect(pUrl).toBe('https://gateway.test/overfit/anthropic/v1/messages');
+    expect(pInit.headers['x-api-key']).toBe('test-key');
+    expect(pInit.headers['cf-aig-authorization']).toBe('Bearer gw-token');
     // Nicht „collect-log: false“ (das würde auch Kosten und Tokens unterdrücken), sondern nur die Inhalte abschalten.
-    expect(gInit.headers['cf-aig-collect-log']).toBeUndefined();
-    expect(gInit.headers['cf-aig-collect-log-payload']).toBe('false');
-    expect(JSON.parse(gInit.headers['cf-aig-metadata'])).toEqual({ tier: 'standard', photo: true, fallback: false });
-    expect(gInit.headers['cf-aig-authorization']).toBe('Bearer gw-token');
-    await c.call('POST', '/v1/messages', body('pro'));
-    const [aUrl, aInit] = anthropic.mock.calls[0];
-    expect(aUrl).toBe('https://gateway.test/overfit/anthropic/v1/messages');
-    expect(aInit.headers['cf-aig-collect-log']).toBeUndefined();
-    expect(aInit.headers['cf-aig-collect-log-payload']).toBeUndefined(); // ohne Foto: normales Logging
-    expect(JSON.parse(aInit.headers['cf-aig-metadata'])).toEqual({ tier: 'pro', photo: false, fallback: false });
-    await c.call('POST', '/v1/messages', body('lite'));
-    expect(ai.run.mock.calls[0][2]).toEqual({ gateway: { id: 'overfit', metadata: { tier: 'lite', photo: false, fallback: false } } });
+    expect(pInit.headers['cf-aig-collect-log']).toBeUndefined();
+    expect(pInit.headers['cf-aig-collect-log-payload']).toBe('false');
+    expect(JSON.parse(pInit.headers['cf-aig-metadata'])).toEqual({ tier: 'standard', photo: true, fallback: false });
+
+    expect((await c.call('POST', '/v1/messages', body('lite'))).status).toBe(200);
+    const [, init] = anthropic.mock.calls[1];
+    expect(init.headers['cf-aig-collect-log-payload']).toBeUndefined(); // ohne Foto: normales Logging
+    expect(JSON.parse(init.headers['cf-aig-metadata'])).toEqual({ tier: 'lite', photo: false, fallback: false });
+    expect(ai.gateway).toHaveBeenCalledWith('overfit');
   });
 
-  it('ohne Gateway-Token gehen Gemini und Anthropic direkt (neue Gateways verlangen Authentifizierung), Workers AI übers Binding', async () => {
+  it('mit Token: Ausweich-Anfrage ist in den Metadaten markiert', async () => {
+    failFor([OPUS], async () => overloaded());
+    const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit', AI_GATEWAY_TOKEN: 'gw-token' }));
+    await fund(c);
+    expect((await c.call('POST', '/v1/messages', body('pro'))).status).toBe(200);
+    expect(anthropic.mock.calls.map((x: any[]) => JSON.parse(x[1].headers['cf-aig-metadata']))).toEqual([
+      { tier: 'pro', photo: false, fallback: false },
+      { tier: 'pro', photo: false, fallback: true },
+    ]);
+  });
+
+  it('ohne Gateway-Token direkt an Anthropic (neue Gateways verlangen Authentifizierung)', async () => {
     const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit' }));
     await fund(c);
-    expect((await c.call('POST', '/v1/messages', body('standard'))).status).toBe(200);
-    const [gUrl, gInit] = gemini.mock.calls[0];
-    expect(gUrl).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent');
-    expect(gInit.headers['cf-aig-authorization']).toBeUndefined();
-    expect(gInit.headers['cf-aig-metadata']).toBeUndefined();
-    expect((await c.call('POST', '/v1/messages', body('pro'))).status).toBe(200);
-    expect(anthropic.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages');
-    await c.call('POST', '/v1/messages', body('lite'));
-    expect(ai.run.mock.calls[0][2]).toEqual({ gateway: { id: 'overfit', metadata: { tier: 'lite', photo: false, fallback: false } } });
+    for (const t of ['lite', 'standard', 'pro']) expect((await c.call('POST', '/v1/messages', body(t))).status).toBe(200);
+    for (const [url, init] of anthropic.mock.calls) {
+      expect(url).toBe('https://api.anthropic.com/v1/messages');
+      expect(init.headers['cf-aig-authorization']).toBeUndefined();
+      expect(init.headers['cf-aig-metadata']).toBeUndefined();
+    }
   });
 
   it('lehnt das Gateway ab (401, Cloudflare-Fehlerformat), geht dieselbe Anfrage direkt an den Anbieter', async () => {
-    anthropic.mockImplementation(async (url: string) =>
+    anthropic.mockImplementation(async (url: string, init: any) =>
       url.startsWith('https://gateway.test/')
         ? new Response(JSON.stringify({ success: false, result: [], messages: [], error: [{ code: 2009, message: 'Unauthorized' }] }), { status: 401 })
-        : anthropicReply(),
+        : anthropicReply(sentModel(init)),
     );
     const c = await Client.create(env({ AI_GATEWAY_ID: 'overfit', AI_GATEWAY_TOKEN: 'falsch' }));
     await fund(c);
     const r = await c.call('POST', '/v1/messages', body('pro'));
     expect(r.status).toBe(200);
-    expect(r.body.overfit).toMatchObject({ servedTier: 'pro', fallback: false });
+    expect(r.body.overfit).toMatchObject({ servedTier: 'pro', fallback: false, costMicro: at('pro') });
     expect(anthropic.mock.calls.map((x: any[]) => x[0])).toEqual(['https://gateway.test/overfit/anthropic/v1/messages', 'https://api.anthropic.com/v1/messages']);
+    expect(sentModels()).toEqual([OPUS, OPUS]);
     expect(anthropic.mock.calls[1][1].headers['cf-aig-authorization']).toBeUndefined();
   });
 });
 
 describe('Schlüssel des Betreibers abgelehnt (401/403)', () => {
-  it('weicht auf die andere Stufe aus und bucht nur dort ab', async () => {
-    anthropic.mockResolvedValue(new Response(JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }), { status: 401 }));
+  it('gilt als Ausfall: weicht auf die Ausweich-Stufe aus und bucht nur dort ab', async () => {
+    failFor([OPUS], async () => new Response(JSON.stringify({ type: 'error', error: { type: 'permission_error', message: 'no access to opus' } }), { status: 403 }));
     const c = await Client.create(env());
-    await fund(c);
-    const r = await c.call('POST', '/v1/messages', body('pro'));
-    expect(r.status).toBe(200);
-    expect(r.body.overfit).toMatchObject({ tier: 'pro', servedTier: 'standard', fallback: true });
-  });
-
-  it('ohne Ausweich-Stufe: 502 upstream_unavailable mit Fehlertext, nichts abgebucht', async () => {
-    anthropic.mockResolvedValue(new Response(JSON.stringify({ success: false, error: [{ code: 2009, message: 'Unauthorized' }] }), { status: 401 }));
-    const c = await Client.create(env({ GEMINI_API_KEY: undefined }));
     const f = await fund(c);
     const r = await c.call('POST', '/v1/messages', body('pro'));
+    expect(r.status).toBe(200);
+    expect(r.body.overfit).toMatchObject({ tier: 'pro', servedTier: 'standard', fallback: true, costMicro: at('standard') });
+    expect(await balance(c)).toBe(f.balanceMicro - at('standard'));
+  });
+
+  it('Schlüssel überall ungültig: 502 upstream_unavailable mit Fehlertext, nichts abgebucht', async () => {
+    anthropic.mockImplementation(
+      async () => new Response(JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }), { status: 401 }),
+    );
+    const c = await Client.create(env());
+    const f = await fund(c);
+    const r = await c.call('POST', '/v1/messages', body('lite'));
     expect(r.status).toBe(502);
-    expect(r.body.error).toMatchObject({ code: 'upstream_unavailable', message: 'Unauthorized', details: { upstreamStatus: 401 } });
+    expect(r.body.error).toMatchObject({ code: 'upstream_unavailable', message: 'invalid x-api-key', details: { upstreamStatus: 401 } });
+    expect(sentModels()).toEqual([HAIKU, SONNET]);
     expect(await balance(c)).toBe(f.balanceMicro);
   });
 });
 
 describe('/v1/config', () => {
-  it('meldet Stufen und Verfügbarkeit', async () => {
+  it('meldet Stufen, Claude-Modelle und Verfügbarkeit', async () => {
     const all = await rawFetch('/v1/config', env());
     expect(all.body.defaultTier).toBe('standard');
-    expect(all.body.tiers.standard).toMatchObject({ available: true, model: 'gemini-3.6-flash', images: true, fallback: 'pro' });
-    expect(all.body.tiers.pro).toMatchObject({ available: true, model: 'claude-sonnet-5-5' });
-    expect(all.body.tiers.lite).toMatchObject({ available: true, images: false });
-    expect(all.body.tiers.standard.price.out).toBe(price('standard').out);
-    const noPro = await rawFetch('/v1/config', baseEnv({ ANTHROPIC_API_KEY: undefined }));
-    expect(noPro.body.tiers.pro.available).toBe(false);
-    expect(noPro.body.tiers.lite.available).toBe(false);
+    expect(all.body.tiers.lite).toMatchObject({ available: true, model: HAIKU, vendor: 'Anthropic', images: true, fallback: 'standard' });
+    expect(all.body.tiers.standard).toMatchObject({ available: true, model: SONNET, vendor: 'Anthropic', images: true, fallback: 'lite' });
+    expect(all.body.tiers.pro).toMatchObject({ available: true, model: OPUS, vendor: 'Anthropic', images: true, fallback: 'standard' });
+    for (const t of ['lite', 'standard', 'pro'] as Tier[]) expect(all.body.tiers[t].price).toEqual(price(t));
+    expect(all.body.invite.giftTier).toBe('lite');
+    expect(GIFT_TIER).toBe('lite');
+    const none = await rawFetch('/v1/config', baseEnv({ ANTHROPIC_API_KEY: undefined, GEMINI_API_KEY: 'gemini-key' } as Partial<Env>));
+    for (const t of ['lite', 'standard', 'pro']) expect(none.body.tiers[t].available).toBe(false);
   });
 
   it('unbekannte Stufe wird abgelehnt', async () => {
@@ -332,19 +372,24 @@ describe('/v1/config', () => {
     await fund(c);
     const r = await c.call('POST', '/v1/messages', body('ultra'));
     expect(r.body.error).toMatchObject({ code: 'model_not_allowed', details: { allowed: ['standard', 'pro', 'lite'] } });
+    expect(anthropic).not.toHaveBeenCalled();
   });
 });
 
 describe('Preistabelle', () => {
-  it('nimmt den zum Zeitpunkt gültigen Preis (Gemini ab 2027 teurer) und rechnet Neurons um', () => {
-    expect(currentPrices(Date.parse('2026-12-31T23:00:00Z'))['gemini-3.6-flash']).toEqual({ in: 690_000, cacheRead: 69_000, cacheWrite: 690_000, out: 3_450_000 });
-    expect(currentPrices(Date.parse('2027-01-01T00:00:00Z'))['gemini-3.6-flash']).toEqual({ in: 1_380_000, cacheRead: 138_000, cacheWrite: 1_380_000, out: 6_900_000 });
-    expect(currentPrices()['claude-sonnet-5-5']).toEqual({ in: 1_840_000, cacheRead: 184_000, cacheWrite: 2_300_000, out: 9_200_000 });
-    // 0,293 $ / 2,253 $ je MTok × 0,92 €/$
-    expect(currentPrices()['@cf/meta/llama-3.3-70b-instruct-fp8-fast']).toMatchObject({ in: 269_560, out: 2_072_760 });
+  it('Claude-Listenpreise × 0,92 €/$; alte Modelle bleiben für alte Buchungen', () => {
+    // Haiku 0,10 $ / 0,50 $, Cache-Lesen 0,01 $, Cache-Schreiben 1,25 × Eingabe
+    expect(currentPrices()[HAIKU]).toEqual({ in: 92_000, cacheRead: 9_200, cacheWrite: 115_000, out: 460_000 });
+    expect(currentPrices()[SONNET]).toEqual({ in: 1_840_000, cacheRead: 184_000, cacheWrite: 2_300_000, out: 9_200_000 });
+    expect(currentPrices()[OPUS]).toEqual({ in: 3_680_000, cacheRead: 184_000, cacheWrite: 4_600_000, out: 18_400_000 });
     // Jede Stufe hat einen Preis für ihr Modell
     for (const t of Object.values(TIERS)) expect(currentPrices()[t.model]).toBeDefined();
-    // Abgekündigtes Modell bleibt für alte Buchungen: 25 608 / 75 147 Neurons je MTok × 0,011 $/1000 Neurons × 0,92 €/$
+    // Gemini: zum Zeitpunkt gültiger Preis (ab 2027 teurer)
+    expect(currentPrices(Date.parse('2026-12-31T23:00:00Z'))['gemini-3.6-flash']).toEqual({ in: 690_000, cacheRead: 69_000, cacheWrite: 690_000, out: 3_450_000 });
+    expect(currentPrices(Date.parse('2027-01-01T00:00:00Z'))['gemini-3.6-flash']).toEqual({ in: 1_380_000, cacheRead: 138_000, cacheWrite: 1_380_000, out: 6_900_000 });
+    // 0,293 $ / 2,253 $ je MTok × 0,92 €/$
+    expect(currentPrices()['@cf/meta/llama-3.3-70b-instruct-fp8-fast']).toMatchObject({ in: 269_560, out: 2_072_760 });
+    // 25 608 / 75 147 Neurons je MTok × 0,011 $/1000 Neurons × 0,92 €/$
     expect(currentPrices()['@cf/meta/llama-3.1-8b-instruct']).toMatchObject({ in: 259_153, out: 760_488 });
   });
 });

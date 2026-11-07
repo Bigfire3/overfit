@@ -2,7 +2,8 @@ import { ApiError } from './errors';
 import type { Config, Device, Env } from './types';
 import { availableMicro, giftedCostSince, grantReviewStatements, monthStart, release, reserve, reserveReview, returnReview, settle, settleReview, now } from './ledger';
 import { costMicro } from './money';
-import { type Tier, callTier, outputLimit, tierAvailable, tierForModel, TIER_NAMES, TIERS, UpstreamError } from './providers';
+import { type Tier, callTier, GIFT_TIER, outputLimit, tierAvailable, tierForModel, TIER_NAMES, TIERS, UpstreamError } from './providers';
+import { logRequest, purposeOf } from './requests';
 
 const enc = new TextEncoder();
 
@@ -37,8 +38,10 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
   } catch {
     throw new ApiError(400, 'invalid_request', 'Body muss ein JSON-Objekt sein');
   }
-  // Overfit-eigene Angaben (`overfit.purpose`: review | chat | other) gehen nie an den KI-Anbieter.
-  const purpose = (body.overfit as { purpose?: unknown } | undefined)?.purpose;
+  // Overfit-eigene Angaben (`overfit.purpose`: review | chat | autofill | plan | other) gehen nie an den KI-Anbieter.
+  const purpose = purposeOf((body.overfit as { purpose?: unknown } | undefined)?.purpose);
+  const t0 = Date.now();
+  const ts = Math.floor(t0 / 1000);
   if ('overfit' in body) {
     const { overfit: _, ...rest } = body;
     body = rest;
@@ -71,11 +74,14 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     maxPrice,
     cfg.markupBp,
   );
-  // Coach-Auswertung mit dem günstigsten Bildmodell: zuerst eine geschenkte Auswertung (Einladungsbonus) verbrauchen.
+  // Coach-Auswertung mit dem günstigsten Modell (Haiku): zuerst eine geschenkte Auswertung (Einladungsbonus) verbrauchen.
   const giftId = purpose === 'review' ? await reserveGift(env, cfg, device.accountId, tier, hold) : null;
   const holdId = giftId ? null : await reserve(env, device.accountId, hold);
+  const log = { accountId: device.accountId, ts, purpose, tier, requestedModel: TIERS[tier].model, photo: images > 0 };
   if (!giftId && !holdId) {
+    const requestId = await logRequest(env, { ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: 'insufficient_funds' });
     throw new ApiError(402, 'insufficient_funds', 'Guthaben reicht nicht', {
+      requestId,
       requiredMicro: hold,
       availableMicro: await availableMicro(env, device.accountId),
     });
@@ -85,6 +91,7 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
   const started = Date.now();
   const opts = (timeoutMs: number) => ({ timeoutMs, hasImages: images > 0, tier });
   let served: Tier = tier;
+  let firstFailure = null as UpstreamError | null;
   let result;
   try {
     try {
@@ -95,22 +102,29 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
       if (!(e instanceof UpstreamError) || !e.unavailable || !fb || !tierAvailable(env, fb) || left < 15_000) throw e;
       if (images > 0 && !TIERS[fb].images) throw e;
       console.warn('fallback', tier, '→', fb, e.status, e.message);
+      firstFailure = e;
       served = fb;
       result = await callTier(env, cfg, fb, body, maxTokens as number, { ...opts(Math.min(cfg.upstreamTimeoutMs, left)), fallback: true });
     }
   } catch (e) {
     if (holdId) await release(env, holdId);
     if (giftId) await returnReview(env, giftId);
+    const code = !(e instanceof UpstreamError) ? 'internal_error' : e.timeout || e.status === 0 || e.unavailable ? 'upstream_unavailable' : 'upstream_rejected';
+    const requestId = await logRequest(env, {
+      ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: code,
+      fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: firstFailure?.message ?? (e instanceof Error ? e.message : null),
+    });
     if (!(e instanceof UpstreamError)) throw e;
     if (e.timeout || e.status === 0) {
-      throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status });
+      throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status, requestId });
     }
     if (!e.unavailable) {
       throw new ApiError(400, 'upstream_rejected', e.message || 'KI-Anbieter hat die Anfrage abgelehnt, nichts abgebucht', {
         upstreamStatus: e.status,
+        requestId,
       });
     }
-    throw new ApiError(502, 'upstream_unavailable', e.message || 'KI-Anbieter nicht verfügbar, nichts abgebucht', { upstreamStatus: e.status });
+    throw new ApiError(502, 'upstream_unavailable', e.message || 'KI-Anbieter nicht verfügbar, nichts abgebucht', { upstreamStatus: e.status, requestId });
   }
 
   const servedModel = TIERS[served].model;
@@ -135,24 +149,29 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
   let charged = 0;
   if (giftId) await settleReview(env, device.accountId, giftId, entry);
   else charged = await settle(env, device.accountId, holdId!, hold, cost, entry);
+  const requestId = await logRequest(env, {
+    ...log, durationMs: Date.now() - t0, status: 'ok', model: servedModel,
+    fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: firstFailure?.message ?? null,
+    input: entry.input, cacheRead: entry.cacheRead, cacheWrite: entry.cacheWrite, output: entry.output, chargedMicro: charged, gift: !!giftId,
+  });
   await rewardInviter(env, cfg, device.accountId);
   const balance = await availableMicro(env, device.accountId);
   return Response.json(
     {
       ...result.body,
-      overfit: { costMicro: charged, balanceMicro: balance, giftReview: !!giftId, currency: 'EUR', tier, servedTier: served, model: servedModel, modelName: TIERS[served].displayName, vendor: TIERS[served].vendor, requestedModel: TIERS[tier].model, requestedModelName: TIERS[tier].displayName, requestedVendor: TIERS[tier].vendor, fallback: served !== tier },
+      overfit: { costMicro: charged, balanceMicro: balance, giftReview: !!giftId, currency: 'EUR', tier, servedTier: served, model: servedModel, modelName: TIERS[served].displayName, vendor: TIERS[served].vendor, requestedModel: TIERS[tier].model, requestedModelName: TIERS[tier].displayName, requestedVendor: TIERS[tier].vendor, fallback: served !== tier, fallbackReason: firstFailure ? `HTTP ${firstFailure.status}: ${firstFailure.message}`.slice(0, 200) : null, purpose, requestId },
     },
     { headers: { 'x-overfit-cost-micro': String(charged), 'x-overfit-balance-micro': String(balance) } },
   );
 }
 
 /**
- * Geschenkte Auswertung reservieren, wenn die Anfrage dafür in Frage kommt: Stufe standard (günstigstes Bildmodell),
+ * Geschenkte Auswertung reservieren, wenn die Anfrage dafür in Frage kommt: Stufe `GIFT_TIER` (Claude Haiku 5.5, das günstigste Modell),
  * reservierte Höchstkosten zum Anbieterpreis höchstens `inviteGiftMaxCostMicro`, und das Monatsbudget der echten
  * KI-Kosten für Geschenktes ist nicht ausgeschöpft. Sonst null (dann zahlt das Guthaben).
  */
 async function reserveGift(env: Env, cfg: Config, accountId: string, tier: Tier, holdMicro: number): Promise<string | null> {
-  if (tier !== 'standard') return null;
+  if (tier !== GIFT_TIER) return null;
   // Der Hold enthält den Aufschlag; die Anbieterkosten sind Hold ÷ (1 + Aufschlag).
   const maxProviderCost = Math.ceil(holdMicro / (1 + cfg.markupBp / 10_000));
   if (maxProviderCost > cfg.inviteGiftMaxCostMicro) return null;

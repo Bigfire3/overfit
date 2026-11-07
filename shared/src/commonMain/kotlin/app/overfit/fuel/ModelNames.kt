@@ -6,8 +6,10 @@ package app.overfit.fuel
  * answers when the config is not at hand.
  */
 private val KNOWN = mapOf(
-    "gemini-3.6-flash" to "Gemini 3.6 Flash (Google)",
+    "claude-haiku-5-5" to "Claude Haiku 5.5 (Anthropic)",
     "claude-sonnet-5-5" to "Claude Sonnet 5.5 (Anthropic)",
+    "claude-opus-5-5" to "Claude Opus 5.5 (Anthropic)",
+    "gemini-3.6-flash" to "Gemini 3.6 Flash (Google)",
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast" to "Llama 3.3 70B (Cloudflare)",
     "@cf/meta/llama-3.1-8b-instruct" to "Llama 3.1 8B (Cloudflare)",
 )
@@ -18,8 +20,8 @@ fun modelLabel(modelId: String): String = KNOWN[modelId] ?: modelId
 fun modelShortName(modelId: String): String = modelLabel(modelId).substringBefore(" (")
 
 /**
- * Model of an internal tier ID (standard | pro | lite), for old bookings that only store the tier. Those bookings are from
- * before the lite switch to Llama 3.3 70B (new bookings store the model), so lite stays Llama 3.1 8B here.
+ * Model of an internal tier ID (standard | pro | lite), for old bookings that only store the tier (from before the
+ * tiers stored their model, i.e. the Gemini/Sonnet/Llama time). Newer bookings store the model itself.
  */
 fun modelOfTier(tier: String): String? = when (tier) {
     "standard" -> "gemini-3.6-flash"

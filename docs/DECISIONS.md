@@ -1297,3 +1297,31 @@ Modell in den Coach-Einstellungen.“ – für Guthaben-Nutzer nicht lösbar.
   - Behoben: Der antippbare Trainingsname bekommt `pressScale` wie alle tippbaren Elemente.
   - Verworfen: „Direkt starten“-Trainings hätten keine `templateId`. Falsch, denn beim Beenden entsteht das Workout und das Training wird ihm zugeordnet (`TemplateRepository`); „in diesem Workout“ greift also auch dort.
   - Bewusst offen: Die Werte werden einmal beim Öffnen der Workout-Seite geladen. Ein Training, das endet, während die Seite im Hintergrund liegt, erscheint erst beim nächsten Öffnen (die Seite wird nach einem Training ohnehin neu geöffnet). Ein leerer Name wird beim Speichern still durch den alten ersetzt (Platzhalter zeigt, dass das Feld leer ist). Feste Einrückung der Satzzeilen (Bildbreite 48 dp) und Import-Reihenfolge sind kosmetisch.
+
+## Guthaben nur mit Claude, Anfrage-Protokoll „Abrechnung“ (7.11.2026)
+Fabian: „möglichst alle Modelle von Claude nutzen … nicht überall ein API-Token erzeugen … für günstige Anfragen Haiku“ und „in der App
+möglichst genau sehen, wo, wann, was angefragt wurde“.
+- **Stufen:** `lite` = Claude Haiku 5.5, `standard` = Claude Sonnet 5.5 (Voreinstellung für Auswertung und Chat), `pro` = Claude Opus 5.5.
+  Der Server braucht nur noch `ANTHROPIC_API_KEY`; Gemini und Workers AI sind aus dem Guthaben-Weg entfernt (Code gelöscht, Preise bleiben
+  für alte Buchungen, alte Modell-IDs werden auf Stufen abgebildet). Der Weg „eigener Schlüssel“ ist unverändert (Gemini, OpenAI, OpenRouter).
+- **Preise** aus der Preisliste von Anthropic (über den claude-api-Skill geprüft, Stand 7.11.): Haiku 0,10 $/0,50 $, Sonnet 2 $/10 $,
+  Opus 4 $/20 $ je MTok, Cache-Lesen 0,01/0,20/0,20 $, Cache-Schreiben 1,25 × Eingabe. `MARKUP_BP` bleibt 2800.
+- **Ausweichen:** lite → standard, standard → lite, pro → standard. Nie ungefragt zu Opus. Berechnet wird wie bisher höchstens der Preis
+  der gewählten Stufe; ein Fehlversuch kostet nichts. Die App wählt bei fehlender Stufe ebenso nie die teurere (standard → lite, lite → standard).
+- **Einladungsbonus** gilt für Haiku (`GIFT_TIER = lite`) statt Gemini Flash; die Kostenbremsen bleiben, greifen mit Haiku aber praktisch nie.
+- **Gespeicherte Modellwahl:** `pro` hieß bis jetzt Claude Sonnet. Damit niemand plötzlich Opus-Preise zahlt, wird ein gespeichertes `pro`
+  einmalig zu `standard` (= wieder Sonnet), auch beim Wiederherstellen alter Backups (`CoachSettings.claudeTiers`). Die Modellwahl bietet
+  jetzt alle drei Modelle an.
+- **Anfrage-Protokoll:** Server-Tabelle `requests` (Migration 0008), geschrieben für jede Anfrage nach der Body-Prüfung, auch bei
+  `insufficient_funds` und Anbieter-Fehlern; nur Metadaten (Zeit, Dauer, Zweck, Stufe, zuerst versuchtes und antwortendes Modell, Ausfall des
+  ersten Versuchs, Token, berechneter Betrag, geschenkt, Foto ja/nein). `GET /v1/account/requests`. Die Antwort von `/v1/messages` nennt die
+  Protokoll-ID (`requestId`), Fehler in `details.requestId`, so dass App und Server einen Eintrag nur einmal zeigen.
+  App: Room-Tabelle `ai_request` (DB v10, AutoMigration, Migrationstest), geschrieben von `LoggingTransport` um jeden Transport, also auch
+  mit eigenem Schlüssel (dann rein lokal, ohne Kosten, mit Token aus der Antwort des Anbieters; keine Backend-Anfrage). Für Guthaben holt die
+  Ansicht „Abrechnung“ zusätzlich das Server-Protokoll (auch Anfragen anderer Geräte des Kontos) und führt Einträge über `serverId` zusammen.
+  Zweck kommt aus `CoachPrompt.purpose` (review, chat, autofill, plan, other). Verworfen: Protokoll im Geld-Ledger (Fehlversuche ohne Betrag
+  hätten Summen und Admin-Auswertung verfälscht).
+- **Cloudflare:** Workers AI wird nicht mehr aufgerufen (keine Kosten). Das AI Gateway ist kostenlos und nur noch mit `AI_GATEWAY_TOKEN`
+  im Weg; ohne Token geht alles direkt an Anthropic. Das Binding `AI` bleibt nur für die Gateway-URL. Kein Zahlungsmittel bei Cloudflare nötig.
+- **Offen:** `effort: medium` geht an alle drei Modelle; laut Anthropic unterstützt Haiku 5.5 `effort` (Standard `medium`), geprüft im
+  E2E-Test nach dem Deploy. Die Spalte `fallback_reason` hält bei Fehlschlägen ohne Ausweichen den Fehlertext des letzten Versuchs.

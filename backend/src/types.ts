@@ -2,12 +2,10 @@ export interface Env {
   DB: D1Database;
   /** R2-Bucket für freigegebene Körperfotos (KI-Chat-Verbindung), verschlüsselt abgelegt. */
   PHOTOS: R2Bucket;
-  /** Workers AI (Stufe `lite`) und AI-Gateway-URLs. Fehlt im lokalen Dev und in Tests ohne Mock. */
+  /** Cloudflare-AI-Binding, nur für die AI-Gateway-URL (`getUrl`). Fehlt im lokalen Dev und in Tests ohne Mock. */
   AI?: AiBinding;
-  // Secrets (mindestens einer der beiden KI-Schlüssel)
+  // Secrets (Pflicht: ANTHROPIC_API_KEY, alle Guthaben-Stufen sind Claude)
   ANTHROPIC_API_KEY?: string;
-  /** Google-AI-Studio-Key (Gemini, Stufe `standard`). */
-  GEMINI_API_KEY?: string;
   INVITE_SIGNING_KEY?: string;
   /** Hauptschlüssel für die Verschlüsselung der KI-Chat-Daten (≥ 32 zufällige Bytes, Base64url). */
   SYNC_ENCRYPTION_KEY?: string;
@@ -41,10 +39,9 @@ export interface Env {
   WEB_PACKAGES?: string;
   WEB_LINK_TTL_SEC?: string;
   ANTHROPIC_BASE_URL?: string;
-  GEMINI_BASE_URL?: string;
   /** Name des Cloudflare AI Gateways; leer = Anbieter direkt (lokal). Setzt der Deploy-Workflow. */
   AI_GATEWAY_ID?: string;
-  /** Token für ein authentifiziertes AI Gateway (`cf-aig-authorization`); ohne Token gehen Gemini/Anthropic direkt. */
+  /** Token für ein authentifiziertes AI Gateway (`cf-aig-authorization`); ohne Token gehen Anfragen direkt an Anthropic. */
   AI_GATEWAY_TOKEN?: string;
   /** Zeitlimit je Anbieter-Versuch (ms) und für die ganze Anfrage inklusive Ausweichen. */
   UPSTREAM_TIMEOUT_MS?: string;

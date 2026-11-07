@@ -20,15 +20,14 @@ npm run dev         # wrangler dev, lokaler D1, DEV_MODE=true
 Für `npm run dev` Secrets lokal in `backend/.dev.vars` (nicht committen):
 
 ```
-GEMINI_API_KEY=AIza...              # Gemini 3.6 Flash; oder GEMINI_BASE_URL=http://localhost:9999 mit eigenem Fake
-ANTHROPIC_API_KEY=sk-ant-...        # Claude Sonnet 5.5; oder ANTHROPIC_BASE_URL=…
+ANTHROPIC_API_KEY=sk-ant-...        # alle Guthaben-Stufen (Haiku, Sonnet, Opus 5.5); oder ANTHROPIC_BASE_URL=… mit eigenem Fake
 INVITE_SIGNING_KEY=irgendein-langer-zufallswert
 ATTESTATION_MODE=mock               # nur mit DEV_MODE=true wirksam
 PURCHASE_MODE=mock
 ```
 
-Lokal gibt es kein Workers-AI-Binding und kein AI Gateway: die Stufe `lite` ist dort nicht verfügbar, Gemini und Anthropic werden
-direkt angesprochen. Die Tests ersetzen beides durch Mocks (`test/tiers.test.ts`).
+Lokal gibt es kein AI Gateway: Anthropic wird direkt angesprochen. Die Tests ersetzen Anthropic und das Gateway durch Mocks
+(`test/tiers.test.ts`).
 
 Im Dev-Modus akzeptieren Kauf und Einladung Token der Form `mock:<id>` statt echter Store-/Attestierungs-Belege. In Produktion
 (`DEV_MODE` nicht `true`) werden die Mock-Modi ignoriert: ohne echte Prüfer sind Käufe und Einladungen abgeschaltet (503).
@@ -55,7 +54,7 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    - **D1 – Edit**
    - **Workers R2 Storage – Edit**
    - **Account Settings – Read**
-   - **Workers AI – Read** (Workers-AI-Binding für die Stufe `lite`; der Workflow prüft das Recht vorab)
+   - **Workers AI – Read** (für das AI-Binding, über das die AI-Gateway-URL ermittelt wird; der Workflow prüft das Recht vorab. Workers AI selbst wird nicht aufgerufen, es entstehen dort keine Kosten)
    - **AI Gateway – Edit** (AI Gateway anlegen und lesen; „Edit“ schließt „Read“ ein)
 
    Hast du schon einen Token mit den ersten vier Rechten: beim Token auf **Edit** → die zwei Zeilen ergänzen → Update Token. Der Wert
@@ -68,8 +67,9 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    |---|---|---|
    | `CLOUDFLARE_API_TOKEN` | ja | der Token aus Schritt 5 |
    | `CLOUDFLARE_ACCOUNT_ID` | ja | Account-ID aus Schritt 4 |
-   | `GEMINI_API_KEY` | mindestens einer der beiden KI-Keys (nur beim ersten Mal, danach merkt sich der Worker ihn) | Google-AI-Studio-Key für Gemini 3.6 Flash (aistudio.google.com/apikey → Create API key, Projekt mit Abrechnung; Ausgabenlimit im Google-Cloud-Projekt setzen) |
-   | `ANTHROPIC_API_KEY` | optional, siehe oben | Anthropic-Key für Claude Sonnet 5.5 (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit). Fehlt er, ist Claude Sonnet nicht verfügbar und die App blendet es aus |
+   | `ANTHROPIC_API_KEY` | ja (nur beim ersten Mal, danach merkt sich der Worker ihn) | Anthropic-Key für alle Guthaben-Stufen: Claude Haiku, Sonnet und Opus 5.5 (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit) |
+   | `AI_GATEWAY_TOKEN` | nein | Token fürs Cloudflare AI Gateway (Protokolle/Kosten im Dashboard); ohne geht alles direkt an Anthropic |
+   | `GEMINI_API_KEY` | nein, nicht mehr genutzt | seit 7.11.2026 läuft Guthaben nur über Claude; darf gelöscht werden |
    | `INVITE_SIGNING_KEY`, `SYNC_ENCRYPTION_KEY` | nein | werden, wenn nicht gesetzt, einmalig zufällig erzeugt und im Worker gespeichert. `SYNC_ENCRYPTION_KEY` nie ändern. Fehlt `INVITE_SIGNING_KEY` als GitHub-Secret, übernimmt der Workflow das alte Secret `SPOT_SIGNING_KEY` (früherer Name) und löscht den alten Namen im Worker; nichts zu tun |
    | `ADMIN_SECRET` | nein | nur Testbetrieb; sonst bei jedem Lauf neu erzeugt |
    | `GOOGLE_PLAY_*`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_*` | nein | Store-Prüfer (siehe Tabelle unten); fehlen sie, überspringt der Workflow sie mit Hinweis |
@@ -113,8 +113,8 @@ Secrets (im Workflow oder von Hand):
 
    | Secret | Zweck | Nötig für |
    |---|---|---|
-   | `GEMINI_API_KEY` | Google-AI-Studio-Key des Betreibers | Gemini 3.6 Flash (Google) |
-   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | Claude Sonnet 5.5 (Anthropic) |
+   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | alle Guthaben-Stufen (Claude Haiku, Sonnet, Opus 5.5) |
+   | `AI_GATEWAY_TOKEN` | optional: Token des authentifizierten AI Gateways | Gateway-Protokolle |
    | `INVITE_SIGNING_KEY` | Zufälliger String ≥ 32 Zeichen (`openssl rand -base64 48`); signiert Einladungs-Tokens und Challenges | Einladungen |
    | `SYNC_ENCRYPTION_KEY` | Zufällige 32 Byte als Base64url; verschlüsselt alle KI-Chat-Daten (die OAuth-Anmeldung des MCP-Servers braucht kein eigenes Geheimnis). **Nie ändern** (sonst sind gespeicherte Daten unlesbar; die App lädt dann beim nächsten Sync neu hoch) | KI-Chat |
    | `ADMIN_SECRET` | ≥ 16 Zeichen, nur Testbetrieb (`POST /v1/admin/credit`) | Test-Guthaben |
@@ -263,9 +263,13 @@ Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `displayName`, `vendo
 
 | Stufe | Anbieter, Modell | Bilder | Ausweichen bei Ausfall | Listenpreis je MTok (ein / aus) |
 |---|---|---|---|---|
-| `standard` (Voreinstellung) | Google Gemini `gemini-3.6-flash` (native API, `responseJsonSchema`) | ja | → `pro` | 0,75 $ / 3,75 $ (ab 2027-01-01: 1,50 $ / 7,50 $) |
-| `pro` | Anthropic `claude-sonnet-5-5` | ja | → `standard` | 2 $ / 10 $ |
-| `lite` | Workers AI `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (JSON-Modus; bis 6.11.2026 `llama-3.1-8b-instruct`, bei Cloudflare abgekündigt) | nein (400 `images_not_supported`) | → `standard` | 0,293 $ / 2,253 $ |
+| `lite` | Anthropic `claude-haiku-5-5` (kurze Anfragen: „Mit KI ausfüllen“, geschenkte Auswertungen) | ja | → `standard` | 0,10 $ / 0,50 $ |
+| `standard` (Voreinstellung) | Anthropic `claude-sonnet-5-5` (Coach-Auswertung, Chat) | ja | → `lite` | 2 $ / 10 $ |
+| `pro` | Anthropic `claude-opus-5-5` | ja | → `standard` | 4 $ / 20 $ |
+
+Cache-Lesen 0,01 $ / 0,20 $ / 0,20 $, Cache-Schreiben 1,25 × Eingabe, Thinking-Token zählen als Ausgabe. Bis 7.11.2026 waren
+`standard` = Gemini 3.6 Flash und `lite` = Llama über Workers AI; alte Modell-IDs werden noch auf die Stufen abgebildet, alte
+Buchungen behalten ihren Preis. Workers AI und Gemini werden nicht mehr aufgerufen.
 
 - Die App schickt das Anthropic-Format mit `model` = Stufe; das Backend bildet es auf den Anbieter ab und antwortet im Anthropic-Format.
 - Preise stehen in `src/providers.ts` (`MODEL_PRICES`, mit Gültig-ab-Datum, Wechselkurs `EUR_PER_USD`). Ändern: Tabelle anpassen
@@ -273,13 +277,12 @@ Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `displayName`, `vendo
 - Ausweichen (5xx, 429, Zeitüberschreitung, Netzwerk): berechnet wird höchstens der Preis der angefragten Stufe für die tatsächlich
   verbrauchten Token; die Differenz trägt die Marge. 401/403 des Anbieters (Schlüssel des Betreibers ungültig) zählt wie ein Ausfall
   (`502 upstream_unavailable`, Fehlertext in `message`). Andere Ablehnungen (4xx) weichen nicht aus.
-- AI Gateway: Workers AI läuft immer über die `gateway`-Option des Bindings. Gemini und Anthropic laufen nur dann über das Gateway
-  (`getUrl`), wenn zusätzlich das Secret `AI_GATEWAY_TOKEN` gesetzt ist: Cloudflare legt neue Gateways seit 2026 immer mit
-  Pflicht-Authentifizierung an (lässt sich nicht abschalten), ohne `cf-aig-authorization` antwortet das Gateway mit 401. Ohne Token
-  gehen diese beiden Stufen direkt an den Anbieter (funktioniert, nur ohne Gateway-Protokoll). Lehnt das Gateway trotz Token ab
-  (401/403), geht dieselbe Anfrage einmal direkt an den Anbieter. **Token anlegen (optional):** dash.cloudflare.com → AI → AI Gateway
-  → `overfit-test` bzw. `overfit` → Settings → Authentication → „Create authentication token“ (Recht *AI Gateway · Run*), als
-  GitHub-Secret `AI_GATEWAY_TOKEN` speichern und den Workflow erneut starten.
+- AI Gateway (kostenlos, nur Protokolle und Kosten-Übersicht): Anfragen laufen nur dann über das Gateway (`getUrl` des Bindings
+  `AI`), wenn das Secret `AI_GATEWAY_TOKEN` gesetzt ist: Cloudflare legt neue Gateways seit 2026 immer mit Pflicht-Authentifizierung
+  an (lässt sich nicht abschalten), ohne `cf-aig-authorization` antwortet es mit 401. Ohne Token gehen alle Anfragen direkt an
+  Anthropic. Lehnt das Gateway trotz Token ab (401/403), geht dieselbe Anfrage einmal direkt. **Token anlegen (optional):**
+  dash.cloudflare.com → AI → AI Gateway → `overfit-test` bzw. `overfit` → Settings → Authentication → „Create authentication token“
+  (Recht *AI Gateway · Run*), als GitHub-Secret `AI_GATEWAY_TOKEN` speichern und den Workflow erneut starten.
   Protokolle und Kosten: dash.cloudflare.com → AI → AI Gateway → `overfit` bzw. `overfit-test`. Der Workflow legt es mit
   Protokollen an, Rate-Limit 600 Anfragen/Minute (gleitend, Notbremse) und Cache aus. Anfragen mit Körperfotos werden nicht
   inhaltlich protokolliert: Sie bekommen `cf-aig-collect-log-payload: false`, das Gateway speichert dann weder Anfrage noch Antwort,

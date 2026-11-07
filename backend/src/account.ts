@@ -175,6 +175,7 @@ export async function restoreAccount(env: Env, cfg: Config, device: Device, code
       env.DB.prepare('UPDATE review_gifts SET account_id = ? WHERE account_id = ?').bind(target.id, from),
       env.DB.prepare('UPDATE web_orders SET account_id = ? WHERE account_id = ?').bind(target.id, from),
       env.DB.prepare('UPDATE web_links SET account_id = ? WHERE account_id = ?').bind(target.id, from),
+      env.DB.prepare('UPDATE requests SET account_id = ? WHERE account_id = ?').bind(target.id, from),
       env.DB.prepare('UPDATE credit_codes SET redeemed_by = ? WHERE redeemed_by = ?').bind(target.id, from),
       env.DB.prepare('UPDATE accounts SET recovery_hash = NULL WHERE id = ?').bind(target.id),
       env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(from),

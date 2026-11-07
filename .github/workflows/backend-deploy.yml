@@ -42,10 +42,11 @@ jobs:
       MODE: ${{ inputs.mode || vars.BACKEND_DEPLOY_MODE }}
       EVENT: ${{ github.event_name }}
       CURRENT_URL: ${{ vars.OVERFIT_BACKEND_URL }}
-      # Worker-Secrets (mindestens GEMINI_API_KEY oder ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
+      # Worker-Secrets (Pflicht: ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
+      # Nicht mehr genutzt (Guthaben nur mit Claude); nur für den Hinweis „kann gelöscht werden“.
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      # Optional: Token fürs AI Gateway (neue Gateways verlangen eins); ohne gehen Gemini/Anthropic direkt.
+      # Optional: Token fürs AI Gateway (neue Gateways verlangen eins); ohne gehen Anfragen direkt an Anthropic.
       AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
       INVITE_SIGNING_KEY: ${{ secrets.INVITE_SIGNING_KEY }}
       # Früherer Name (vor Session AD); wird übernommen, falls INVITE_SIGNING_KEY fehlt.
