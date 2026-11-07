@@ -1415,3 +1415,17 @@ Umsetzung des von Fabian freigegebenen Entwurfs (7 Bildschirme). Annahmen und En
   ohne Audio/Bild/Embedding-Modelle. 402 = gültig, aber kein Guthaben beim Anbieter.
 - **Chat-Verlauf nur lokal:** Tabellen `coach_chat`/`coach_chat_message` (seit v6) bleiben auf dem Gerät (und im eigenen Backup); v12 ergänzt
   `profileOff`, `attachments` (JSON), `providerId`, `model` (reine Ergänzung, AutoMigration, Test `migration11to12…`).
+- **Auswertung als Chat, ohne Warteschlange:** Die Auswertung nach dem Training ist ein Chat (neuer Chat, Training angehängt, „Werte mein
+  Training aus“, sofort gesendet, wenn die Einstellung an ist und KI-Zugang besteht; „Später“ im Abschluss überspringt sie einmal). Ohne
+  Netz wartet sie nicht mehr in der Warteschlange der alten Auswertung, sondern die Antwort zeigt den Fehlergrund und „Erneut versuchen“
+  (bewusst: ein Chat soll nicht später ungefragt Geld ausgeben). Alte strukturierte Auswertungen bleiben unter Einstellungen → Coach →
+  Auswertungen lesbar, inklusive „Alle annehmen“ für den Plan.
+- **Modell-Chip ändert den Zugang global:** Modell-Sheet im Chat und „KI-Zugang/Standardmodell“ in den Einstellungen sind dieselbe Auswahl
+  (eine Wahrheit, kein Modell pro Chat). Guthaben-Chip nur, wenn Guthaben der Zugang ist (mit eigenem Schlüssel keine Backend-Anfrage).
+  Preise im Guthaben-Teil des Sheets lädt die App erst, wenn Guthaben schon der Zugang ist oder die Person selbst auf „Overfit-Guthaben“
+  tippt (Opt-in wie „Guthaben ansehen“).
+- **Gegencheck (Sonnet, effort high):** behoben: Ergänzung fehlte bei Auswertungen; Chat-Daten wurden bei jedem Tab-Besuch neu gebaut
+  (Collector-Leck); Backup ohne Coach-Profil/Ergänzung; „Push · heute“ blieb im Verlauf stehen (Datum wird jetzt beim Anzeigen berechnet);
+  OpenRouter-Vorschläge zeigten nur exotische Modelle; Migration der alten Anweisung konnte lange Texte abschneiden. Weitere UI-Punkte
+  (gelöschter offener Chat, Entwurf überschreibt Getipptes, Foto-Obergrenze, Fehlergrund, Häkchen-Farbe, pressScale, Trennlinien,
+  Aufladen-Knöpfe, Größen-Prüfung, Tests für Prompts/„Im Chat nutzen“/Backup) im selben PR.
