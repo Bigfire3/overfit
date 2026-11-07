@@ -37,3 +37,10 @@ Für die Claude-Session, die Fabians Feedback koordiniert. Stand: 4.11.2026. Kei
 
 ## Verlauf seit 3.11. abends (Sessions)
 AF #58 Feedback-Runde 4 · #59 Name „Overfit“ · AG #60 Ticken, nicht wegwischbare Pausen-Benachrichtigung, Settings „Benachrichtigungen“ · AH #61 Übungsbild → Vollbild-Animation · U #43 iOS testbar, TestFlight-Workflow · AI #63 Sauna (DB v8) · AJ #62 Coach-Story · #64 Sonnet-Gegencheck-Regel · AK #65 SVG-Hotfix · #66/#72 impeccable · AL #67 Verlauf-Tab weg, Kalender-Tag, Trainings bearbeiten (DB v9), Tabs Workouts/Coach/Kalender/Profil · AN #68 CI-Stabilität (AppTeardown, Simulator-Boot) · AM #69–#71 UI-Audit (Zahlenfelder, Panels, Popups).
+
+## Geplant, noch nicht beauftragt: Coach-Tab als Chat (Stand 7.11.)
+Fabian will das später umsetzen lassen. Vorschlag des Managers (6.11.) plus Fabians Festlegungen:
+- Coach-Tab = schlichter Chat: oben Modell-Auswahl-Chip, Verlauf (frühere Chats), neuer Chat; Mitte Nachrichten; unten Eingabe mit „+“ für Kontext und Senden. Keine Vorschlagskacheln. Alles andere (KI-Zugang, Guthaben, Einladen, Standardmodell, automatische Auswertung, Coach-Profil, Story) wandert in die Einstellungen.
+- **Fabian:** Das Profil wird **immer** mitgeschickt (nicht erst hinzufügen müssen). Bilder wählt man selbst aus. Das (aktuelle) Workout/Training ist schon **automatisch angehängt**.
+- System-Prompt sinngemäß: „Du bist ein professioneller Fitness-Trainer … Antworte in der Sprache, in der die Frage gestellt wurde …“, konkret, ehrlich, keine Diagnosen, nur Übungen aus der mitgeschickten Liste, Vorschläge im Overfit-Format zum Übernehmen (Entwurf im Chat vom 6.11., siehe Manager-Verlauf).
+- Offen: Chat-Verlauf nur lokal (Vorschlag) oder auch Server.
