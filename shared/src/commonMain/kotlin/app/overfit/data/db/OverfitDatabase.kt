@@ -29,7 +29,7 @@ import androidx.room.useWriterConnection
         CoachChatMessageEntity::class,
         AiRequestEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
     // v1 → v2 adds the workout tables, v2 → v3 the photo table, v3 → v4 the coach tables (nothing is dropped or rewritten).
     // v4 → v5 is manual ([MIGRATION_4_5]): free-exercise-db removed, exercise.note added.
@@ -39,10 +39,12 @@ import androidx.room.useWriterConnection
     // v8 → v9 makes workout_photo.sessionId nullable (photos on calendar days without a training). Room recreates the
     // table and copies every row; the foreign key (CASCADE) and the indices stay.
     // v9 → v10 adds the AI request log `ai_request` (pure addition).
+    // v10 → v11 adds coach_chat.profileOff (NOT NULL, default 0) and coach_chat_message.attachments / providerId / model
+    // (nullable) for the chat redesign (pure addition).
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
         AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7),
-        AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10),
+        AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11),
     ],
 )
 @TypeConverters(Converters::class)

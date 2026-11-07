@@ -43,7 +43,22 @@ data class ChatMessage(
     /** Credit: model ID that answered, and the chosen model if a replacement answered. */
     val servedModel: String? = null,
     val fallbackFrom: String? = null,
+    /** Question: what the user attached (cards above the bubble). */
+    val attachments: List<ChatAttachment> = emptyList(),
+    /** Answer: provider and model that were asked (own key: shown under the answer instead of a price). */
+    val providerId: ProviderId? = null,
+    val model: String? = null,
 )
+
+/** What one send carries: the text, the attachments (photos included) and whether the coach profile goes along. */
+data class ChatSendRequest(
+    val text: String,
+    val attachments: List<ChatAttachment> = emptyList(),
+    val includeProfile: Boolean = true,
+)
+
+/** What the system prompt of one question is built from: profile on/off and every attachment of the chat so far. */
+data class ChatContextRequest(val includeProfile: Boolean, val attachments: List<ChatAttachment>)
 
 /** Answer of the model, split into the visible text and an optional workout in the share format v1. */
 data class ChatAnswer(val text: String, val workoutJson: String?)
@@ -117,9 +132,9 @@ object CoachChatParser {
 data class ChatPromptParts(
     /** Coach role and rules (same as the coach's instructions). */
     val instructions: String,
-    /** Profile block (facts, reply language, units, today). */
+    /** Profile block: coach profile, facts and memory when the profile goes along; reply language, units, today always. */
     val profileBlock: String,
-    /** Compact status as for "Copy context", without the answer instructions. */
+    /** Text of the attachments (training, workout, history, exercise); empty when nothing is attached. */
     val context: String,
     /** id → name of the exercises the chat may use. */
     val exerciseList: List<Pair<String, String>>,
@@ -143,8 +158,13 @@ object CoachChatPrompt {
         }.trimEnd()
         val dynamic = buildString {
             appendLine(parts.profileBlock.trim())
-            appendLine()
-            append(parts.context.trim())
+            if (parts.context.isNotBlank()) {
+                appendLine()
+                append(parts.context.trim())
+            } else {
+                appendLine()
+                append("Nothing else is attached to this chat. If the question needs training data, ask the user to attach it with \"+\".")
+            }
         }
         return CoachPrompt(
             staticSystem = static,
@@ -177,16 +197,21 @@ object CoachChatPrompt {
 }
 
 /**
- * The coach chat: questions and answers stored in `coach_chat_message`, sent with the user's own key or Fuel through
- * the same transports as the coach. Every send runs in [scope] (the app scope), so leaving the chat never cancels
- * an answer. Without AI access the demo answers with a fixed text (and a sample workout).
+ * The coach chat: questions and answers stored in `coach_chat_message` (only on this device), sent with the user's own
+ * key (straight to the provider) or credit (through the backend) through the same transports as the coach. Every send
+ * runs in [scope] (the app scope), so leaving the chat never cancels an answer. Without AI access the demo answers with
+ * a fixed text (and a sample workout).
+ *
+ * Context: the coach profile goes along unless the user removed the profile chip for this chat; attachments (training,
+ * workout, history, exercise) of every question of the chat so far go into the system prompt, photos only with the
+ * question they were attached to.
  */
 class CoachChatService(
     private val dao: CoachChatDao,
     private val access: () -> CoachAccess,
     private val transport: (ProviderId) -> CoachTransport,
     private val model: (ProviderId) -> String,
-    private val parts: suspend () -> ChatPromptParts,
+    private val parts: suspend (ChatContextRequest) -> ChatPromptParts,
     /** Explicitly attached photos (ids) → downscaled JPEGs with their date. */
     private val photos: suspend (List<String>) -> List<CoachImage>,
     /** Demo answer in the app language. */
@@ -198,6 +223,8 @@ class CoachChatService(
 
     fun messages(chatId: String): Flow<List<ChatMessage>> = dao.observeMessages(chatId).map { list -> list.map { it.toMessage() } }
 
+    fun chat(chatId: String): Flow<CoachChatEntity?> = dao.observeChat(chatId)
+
     suspend fun latestChatId(): String? = dao.latestChat()?.id
 
     fun available(): Boolean = access() is CoachAccess.Ready
@@ -206,38 +233,57 @@ class CoachChatService(
     fun recover(): Job = scope.launch { runCatching { dao.failInterrupted() } }
 
     /**
-     * Sends [text] (with the explicitly chosen [photoIds]) into [chatId], or into a new chat when null. Returns the
-     * chat id right away; question and answer appear through [messages].
+     * Sends [request] into [chatId], or into a new chat when null. Returns the chat id right away; question and answer
+     * appear through [messages].
      */
-    fun send(chatId: String?, text: String, photoIds: List<String> = emptyList()): Pair<String, Job> {
+    fun send(chatId: String?, request: ChatSendRequest): Pair<String, Job> {
         val id = chatId ?: newId()
         val job = scope.launch {
-            try { sendNow(id, text, photoIds) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+            try { sendNow(id, request) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
         }
         return id to job
     }
 
+    /** Old call shape: text and photos only (profile on). */
+    fun send(chatId: String?, text: String, photoIds: List<String> = emptyList()): Pair<String, Job> =
+        send(chatId, ChatSendRequest(text, photoIds.map { ChatAttachment.Photo(it) }))
+
     /** Same as [send] but suspends until the answer is stored (tests). */
-    suspend fun sendNow(chatId: String, text: String, photoIds: List<String> = emptyList()) {
-        val question = text.trim()
+    suspend fun sendNow(chatId: String, request: ChatSendRequest) {
+        val question = request.text.trim()
         if (question.isEmpty()) return
         val earlier = dao.messages(chatId)
         // Strictly increasing times keep question → answer order even with a coarse clock.
         val now = maxOf(clock(), (earlier.maxOfOrNull { it.createdAt } ?: 0L) + 1)
         val chat = dao.chat(chatId)
-        dao.upsertChat(chat?.copy(updatedAt = now) ?: CoachChatEntity(chatId, question.lineSequence().first().take(TITLE_LENGTH), now, now))
-        val history = CoachChatPrompt.history(earlier)
-        dao.upsertMessage(
-            CoachChatMessageEntity(
-                id = newId(), chatId = chatId, fromUser = true, text = question, status = ChatMessageStatus.DONE.name,
-                createdAt = now, photoIds = photoIds.takeIf { it.isNotEmpty() }?.joinToString(","),
-            ),
+        val profileOff = !request.includeProfile
+        dao.upsertChat(
+            chat?.copy(updatedAt = now, profileOff = profileOff)
+                ?: CoachChatEntity(chatId, question.lineSequence().first().take(TITLE_LENGTH), now, now, profileOff = profileOff),
         )
+        val history = CoachChatPrompt.history(earlier)
+        val attachments = request.attachments.distinctBy { it.key() }
+        val photoIds = attachments.filterIsInstance<ChatAttachment.Photo>().map { it.photoId }
+        val questionRow = CoachChatMessageEntity(
+            id = newId(), chatId = chatId, fromUser = true, text = question, status = ChatMessageStatus.DONE.name,
+            createdAt = now, photoIds = photoIds.takeIf { it.isNotEmpty() }?.joinToString(","),
+            attachments = ChatAttachment.encode(attachments),
+        )
+        dao.upsertMessage(questionRow)
         val answer = CoachChatMessageEntity(
             id = newId(), chatId = chatId, fromUser = false, text = "", status = ChatMessageStatus.SENDING.name, createdAt = now + 1,
         )
         dao.upsertMessage(answer)
-        answer(answer, history, question, photoIds)
+        answer(answer, history, question, contextOf(earlier + questionRow, request.includeProfile), photoIds)
+    }
+
+    /** Old call shape (tests). */
+    suspend fun sendNow(chatId: String, text: String, photoIds: List<String> = emptyList()) =
+        sendNow(chatId, ChatSendRequest(text, photoIds.map { ChatAttachment.Photo(it) }))
+
+    /** Profile chip of an existing chat. */
+    fun setProfileIncluded(chatId: String, included: Boolean): Job = scope.launch {
+        dao.chat(chatId)?.let { dao.upsertChat(it.copy(profileOff = !included)) }
     }
 
     /** "Try again" on a failed answer: asks the question before it again. */
@@ -246,30 +292,43 @@ class CoachChatService(
         val all = dao.messages(answer.chatId)
         val index = all.indexOfFirst { it.id == answerId }
         val question = all.take(index).lastOrNull { it.fromUser } ?: return@launch
-        val history = CoachChatPrompt.history(all.take(all.indexOf(question)))
+        val before = all.take(all.indexOf(question))
+        val history = CoachChatPrompt.history(before)
         val sending = answer.copy(status = ChatMessageStatus.SENDING.name, errorKind = null, text = "")
         dao.upsertMessage(sending)
+        val profile = dao.chat(answer.chatId)?.profileOff != true
         try {
-            answer(sending, history, question.text, question.photoIds?.split(',').orEmpty())
+            answer(sending, history, question.text, contextOf(before + question, profile), question.photoIds?.split(',').orEmpty().filter { it.isNotEmpty() })
         } catch (e: CancellationException) { throw e } catch (_: Exception) { }
     }
 
     fun delete(chatId: String): Job = scope.launch { dao.deleteChat(chatId) }
 
-    private suspend fun answer(row: CoachChatMessageEntity, history: List<PromptTurn>, question: String, photoIds: List<String>) {
+    /** Profile flag and every non-photo attachment of the questions so far (oldest first, without duplicates). */
+    private fun contextOf(questions: List<CoachChatMessageEntity>, includeProfile: Boolean): ChatContextRequest {
+        val all = questions.filter { it.fromUser }.flatMap { ChatAttachment.decode(it.attachments) }
+            .filter { it !is ChatAttachment.Photo }
+            .distinctBy { it.key() }
+        return ChatContextRequest(includeProfile, all)
+    }
+
+    private suspend fun answer(row: CoachChatMessageEntity, history: List<PromptTurn>, question: String, context: ChatContextRequest, photoIds: List<String>) {
         val ready = access() as? CoachAccess.Ready
         if (ready == null) {
             val d = demo()
             dao.upsertMessage(row.copy(text = d.text, workoutJson = d.workoutJson, status = ChatMessageStatus.DONE.name, demo = true))
             return
         }
+        val modelId = model(ready.providerId)
+        val asked = row.copy(providerId = ready.providerId.name, model = modelId)
+        dao.upsertMessage(asked)
         try {
             val images = if (photoIds.isEmpty()) emptyList() else photos(photoIds)
-            val prompt = CoachChatPrompt.build(parts(), history, question, images)
-            val reply = exchange(transport(ready.providerId), prompt, model(ready.providerId))
+            val prompt = CoachChatPrompt.build(parts(context), history, question, images)
+            val reply = exchange(transport(ready.providerId), prompt, modelId)
             val parsed = CoachChatParser.parse(reply.text)
             dao.upsertMessage(
-                row.copy(
+                asked.copy(
                     text = parsed.text, workoutJson = parsed.workoutJson, status = ChatMessageStatus.DONE.name,
                     costMicro = reply.costMicro, servedModel = reply.servedModel, fallbackFrom = reply.fallbackFrom, errorKind = null,
                 ),
@@ -278,9 +337,9 @@ class CoachChatService(
             // The row stays SENDING; [recover] marks it failed on the next start.
             throw e
         } catch (e: CoachException) {
-            dao.upsertMessage(row.copy(status = ChatMessageStatus.FAILED.name, errorKind = e.kind.name))
+            dao.upsertMessage(asked.copy(status = ChatMessageStatus.FAILED.name, errorKind = e.kind.name))
         } catch (e: Exception) {
-            dao.upsertMessage(row.copy(status = ChatMessageStatus.FAILED.name, errorKind = CoachErrorKind.SERVER.name))
+            dao.upsertMessage(asked.copy(status = ChatMessageStatus.FAILED.name, errorKind = CoachErrorKind.SERVER.name))
         }
     }
 
@@ -331,4 +390,16 @@ private fun CoachChatMessageEntity.toMessage() = ChatMessage(
     demo = demo,
     servedModel = servedModel,
     fallbackFrom = fallbackFrom,
+    attachments = ChatAttachment.decode(attachments),
+    providerId = providerId?.let { p -> ProviderId.entries.firstOrNull { it.name == p } },
+    model = model,
 )
+
+/** Identity of an attachment without its label (the same training attached twice counts once). */
+internal fun ChatAttachment.key(): String = when (this) {
+    is ChatAttachment.Training -> "t:$sessionId"
+    is ChatAttachment.Plan -> "p:$templateId"
+    is ChatAttachment.History -> "h:$weeks"
+    is ChatAttachment.Exercise -> "e:$exerciseId"
+    is ChatAttachment.Photo -> "f:$photoId"
+}

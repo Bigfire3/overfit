@@ -90,11 +90,14 @@ object ChatContext {
         return cut.substringBeforeLast('\n') + "\n…\n\n" + task
     }
 
-    private fun workoutBlock(r: WorkoutRecord, t: ChatStrings, input: ContextInput): String {
+    private fun workoutBlock(r: WorkoutRecord, t: ChatStrings, input: ContextInput): String =
+        workoutBlock(r, t, input.profile.unit, input.language, input.timeZone)
+
+    /** One finished workout: "- date · name · 52 min · feeling" and one line per exercise with its done sets. */
+    fun workoutBlock(r: WorkoutRecord, t: ChatStrings, unit: WeightUnit, language: Language, zone: TimeZone): String {
         val w = r.workout
-        val unit = input.profile.unit
         val title = buildList {
-            add(dateOf(w.startedAt, input.timeZone))
+            add(dateOf(w.startedAt, zone))
             add(w.name)
             r.endedAt?.let { add("${((it - w.startedAt) / 60_000).coerceAtLeast(0)} min") }
             r.feeling?.let { add(t.ctxFeeling(it)) }
@@ -105,13 +108,13 @@ object ChatContext {
             val done = e.sets.filter { it.completed }
             if (done.isEmpty()) continue
             sb.append("  ").append(e.exercise.name).append(": ")
-                .append(done.joinToString(", ") { setText(it, e.exercise.trackingType, unit, input.language) }).append('\n')
+                .append(done.joinToString(", ") { setText(it, e.exercise.trackingType, unit, language) }).append('\n')
         }
         w.note?.takeIf { it.isNotBlank() }?.let { sb.append("  ").append(it.trim()).append('\n') }
         return sb.toString()
     }
 
-    private fun setText(s: WorkoutSet, type: TrackingType, unit: WeightUnit, language: Language): String {
+    fun setText(s: WorkoutSet, type: TrackingType, unit: WeightUnit, language: Language): String {
         val a = s.actual
         val weight = a.weightKg?.takeIf { type.usesWeight }?.let { Numbers.formatWeight(it, unit, language) }
         return when {
