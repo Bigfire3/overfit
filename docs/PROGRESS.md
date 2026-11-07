@@ -32,6 +32,25 @@ Alte GitHub-Secrets `INVITE_SIGNING_KEY`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APP
 3. Coach → „Über den Coach“ → Seite „Mit Guthaben“: kein Wort mehr über Freunde/Einladungsbonus.
 4. Ein alter Einladungs-QR (`overfit://invite#…`) öffnet nichts Besonderes mehr (höchstens die Import-Meldung „kein Training“).
 5. Coach-Antwort mit Guthaben: darunter immer ein Betrag „… € Guthaben“, nie „geschenkte Auswertung“.
+## Muskel-Heatmap „Trainierte Muskeln“ (7.11.)
+**Erledigt:** Kalender → neues Körper-Icon in der Titelzeile öffnet ein Bottom-Sheet „Trainierte Muskeln“: eigene, stilisierte
+Figur vorne und hinten, jeder Muskel je nach Sätzen im Zeitraum von Dunkelgrau (untrainiert) bis Weiß (am meisten), Legende
+„Viel ▬ Wenig“. Zeitraum per Chips: Diese Woche, Dieser Monat, Dieses Jahr, Gesamt (wird gemerkt). Gezählt werden abgehakte
+Sätze beendeter Trainings, primäre Muskeln voll, mittrainierte halb. Tipp auf einen Muskel zeigt „Brust · 6 Sätze + 4 Sätze mittrainiert“.
+Die Trainingsdetail-Ansicht zeigt dieselbe Figur klein für genau dieses Training. Grafik selbst gezeichnet (keine fremde Vorlage),
+keine DB-Migration. Details in DECISIONS.md. Tests: `MuscleMapTest` (shared und App), `MuscleMapShotTest`.
+Screenshots: `docs/screenshots/muskel-heatmap/`.
+**Offen:** Schulter vorne/seitlich/hinten getrennt bräuchte feinere Muskelgruppen im Katalog.
+
+### Bitte auf dem Handy testen (Muskel-Heatmap)
+1. Kalender → Körper-Icon oben rechts: Sheet fährt von unten hoch, „Diese Woche“ ist gewählt, die Muskeln deiner Trainings dieser
+   Woche sind hell, untrainierte dunkelgrau.
+2. Auf einen Muskel tippen (z. B. Brust, Latissimus, Waden hinten): Darunter Name und Sätze; die anderen Muskeln werden blasser.
+   Nochmal tippen hebt es auf.
+3. „Dieser Monat“, „Dieses Jahr“, „Gesamt“ durchschalten: Färbung ändert sich. Sheet schließen (✕, Zurück, über dem Sheet tippen
+   oder nach unten ziehen) und wieder öffnen: Der zuletzt gewählte Zeitraum ist noch aktiv, auch nach App-Neustart.
+4. Kalender → Tag → Training öffnen: Abschnitt „Trainierte Muskeln“ zeigt nur dieses Training, ohne Zeitraum-Chips.
+5. App auf Englisch: „Muscles trained“, „This week …“, Legende „High / Low“.
 
 ## Hotfix: KI-Auswertung mit Guthaben (6.11.)
 **Erledigt:** Auswertungen über Guthaben scheiterten auf dem Testserver: Gemini Flash ohne Schlüssel, Claude über das (seit 2026 immer
@@ -44,6 +63,7 @@ Server-Fehler verständlich. Details in DECISIONS.md. Tests: `tiers.test.ts`, `C
 ### Bitte auf dem Handy testen (Hotfix KI)
 1. Training beenden → Coach-Auswertung mit Guthaben: Auswertung kommt (zurzeit von Claude Sonnet 5.5, weil Gemini Flash fehlt), Guthaben sinkt um wenige Cent (ca. 3–10 ct).
 2. Profil → Guthaben → Modell: Gemini 3.6 Flash erscheint erst, wenn `GEMINI_API_KEY` gesetzt und der Server neu deployt ist.
+
 ## Letzte Werte im Workout, Trainings umbenennen (7.11.)
 **Erledigt:** In einem gespeicherten Workout klappt ein Tipp auf eine Übung die Karte auf: „Letztes Mal · Datum“ und jeder Satz
 wie eingetragen (Gewicht × Wdh., Zeit … je Tracking-Typ). Bevorzugt aus diesem Workout, sonst „Letztes Mal in einem anderen
