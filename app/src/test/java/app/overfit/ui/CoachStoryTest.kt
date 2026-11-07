@@ -166,7 +166,7 @@ class CoachStoryTest {
     }
 
     @Test
-    fun movesOnByItselfAndStopsAtTheLastPage() {
+    fun movesOnByItselfAndClosesAfterTheLastPage() {
         compose.mainClock.autoAdvance = false
         val closed = mutableStateOf(false)
         compose.setContent {
@@ -178,8 +178,11 @@ class CoachStoryTest {
         }
         compose.mainClock.advanceTimeBy(app.overfit.ui.coach.STORY_AUTO_MS + 100)
         compose.onNodeWithTag("story:title").assertTextEquals(s.ownKey.title)
-        compose.mainClock.advanceTimeBy(app.overfit.ui.coach.STORY_AUTO_MS * 5)
+        compose.mainClock.advanceTimeBy(app.overfit.ui.coach.STORY_AUTO_MS * 2)
         compose.onNodeWithTag("story:title").assertTextEquals(s.subscription.title)
         assertEquals(false, closed.value)
+        // The last page runs through, then the story closes by itself.
+        compose.mainClock.advanceTimeBy(app.overfit.ui.coach.STORY_AUTO_MS + 300)
+        assertEquals(true, closed.value)
     }
 }

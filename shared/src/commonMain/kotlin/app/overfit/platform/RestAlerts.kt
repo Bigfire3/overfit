@@ -93,6 +93,9 @@ interface RestAlerts {
      */
     fun allowNotifications() = Unit
 
+    /** Opens the system notification settings of the app (also when notifications are already allowed). */
+    fun openNotificationSettings() = Unit
+
     /**
      * Whether the app itself has to play the ticks right now. Android plays them from its tick
      * alarm (foreground and background alike, so they never play twice) and answers false; iOS
@@ -125,6 +128,8 @@ class RecordingRestAlerts : RestAlerts {
 
     override suspend fun notificationsAllowed() = allowed
     override fun allowNotifications() { allowRequests++ }
+    var settingsOpened = 0
+    override fun openNotificationSettings() { settingsOpened++ }
 
     /** What [appPlaysTicks] answers. */
     var appPlays = false

@@ -1260,6 +1260,16 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   - Behoben: Der Einstellungs-Hinweis hat auf iOS einen eigenen Text, denn dort gibt es nur die Meldung zum Pausenende.
   - Bewusst offen: Ändert man mitten im Training Sprache, Einheit oder Vibration, wird die Benachrichtigung erst bei der nächsten Änderung neu gezeichnet. Das ist selten, und wer die Einstellung ändert, hat die App ohnehin offen.
 
+## Ohne Rahmen, schwebende Knöpfe (7.11.)
+- Alle Rahmen entfernt (Panel, Block, Felder, Chips, Bildvorschau, Schalter aus, leere Checkbox/Kreis, Tag „heute“, Foto-Auswahl, Coach-Karten). Abgrenzung nur durch Flächen: `surface` auf Schwarz, verschachtelt `surfacePressed`. Panel-Zeilen bleiben durch 1 dp schwarze Lücke getrennt (Lesbarkeit). Auswahl im Kalender/Coach: gefüllte Fläche bzw. Tönung + Häkchen statt Rahmen. Ausnahme: das Sauna-Ring-Symbol (Zeichen, kein Rahmen).
+- `Screen`-Footer (scroll=true) schwebt über dem Inhalt: kein Balken, nur ein weicher Verlauf (0 → 85 % Schwarz) unter dem Knopf; Scrollinhalt hat am Ende Platz in Footer-Höhe. Nicht scrollende Screens (Chat, laufendes Training) behalten ihre feste Fußzeile.
+- Hauptknöpfe (alle `PillButton` in Standardhöhe) zentrieren Text + Icon; vorher linksbündig.
+- Zweiter Stift im Vorlagen-Editor neben dem Namen entfernt (Feld ist selbst editierbar). Regel: kein Icon ohne Aktion.
+- Profil → Benachrichtigungen „Erlaubt“ öffnet die System-Benachrichtigungseinstellungen (`RestAlerts.openNotificationSettings`). „Genaue Alarme“ zeigt die Zeile nur, wenn nicht erlaubt, und öffnet dann schon die Einstellung.
+- Coach-Story: „Seite N von 4“ nicht mehr sichtbar (Ansage per contentDescription der Balken bleibt); die letzte Seite läuft 6 s durch und schließt dann wie mit X.
+- Einstellungen → Benachrichtigungen: lange Erklärtexte (Ticken, Trainings-Benachrichtigung) samt Strings entfernt; kurze Warnhinweise bei verweigerter Erlaubnis bleiben.
+- `NoBordersTest` verhindert `.border(`/`BorderStroke`/`.shadow(` in `shared/.../ui` (Ausnahme Sauna-Ring-Symbol).
+- Nicht scrollende Screens mit Fußzeile (laufendes Training, Chat) behalten die feste Fußzeile.
 ## Letzte Werte im Workout, Trainings umbenennen (7.11.)
 - **Auftrag (Fabian):** Im Workout beim Antippen einer Übung die Werte vom letzten Mal sehen; vergangene Trainings (auch „Direkt starten“) umbenennen können.
 - **Letzte Werte – Aufklappen statt Detailseite:** Tipp auf die Übungskarte in der Workout-Ansicht (`WorkoutPlanScreen`) klappt sie auf (Pfeil rechts zeigt den Zustand), Tipp aufs Bild öffnet wie bisher die Übungsdetails. Fabians Wortlaut („tippe drauf, dann möchte ich dort … sehen“) spricht für die Anzeige an Ort und Stelle; mehrere Karten können offen sein (zum Vergleichen). Inhalt: „Letztes Mal · Datum“ und je Satz „Satz n – Wert“ im Format des laufenden Trainings (`WorkoutFormat.values`: Gewicht × Wdh., Zeit, Gewicht · Zeit je Tracking-Typ). Die Plan-Zielwerte bleiben in der Kopfzeile darüber.

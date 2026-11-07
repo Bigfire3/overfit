@@ -299,7 +299,7 @@ private fun DayCell(
         Modifier
             .fillMaxWidth()
             .aspectRatio(0.62f)
-            .then(if (isToday) Modifier.border(1.dp, Theme.colors.foreground, shape) else Modifier)
+            .then(if (isToday) Modifier.background(Theme.colors.surfacePressed, shape) else Modifier)
             .padding(2.dp)
             .semantics { contentDescription = desc }
             .then(if (if (selecting) photo != null else tappable) Modifier.clickable { onDay(date, day) } else Modifier),
@@ -319,7 +319,7 @@ private fun DayCell(
                     Modifier.align(Alignment.BottomEnd).padding(4.dp).size(20.dp).background(Theme.colors.inverseBackground, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) { Text(p.photoCount(n), style = Theme.type.caption, tone = Tone.Inverse) }
-                if (selecting && picked) Box(Modifier.fillMaxSize().border(2.dp, Theme.colors.foreground, shape))
+                if (selecting && picked) Box(Modifier.fillMaxSize().background(Theme.colors.foreground.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) { LineIcon(Icon.Check, size = 24.dp) }
                 // Photo and workout on the same day: the photo wins, a small dot keeps the workout visible.
                 if (training) Row(Modifier.align(Alignment.TopStart).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     Box(Modifier.size(10.dp).background(Theme.colors.inverseBackground, CircleShape))

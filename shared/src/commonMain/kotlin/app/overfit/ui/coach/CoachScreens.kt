@@ -521,7 +521,7 @@ private fun ChangeRow(change: PlanChange, unit: WeightUnit, language: Language, 
             if (enabled) {
                 Spacer(Modifier.width(Space.m))
                 if (checked) LineIcon(Icon.Check)
-                else Box(Modifier.size(20.dp).border(1.dp, Theme.colors.muted, CircleShape))
+                else Box(Modifier.size(20.dp).background(Theme.colors.surfacePressed, CircleShape))
             }
         }
     }

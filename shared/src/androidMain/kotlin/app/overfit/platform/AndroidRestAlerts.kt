@@ -126,7 +126,7 @@ class AndroidRestAlerts(
         if (!granted && asked != 0L && android.os.SystemClock.elapsedRealtime() - asked < NO_DIALOG_MS) openNotificationSettings()
     }
 
-    private fun openNotificationSettings() {
+    override fun openNotificationSettings() {
         val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

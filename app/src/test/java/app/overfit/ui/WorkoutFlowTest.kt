@@ -17,6 +17,9 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.performTouchInput
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.ai.Providers
@@ -145,7 +148,10 @@ class WorkoutFlowTest {
         compose.onNodeWithText("Sauna").performScrollTo().assertIsOn().performClick()
         compose.onNodeWithText("Sauna").assertIsOff()
         compose.onNodeWithContentDescription("Gewicht Satz 1").performScrollTo().performTextReplacement("62,5")
-        compose.onNodeWithText("Satz hinzufügen").performScrollTo().performClick()
+        // The main button floats over the content: scroll the target clear of it before tapping.
+        compose.onNodeWithText("Satz hinzufügen").performScrollTo()
+        compose.onRoot().performTouchInput { swipeUp(startY = height * 0.6f, endY = height * 0.4f) }
+        compose.onNodeWithText("Satz hinzufügen").performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Gewicht Satz 3")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Speichern").performClick()
         compose.waitUntilState(5_000) { runBlocking { data.workouts.getFinished(id)?.sauna } == false }

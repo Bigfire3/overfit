@@ -131,7 +131,7 @@ fun SettingsScreen(
 
         PanelSection(t.notifications) {
             when (notificationsAllowed) {
-                true -> ListRow(t.notificationsPermission, t.notificationsAllowed)
+                true -> ListRow(t.notificationsPermission, t.notificationsAllowed, onClick = restAlerts::openNotificationSettings)
                 false -> ListRow(t.notificationsPermission, t.exactAlarmAllow, onClick = restAlerts::allowNotifications)
                 null -> Unit
             }
@@ -143,8 +143,6 @@ fun SettingsScreen(
         }
         if (notificationsAllowed == false) Hint(t.notificationsDeniedHint)
         if (exactAllowed == false) Hint(t.exactAlarmHint)
-        Hint(t.restTicksHint)
-        Hint(if (restAlerts.workoutNotification) t.notificationsInfo else t.notificationsInfoRestEnd)
 
         // Everything about the coach and AI access lives in the Coach tab; here only the link (and Fuel, the wallet).
         val hub = app.overfit.i18n.LocalCoachStrings.current.hub
