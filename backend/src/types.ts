@@ -2,10 +2,15 @@ export interface Env {
   DB: D1Database;
   /** R2-Bucket für freigegebene Körperfotos (KI-Chat-Verbindung), verschlüsselt abgelegt. */
   PHOTOS: R2Bucket;
-  /** Cloudflare-AI-Binding, nur für die AI-Gateway-URL (`getUrl`). Fehlt im lokalen Dev und in Tests ohne Mock. */
+  /** Cloudflare-AI-Binding: Workers AI (`run`) und AI-Gateway-URLs (`getUrl`). Fehlt im lokalen Dev und in Tests ohne Mock. */
   AI?: AiBinding;
-  // Secrets (Pflicht: ANTHROPIC_API_KEY, alle Guthaben-Stufen sind Claude)
+  // KI-Schlüssel je Anbieter (welche nötig sind, hängt von der Voreinstellung in llm-routing.jsonc ab)
   ANTHROPIC_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  GEMINI_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
+  /** Voreinstellung aus llm-routing.jsonc (claude, openai, gemini, gratis, gemischt, …); leer = `default` der Datei. */
+  LLM_PRESET?: string;
   /** Hauptschlüssel für die Verschlüsselung der KI-Chat-Daten (≥ 32 zufällige Bytes, Base64url). */
   SYNC_ENCRYPTION_KEY?: string;
   GOOGLE_PLAY_SERVICE_ACCOUNT?: string;
@@ -37,7 +42,11 @@ export interface Env {
   /** JSON {"web.5": {"priceMicro": 5000000}, …}; Guthaben = Preis (1:1). */
   WEB_PACKAGES?: string;
   WEB_LINK_TTL_SEC?: string;
+  /** Nur Tests/lokal: andere API-Basis je Anbieter. */
   ANTHROPIC_BASE_URL?: string;
+  OPENAI_BASE_URL?: string;
+  GEMINI_BASE_URL?: string;
+  OPENROUTER_BASE_URL?: string;
   /** Name des Cloudflare AI Gateways; leer = Anbieter direkt (lokal). Setzt der Deploy-Workflow. */
   AI_GATEWAY_ID?: string;
   /** Token für ein authentifiziertes AI Gateway (`cf-aig-authorization`); ohne Token gehen Anfragen direkt an Anthropic. */

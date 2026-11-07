@@ -3,6 +3,9 @@ package app.overfit.fuel
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Wire models of the credit backend (docs/backend-api.md). All amounts are integer µ€. Credit never expires. Fields an
@@ -32,6 +35,8 @@ data class LedgerEntry(
     val outputTokens: Long = 0,
     /** A replacement model answered (the price of the chosen model, [tier], was charged). */
     val fallback: Boolean = false,
+    /** Model ID that was chosen (and charged) on a fallback, if the server sends it; else derived from [tier]. */
+    val requestedModel: String? = null,
     /** Where credit came from: null = store/internal, `web` = bought on the web page, `code` = redeemed credit code. */
     val source: String? = null,
     /** paid | gifted | used | refunded | expired (from the server; computed locally for old backends). */
@@ -94,6 +99,10 @@ data class FuelPackage(val productId: String, val priceMicro: Long, val creditMi
 @Serializable
 data class TierPrice(@SerialName("in") val input: Long = 0, val out: Long = 0, val cacheRead: Long = 0, val cacheWrite: Long = 0)
 
+/** Name of a model as the server sends it (`/v1/config` → `modelNames`, a tier's `fallback`). */
+@Serializable
+data class ModelName(val model: String = "", val displayName: String = "", val vendor: String = "")
+
 /** One AI tier of the backend (`/v1/config` → `tiers`). */
 @Serializable
 data class FuelTierInfo(
@@ -106,7 +115,21 @@ data class FuelTierInfo(
     val vendor: String = "",
     /** Typical thinking tokens per coach request (counted as output), only for the cost estimate. */
     val thinkingTokens: Int = 0,
+    /**
+     * Replacement model when [model] fails. New backends send `{model, displayName, vendor}`, old ones a tier name
+     * (string) – kept raw so neither shape breaks parsing; read it through [fallbackModel].
+     */
+    val fallback: JsonElement? = null,
+    /** Upstream API of the tier: anthropic | openai | gemini | workers-ai | openrouter (empty = old backend). */
+    val provider: String = "",
 ) {
+    /** The fallback as a model name (null for an old backend's tier name or no fallback). */
+    val fallbackModel: ModelName?
+        get() = (fallback as? JsonObject)?.let { o ->
+            fun str(key: String) = runCatching { o[key]?.jsonPrimitive?.contentOrNull }.getOrNull().orEmpty()
+            ModelName(str("model"), str("displayName"), str("vendor")).takeIf { it.model.isNotEmpty() }
+        }
+
     /** "Gemini 3.6 Flash (Google)"; falls back to the known names of the model ID. */
     val label: String get() = if (displayName.isNotEmpty()) "$displayName ($vendor)" else modelLabel(model)
 }
@@ -150,12 +173,16 @@ data class FuelConfig(
     val markupBp: Int = 0,
     val maxTokensCap: Int = 8192,
     val defaultTier: String = "standard",
+    /** Provider preset the server runs (e.g. `claude`, `openai`); empty = old backend. Informational only. */
+    val preset: String = "",
     /** standard | pro | lite → availability and price. Empty = old backend (only the model `claude-sonnet-5-5`). */
     val tiers: Map<String, FuelTierInfo> = emptyMap(),
     /** coach | chat | autofill → typical tokens, for the cost estimate. Empty = old backend. */
     val usageProfiles: Map<String, UsageProfile> = emptyMap(),
     val packages: List<FuelPackage> = emptyList(),
     val webPurchase: WebPurchaseConfig = WebPurchaseConfig(),
+    /** Model ID → name of every model the server knows (also retired ones, for old bookings). Empty = old backend. */
+    val modelNames: Map<String, ModelName> = emptyMap(),
 )
 
 @Serializable
@@ -174,6 +201,13 @@ data class FuelMessageResult(
     val requestId: Long? = null,
     /** Why the chosen model did not answer on a fallback ("HTTP 529: Overloaded"); not charged. */
     val fallbackReason: String? = null,
+    /** Names the server sent for [servedModel] / [chosenModel] (null with an old backend). */
+    val servedModelName: String? = null,
+    val servedVendor: String? = null,
+    val chosenModelName: String? = null,
+    val chosenVendor: String? = null,
+    /** Upstream API that answered: anthropic | openai | gemini | workers-ai | openrouter (null with an old backend). */
+    val provider: String? = null,
 )
 
 /** Error from the backend or on the way there. [code] is the API error code (or a local one like "network"). */

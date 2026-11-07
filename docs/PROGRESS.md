@@ -1213,3 +1213,14 @@ Offen / Hinweise:
 4. Weiter-Taste springt wie bisher zum nächsten Feld (Cursor am Ende), Fertig und Tipp daneben schließen die Tastatur
 5. Workout → Stift → Bearbeiten und Kalender → Training → Stift: Felder ebenso leicht hervorgehoben, Cursor am Ende
 
+
+## Session BC – KI-Anbieter umschaltbar (7.11.)
+- Erledigt: Guthaben-Stufen (günstig/normal/stark) können jetzt von Anthropic, OpenAI, Google Gemini, Cloudflare Workers AI oder OpenRouter beantwortet werden. Umschalten ohne Code über die Auswahlliste „KI-Anbieter“ im Workflow „Backend deployen“ (Voreinstellungen `claude`, `openai`, `gemini`, `gratis`, `gemischt`, `openrouter` in `backend/llm-routing.jsonc`). Ausweichen auch über Anbietergrenzen, bezahlt wird das günstigere Modell; Protokoll und Buchungen nennen den Anbieter. Die App zeigt Modellnamen und Kosten aus dem Server und merkt sich die letzte Antwort für offline. Anleitung: docs/anbieter-umstellen.md, Details in docs/DECISIONS.md.
+- Offen (Geld): Preis für `gratis` (Nutzer zahlen den Workers-AI-Listenpreis), OpenAI-/Workers-AI-Preise vor Produktion prüfen.
+
+### Bitte auf dem Handy testen (KI-Anbieter)
+1. Neue APK installieren → Coach → Einstellungen → Modell (Guthaben): drei Modelle mit Namen „Claude Haiku 5.5 (Anthropic)“, „Claude Sonnet 5.5 (Anthropic)“, „Claude Opus 5.5 (Anthropic)“ und Kosten je Auswertung, wie bisher
+2. Training beenden → Coach-Auswertung über Guthaben: läuft wie bisher; Profil → Guthaben → Abrechnung: Eintrag mit Modell und Betrag
+3. Optional umschalten: GitHub-App → Actions → „Backend deployen“ → Run workflow → mode `test`, KI-Anbieter `gratis` → nach dem Lauf in der App (App neu starten) zeigt die Modellwahl „Llama 4 Scout (Cloudflare)“; eine Auswertung ohne Foto kommt von Llama, mit Foto antwortet Claude Haiku („Ausweich-Modell“ im Hinweis). Danach wieder `claude` wählen
+4. Flugmodus an, App neu starten → Coach-Einstellungen zeigen weiter die zuletzt geladenen Modellnamen
+5. Mit eigenem API-Schlüssel: nichts ändert sich

@@ -13,7 +13,8 @@ import {
   setProfile,
 } from './account';
 import { handleMessages } from './messages';
-import { DEFAULT_TIER, TIER_NAMES, TIERS, USAGE_PROFILES, tierAvailable } from './providers';
+import { DEFAULT_TIER, TIER_NAMES, USAGE_PROFILES, modelNames } from './providers';
+import { routes } from './routing';
 import { requestsPage } from './requests';
 import { handleAdminCredit, handleAdminUsage } from './admin';
 import { handleVerifyPurchase } from './purchases';
@@ -91,6 +92,7 @@ const CHAT_ROUTES = ['/v1/chat', '/v1/chat/enable', '/v1/chat/disable', '/v1/cha
 const PHOTO_ROUTE = /^\/v1\/chat\/photos\/([A-Za-z0-9_.:-]{1,80})$/;
 
 function publicConfig(env: Env, cfg: Config) {
+  const r = routes(env);
   return {
     /** `test` = Testbetrieb (keine Geräteprüfung, Test-Guthaben); die App zeigt dann einen Hinweis. */
     mode: cfg.testMode ? 'test' : 'production',
@@ -99,24 +101,32 @@ function publicConfig(env: Env, cfg: Config) {
     markupBp: cfg.markupBp,
     models: Object.fromEntries(Object.entries(cfg.prices).map(([m, p]) => [m, p])),
     maxTokensCap: cfg.maxTokensCap,
-    /** KI-Stufen: die App schickt den Namen als `model`; Preise in µ€/MTok ohne Aufschlag. */
+    /** KI-Stufen: die App schickt den Namen als `model`; Preise in µ€/MTok ohne Aufschlag. Welche Modelle dahinter stecken, steht in llm-routing.jsonc. */
     defaultTier: DEFAULT_TIER,
+    preset: r.preset.name,
     tiers: Object.fromEntries(
-      TIER_NAMES.map((t) => [
-        t,
-        {
-          available: tierAvailable(env, t),
-          model: TIERS[t].model,
-          displayName: TIERS[t].displayName,
-          vendor: TIERS[t].vendor,
-          label: `${TIERS[t].displayName} (${TIERS[t].vendor})`,
-          thinkingTokens: TIERS[t].thinkingTokens,
-          images: TIERS[t].images,
-          fallback: TIERS[t].fallback,
-          price: cfg.prices[TIERS[t].model],
-        },
-      ]),
+      TIER_NAMES.map((t) => {
+        const { primary: m, fallback: fb } = r.tiers[t];
+        return [
+          t,
+          {
+            available: !!m,
+            model: m?.id ?? '',
+            provider: m?.provider ?? '',
+            displayName: m?.displayName ?? '',
+            vendor: m?.vendor ?? '',
+            label: m ? `${m.displayName} (${m.vendor})` : '',
+            thinkingTokens: m?.thinkingTokens ?? 0,
+            images: !!m && (m.images || !!fb?.images),
+            fallback: fb ? { model: fb.id, provider: fb.provider, displayName: fb.displayName, vendor: fb.vendor } : null,
+            // Immer ein Preisobjekt: ältere Apps lesen `price` nicht nullable.
+            price: m ? cfg.prices[m.id] : { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 },
+          },
+        ];
+      }),
     ),
+    /** Namen aller bekannten Modelle (auch früherer), damit die App Protokoll und Buchungen benennen kann. */
+    modelNames: modelNames(),
     /** Typische Token-Mengen je Aufgabe (gemessen, DECISIONS.md „Kostenschätzung“) für die Kostenanzeige der App. */
     usageProfiles: USAGE_PROFILES,
     packages: Object.entries(cfg.packages).map(([productId, p]) => ({

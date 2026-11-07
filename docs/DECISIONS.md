@@ -1399,3 +1399,59 @@ Heckmeck. Entferne das mal komplett aus der App. Da soll nichts mehr zu finden s
 - **Ganze Zeile grün:** Ein abgehakter Satz im laufenden Training (und beim nachträglichen Bearbeiten, gleiche Komponente `WorkoutSetRow`) füllt die ganze Zeile mit `Colors.confirmFill` (Fabian: „gesamte Zeile grün“). Der Haken-Kreis ist darauf hellgrün durchscheinend mit weißem Haken statt eigenem Grün; Nummer und Werte weiß. Vorgabewerte (Platzhalter) auf Grün in Weiß 70 % statt Grau. Ausnahme vom Schwarz-Weiß-Prinzip, da Grün = abgeschlossen (wie „Beenden“).
 - **Felder hervorgehoben:** neues Token `Colors.inputFill` = Weiß 12 % (durchscheinend), damit das Feld auf jeder Zeilenfläche (grau `surfacePressed` oder grün) etwas heller ist. Vorher hatten Feld und Zeile dieselbe Farbe und das Feld war unsichtbar. Gilt zentral in `SetField`, also im Training, im Workout-Editor und beim nachträglichen Bearbeiten. Offene Zeilen bleiben `surfacePressed` im `surface`-Block (wie bisher; das Briefing nannte „surface“, die Zeile liegt aber in einem `surface`-Block und wäre dann unsichtbar). Kein Rand.
 - **Cursor ans Ende:** `SetField` hält intern ein `TextFieldValue`. Bei Fokusgewinn (Tipp oder Weiter) setzt ein `LaunchedEffect(focused)` den Cursor ans Textende. Der Effekt läuft nach dem Tipp, der den Cursor an die Tippstelle setzt, überschreibt ihn also zuverlässig. Ein weiterer Tipp in das schon fokussierte Feld setzt den Cursor normal (Korrektur in der Mitte bleibt möglich). Andere Textfelder (Name, Notizen, Einstellungen) sind unverändert, da es um die Satz-Eingabe ging.
+
+## Anbieter umschaltbar: Routing-Tabelle statt fester Claude-Stufen (7.11.2026)
+Fabian: „Ich möchte im Backend einfach zwischen den LLM Providern umstellen können.“ Ohne Codeänderung, auch vom Handy.
+- **Eine Datei, `backend/llm-routing.jsonc`:** `models` (Modell-ID → Anbieter, Anzeigename, Anbietername, Bilder ja/nein, „denkt mit“,
+  Preise in USD/MTok mit optionalem `since`, Wechselkurs `usdToEur`) und `presets` (Stufe → Modell + Ausweich-Modell). Voreinstellungen:
+  `claude` (Standard, bisheriger Stand), `openai`, `gemini`, `gratis` (Workers AI), `gemischt`, `openrouter`. Modell-Katalog und Zuordnung
+  getrennt, damit jeder Preis nur einmal steht. JSONC mit ganzen Kommentarzeilen (wie `wrangler.jsonc`), damit die Datei für Fabian
+  erklärt ist; `scripts/build-routing.mjs` erzeugt daraus `src/routing.gen.json` automatisch vor Test, Typprüfung, Dev und Deploy (nicht
+  eingecheckt, so kann eine Bearbeitung im Browser nie eine veraltete Kopie hinterlassen). `parseRouting` prüft alles und meldet alle
+  Fehler auf einmal; ein Fehler bricht Tests und Deploy ab, nie still zur Laufzeit.
+- **Umschalten:** Workflow „Backend deployen“ hat die Auswahlliste „KI-Anbieter“ (`wie-bisher` + alle Voreinstellungen), in der
+  GitHub-App bedienbar. Die Wahl wird im Worker als Secret `LLM_PRESET` gespeichert, nicht als Variable: Variablen überschreibt jeder
+  Deploy, ein automatischer Deploy nach einem Merge würde die Wahl sonst zurückdrehen. Reihenfolge: Auswahl → Repo-Variable
+  `LLM_PRESET` → im Worker gespeichert → `default` der Datei. Verworfen: Umschalten zur Laufzeit über einen Admin-Endpunkt (bräuchte
+  ein Geheimnis auf dem Handy und eine eigene Oberfläche; der Workflow-Knopf existiert schon).
+- **Fehlender Schlüssel:** Eine Voreinstellung ist vollständig, wenn das erste Modell jeder Stufe einen Schlüssel hat (Workers AI immer,
+  über das Binding). Unvollständig → Worker nimmt die erste vollständige aus `fallbackOrder` (`/v1/config.preset` zeigt die wirksame),
+  der Deploy schreibt eine gelbe Warnung mit dem fehlenden Secret-Namen; keine vollständige → Deploy bricht mit Anleitung ab. Die
+  Regel steht doppelt (Worker `src/routing.ts`, Deploy `scripts/deploy-secrets.mjs`), ein Test vergleicht beide für alle 16
+  Schlüssel-Kombinationen × alle Voreinstellungen. Ohne jeden Schlüssel bleibt `gratis` (Workers AI) übrig: lieber ein kostenloses
+  Modell mit Warnung als ein Server ohne KI.
+- **Adapter (`src/providers.ts`):** Anthropic (Body durchgereicht wie bisher), OpenAI und OpenRouter (Chat Completions: System als
+  `developer`/`system`, Bilder als Data-URL, Structured Output über `response_format` json_schema mit `strict: false`, weil das
+  App-Schema nicht alle strict-Regeln erfüllt; GPT-5 mit `max_completion_tokens` und `reasoning_effort`, ohne Temperatur), Gemini
+  (aus der Git-Historie vor 573c0ab zurückgeholt: generateContent, `responseJsonSchema`, Denk-Token als Ausgabe), Workers AI (Binding,
+  nur Text, JSON-Modus; Gateway nur mit `AI_GATEWAY_TOKEN` wie bei den anderen). Antwort immer Anthropic-Format, Token auf
+  Eingabe/Cache-Lesen/Ausgabe umgerechnet. Fehler einheitlich `UpstreamError` (Ausfall: Netzwerk, Zeit, 5xx, 429, 408, 401, 403 →
+  Ausweichen; sonst Ablehnung). „Denkende“ Modelle bekommen den doppelten Ausgabe-Raum (wie früher Gemini).
+- **Abrechnung:** unverändert aus den echten Token, Preis des antwortenden Modells, Aufschlag `MARKUP_BP`; beim Ausweichen (einmal,
+  auch über Anbietergrenzen) das günstigere von Stufen-Modell und antwortendem Modell. Die Reserve deckt den größten Ausgabe-Raum
+  beider Kandidaten zum Preis der Stufe. Kann das Stufen-Modell keine Fotos (Workers AI), antwortet bei Foto-Anfragen gleich das
+  Ausweich-Modell (Protokoll: Ausweichen, Grund „keine Bilder“), bezahlt wird ebenso das günstigere; kann es keins, `400 images_not_supported`.
+  Protokoll `requests` speichert `requested_provider` und `provider` (D1-Migration 0010). `servedTier` bleibt für alte Apps erhalten.
+- **App:** Namen und Preise kommen aus `/v1/config` (`tiers`, neu `preset`, `provider`, `fallback` als Objekt, `modelNames` für alle
+  bekannten Modelle); die letzte Antwort wird gespeichert und genutzt, wenn der Server nicht erreichbar ist. Die feste Namenstabelle
+  bleibt nur als letzter Rückfall. Mit eigenem Schlüssel ändert sich nichts (`OwnKeyPrivacyTest`).
+- **Preise (Stand 7.11., vor Produktion prüfen):** OpenAI GPT-5 mini 0,25 $/2 $ (Cache 0,025 $), GPT-5 1,25 $/10 $ (Cache 0,125 $),
+  laut developers.openai.com; Workers AI Llama 4 Scout 0,27 $/0,85 $ laut Cloudflare-Preisseite; Gemini und Llama 3.3 wie früher.
+  OpenRouter mit den Anthropic-Listenpreisen (OpenRouter selbst nimmt eine Gebühr beim Aufladen, die trägt die Marge).
+- **Offen (Geld, für Fabian):** (1) `gratis` berechnet Nutzern den Workers-AI-Listenpreis, obwohl der Betreiber bis 10 000 Neurons/Tag
+  nichts zahlt; Preis 0 wäre ein Eintrag in der Datei. (2) Ohne Workers-Paid-Tarif liefert Workers AI nach dem Tageskontingent Fehler,
+  dann antwortet das Ausweich-Modell (Haiku, teurer für den Betreiber, Nutzer zahlt den Llama-Preis). (3) `openai` nutzt GPT-5 auch für
+  `pro` (kein eigenes, teureres Modell gewählt; bewusst ohne ungeprüfte Modell-IDs). (4) `gemini` hat nur ein Modell, also kein
+  Ausweichen.
+- **Sonnet-Gegencheck (Befunde und Umgang):**
+  - Behoben: `/v1/config` schickte für eine Stufe ohne bereites Modell `price: null`/`provider: null`; die App (auch ältere) parst beides nicht
+    nullable, die ganze Config wäre gescheitert. Jetzt Nullpreis und leerer String, Test.
+  - Behoben: Ohne Schlüssel blieb wegen `gratis` immer eine „vollständige“ Voreinstellung, der versprochene Abbruch kam nie. Jetzt bricht
+    der **Produktions**-Deploy ab, statt ungefragt auf `gratis` zurückzufallen; im Testbetrieb bleibt der Rückfall mit Warnung. Doku angepasst.
+  - Behoben: HTTP 404 (falsche/abgekündigte Modell-ID in der Datei) und 402 (Anbieter-Konto leer, OpenRouter) gelten jetzt als Ausfall →
+    Ausweichen statt `upstream_rejected` für jeden Nutzer.
+  - Behoben: docs/backend-api.md beschreibt die neuen Felder; Test gleicht die Auswahlliste im Workflow mit den Voreinstellungen ab;
+    Doku sagt deutlich, dass die Repo-Variable eine Listen-Auswahl bei jedem automatischen Deploy überschreibt.
+  - Bewusst so: Die gespeicherte Config hängt nicht an der Backend-URL (Wechsel Test → Produktion ohne Netz zeigt kurz alte Namen/Preise,
+    beim nächsten Laden ersetzt); OpenRouter-Cache-Schreiben wird nicht getrennt gezählt (Overfit schickt dort kein `cache_control`);
+    alte App-Versionen zeigen bei neuen Modellen die Modell-ID statt des Namens (neue App liest `modelNames`).

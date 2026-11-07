@@ -171,10 +171,11 @@ class WebCreditTest {
         showFuel(Distribution.Store)
         waitFor("Code einlösen")
         compose.waitUntilState { requests.contains("GET /v1/config") }
+        // The config answer is rendered (not only requested) before the negatives below mean anything.
+        waitFor("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)")
         compose.waitForIdle()
         assertFalse("store build: no web purchase by default", shown("Im Web aufladen"))
         assertFalse("no web packages either", shown("10,00 € Guthaben · Preis: 10,00 €"))
-        assertTrue("store package with surcharge", shown("5,00 € Guthaben · 6,99 € (inkl. Store-Gebühr)"))
     }
 
     @Test

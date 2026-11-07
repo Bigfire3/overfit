@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client, baseEnv, fund, rawFetch } from './helpers';
 import { costMicro } from '../src/money';
-import { currentPrices, TIERS, type Tier } from '../src/providers';
+import { currentPrices, type Tier } from '../src/providers';
+import { ROUTING } from '../src/routing';
+const TIERS = ROUTING.presets.claude.tiers;
 import { purposeOf } from '../src/requests';
 
 const HAIKU = 'claude-haiku-5-5';
@@ -57,7 +59,7 @@ describe('Anfrage-Protokoll GET /v1/account/requests', () => {
     const e = entries[0];
     expect(r.body.overfit.requestId).toBe(e.id);
     expect(e).toMatchObject({
-      purpose: 'chat', tier: 'standard', status: 'ok', errorCode: null, requestedModel: SONNET, model: SONNET,
+      purpose: 'chat', tier: 'standard', status: 'ok', errorCode: null, requestedModel: SONNET, model: SONNET, requestedProvider: 'anthropic', provider: 'anthropic',
       fallbackFromStatus: null, fallbackReason: null,
       inputTokens: 1200, cacheReadTokens: 300, cacheWriteTokens: 200, outputTokens: 400,
       chargedMicro: at('standard'), gift: false, photo: false, fallback: false,
@@ -83,7 +85,7 @@ describe('Anfrage-Protokoll GET /v1/account/requests', () => {
     for (const s of [SECRET_PROMPT, SECRET_ANSWER, 'R0VIRUlNRVNGT1RP', 'Kniebeuge']) expect(text).not.toContain(s);
     expect(Object.keys(entries[0]).sort()).toEqual(
       ['id', 'ts', 'durationMs', 'purpose', 'tier', 'status', 'errorCode', 'requestedModel', 'model', 'fallbackFromStatus', 'fallbackReason',
-        'inputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'outputTokens', 'chargedMicro', 'gift', 'photo', 'fallback'].sort(),
+        'inputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'outputTokens', 'chargedMicro', 'gift', 'photo', 'fallback', 'requestedProvider', 'provider'].sort(),
     );
     // Auch direkt in der Tabelle keine Inhalte
     const rows = await c.env.DB.prepare('SELECT * FROM requests').all();

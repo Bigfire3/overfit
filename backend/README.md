@@ -20,7 +20,7 @@ npm run dev         # wrangler dev, lokaler D1, DEV_MODE=true
 Für `npm run dev` Secrets lokal in `backend/.dev.vars` (nicht committen):
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...        # alle Guthaben-Stufen (Haiku, Sonnet, Opus 5.5); oder ANTHROPIC_BASE_URL=… mit eigenem Fake
+ANTHROPIC_API_KEY=sk-ant-...        # Voreinstellung claude (Standard); LLM_PRESET=openai + OPENAI_API_KEY usw. für andere; *_BASE_URL=… für Fakes
 PURCHASE_MODE=mock
 ```
 
@@ -52,7 +52,7 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    - **D1 – Edit**
    - **Workers R2 Storage – Edit**
    - **Account Settings – Read**
-   - **Workers AI – Read** (für das AI-Binding, über das die AI-Gateway-URL ermittelt wird; der Workflow prüft das Recht vorab. Workers AI selbst wird nicht aufgerufen, es entstehen dort keine Kosten)
+   - **Workers AI – Read** (für das AI-Binding: Workers AI in der Voreinstellung `gratis` und die AI-Gateway-URL; der Workflow prüft das Recht vorab. Kosten bei Workers AI nur mit `gratis` und nur über 10 000 Neurons/Tag)
    - **AI Gateway – Edit** (AI Gateway anlegen und lesen; „Edit“ schließt „Read“ ein)
 
    Hast du schon einen Token mit den ersten vier Rechten: beim Token auf **Edit** → die zwei Zeilen ergänzen → Update Token. Der Wert
@@ -65,9 +65,11 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
    |---|---|---|
    | `CLOUDFLARE_API_TOKEN` | ja | der Token aus Schritt 5 |
    | `CLOUDFLARE_ACCOUNT_ID` | ja | Account-ID aus Schritt 4 |
-   | `ANTHROPIC_API_KEY` | ja (nur beim ersten Mal, danach merkt sich der Worker ihn) | Anthropic-Key für alle Guthaben-Stufen: Claude Haiku, Sonnet und Opus 5.5 (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit) |
-   | `AI_GATEWAY_TOKEN` | nein | Token fürs Cloudflare AI Gateway (Protokolle/Kosten im Dashboard); ohne geht alles direkt an Anthropic |
-   | `GEMINI_API_KEY` | nein, nicht mehr genutzt | seit 7.11.2026 läuft Guthaben nur über Claude; darf gelöscht werden |
+   | `ANTHROPIC_API_KEY` | für die Voreinstellungen `claude`, `gemischt` (Standard: `claude`) | Anthropic-Key (console.anthropic.com → API Keys; am besten eigener Workspace mit Ausgabenlimit). Nur beim ersten Mal nötig, danach merkt sich der Worker ihn |
+   | `OPENAI_API_KEY` | für `openai` | OpenAI-Key (platform.openai.com → API keys) |
+   | `GEMINI_API_KEY` | für `gemini`, `gemischt` | Google-AI-Studio-Key (aistudio.google.com → Get API key) |
+   | `OPENROUTER_API_KEY` | für `openrouter` | OpenRouter-Key (openrouter.ai → Keys) |
+   | `AI_GATEWAY_TOKEN` | nein | Token fürs Cloudflare AI Gateway (Protokolle/Kosten im Dashboard); ohne geht alles direkt an den Anbieter |
    | `SYNC_ENCRYPTION_KEY` | nein | wird, wenn nicht gesetzt, einmalig zufällig erzeugt und im Worker gespeichert. Nie ändern |
    | `INVITE_SIGNING_KEY`, `PLAY_INTEGRITY_SERVICE_ACCOUNT`, `APPLE_APP_ATTEST_TEAM_ID` | nein, nicht mehr genutzt | Einladungen sind seit 7.11.2026 entfernt; dürfen gelöscht werden |
    | `ADMIN_SECRET` | nein | nur Testbetrieb; sonst bei jedem Lauf neu erzeugt |
@@ -110,7 +112,8 @@ Secrets (im Workflow oder von Hand):
 
    | Secret | Zweck | Nötig für |
    |---|---|---|
-   | `ANTHROPIC_API_KEY` | Anthropic-Key des Betreibers (Workspace mit Ausgabelimit empfohlen) | alle Guthaben-Stufen (Claude Haiku, Sonnet, Opus 5.5) |
+   | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` | KI-Schlüssel des Betreibers je Anbieter (Ausgabelimit empfohlen) | die Voreinstellung in `llm-routing.jsonc` (Workers AI braucht keinen) |
+   | `LLM_PRESET` | gewählte Voreinstellung (setzt der Workflow aus der Auswahlliste; kein Geheimnis, liegt als Secret, damit sie Deploys überdauert) | Guthaben |
    | `AI_GATEWAY_TOKEN` | optional: Token des authentifizierten AI Gateways | Gateway-Protokolle |
    | `SYNC_ENCRYPTION_KEY` | Zufällige 32 Byte als Base64url; verschlüsselt alle KI-Chat-Daten (die OAuth-Anmeldung des MCP-Servers braucht kein eigenes Geheimnis). **Nie ändern** (sonst sind gespeicherte Daten unlesbar; die App lädt dann beim nächsten Sync neu hoch) | KI-Chat |
    | `ADMIN_SECRET` | ≥ 16 Zeichen, nur Testbetrieb (`POST /v1/admin/credit`) | Test-Guthaben |
@@ -246,23 +249,24 @@ Zahlungen nie bloß Test-Guthaben. Zusätzlich ignoriert der Webhook Ereignisse,
 ## KI-Modelle, Preise und AI Gateway
 
 Die Stufen-IDs `standard`, `pro`, `lite` sind nur intern (Protokoll zwischen App und Backend). Nutzer sehen überall die echten
-Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `displayName`, `vendor`, `label` und die Preise.
+Modellnamen samt Anbieter; `GET /v1/config` liefert dafür `preset`, je Stufe `model`, `provider`, `displayName`, `vendor`, `label`,
+`fallback`, die Preise und `modelNames` (Namen aller bekannten Modelle).
 
-| Stufe | Anbieter, Modell | Bilder | Ausweichen bei Ausfall | Listenpreis je MTok (ein / aus) |
-|---|---|---|---|---|
-| `lite` | Anthropic `claude-haiku-5-5` (kurze Anfragen, z. B. „Mit KI ausfüllen“) | ja | → `standard` | 0,10 $ / 0,50 $ |
-| `standard` (Voreinstellung) | Anthropic `claude-sonnet-5-5` (Coach-Auswertung, Chat) | ja | → `lite` | 2 $ / 10 $ |
-| `pro` | Anthropic `claude-opus-5-5` | ja | → `standard` | 4 $ / 20 $ |
+**Welches Modell hinter welcher Stufe steckt, steht in [`llm-routing.jsonc`](llm-routing.jsonc)** (Anleitung ohne Programmieren:
+[docs/anbieter-umstellen.md](../docs/anbieter-umstellen.md)). Dort stehen alle Modelle mit Anbieter, Anzeigename und Preis
+(USD je MTok, Wechselkurs `usdToEur`) und fertige Voreinstellungen: `claude` (Standard: Haiku/Sonnet/Opus 5.5), `openai`,
+`gemini`, `gratis` (Cloudflare Workers AI, Fotos über Claude Haiku), `gemischt`, `openrouter`. Umschalten: Actions → „Backend
+deployen“ → Feld „KI-Anbieter“ (wird im Worker gespeichert) oder Repo-Variable `LLM_PRESET`. Fehlt ein Schlüssel, nimmt der
+Worker die erste vollständige Voreinstellung aus `fallbackOrder`, und der Deploy warnt deutlich; ist keine vollständig, bricht er ab.
+Adapter (`src/providers.ts`): Anthropic (unverändert durchgereicht), OpenAI und OpenRouter (Chat Completions), Gemini
+(generateContent), Workers AI (Binding, nur Text). Die App schickt immer das Anthropic-Format; Antworten kommen immer im
+Anthropic-Format zurück, Token je Anbieter auf Eingabe/Cache/Ausgabe umgerechnet (Denk-Token = Ausgabe). Alte Modell-IDs werden
+auf Stufen abgebildet, alte Buchungen behalten ihren Preis. Nach Änderungen an der Datei `node scripts/build-routing.mjs`
+(der Workflow macht es selbst; `test/routing.test.ts` prüft Gültigkeit und Aktualität).
 
-Cache-Lesen 0,01 $ / 0,20 $ / 0,20 $, Cache-Schreiben 1,25 × Eingabe, Thinking-Token zählen als Ausgabe. Bis 7.11.2026 waren
-`standard` = Gemini 3.6 Flash und `lite` = Llama über Workers AI; alte Modell-IDs werden noch auf die Stufen abgebildet, alte
-Buchungen behalten ihren Preis. Workers AI und Gemini werden nicht mehr aufgerufen.
-
-- Die App schickt das Anthropic-Format mit `model` = Stufe; das Backend bildet es auf den Anbieter ab und antwortet im Anthropic-Format.
-- Preise stehen in `src/providers.ts` (`MODEL_PRICES`, mit Gültig-ab-Datum, Wechselkurs `EUR_PER_USD`). Ändern: Tabelle anpassen
-  und deployen, oder kurzfristig `PRICE_TABLE` setzen.
-- Ausweichen (5xx, 429, Zeitüberschreitung, Netzwerk): berechnet wird höchstens der Preis der angefragten Stufe für die tatsächlich
-  verbrauchten Token; die Differenz trägt die Marge. 401/403 des Anbieters (Schlüssel des Betreibers ungültig) zählt wie ein Ausfall
+- Preise ändern: Zahl in `llm-routing.jsonc` ändern (optional mit `since`-Datum) und deployen, oder kurzfristig `PRICE_TABLE` setzen.
+- Ausweichen (5xx, 429, Zeitüberschreitung, Netzwerk), einmal und auch über Anbietergrenzen: berechnet wird das günstigere von
+  Stufen-Modell und antwortendem Modell für die tatsächlich verbrauchten Token; die Differenz trägt die Marge. 401/403 des Anbieters (Schlüssel des Betreibers ungültig) zählt wie ein Ausfall
   (`502 upstream_unavailable`, Fehlertext in `message`). Andere Ablehnungen (4xx) weichen nicht aus.
 - AI Gateway (kostenlos, nur Protokolle und Kosten-Übersicht): Anfragen laufen nur dann über das Gateway (`getUrl` des Bindings
   `AI`), wenn das Secret `AI_GATEWAY_TOKEN` gesetzt ist: Cloudflare legt neue Gateways seit 2026 immer mit Pflicht-Authentifizierung
@@ -292,7 +296,7 @@ ADMIN_SECRET=… node scripts/usage-report.mjs https://<worker-domain> 2026-11-0
   Refresh-Rotation) · `pages.ts` Anmeldeseite · `sync.ts` Geräte-Endpunkte · `data.ts` Lesen + Kennzahlen · `vault.ts`
   AES-GCM · `catalog.ts` Übungskatalog (`catalog.gen.json` aus dem App-Katalog, neu erzeugen mit `node scripts/build-catalog.mjs`)
 - `src/index.ts` Router · `auth.ts` Signaturprüfung/Replay-Schutz · `ledger.ts` Saldo, Reservierung, Abrechnung ·
-  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `providers.ts` Stufen, Preise, Anbieter-Adapter · `purchases.ts` · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-Prüfer-Schnittstellen)
+  `messages.ts` KI-Proxy (Reservierung, Ausweichen, Abrechnung) · `routing.ts` Routing-Tabelle (llm-routing.jsonc) · `providers.ts` Preise, Anbieter-Adapter · `purchases.ts` · `account.ts` (Konto, Wiederherstellung) · `verifiers.ts` (Store-Prüfer-Schnittstellen)
 - Guthaben als „Posten“ (`lots`): nichts verfällt (seit 7.11.2026, Migration 0009); Verbrauch zuerst Gutschriften, dann Gekauftes. Die
   Tabellen der früheren Einladungen (`invite_tokens_used`, `invite_redemptions`, `review_gifts`) bleiben bestehen, werden aber nicht genutzt. Reservierung =
   ein atomares `INSERT … SELECT … WHERE saldo ≥ betrag` (D1 serialisiert Schreibzugriffe) – parallele Anfragen können nicht überziehen.

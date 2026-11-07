@@ -10,7 +10,12 @@
     "typecheck": "tsc --noEmit",
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply overfit --local",
-    "db:migrate:remote": "wrangler d1 migrations apply overfit --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply overfit --remote",
+    "routing": "node scripts/build-routing.mjs",
+    "predev": "node scripts/build-routing.mjs",
+    "pretest": "node scripts/build-routing.mjs",
+    "pretypecheck": "node scripts/build-routing.mjs",
+    "predeploy": "node scripts/build-routing.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.5.0",

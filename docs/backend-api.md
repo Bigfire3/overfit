@@ -114,9 +114,9 @@ Die Einladungs- und Attestierungs-Fehlercodes (`invite_*`, `challenge_invalid`, 
   "models": { "claude-haiku-5-5": { "in": 92000, "cacheRead": 9200, "cacheWrite": 115000, "out": 460000 }, "claude-sonnet-5-5": { … }, "claude-opus-5-5": { … }, "gemini-3.6-flash": { … } },
   "defaultTier": "standard",
   "tiers": {
-    "standard": { "available": true, "model": "claude-sonnet-5-5", "displayName": "Claude Sonnet 5.5", "vendor": "Anthropic", "label": "Claude Sonnet 5.5 (Anthropic)", "thinkingTokens": 0, "images": true, "fallback": "lite", "price": { … } },
-    "pro": { "available": true, "model": "claude-opus-5-5", "images": true, "fallback": "standard", "price": { … } },
-    "lite": { "available": true, "model": "claude-haiku-5-5", "images": true, "fallback": "standard", "price": { … } }
+    "standard": { "available": true, "model": "claude-sonnet-5-5", "provider": "anthropic", "displayName": "Claude Sonnet 5.5", "vendor": "Anthropic", "label": "Claude Sonnet 5.5 (Anthropic)", "thinkingTokens": 0, "images": true, "fallback": { "model": "claude-haiku-5-5", "provider": "anthropic", "displayName": "Claude Haiku 5.5", "vendor": "Anthropic" }, "price": { … } },
+    "pro": { "available": true, "model": "claude-opus-5-5", "images": true, "fallback": { "model": "claude-sonnet-5-5", … }, "price": { … } },
+    "lite": { "available": true, "model": "claude-haiku-5-5", "images": true, "fallback": { "model": "claude-sonnet-5-5", … }, "price": { … } }
   },
   "usageProfiles": { "coach": { "inputTokens": 8200, "outputTokens": 1400 }, "chat": { "inputTokens": 6700, "outputTokens": 500 }, "autofill": { "inputTokens": 900, "outputTokens": 120 } },
   "packages": [ { "productId": "overfit.fuel.10", "priceMicro": 10000000, "creditMicro": 7870370 } ]
@@ -128,8 +128,11 @@ Buchungstyp `test_credit`, läuft nie ab), niedrige Limits; die App zeigt unter 
 Modellpreise in µ€ je 1 Mio. Token ohne Aufschlag (für Kostenschätzung in der App), jeweils der heute gültige Preis.
 `displayName`/`vendor`/`label`: echter Modellname und Anbieter für die UI (kein Marketingname). `usageProfiles`: typische Token-Mengen je
 Aufgabe (gemessen, docs/DECISIONS.md „Kostenschätzung“); die App rechnet damit aus Preis, Aufschlag und `thinkingTokens` die geschätzten Kosten.
-`tiers.<stufe>.available`: Stufe ist konfiguriert (seit 7.11.2026 alle drei Claude-Stufen genau dann, wenn `ANTHROPIC_API_KEY` gesetzt
-ist; `models` enthält auch die Preise früherer Modelle für alte Buchungen). Die App bietet nur verfügbare Stufen an. `productId` entspricht der Produkt-ID im Play-/App-Store.
+`tiers.<stufe>.available`: Stufe ist konfiguriert. Welche Modelle die Stufen haben, bestimmt die Voreinstellung aus
+`backend/llm-routing.jsonc` (`preset` = die wirksame, z. B. `claude`, `openai`; docs/anbieter-umstellen.md). `provider`: anthropic |
+openai | gemini | workers-ai | openrouter (leer, wenn nicht verfügbar; `price` ist dann ein Nullpreis). `fallback`: Ausweich-Modell
+oder `null` (bis 7.11.2026 ein Stufenname). `modelNames`: `{ "<modell-id>": { displayName, vendor } }` für alle bekannten Modelle,
+auch frühere, damit die App Protokoll und Buchungen benennen kann. `models` enthält auch die Preise früherer Modelle für alte Buchungen. Die App bietet nur verfügbare Stufen an. `productId` entspricht der Produkt-ID im Play-/App-Store.
 
 ### `GET /v1/admin/usage?from=&to=` (inhaltsfreie Nutzung)
 `Authorization: Bearer <ADMIN_SECRET>` (nur mit gesetztem ADMIN_SECRET, auch in Produktion; sonst 404). `from`/`to` ISO-Datum (`to` exklusiv,
@@ -184,7 +187,7 @@ Dasselbe Konto-Objekt liefern `/v1/devices` und `/v1/recovery/restore`.
 Body `{ "displayName": "Fabian" }` (≤ 24 Zeichen, `null` oder `""` löscht). → `{ "displayName": "Fabian" }`. Der Name war für Einladungen gedacht; seit deren Entfernung (7.11.2026) nutzt die App ihn nicht mehr.
 
 ### `GET /v1/account/ledger?limit=50&before=<id>`
-`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|code_redeem|test_credit|refund|chargeback", "category": "used", "reviews": null, "amountMicro": -6956, "model": "claude-sonnet-5-5", "tier": "standard", "fallback": false, "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv. Alte Konten können noch Buchungen der früheren Typen `invite_bonus`, `invite_reward`, `invite_expired` und ein `reviews`-Feld (geschenkte Auswertungen) haben; die App zeigt sie neutral als Gutschrift bzw. Ausbuchung. `category`: `paid` | `gifted` | `used` | `refunded` | `expired`. Bei `usage`: `model` = tatsächlich genutztes Modell, `tier` = angefragte und abgerechnete Stufe (alte Buchungen: `null`).
+`limit` 1–200. → `{ "entries": [ { "id": 12, "ts": 1762128000, "type": "usage|purchase|code_redeem|test_credit|refund|chargeback", "category": "used", "reviews": null, "amountMicro": -6956, "model": "claude-sonnet-5-5", "tier": "standard", "fallback": false, "requestedModel": "claude-sonnet-5-5", "inputTokens": 1000, "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 500 } ], "next": 12 }` (neueste zuerst; `next` = `before` für die nächste Seite, `null` am Ende). Verbrauch negativ, Gutschrift positiv. Alte Konten können noch Buchungen der früheren Typen `invite_bonus`, `invite_reward`, `invite_expired` und ein `reviews`-Feld (geschenkte Auswertungen) haben; die App zeigt sie neutral als Gutschrift bzw. Ausbuchung. `category`: `paid` | `gifted` | `used` | `refunded` | `expired`. Bei `usage`: `model` = tatsächlich genutztes Modell, `requestedModel` = Modell der Stufe (seit 7.11.2026, vorher `null`), `tier` = angefragte und abgerechnete Stufe (alte Buchungen: `null`).
 
 ## Wiederherstellungscode (Umzug aufs neue Handy)
 
@@ -222,7 +225,7 @@ Antwort `200`: Anthropic-Format (`content`, `stop_reason` mit `end_turn` | `max_
 **plus** Feld `overfit`:
 ```json
 { "id": "msg_…", "model": "claude-sonnet-5-5", "content": [ … ], "stop_reason": "end_turn", "usage": { … },
-  "overfit": { "costMicro": 2320, "balanceMicro": 997680, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "claude-sonnet-5-5", "modelName": "Claude Sonnet 5.5", "vendor": "Anthropic", "requestedModel": "claude-sonnet-5-5", "requestedModelName": "Claude Sonnet 5.5", "requestedVendor": "Anthropic", "fallback": false, "fallbackReason": null, "purpose": "review", "requestId": 17 } }
+  "overfit": { "costMicro": 2320, "balanceMicro": 997680, "currency": "EUR", "tier": "standard", "servedTier": "standard", "model": "claude-sonnet-5-5", "modelName": "Claude Sonnet 5.5", "vendor": "Anthropic", "provider": "anthropic", "requestedModel": "claude-sonnet-5-5", "requestedModelName": "Claude Sonnet 5.5", "requestedVendor": "Anthropic", "requestedProvider": "anthropic", "fallback": false, "fallbackReason": null, "purpose": "review", "requestId": 17 } }
 ```
 `requestId` = Eintrag im Anfrage-Protokoll (unten); `fallbackReason` = warum das gewählte Modell nicht antwortete (`"HTTP 529: Overloaded"`, nicht berechnet). Fehlerantworten nach der Prüfung des Bodys (`insufficient_funds`, `upstream_*`) tragen `details.requestId`. Dazu Header `X-Overfit-Cost-Micro`, `X-Overfit-Balance-Micro`. Die App zeigt „Guthaben · 7,86 €“ und die Kosten der Auswertung daraus. Bilder
 werden bei der Reservierung pauschal (3000 Token je Bild) gezählt, nicht nach Base64-Länge. Zeitlimit je Anbieter 100 s, für die ganze
@@ -232,10 +235,10 @@ Anfrage samt Ausweichen 140 s. Anfragen mit Bildern bekommen `cf-aig-collect-log
 Jede Anfrage an `/v1/messages` nach der Prüfung des Bodys, auch fehlgeschlagene (`insufficient_funds`, Anbieter-Fehler), neueste zuerst.
 Nur Metadaten, nie Prompt, Antwort oder Foto. `limit` 1–200. → `{ "entries": [ { "id": 17, "ts": 1762534000, "durationMs": 3968,
 "purpose": "review", "tier": "standard", "status": "ok" | "failed", "errorCode": null, "requestedModel": "claude-sonnet-5-5",
-"model": "claude-sonnet-5-5", "fallback": false, "fallbackFromStatus": null, "fallbackReason": null, "inputTokens": 280,
+"model": "claude-sonnet-5-5", "requestedProvider": "anthropic", "provider": "anthropic", "fallback": false, "fallbackFromStatus": null, "fallbackReason": null, "inputTokens": 280,
 "cacheReadTokens": 0, "cacheWriteTokens": 0, "outputTokens": 141, "chargedMicro": 2320, "gift": false, "photo": false } ], "next": null }`. `gift` ist seit 7.11.2026 immer `false` (früher: geschenkte Auswertung).
 Beim Ausweichen: `requestedModel` = zuerst versuchtes Modell (nicht berechnet), `model` = Modell, das geantwortet hat (berechnet),
-`fallbackFromStatus`/`fallbackReason` = Ausfall des ersten Versuchs. Bei `failed` steht in `fallbackReason` der Fehlertext des letzten
+`fallbackFromStatus`/`fallbackReason` = Ausfall des ersten Versuchs (`"keine Bilder"`: Foto-Anfrage ging gleich an das Ausweich-Modell). Berechnet wird das günstigere der beiden Modelle. Bei `failed` steht in `fallbackReason` der Fehlertext des letzten
 Versuchs. Zieht beim Kontoumzug (`/v1/recovery/restore`) mit. Die App zeigt die Liste unter Profil → Guthaben → „Abrechnung“.
 
 ## Kauf

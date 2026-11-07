@@ -18,7 +18,9 @@ export interface RequestLog {
   status: 'ok' | 'failed';
   errorCode?: string | null;
   requestedModel: string;
+  requestedProvider?: string | null;
   model?: string | null;
+  provider?: string | null;
   fallbackFromStatus?: number | null;
   fallbackReason?: string | null;
   input?: number;
@@ -35,13 +37,15 @@ export async function logRequest(env: Env, r: RequestLog): Promise<number | null
   try {
     const res = await env.DB.prepare(
       `INSERT INTO requests (account_id, ts, duration_ms, purpose, tier, status, error_code, requested_model, model,
-         fallback_from_status, fallback_reason, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, charged_micro, gift, photo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         fallback_from_status, fallback_reason, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, charged_micro, gift, photo,
+         requested_provider, provider)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         r.accountId, r.ts, r.durationMs, r.purpose, r.tier, r.status, r.errorCode ?? null, r.requestedModel, r.model ?? null,
         r.fallbackFromStatus ?? null, r.fallbackReason ? r.fallbackReason.slice(0, 200) : null,
         r.input ?? 0, r.cacheRead ?? 0, r.cacheWrite ?? 0, r.output ?? 0, r.chargedMicro ?? 0, r.gift ? 1 : 0, r.photo ? 1 : 0,
+        r.requestedProvider ?? null, r.provider ?? null,
       )
       .run();
     return res.meta.last_row_id ?? null;
@@ -59,7 +63,7 @@ export async function requestsPage(env: Env, accountId: string, url: URL) {
     `SELECT id, ts, duration_ms AS durationMs, purpose, tier, status, error_code AS errorCode, requested_model AS requestedModel,
             model, fallback_from_status AS fallbackFromStatus, fallback_reason AS fallbackReason, input_tokens AS inputTokens,
             cache_read_tokens AS cacheReadTokens, cache_write_tokens AS cacheWriteTokens, output_tokens AS outputTokens,
-            charged_micro AS chargedMicro, gift, photo
+            charged_micro AS chargedMicro, gift, photo, requested_provider AS requestedProvider, provider
      FROM requests WHERE account_id = ? AND id < ? ORDER BY id DESC LIMIT ?`,
   )
     .bind(accountId, before, limit)

@@ -16,6 +16,11 @@ on:
         description: 'Nur test: Test-Guthaben in € allen Konten gutschreiben (0 = nichts; höchstens 10 € je Lauf)'
         type: string
         default: '0'
+      llm:
+        description: 'KI-Anbieter fürs Guthaben (backend/llm-routing.jsonc): wie-bisher = nichts ändern'
+        type: choice
+        options: [wie-bisher, claude, openai, gemini, gratis, gemischt, openrouter]
+        default: wie-bisher
   # Automatisch nach Änderungen am Backend, aber nur wenn die Repo-Variable BACKEND_DEPLOY_MODE (test | production)
   # gesetzt ist und die Cloudflare-Secrets existieren. Sonst passiert nichts.
   push:
@@ -42,11 +47,15 @@ jobs:
       MODE: ${{ inputs.mode || vars.BACKEND_DEPLOY_MODE }}
       EVENT: ${{ github.event_name }}
       CURRENT_URL: ${{ vars.OVERFIT_BACKEND_URL }}
-      # Worker-Secrets (Pflicht: ANTHROPIC_API_KEY, Rest optional; Details in backend/README.md)
-      # Nicht mehr genutzt (Guthaben nur mit Claude); nur für den Hinweis „kann gelöscht werden“.
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # KI-Anbieter (docs/anbieter-umstellen.md): Schlüssel je Anbieter; welche nötig sind, hängt von der Voreinstellung ab.
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      # Optional: Token fürs AI Gateway (neue Gateways verlangen eins); ohne gehen Anfragen direkt an Anthropic.
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      # Voreinstellung: Auswahlliste beim Start (wird im Worker gespeichert), sonst Repo-Variable LLM_PRESET, sonst wie bisher.
+      LLM_PRESET_INPUT: ${{ inputs.llm }}
+      LLM_PRESET_VAR: ${{ vars.LLM_PRESET }}
+      # Optional: Token fürs AI Gateway (neue Gateways verlangen eins); ohne gehen Anfragen direkt an den Anbieter.
       AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
       SYNC_ENCRYPTION_KEY: ${{ secrets.SYNC_ENCRYPTION_KEY }}
       ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
@@ -124,6 +133,7 @@ jobs:
         if: steps.pre.outputs.run == 'true'
         run: |
           npm ci
+          node scripts/build-routing.mjs
           npm run typecheck
           npm test
 
@@ -157,7 +167,7 @@ jobs:
             } | tee -a "$GITHUB_STEP_SUMMARY"
             exit 1
           }
-          # Workers AI (Stufe lite, Binding beim Deploy)
+          # Workers AI (Voreinstellung „gratis“, Binding beim Deploy)
           CODE=$(cf "$API/ai/models/search?per_page=1") || CODE=000
           case "$CODE" in
             200) echo "Workers AI: Zugriff in Ordnung." ;;
@@ -263,7 +273,10 @@ jobs:
           TIERS=$(echo "$CFG" | jq -r '[.tiers | to_entries[] | select(.value.available) | .key] | join(", ")')
           [ -n "$TIERS" ] || { echo "::error::Keine KI-Stufe verfügbar: $CFG"; exit 1; }
           echo "Health und Config in Ordnung (mode=$MODE, Stufen: $TIERS)."
-          echo "- Verfügbare KI-Stufen: $TIERS" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "- KI-Voreinstellung im Betrieb: **$(echo "$CFG" | jq -r '.preset // "?"')**"
+            echo "$CFG" | jq -r '.tiers | to_entries[] | "  - \(.key): " + (if .value.available then "\(.value.label)" + (if .value.fallback then ", Ausweichen: \(.value.fallback.displayName) (\(.value.fallback.vendor))" else "" end) else "nicht verfügbar" end)'
+          } >> "$GITHUB_STEP_SUMMARY"
           WEB=$(echo "$CFG" | jq -c '.webPurchase // {}')
           {
             echo
