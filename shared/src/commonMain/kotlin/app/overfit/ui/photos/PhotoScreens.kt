@@ -164,7 +164,9 @@ fun PhotosScreen(
                         },
                         modifier = Modifier.testTag(TODAY_BUTTON_TAG).semantics { contentDescription = t.bodyWeight.jumpTodayDescription },
                     )
-                    if (!asList && photoList.size >= 2) SmallButton(p.compare, onClick = { selecting = true })
+                    // At 360 dp "Heute", "Vergleichen" and the toggle do not fit together: while "Heute" shows, compare
+                    // waits (one tap back to today, or start comparing first and then scroll – selection stays).
+                    if (!asList && photoList.size >= 2 && !(loaded && awayFromToday)) SmallButton(p.compare, onClick = { selecting = true })
                     // The icon shows the other view: list while the calendar is up, calendar while the list is up.
                     HeaderIconButton(
                         if (asList) Icon.Calendar else Icon.List,
@@ -360,7 +362,7 @@ private fun DayCell(
             .fillMaxWidth()
             .aspectRatio(0.62f)
             // Future days: greyed out and not tappable (nothing to log there yet).
-            .then(if (!tappable && !selecting) Modifier.alpha(0.4f) else Modifier)
+            .then(if (!tappable) Modifier.alpha(0.5f) else Modifier)
             .then(if (isToday) Modifier.background(Theme.colors.surfacePressed, shape) else Modifier)
             .padding(2.dp)
             .semantics { contentDescription = desc }

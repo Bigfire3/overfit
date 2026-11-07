@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -162,4 +163,39 @@ class WeightCalendarTest {
         assertEquals("delete", log.last())
         compose.onAllNodesWithContentDescription("Gewicht löschen").assertCountEquals(0)
     }
+
+    @Test fun poundsAreNotOverwrittenWhileTyping() {
+        val log = mutableListOf<Double>()
+        show {
+            var list by remember { mutableStateOf(emptyList<WeightEntry>()) }
+            DayScreen(
+                date = today, photos = emptyList(), history = emptyList(), unit = WeightUnit.LB, language = Language.DE,
+                onBack = {}, onOpenPhoto = {}, onOpenWorkout = {}, onAddPhoto = {}, onRemovePhoto = {},
+                weights = list,
+                // Writes the value back like the database flow does.
+                onSetWeight = { kg -> log += kg; list = listOf(WeightEntry("2026-11-07", kg)) },
+            )
+        }
+        val field = compose.onNodeWithTag(WEIGHT_FIELD_TAG)
+        field.performClick()
+        "180,5".forEachIndexed { i, _ -> field.performTextReplacement("180,5".substring(0, i + 1)); compose.waitForIdle() }
+        field.assertTextEquals("180,5")
+        assertEquals(81.87, log.last(), 0.001)
+        // Leaving the field shows the stored value in lb again: unchanged.
+        compose.onNodeWithText("Körpergewicht".uppercase()).performClick()
+        compose.waitForIdle()
+        field.assertTextEquals("180,5")
+    }
+
+    @Test fun headerKeepsTheToggleWhenTodayShowsWithManyPhotos() {
+        fun photo(id: String, d: LocalDate) = app.overfit.data.DiaryPhoto(app.overfit.data.WorkoutPhoto(id, null, "$id.jpg", ms(d), "/nonexistent/$id.jpg"), null)
+        val photos = listOf(photo("a", LocalDate(2026, 11, 2)), photo("b", LocalDate(2026, 10, 2)))
+        show { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }, weights = weights) }
+        compose.onNodeWithText("Vergleichen").assertIsDisplayed()
+        compose.onNodeWithTag(DIARY_GRID_TAG).performScrollToIndex(0)
+        compose.onNodeWithTag(TODAY_BUTTON_TAG).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Als Liste anzeigen").assertIsDisplayed()
+        compose.onAllNodesWithText("Vergleichen").assertCountEquals(0)
+    }
 }
+

@@ -51,9 +51,11 @@ const val WEIGHT_CARD_TAG = "weight-card"
 fun WeightCard(entries: List<WeightEntry>, today: LocalDate, unit: WeightUnit, language: Language, onClick: () -> Unit) {
     val t = LocalStrings.current
     val w = t.bodyWeight
-    val latest = remember(entries) { BodyWeightStats.sorted(entries).lastOrNull() }
-    val change = remember(entries) { BodyWeightStats.weekChange(entries) }
-    val points = remember(entries, today) { BodyWeightStats.sparkline(entries, today) }
+    // Only up to today (a future date can only come from an edited backup).
+    val past = remember(entries, today) { entries.filter { it.date <= today.toString() } }
+    val latest = remember(past) { BodyWeightStats.sorted(past).lastOrNull() }
+    val change = remember(past) { BodyWeightStats.weekChange(past) }
+    val points = remember(past, today) { BodyWeightStats.sparkline(past, today) }
     if (latest == null) {
         FloatingCard(Modifier.testTag(WEIGHT_CARD_TAG).semantics(mergeDescendants = true) {}, onClick = onClick) {
             Row(

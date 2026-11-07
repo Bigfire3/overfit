@@ -2,6 +2,7 @@ package app.overfit.data
 
 import app.overfit.data.db.BodyWeightEntity
 import app.overfit.data.db.OverfitDatabase
+import app.overfit.data.db.transaction
 import app.overfit.domain.WeightEntry
 import app.overfit.domain.round1
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +27,8 @@ class BodyWeightRepository(private val database: OverfitDatabase, private val cl
     /** Enters [kg] for [date]; replaces an existing entry of that day. */
     suspend fun set(date: LocalDate, kg: Double) {
         val now = clock()
-        dao.upsert(BodyWeightEntity(date.toString(), round1(kg), measuredAt = now, updatedAt = now))
+        // Two decimals: a value typed in lb (stored as kg) shows the same lb again.
+        dao.upsert(BodyWeightEntity(date.toString(), kotlin.math.round(kg * 100) / 100, measuredAt = now, updatedAt = now))
     }
 
     suspend fun delete(date: LocalDate) = dao.delete(date.toString())
@@ -42,7 +44,7 @@ class BodyWeightRepository(private val database: OverfitDatabase, private val cl
     }
 
     /** Replaces everything with [entries] (backup restore). */
-    suspend fun replaceAll(entries: List<BodyWeightEntity>) {
+    suspend fun replaceAll(entries: List<BodyWeightEntity>) = database.transaction {
         dao.deleteAll()
         if (entries.isNotEmpty()) dao.upsertAll(entries.distinctBy { it.date })
     }

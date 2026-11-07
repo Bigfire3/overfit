@@ -45,7 +45,7 @@ class BodyWeightRepositoryTest {
         now = 2_000L
         repo.set(day, 81.96)
         repo.set(LocalDate(2026, 11, 1), 83.0)
-        assertEquals(listOf(WeightEntry("2026-11-01", 83.0), WeightEntry("2026-11-07", 82.0)), repo.entries.first())
+        assertEquals(listOf(WeightEntry("2026-11-01", 83.0), WeightEntry("2026-11-07", 81.96)), repo.entries.first())
         val row = repo.all().last()
         assertEquals(2_000L, row.measuredAt)
 

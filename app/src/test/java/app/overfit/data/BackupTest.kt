@@ -248,7 +248,7 @@ class BackupTest {
 
         backup.restore(backup.preview(file).getOrThrow())
         val back = data.bodyWeights.all()
-        assertEquals(listOf("2026-11-01" to 83.0, "2026-11-07" to 82.4), back.map { it.date to it.weightKg })
+        assertEquals(listOf("2026-11-01" to 83.0, "2026-11-07" to 82.44), back.map { it.date to it.weightKg })
         assertEquals(1_000L, back.last().measuredAt) // time of day kept
         // The profile mirror (AI context) matches the table.
         assertEquals(back.map { it.date }, store.state.value.weights.map { it.date })
