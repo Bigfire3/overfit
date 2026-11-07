@@ -62,7 +62,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.sp
 import app.overfit.ui.components.BigInput
-import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ExerciseImage
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
@@ -287,8 +286,8 @@ fun TemplateEditorScreen(
                 // Notes of an import (new exercises, chat message, diff): short, only when they apply.
                 val newNames = draft.exercises.filter { it.exercise.id.startsWith(ShareMapper.PENDING_PREFIX) }
                     .map { it.exercise.name }.distinctBy { it.lowercase() }
-                viewModel.seed?.hints?.forEach { Hint(it) }
-                if (newNames.isNotEmpty()) Hint(t.share.importNewNote(newNames))
+                viewModel.seed?.hints?.forEach { Text(it, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
+                if (newNames.isNotEmpty()) Text(t.share.importNewNote(newNames), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
                 viewModel.seed?.discardLabel?.let { label ->
                     Spacer(Modifier.height(Space.s))
                     SmallButton(label, onClick = viewModel::discardSeed)
