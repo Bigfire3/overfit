@@ -27,7 +27,7 @@ fun buildProfileBlock(
 }
 
 /**
- * Name, age and current body weight (latest entry, in the profile unit) as one line. Every AI path uses this one
+ * Name, age, current body weight (latest entry, in the profile unit) and its trend as one line. Every AI path uses this one
  * function: coach (own key and Fuel), "Copy context", the AI template prompt, the Gem/GPT instructions and the chat
  * sync (the backend puts it into every MCP tool answer). Missing values are left out; null when nothing is known.
  * [language] only picks the labels and the decimal separator, so a pasted German prompt stays German.
@@ -42,6 +42,13 @@ fun aiProfileFacts(profile: Profile, weights: List<WeightEntry>, today: LocalDat
         latestWeight(weights)?.let {
             val value = "${formatNumber(displayWeight(it.kg, profile.unit), language)} ${profile.unit.symbol}"
             add(if (de) "Körpergewicht: $value (Stand ${it.date})" else "Body weight: $value (as of ${it.date})")
+        }
+        // Trend over up to 8 weeks (calendar weight log), plain ASCII sign so every model reads it the same way.
+        BodyWeightStats.trend(weights)?.let { tr ->
+            val v = displayWeight(kotlin.math.abs(tr.deltaKg), profile.unit)
+            val sign = if (v == 0.0) "±" else if (tr.deltaKg > 0) "+" else "-"
+            val change = "$sign${formatNumber(v, language)} ${profile.unit.symbol}"
+            add(if (de) "Gewichtstrend: $change in ${tr.days} Tagen" else "Weight trend: $change over ${tr.days} days")
         }
     }
     return facts.takeIf { it.isNotEmpty() }?.joinToString(" · ")

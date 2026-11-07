@@ -310,7 +310,7 @@ class AppDependencies(
 /** Finish flow right after "Finish": summary, feeling, note, photos, coach slot. */
 @Serializable data class FinishRoute(val workoutId: String)
 /** A calendar day (ISO date, e.g. 2026-11-03): its photos and trainings. */
-@Serializable data class DayRoute(val date: String)
+@Serializable data class DayRoute(val date: String, val focusWeight: Boolean = false)
 /** One finished training (from its calendar day or a photo). */
 @Serializable data class WorkoutDetailRoute(val workoutId: String)
 /** Edit a finished training afterwards. */
@@ -365,6 +365,8 @@ fun OverfitApp(deps: AppDependencies) {
     // before the first screen (see [overfitImageLoader]).
     // App scope: the first saved workout changes the screen, a composition scope would cancel the seeding half-way.
     LaunchedEffect(Unit) { deps.data.seedCatalog(); deps.data.scope.launch { deps.data.seedSamplesOnce() } }
+    // Body weight: take over the profile list once, then mirror the table into the profile (AI context reads it there).
+    LaunchedEffect(deps) { app.overfit.data.syncProfileWeights(deps.data, deps.store, deps.kv) }
     // KI-Chat: back in the foreground → send what is left and fetch the inbox; to the background → send a running workout now.
     // Queued coach requests go out on app start and whenever the app comes back to the foreground.
     LifecycleResumeEffect(deps) {
@@ -458,6 +460,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                         ) {
                             deps.store.logWeight(it, deps.today())
+                            val kg = it
+                            deps.data.scope.launch { deps.data.bodyWeights.set(deps.today(), kg) }
                             nav.navigate(AiRoute)
                         }
                     }
@@ -584,10 +588,17 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<DayRoute> { entry ->
-                        val date = LocalDate.parse(entry.toRoute<DayRoute>().date)
+                        val route = entry.toRoute<DayRoute>()
+                        val date = LocalDate.parse(route.date)
                         val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
                         val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
+                        val weights by deps.data.bodyWeights.entries.collectAsStateWithLifecycle(initialValue = null)
                         DayScreen(
+                            weights = weights,
+                            focusWeight = route.focusWeight,
+                            // App scope: leaving the day right after typing must not drop the value.
+                            onSetWeight = { kg -> deps.data.scope.launch { deps.data.bodyWeights.set(date, kg) } },
+                            onDeleteWeight = { deps.data.scope.launch { deps.data.bodyWeights.delete(date) } },
                             date = date,
                             photos = photos,
                             history = history,
@@ -741,8 +752,11 @@ fun OverfitApp(deps: AppDependencies) {
                         val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
                         val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
                         val viewPref = remember { app.overfit.ui.photos.DiaryViewPref(deps.kv) }
+                        val weights by deps.data.bodyWeights.entries.collectAsStateWithLifecycle(initialValue = null)
                         var showMuscles by rememberSaveable { mutableStateOf(false) }
                         PhotosScreen(
+                            weights = weights,
+                            onWeightToday = { nav.navigate(DayRoute(deps.today().toString(), focusWeight = true)) },
                             photos = photos,
                             history = history,
                             language = state.language,

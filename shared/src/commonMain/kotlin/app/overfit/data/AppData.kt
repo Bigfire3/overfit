@@ -28,6 +28,7 @@ class AppData(
     val exercises = ExerciseRepository(database, clock)
     val templates = TemplateRepository(database, clock)
     val workouts = WorkoutRepository(database, clock, photoFiles)
+    val bodyWeights = BodyWeightRepository(database, clock)
     val importer = TemplateImporter(exercises, templates, readSample)
     val catalog = CatalogSeeder(database, kv, readCatalog)
     val coachSettings = CoachSettingsStore(kv)
@@ -38,7 +39,7 @@ class AppData(
      */
     val dataChanged: Flow<Unit> = database.invalidationTracker.createFlow(
         "workout_session", "session_exercise", "set_entry", "workout_photo",
-        "workout_template", "template_exercise", "template_set", "exercise",
+        "workout_template", "template_exercise", "template_set", "exercise", "body_weight",
     ).map { }
 
     /** Loads the bundled catalogue if it changed. Failures are not fatal (the list just stays empty). */
@@ -65,6 +66,7 @@ class AppData(
             database.workoutDao().deleteAll()
             database.templateDao().deleteAll()
             database.exerciseDao().deleteAll()
+            database.bodyWeightDao().deleteAll()
         }
         coachSettings.reset()
         workouts.photoFiles.list().forEach { workouts.photoFiles.delete(it) }

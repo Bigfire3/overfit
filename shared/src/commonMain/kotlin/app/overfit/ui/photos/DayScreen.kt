@@ -51,6 +51,24 @@ import app.overfit.ui.history.TrainingRow
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.datetime.LocalDate
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.input.KeyboardType
+import app.overfit.domain.WEIGHT_KG_MAX
+import app.overfit.domain.WEIGHT_KG_MIN
+import app.overfit.domain.WeightEntry
+import app.overfit.domain.displayWeight
+import app.overfit.domain.formatNumber
+import app.overfit.domain.formatWeight
+import app.overfit.domain.parseDecimal
+import app.overfit.domain.lbToKg
+import app.overfit.ui.components.HeaderDeleteButton
+import app.overfit.ui.components.SetField
 
 /**
  * One calendar day (tap on a day in the calendar): its photos (view, add with camera or library,
@@ -71,6 +89,12 @@ fun DayScreen(
     /** Picked or taken image, still unprocessed; the caller prepares and stores it for this day. */
     onAddPhoto: (bytes: ByteArray) -> Unit,
     onRemovePhoto: (photoId: String) -> Unit,
+    /** Body-weight log (null while loading); the day's entry is set (replaces) or deleted from here. */
+    weights: List<WeightEntry>? = emptyList(),
+    onSetWeight: (kg: Double) -> Unit = {},
+    onDeleteWeight: () -> Unit = {},
+    /** Opened from the weight card: the field gets the focus right away. */
+    focusWeight: Boolean = false,
 ) {
     val t = LocalStrings.current
     val p = t.photos
@@ -81,6 +105,8 @@ fun DayScreen(
 
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         Title(t.date(date))
+
+        if (weights != null) DayWeight(date, weights, unit, language, focusWeight, onSetWeight, onDeleteWeight)
 
         SectionTitle(p.dayTrainings)
         if (history != null && trainings.isEmpty()) Text(p.dayNoTraining, tone = Tone.Muted)
@@ -141,3 +167,82 @@ private fun DayPhoto(item: DiaryPhoto, description: String, onOpen: () -> Unit, 
         }
     }
 }
+
+/**
+ * Body weight of the day: number field like the set fields (saved on every valid input, a new value replaces the old),
+ * the previous value as grey placeholder, delete with two taps (red trash).
+ */
+@Composable
+private fun DayWeight(
+    date: LocalDate,
+    weights: List<WeightEntry>,
+    unit: WeightUnit,
+    language: Language,
+    focus: Boolean,
+    onSet: (Double) -> Unit,
+    onDelete: () -> Unit,
+) {
+    val t = LocalStrings.current
+    val w = t.bodyWeight
+    val key = date.toString()
+    val entry = weights.firstOrNull { it.date == key }
+    val previous = weights.filter { it.date < key }.maxByOrNull { it.date }
+    fun shown(kg: Double) = formatNumber(displayWeight(kg, unit), language)
+    // Text follows the stored value only while the field is not focused: saving on every keystroke must not
+    // overwrite what is being typed (lb: "180" is stored as kg and would come back as "179,9").
+    var focused by remember { mutableStateOf(false) }
+    var text by remember(key) { mutableStateOf(entry?.let { shown(it.kg) } ?: "") }
+    LaunchedEffect(key, entry?.kg, unit) { if (!focused) text = entry?.let { shown(it.kg) } ?: "" }
+    var error by remember(key) { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(focus) { if (focus) runCatching { focusRequester.requestFocus() } }
+
+    SectionTitle(w.title)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        SetField(
+            value = text,
+            onValueChange = { input ->
+                val clean = input.filter { it.isDigit() || it == ',' || it == '.' }.take(6)
+                text = clean
+                val kg = bodyWeightKg(clean, unit)
+                // Too low is normal while typing ("8" on the way to "82"); only a value above the maximum is flagged.
+                error = kg == null && (parseDecimal(clean)?.let { if (unit == WeightUnit.KG) it else lbToKg(it) } ?: 0.0) > WEIGHT_KG_MAX
+                if (kg != null && kg != entry?.kg) onSet(kg)
+            },
+            description = w.fieldDescription(unit.symbol),
+            modifier = Modifier.width(120.dp).testTag(WEIGHT_FIELD_TAG).onFocusChanged { state ->
+                // Leaving an empty or invalid field shows the stored value again (deleting is the trash's job).
+                focused = state.isFocused
+                if (!state.isFocused) {
+                    text = entry?.let { shown(it.kg) } ?: if (bodyWeightKg(text, unit) == null) "" else text
+                    error = false
+                }
+            },
+            keyboardType = KeyboardType.Decimal,
+            placeholder = previous?.let { shown(it.kg) } ?: "–",
+            focusRequester = focusRequester,
+        )
+        Spacer(Modifier.width(Space.s))
+        Text(unit.symbol, tone = Tone.Muted)
+        Spacer(Modifier.weight(1f))
+        if (entry != null) HeaderDeleteButton(w.deleteEntry, onConfirm = { text = ""; onDelete() })
+    }
+    if (error) {
+        val min = formatWeight(WEIGHT_KG_MIN, unit, language)
+        val max = formatWeight(WEIGHT_KG_MAX, unit, language)
+        Hint(w.invalid(min, max))
+    } else {
+        Hint(w.dayHint)
+    }
+}
+
+/** Input in [unit] → kg (two decimals, so a pound value comes back unchanged), or null outside 25–350 kg. */
+internal fun bodyWeightKg(input: String, unit: WeightUnit): Double? {
+    val v = parseDecimal(input) ?: return null
+    val kg = if (unit == WeightUnit.KG) v else lbToKg(v)
+    if (kg < WEIGHT_KG_MIN || kg > WEIGHT_KG_MAX) return null
+    return kotlin.math.round(kg * 100) / 100
+}
+
+/** Test tag of the body-weight field in the day view. */
+const val WEIGHT_FIELD_TAG = "day-weight-field"
