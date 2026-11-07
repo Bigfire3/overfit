@@ -360,7 +360,7 @@ class DayWithOverfitTest {
         waitFor("4,20 € Guthaben")
 
         // Coach tab = chat: ask (profile and the last training go along), the answer proposes a workout,
-        // "Übernehmen" opens the import preview. (The prompts with "Copy context" moved to the coach settings.)
+        // "Übernehmen" opens the editor. (The prompts with "Copy context" moved to the coach settings.)
         tab("Coach")
         waitFor("Wie lief mein Training?")
         compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:input"))).performTextInput("Was soll ich morgen trainieren?")
