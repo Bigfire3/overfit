@@ -239,7 +239,9 @@ final class ScreenshotTests: OverfitUITestCase {
         }
         sleep(1)
         shot("10b-coach")
-        waitFor("Nachricht an den Coach").tap()
+        // Coach tab = chat: three suggestions, input block at the bottom (placeholder "Frag deinen Coach …").
+        waitFor("Wie lief mein Training?")
+        waitFor("Frag deinen Coach").tap()
         sleep(1)
         app.typeText("Wie trainiere ich morgen?")
         shot("10c-coach-tastatur")
