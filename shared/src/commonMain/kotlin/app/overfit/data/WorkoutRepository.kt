@@ -245,6 +245,8 @@ class WorkoutRepository(
             if (existing?.status != SessionStatus.FINISHED) return@transaction false
             dao.upsertSession(
                 existing.copy(
+                    // Renaming a past training changes only this training, never its saved workout.
+                    name = workout.name.trim().take(80).ifEmpty { existing.name },
                     note = note?.trim()?.ifEmpty { null },
                     feeling = feeling?.coerceIn(1, 5),
                     sauna = sauna,
@@ -273,7 +275,21 @@ class WorkoutRepository(
 
     override suspend fun lastSets(exerciseId: String): List<SetValues> =
         dao.lastCompletedSets(exerciseId).map { SetValues(it.weightKg, it.reps, it.durationSec) }
+
+    /**
+     * "Last time" for the workout plan: the completed sets of [exerciseId] from the last training of the saved workout
+     * [templateId], otherwise from the last training at all ([LastPerformance.inThisWorkout] false). null = never done.
+     */
+    suspend fun lastPerformance(exerciseId: String, templateId: Long?): LastPerformance? {
+        val inWorkout = templateId?.let { dao.lastPerformance(exerciseId, it) }
+        val row = inWorkout ?: dao.lastPerformance(exerciseId, null) ?: return null
+        val sets = dao.completedSetsOf(row.sessionExerciseId).map { SetValues(it.weightKg, it.reps, it.durationSec) }
+        return LastPerformance(row.startedAt, sets, inThisWorkout = inWorkout != null)
+    }
 }
+
+/** The completed sets of an exercise from one earlier training ([startedAt]); see [WorkoutRepository.lastPerformance]. */
+data class LastPerformance(val startedAt: Long, val sets: List<SetValues>, val inThisWorkout: Boolean)
 
 /** A finished workout as shown in the history detail. */
 data class FinishedWorkout(

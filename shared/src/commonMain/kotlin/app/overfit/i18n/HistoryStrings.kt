@@ -43,6 +43,8 @@ data class HistoryStrings(
     // Editing a finished training afterwards (calendar → training → edit)
     val editWorkout: String,
     val editTitle: String,
+    val trainingNamePlaceholder: String,
+    val renameWorkout: String,
     val editHint: String,
     val editSaveFailed: String,
     val editNoExercises: String,
@@ -109,6 +111,8 @@ val HistoryGerman = HistoryStrings(
 
     editWorkout = "Training bearbeiten",
     editTitle = "Training bearbeiten",
+    trainingNamePlaceholder = "Name des Trainings",
+    renameWorkout = "Training umbenennen",
     editHint = "Statistiken und Bestwerte rechnen mit den neuen Werten. Eine schon erstellte Coach-Auswertung bleibt, wie sie ist.",
     editSaveFailed = "Konnte nicht gespeichert werden. Versuch es nochmal.",
     editNoExercises = "Dieses Training hat keine Übungen.",
@@ -173,6 +177,8 @@ val HistoryEnglish = HistoryStrings(
 
     editWorkout = "Edit workout",
     editTitle = "Edit workout",
+    trainingNamePlaceholder = "Training name",
+    renameWorkout = "Rename workout",
     editHint = "Statistics and personal bests use the new values. A coach review that already exists stays as it is.",
     editSaveFailed = "Could not save. Please try again.",
     editNoExercises = "This workout has no exercises.",
