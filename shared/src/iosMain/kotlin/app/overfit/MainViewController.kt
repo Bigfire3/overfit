@@ -47,7 +47,7 @@ fun MainViewController(): UIViewController {
     val fuelAccess = FuelAccess(kv, backendUrl) { url -> FuelApi(createHttpClient(), url, RequestSigner(IosDeviceKey())) }
     val deps = AppDependencies(
         store = AppStore(kv, KeychainSecretStore(service = if (launch.uiTest) LaunchOptions.UI_TEST_SUITE else "app.overfit"), deviceDefaults()),
-        providers = Providers(createHttpClient()) { fuelAccess.service() },
+        providers = Providers(createHttpClient(), kv) { fuelAccess.service() },
         data = AppData(
             if (launch.uiTest) buildDatabase("uitest-" + OverfitDatabase.NAME, fresh = !launch.keepData) else buildDatabase(),
             kv,

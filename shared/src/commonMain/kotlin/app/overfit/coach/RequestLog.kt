@@ -90,8 +90,11 @@ class LoggingTransport(
     }
 }
 
-/** Model of a credit tier today (Claude-only since 7.11.2026); unknown values stay as they are. */
-fun modelOfCurrentTier(tier: String): String = when (tier) {
+/**
+ * Model of a credit tier today: what the server last named for it (`/v1/config`), else the Claude tiers of 7.11.2026;
+ * unknown values stay as they are.
+ */
+fun modelOfCurrentTier(tier: String): String = app.overfit.fuel.ModelNames.modelOfTier(tier) ?: when (tier) {
     app.overfit.ai.TIER_LITE -> "claude-haiku-5-5"
     app.overfit.ai.TIER_STANDARD -> "claude-sonnet-5-5"
     app.overfit.ai.TIER_PRO -> "claude-opus-5-5"

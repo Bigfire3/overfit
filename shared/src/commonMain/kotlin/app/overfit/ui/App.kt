@@ -905,6 +905,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onImportBackup = pickBackup,
                             onReset = {
                                 deps.store.resetAll()
+                                deps.providers.fuel.resetAll()
                                 deps.data.scope.launch { deps.workout.discard(keepStructure = false); deps.data.resetAll() }
                                 nav.navigate(NameRoute) { popUpTo(0) { inclusive = true } }
                             },
