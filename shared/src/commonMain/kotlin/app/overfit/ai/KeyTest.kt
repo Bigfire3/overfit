@@ -90,7 +90,7 @@ class KeyTester(private val http: HttpClient) {
         if (!response.status.isSuccess()) return failure(response.status, invalidOnBadRequest)
         val root = runCatching { json.parseToJsonElement(response.bodyAsText()) as? JsonObject }.getOrNull()
             ?: return KeyTestResult.Failed(response.status.value)
-        return KeyTestResult.Ok(parse(root).distinct().sortedWith(modelOrder))
+        return KeyTestResult.Ok(suggestionOrder(parse(root).distinct()))
     }
 
     private fun failure(status: HttpStatusCode, invalidOnBadRequest: Boolean = false): KeyTestResult = when {
@@ -121,7 +121,14 @@ class KeyTester(private val http: HttpClient) {
             return chat && other.none { it in id }
         }
 
-        /** Newest-looking first: longer version numbers sort later alphabetically, so a descending sort works well. */
-        private val modelOrder = compareByDescending<String> { it }
+        /**
+         * Order of the suggestions: models of the big labs first (OpenRouter lists ~300 models of every vendor), then
+         * newest-looking first (a descending sort puts higher version numbers on top).
+         */
+        fun suggestionOrder(ids: List<String>): List<String> {
+            val preferred = listOf("anthropic/", "openai/", "google/", "claude", "gpt", "gemini", "o")
+            fun rank(id: String) = preferred.indexOfFirst { id.startsWith(it) }.let { if (it < 0) preferred.size else it }
+            return ids.sortedWith(compareBy<String> { rank(it) }.thenByDescending { it })
+        }
     }
 }

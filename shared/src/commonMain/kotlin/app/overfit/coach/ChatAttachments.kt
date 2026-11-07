@@ -24,9 +24,12 @@ import kotlin.time.Instant
 sealed interface ChatAttachment {
     val label: String
 
-    /** A finished training from the calendar. */
+    /**
+     * A finished training from the calendar. [label] is its name; with [startedAt] the UI adds "· today" / the date at
+     * display time, so an old chat never keeps saying "today".
+     */
     @Serializable @SerialName("training")
-    data class Training(val sessionId: String, override val label: String = "") : ChatAttachment
+    data class Training(val sessionId: String, override val label: String = "", val startedAt: Long? = null) : ChatAttachment
 
     /** A saved workout (plan). */
     @Serializable @SerialName("plan")

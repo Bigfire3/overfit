@@ -403,7 +403,7 @@ private fun AttachmentCard(a: ChatAttachment) {
     ) {
         LineIcon(a.icon(), size = 18.dp, color = Theme.colors.muted)
         Spacer(Modifier.width(Space.s))
-        Text(a.label, style = Theme.type.caption, maxLines = 1)
+        Text(attachmentText(a), style = Theme.type.caption, maxLines = 1)
     }
 }
 
@@ -498,7 +498,8 @@ private fun ContextChips(
                 is ChatAttachment.Exercise -> "chip:exercise"
                 is ChatAttachment.Photo -> "chip:photo"
             }
-            ContextChip(a.label, a.icon(), s.remove(a.label), tag, onClick = null, onRemove = { onRemove(a) })
+            val text = attachmentText(a)
+            ContextChip(text, a.icon(), s.remove(text), tag, onClick = null, onRemove = { onRemove(a) })
         }
     }
 }

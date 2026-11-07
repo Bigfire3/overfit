@@ -109,7 +109,11 @@ class CoachChatPrefsStore(private val kv: KeyValueStore) {
         val legacy = settings.state.value.instructions?.trim().orEmpty()
         if (legacy.isEmpty()) return
         val current = state.value.addition
-        if (!current.contains(legacy)) setAddition(listOf(legacy, current).filter { it.isNotBlank() }.joinToString("\n\n"))
+        if (!current.contains(legacy)) {
+            // Not cut to ADDITION_MAX here: nothing the user wrote is lost (the field shows all of it and they can shorten it).
+            val merged = listOf(legacy, current).filter { it.isNotBlank() }.joinToString("\n\n")
+            edit { it.copy(addition = merged) }
+        }
         settings.setInstructions(null)
     }
 

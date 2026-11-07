@@ -27,7 +27,7 @@ import kotlin.time.Instant
 fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
     val store = deps.store
     fun strings(): CoachChatStrings = coachChatStringsFor(store.state.value.language)
-    fun label(row: HistoryRow): String = row.name + " · " + dayLabel(row.startedAt, deps.today(), strings(), store.state.value.language)
+    fun training(row: HistoryRow) = ChatAttachment.Training(row.id, row.name, row.startedAt)
     // Model chip and cost follow the access and the chosen model live. The cost needs the backend's price table: it is
     // only asked while credit is the chosen access (own key: no backend request, OwnKeyPrivacyTest).
     val access = kotlinx.coroutines.flow.combine(store.state, deps.coach.settings.state) { s, settings -> s to settings }
@@ -45,8 +45,8 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
     return CoachChatEnv(
         chat = deps.coachChat,
         prefs = deps.data.coachChatPrefs,
-        lastTraining = deps.data.workouts.history.map { list -> list.firstOrNull()?.let { ChatAttachment.Training(it.id, label(it)) } },
-        trainings = deps.data.workouts.history.map { list -> list.map { ChatAttachment.Training(it.id, label(it)) } },
+        lastTraining = deps.data.workouts.history.map { list -> list.firstOrNull()?.let(::training) },
+        trainings = deps.data.workouts.history.map { list -> list.map(::training) },
         plans = deps.data.templates.templates.map { list -> list.map { ChatAttachment.Plan(it.id, it.name) } },
         exercises = {
             val s = store.state.value
@@ -89,4 +89,13 @@ internal fun dayLabel(ms: Long, today: LocalDate, s: CoachChatStrings, language:
         today.minus(DatePeriod(days = 1)) -> s.yesterday
         else -> stringsFor(language).date(day)
     }
+}
+
+/** Card/chip text of an attachment: a training gets "· heute" / "· gestern" / the date, computed when shown. */
+@androidx.compose.runtime.Composable
+internal fun attachmentText(a: ChatAttachment): String {
+    if (a !is ChatAttachment.Training || a.startedAt == null) return a.label
+    val language = app.overfit.i18n.LocalFuelStrings.current.language
+    val today = kotlin.time.Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+    return a.label + " · " + dayLabel(a.startedAt, today, coachChatStringsFor(language), language)
 }

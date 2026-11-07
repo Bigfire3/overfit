@@ -216,6 +216,9 @@ class AppDependencies(
     /** Next chat the Coach tab opens (CoachChatRoute, automatic review after a training). */
     val coachChatRequests = CoachChatRequests()
 
+    /** Data of the Coach tab chat; built once (its model/cost flows live in the app scope). */
+    val coachChatEnv: app.overfit.ui.coach.chat.CoachChatEnv by lazy { createCoachChatEnv(this) }
+
     /**
      * The review after a training (automatic, or "Send to coach" on a training): a new chat with the training attached
      * and the question "Review my training", sent right away; the Coach tab opens it next.
@@ -224,10 +227,9 @@ class AppDependencies(
         data.scope.launch {
             val record = data.workouts.record(sessionId) ?: return@launch
             val s = coachChatStringsFor(store.state.value.language)
-            val label = record.workout.name + " · " + app.overfit.ui.coach.chat.dayLabel(record.workout.startedAt, today(), s, store.state.value.language)
             val (chatId, _) = coachChat.send(
                 null,
-                app.overfit.coach.ChatSendRequest(s.reviewMyTraining, listOf(app.overfit.coach.ChatAttachment.Training(sessionId, label))),
+                app.overfit.coach.ChatSendRequest(s.reviewMyTraining, listOf(app.overfit.coach.ChatAttachment.Training(sessionId, record.workout.name, record.workout.startedAt))),
             )
             coachChatRequests.open(ChatOpenRequest(chatId = chatId))
         }
@@ -278,7 +280,7 @@ class AppDependencies(
                 startTrainingReviewChat(id)
             }
         }
-        backupContributors += CoachBackup(coach)
+        backupContributors += CoachBackup(coach, data.coachChatPrefs)
         backupContributors += app.overfit.ui.coach.CoachChatBackup(coachChat)
         coachChat.recover()
     }
@@ -999,7 +1001,7 @@ fun OverfitApp(deps: AppDependencies) {
                                 nav.navigate(CoachStoryRoute)
                             }
                         }
-                        val coachEnv = remember(deps) { createCoachChatEnv(deps) }
+                        val coachEnv = deps.coachChatEnv
                         val openRequest by deps.coachChatRequests.pending.collectAsStateWithLifecycle()
                         var modelSheet by rememberSaveable { mutableStateOf(false) }
                         var creditPopup by rememberSaveable { mutableStateOf(false) }

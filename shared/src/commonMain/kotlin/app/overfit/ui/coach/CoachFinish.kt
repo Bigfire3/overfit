@@ -60,7 +60,7 @@ fun CoachFinishSection(coach: CoachService, prefs: app.overfit.coach.CoachChatPr
 }
 
 /** Coach memory (all versions), reviews and coach settings in the backup (no keys). */
-class CoachBackup(private val coach: CoachService) : BackupContributor {
+class CoachBackup(private val coach: CoachService, private val prefs: app.overfit.coach.CoachChatPrefsStore? = null) : BackupContributor {
     override val key = "coach"
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -69,16 +69,23 @@ class CoachBackup(private val coach: CoachService) : BackupContributor {
         val reviews: List<CoachReviewEntity> = emptyList(),
         val memory: List<CoachMemoryEntity> = emptyList(),
         val settings: CoachSettings = CoachSettings(),
+        /** Coach profile, "Deine Ergänzung", automatic review (since the chat redesign; missing in older backups). */
+        val chat: app.overfit.coach.CoachChatPrefs? = null,
     )
 
     override suspend fun export(): JsonElement? {
         val (reviews, memory) = coach.exportAll()
-        return json.encodeToJsonElement(Content.serializer(), Content(reviews, memory, coach.settings.state.value))
+        return json.encodeToJsonElement(Content.serializer(), Content(reviews, memory, coach.settings.state.value, prefs?.state?.value))
     }
 
     override suspend fun import(value: JsonElement?) {
         val content = value?.let { runCatching { json.decodeFromJsonElement(Content.serializer(), it) }.getOrNull() } ?: Content()
         coach.importAll(content.reviews, content.memory)
         coach.settings.replace(content.settings)
+        prefs?.let { p ->
+            content.chat?.let(p::replace)
+            // An older backup may bring a whole edited instruction: it becomes the addition, the base stays Overfit's.
+            p.migrateLegacyInstructions(coach.settings)
+        }
     }
 }

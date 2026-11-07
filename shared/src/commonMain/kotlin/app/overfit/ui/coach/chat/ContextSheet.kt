@@ -99,7 +99,7 @@ internal fun ColumnScope.ContextSheet(
         ContextPage.Trainings -> {
             val list by env.trainings.collectAsState(initial = null)
             SubPage(s.rowTraining, s, state) {
-                ItemList(list?.take(MAX_LIST), s.emptyTrainings, state) { it.label to null }
+                ItemList(list?.take(MAX_LIST), s.emptyTrainings, state) { attachmentText(it) to null }
             }
         }
         ContextPage.Plans -> {
@@ -192,7 +192,7 @@ private fun SubPage(title: String, s: CoachChatStrings, state: ContextSelection,
 }
 
 @Composable
-private fun <T : ChatAttachment> ItemList(list: List<T>?, empty: String, state: ContextSelection, text: (T) -> Pair<String, String?>) {
+private fun <T : ChatAttachment> ItemList(list: List<T>?, empty: String, state: ContextSelection, text: @Composable (T) -> Pair<String, String?>) {
     when {
         list == null -> Unit
         list.isEmpty() -> Text(empty, Modifier.padding(vertical = Space.m), style = Theme.type.caption, tone = Tone.Muted)

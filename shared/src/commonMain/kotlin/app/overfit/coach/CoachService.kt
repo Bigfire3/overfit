@@ -310,7 +310,7 @@ class CoachService(
         return CoachContext(
             kind = kind,
             language = p.language,
-            instructions = s.instructions ?: defaultInstructions(p.language),
+            instructions = instructions(p.language),
             profileBlock = p.block,
             memory = dao.currentMemory()?.text,
             exerciseList = list,
