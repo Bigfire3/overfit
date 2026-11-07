@@ -1394,3 +1394,47 @@ Heckmeck. Entferne das mal komplett aus der App. Da soll nichts mehr zu finden s
   - Behoben: Das Feld wurde nach jedem Speichern mit dem gerundeten Wert überschrieben (lb: „180“ → „179,9“ mitten im Tippen). Jetzt folgt es dem gespeicherten Wert nur ohne Fokus; gespeichert wird auf 0,01 kg, damit ein lb-Wert unverändert zurückkommt. Test mit Rückschreiben.
   - Behoben: Ersetzen der Gewichte beim Restore läuft in einer Transaktion. Künftige Tage sind auch im Vergleichsmodus ausgegraut (Deckkraft 50 % statt 40 %, besser lesbar). Die Karte ignoriert Einträge mit Datum nach heute (nur über ein bearbeitetes Backup möglich).
   - Bewusst so: Onboarding schreibt Profil und Tabelle (der Spiegel gleicht sofort ab, der Profilwert ist für die nächsten Schritte direkt da). Der Kalender startet auf dem Monat beim Öffnen; über Mitternacht hinweg rechnet „Heute“ mit dem neuen Datum.
+
+## Anbieter umschaltbar: Routing-Tabelle statt fester Claude-Stufen (7.11.2026)
+Fabian: „Ich möchte im Backend einfach zwischen den LLM Providern umstellen können.“ Ohne Codeänderung, auch vom Handy.
+- **Eine Datei, `backend/llm-routing.jsonc`:** `models` (Modell-ID → Anbieter, Anzeigename, Anbietername, Bilder ja/nein, „denkt mit“,
+  Preise in USD/MTok mit optionalem `since`, Wechselkurs `usdToEur`) und `presets` (Stufe → Modell + Ausweich-Modell). Voreinstellungen:
+  `claude` (Standard, bisheriger Stand), `openai`, `gemini`, `gratis` (Workers AI), `gemischt`, `openrouter`. Modell-Katalog und Zuordnung
+  getrennt, damit jeder Preis nur einmal steht. JSONC mit ganzen Kommentarzeilen (wie `wrangler.jsonc`), damit die Datei für Fabian
+  erklärt ist; `scripts/build-routing.mjs` erzeugt daraus `src/routing.gen.json` automatisch vor Test, Typprüfung, Dev und Deploy (nicht
+  eingecheckt, so kann eine Bearbeitung im Browser nie eine veraltete Kopie hinterlassen). `parseRouting` prüft alles und meldet alle
+  Fehler auf einmal; ein Fehler bricht Tests und Deploy ab, nie still zur Laufzeit.
+- **Umschalten:** Workflow „Backend deployen“ hat die Auswahlliste „KI-Anbieter“ (`wie-bisher` + alle Voreinstellungen), in der
+  GitHub-App bedienbar. Die Wahl wird im Worker als Secret `LLM_PRESET` gespeichert, nicht als Variable: Variablen überschreibt jeder
+  Deploy, ein automatischer Deploy nach einem Merge würde die Wahl sonst zurückdrehen. Reihenfolge: Auswahl → Repo-Variable
+  `LLM_PRESET` → im Worker gespeichert → `default` der Datei. Verworfen: Umschalten zur Laufzeit über einen Admin-Endpunkt (bräuchte
+  ein Geheimnis auf dem Handy und eine eigene Oberfläche; der Workflow-Knopf existiert schon).
+- **Fehlender Schlüssel:** Eine Voreinstellung ist vollständig, wenn das erste Modell jeder Stufe einen Schlüssel hat (Workers AI immer,
+  über das Binding). Unvollständig → Worker nimmt die erste vollständige aus `fallbackOrder` (`/v1/config.preset` zeigt die wirksame),
+  der Deploy schreibt eine gelbe Warnung mit dem fehlenden Secret-Namen; keine vollständige → Deploy bricht mit Anleitung ab. Die
+  Regel steht doppelt (Worker `src/routing.ts`, Deploy `scripts/deploy-secrets.mjs`), ein Test vergleicht beide für alle 16
+  Schlüssel-Kombinationen × alle Voreinstellungen. Ohne jeden Schlüssel bleibt `gratis` (Workers AI) übrig: lieber ein kostenloses
+  Modell mit Warnung als ein Server ohne KI.
+- **Adapter (`src/providers.ts`):** Anthropic (Body durchgereicht wie bisher), OpenAI und OpenRouter (Chat Completions: System als
+  `developer`/`system`, Bilder als Data-URL, Structured Output über `response_format` json_schema mit `strict: false`, weil das
+  App-Schema nicht alle strict-Regeln erfüllt; GPT-5 mit `max_completion_tokens` und `reasoning_effort`, ohne Temperatur), Gemini
+  (aus der Git-Historie vor 573c0ab zurückgeholt: generateContent, `responseJsonSchema`, Denk-Token als Ausgabe), Workers AI (Binding,
+  nur Text, JSON-Modus; Gateway nur mit `AI_GATEWAY_TOKEN` wie bei den anderen). Antwort immer Anthropic-Format, Token auf
+  Eingabe/Cache-Lesen/Ausgabe umgerechnet. Fehler einheitlich `UpstreamError` (Ausfall: Netzwerk, Zeit, 5xx, 429, 408, 401, 403 →
+  Ausweichen; sonst Ablehnung). „Denkende“ Modelle bekommen den doppelten Ausgabe-Raum (wie früher Gemini).
+- **Abrechnung:** unverändert aus den echten Token, Preis des antwortenden Modells, Aufschlag `MARKUP_BP`; beim Ausweichen (einmal,
+  auch über Anbietergrenzen) das günstigere von Stufen-Modell und antwortendem Modell. Die Reserve deckt den größten Ausgabe-Raum
+  beider Kandidaten zum Preis der Stufe. Kann das Stufen-Modell keine Fotos (Workers AI), antwortet bei Foto-Anfragen gleich das
+  Ausweich-Modell (Protokoll: Ausweichen, Grund „keine Bilder“), bezahlt wird ebenso das günstigere; kann es keins, `400 images_not_supported`.
+  Protokoll `requests` speichert `requested_provider` und `provider` (D1-Migration 0010). `servedTier` bleibt für alte Apps erhalten.
+- **App:** Namen und Preise kommen aus `/v1/config` (`tiers`, neu `preset`, `provider`, `fallback` als Objekt, `modelNames` für alle
+  bekannten Modelle); die letzte Antwort wird gespeichert und genutzt, wenn der Server nicht erreichbar ist. Die feste Namenstabelle
+  bleibt nur als letzter Rückfall. Mit eigenem Schlüssel ändert sich nichts (`OwnKeyPrivacyTest`).
+- **Preise (Stand 7.11., vor Produktion prüfen):** OpenAI GPT-5 mini 0,25 $/2 $ (Cache 0,025 $), GPT-5 1,25 $/10 $ (Cache 0,125 $),
+  laut developers.openai.com; Workers AI Llama 4 Scout 0,27 $/0,85 $ laut Cloudflare-Preisseite; Gemini und Llama 3.3 wie früher.
+  OpenRouter mit den Anthropic-Listenpreisen (OpenRouter selbst nimmt eine Gebühr beim Aufladen, die trägt die Marge).
+- **Offen (Geld, für Fabian):** (1) `gratis` berechnet Nutzern den Workers-AI-Listenpreis, obwohl der Betreiber bis 10 000 Neurons/Tag
+  nichts zahlt; Preis 0 wäre ein Eintrag in der Datei. (2) Ohne Workers-Paid-Tarif liefert Workers AI nach dem Tageskontingent Fehler,
+  dann antwortet das Ausweich-Modell (Haiku, teurer für den Betreiber, Nutzer zahlt den Llama-Preis). (3) `openai` nutzt GPT-5 auch für
+  `pro` (kein eigenes, teureres Modell gewählt; bewusst ohne ungeprüfte Modell-IDs). (4) `gemini` hat nur ein Modell, also kein
+  Ausweichen.

@@ -2,3 +2,4 @@ node_modules
 .wrangler
 .dev.vars
 wrangler.generated.jsonc
+src/routing.gen.json

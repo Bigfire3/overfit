@@ -61,7 +61,7 @@ export function buildConfig(mode, databaseId, base = readJsonc(join(root, 'wrang
   cfg.main = join(root, 'src/index.ts');
   cfg.d1_databases = [{ ...base.d1_databases[0], database_name: n.db, database_id: databaseId, migrations_dir: join(root, 'migrations') }];
   cfg.r2_buckets = [{ ...base.r2_buckets[0], bucket_name: n.bucket }];
-  // Workers AI (Stufe `lite`) und AI-Gateway-URLs; nur im Deploy, damit lokale Tests kein Cloudflare-Konto brauchen.
+  // Workers AI (Voreinstellung „gratis“) und AI-Gateway-URLs; nur im Deploy, damit lokale Tests kein Cloudflare-Konto brauchen.
   cfg.ai = { binding: 'AI' };
   cfg.vars = { ...base.vars, ...MODE_VARS[mode], AI_GATEWAY_ID: n.gateway, ...webVars(mode, env) };
   return cfg;

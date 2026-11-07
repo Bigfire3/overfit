@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client, baseEnv, fund, rawFetch } from './helpers';
 import { costMicro } from '../src/money';
-import { currentPrices, TIERS } from '../src/providers';
+import { currentPrices } from '../src/providers';
+import { ROUTING } from '../src/routing';
+const TIERS = ROUTING.presets.claude.tiers;
 import type { Env } from '../src/types';
 
 const ADMIN = 'admin-secret-0123456789';

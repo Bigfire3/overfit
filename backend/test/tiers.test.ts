@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client, baseEnv, fund, rawFetch } from './helpers';
 import { costMicro } from '../src/money';
-import { currentPrices, TIERS, tierForModel, type Tier } from '../src/providers';
+import { currentPrices, tierForModel, type Tier } from '../src/providers';
+import { ROUTING } from '../src/routing';
+const TIERS = ROUTING.presets.claude.tiers;
 import type { Env } from '../src/types';
 
 const MARKUP = 2800;
@@ -135,8 +137,8 @@ describe('Alle Stufen sind Claude über Anthropic', () => {
     expect(JSON.parse(anthropic.mock.calls[0][1].body).messages).toEqual([{ role: 'user', content }]);
   });
 
-  it('ohne ANTHROPIC_API_KEY ist nichts verfügbar (auch nicht mit Gemini-Key)', async () => {
-    const c = await Client.create(env({ ANTHROPIC_API_KEY: undefined, GEMINI_API_KEY: 'gemini-key' } as Partial<Env>));
+  it('ohne jeden KI-Schlüssel ist nichts verfügbar', async () => {
+    const c = await Client.create(env({ ANTHROPIC_API_KEY: undefined } as Partial<Env>));
     const f = await fund(c);
     for (const t of ['lite', 'standard', 'pro']) {
       const r = await c.call('POST', '/v1/messages', body(t));
@@ -357,13 +359,13 @@ describe('/v1/config', () => {
   it('meldet Stufen, Claude-Modelle und Verfügbarkeit', async () => {
     const all = await rawFetch('/v1/config', env());
     expect(all.body.defaultTier).toBe('standard');
-    expect(all.body.tiers.lite).toMatchObject({ available: true, model: HAIKU, vendor: 'Anthropic', images: true, fallback: 'standard' });
-    expect(all.body.tiers.standard).toMatchObject({ available: true, model: SONNET, vendor: 'Anthropic', images: true, fallback: 'lite' });
-    expect(all.body.tiers.pro).toMatchObject({ available: true, model: OPUS, vendor: 'Anthropic', images: true, fallback: 'standard' });
+    expect(all.body.tiers.lite).toMatchObject({ available: true, model: HAIKU, vendor: 'Anthropic', images: true, fallback: { model: SONNET, provider: 'anthropic', displayName: 'Claude Sonnet 5.5' } });
+    expect(all.body.tiers.standard).toMatchObject({ available: true, model: SONNET, vendor: 'Anthropic', images: true, fallback: { model: HAIKU } });
+    expect(all.body.tiers.pro).toMatchObject({ available: true, model: OPUS, vendor: 'Anthropic', images: true, fallback: { model: SONNET, provider: 'anthropic', displayName: 'Claude Sonnet 5.5' } });
     for (const t of ['lite', 'standard', 'pro'] as Tier[]) expect(all.body.tiers[t].price).toEqual(price(t));
     // Keine Einladungen mehr (Fabian, 7.11.2026).
     expect(all.body.invite).toBeUndefined();
-    const none = await rawFetch('/v1/config', baseEnv({ ANTHROPIC_API_KEY: undefined, GEMINI_API_KEY: 'gemini-key' } as Partial<Env>));
+    const none = await rawFetch('/v1/config', baseEnv({ ANTHROPIC_API_KEY: undefined } as Partial<Env>));
     for (const t of ['lite', 'standard', 'pro']) expect(none.body.tiers[t].available).toBe(false);
   });
 
@@ -383,7 +385,7 @@ describe('Preistabelle', () => {
     expect(currentPrices()[SONNET]).toEqual({ in: 1_840_000, cacheRead: 184_000, cacheWrite: 2_300_000, out: 9_200_000 });
     expect(currentPrices()[OPUS]).toEqual({ in: 3_680_000, cacheRead: 184_000, cacheWrite: 4_600_000, out: 18_400_000 });
     // Jede Stufe hat einen Preis für ihr Modell
-    for (const t of Object.values(TIERS)) expect(currentPrices()[t.model]).toBeDefined();
+    for (const t of Object.values(ROUTING.models)) expect(currentPrices()[t.id]).toBeDefined();
     // Gemini: zum Zeitpunkt gültiger Preis (ab 2027 teurer)
     expect(currentPrices(Date.parse('2026-12-31T23:00:00Z'))['gemini-3.6-flash']).toEqual({ in: 690_000, cacheRead: 69_000, cacheWrite: 690_000, out: 3_450_000 });
     expect(currentPrices(Date.parse('2027-01-01T00:00:00Z'))['gemini-3.6-flash']).toEqual({ in: 1_380_000, cacheRead: 138_000, cacheWrite: 1_380_000, out: 6_900_000 });

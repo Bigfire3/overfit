@@ -4,8 +4,11 @@
 //
 //   node scripts/deploy-secrets.mjs <test|production> <vorhandene-secrets.json> <ausgabe.json> <zusammenfassung.md>
 //
-// - KI-Schlüssel: ANTHROPIC_API_KEY (alle Stufen: Haiku, Sonnet, Opus), aus GitHub oder schon im Worker. Pflicht, sonst Exit 1
-//   mit Anleitung. GEMINI_API_KEY wird nicht mehr gebraucht (nur Hinweis, falls noch gesetzt).
+// - KI-Anbieter (llm-routing.jsonc): Schlüssel je Anbieter (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY),
+//   aus GitHub oder schon im Worker; Workers AI braucht keinen. Die Voreinstellung kommt aus der Auswahlliste des Workflows
+//   (LLM_PRESET_INPUT, wird im Worker als LLM_PRESET gespeichert), sonst aus der Repo-Variable LLM_PRESET, sonst bleibt die im
+//   Worker gespeicherte, sonst `default` der Datei. Fehlt ein Schlüssel der gewählten Voreinstellung: Warnung, der Worker nimmt
+//   die nächste vollständige aus `fallbackOrder`. Ist keine vollständig: Exit 1 mit Anleitung.
 // - SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
 //   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
 //   Einladungen gibt es nicht mehr (7.11.2026): INVITE_SIGNING_KEY wird nicht mehr gebraucht.
@@ -18,6 +21,34 @@
 // - Optional (Play/Apple-Prüfer): nur gesetzt, wenn vorhanden; sonst Hinweis in der Zusammenfassung.
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+
+import ROUTING_JSON from '../src/routing.gen.json' with { type: 'json' };
+
+/** Routing-Tabelle (erzeugt aus llm-routing.jsonc). */
+export const ROUTING = ROUTING_JSON;
+export const PROVIDER_SECRETS = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', gemini: 'GEMINI_API_KEY', openrouter: 'OPENROUTER_API_KEY', 'workers-ai': null };
+const TIERS = ['lite', 'standard', 'pro'];
+
+/** Fehlende Secrets der ersten Modelle einer Voreinstellung (gleiche Regel wie src/routing.ts `presetComplete`). */
+export function missingFor(preset, ready, routing = ROUTING) {
+  const p = routing.presets[preset];
+  if (!p) return null;
+  const out = new Set();
+  for (const t of TIERS) {
+    const s = PROVIDER_SECRETS[routing.models[p.tiers[t].model].provider];
+    if (s && !ready.has(s)) out.add(s);
+  }
+  return [...out];
+}
+
+/** Welche Voreinstellung der Worker nutzen wird (wie src/routing.ts `choosePreset`). */
+export function choosePreset(wanted, ready, routing = ROUTING) {
+  const requested = routing.presets[wanted] ? wanted : routing.default;
+  const missing = missingFor(requested, ready, routing);
+  if (missing.length === 0) return { name: requested, requested, missing };
+  const alt = routing.fallbackOrder.find((n) => missingFor(n, ready, routing).length === 0);
+  return { name: alt ?? null, requested, missing };
+}
 
 export const STRIPE = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
 
@@ -38,17 +69,46 @@ export function plan(mode, env, existing) {
   const secrets = {};
   const notes = [];
   const errors = [];
+  const warnings = [];
   const generated = [];
+  let llm = null;
   const given = (n) => (env[n] ?? '').trim();
 
-  // KI: nur noch Anthropic (alle Guthaben-Stufen sind Claude-Modelle). GEMINI_API_KEY wird nicht mehr gebraucht.
-  if (given('ANTHROPIC_API_KEY')) secrets.ANTHROPIC_API_KEY = given('ANTHROPIC_API_KEY');
-  else if (have.has('ANTHROPIC_API_KEY')) notes.push('`ANTHROPIC_API_KEY`: bleibt wie im Worker gesetzt.');
-  else errors.push('AI_KEY');
-  if (given('GEMINI_API_KEY') || have.has('GEMINI_API_KEY')) {
-    notes.push('`GEMINI_API_KEY` wird nicht mehr genutzt (Guthaben nur mit Claude) und kann in GitHub und im Worker gelöscht werden.');
+  // KI: Schlüssel je Anbieter übertragen (nur wenn in GitHub gesetzt); vorhandene im Worker bleiben.
+  const ready = new Set();
+  for (const n of Object.values(PROVIDER_SECRETS).filter(Boolean)) {
+    if (given(n)) { secrets[n] = given(n); ready.add(n); }
+    else if (have.has(n)) ready.add(n);
   }
-
+  // Voreinstellung: Auswahlliste (wird im Worker gespeichert) → Repo-Variable → im Worker gespeichert → default.
+  const input = given('LLM_PRESET_INPUT');
+  const fromInput = input && input !== 'wie-bisher';
+  const variable = given('LLM_PRESET_VAR');
+  let wanted = ROUTING.default;
+  let source = 'Voreinstellung der Datei';
+  if (fromInput) { wanted = input; source = 'Auswahl beim Start'; }
+  else if (variable) { wanted = variable; source = 'Repo-Variable `LLM_PRESET`'; }
+  else if (have.has('LLM_PRESET')) { wanted = null; source = 'im Worker gespeichert'; }
+  if (wanted !== null) {
+    if (!ROUTING.presets[wanted]) {
+      errors.push('LLM_PRESET');
+      notes.push(`Voreinstellung \`${wanted}\` gibt es nicht (vorhanden: ${Object.keys(ROUTING.presets).map((n) => `\`${n}\``).join(', ')}).`);
+    } else {
+      secrets.LLM_PRESET = wanted;
+      const c = choosePreset(wanted, ready);
+      llm = { ...c, source };
+      if (!c.name) errors.push('AI_KEY');
+      else if (c.name !== wanted) {
+        warnings.push(`KI-Anbieter: „${wanted}“ (${source}) ist unvollständig, es fehlt ${c.missing.map((n) => `\`${n}\``).join(', ')}. ` +
+          `Der Server nutzt stattdessen **„${c.name}“**, bis der Schlüssel als GitHub-Secret eingetragen und neu deployt ist.`);
+      }
+    }
+  } else {
+    // Gespeicherte Wahl ist hier unbekannt (Secrets sind nicht lesbar): mindestens eine Voreinstellung muss vollständig sein.
+    const any = Object.keys(ROUTING.presets).find((n) => missingFor(n, ready).length === 0);
+    if (!any) errors.push('AI_KEY');
+    llm = { name: null, requested: null, missing: [], source };
+  }
   for (const n of ['SYNC_ENCRYPTION_KEY']) {
     if (given(n)) secrets[n] = given(n);
     else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
@@ -88,7 +148,7 @@ export function plan(mode, env, existing) {
   // AI Gateway (Protokolle, Kosten): neue Gateways verlangen immer ein Token. Ohne Token gehen Anfragen direkt an Anthropic.
   if (given('AI_GATEWAY_TOKEN')) secrets.AI_GATEWAY_TOKEN = given('AI_GATEWAY_TOKEN');
   else if (have.has('AI_GATEWAY_TOKEN')) notes.push('`AI_GATEWAY_TOKEN`: bleibt wie im Worker gesetzt.');
-  else notes.push('`AI_GATEWAY_TOKEN` fehlt (optional): Anfragen gehen direkt an Anthropic, nicht über das AI Gateway ' +
+  else notes.push('`AI_GATEWAY_TOKEN` fehlt (optional): Anfragen gehen direkt an den KI-Anbieter, nicht über das AI Gateway ' +
     '(keine Gateway-Protokolle für diese Stufen, Auswertungen funktionieren). Anleitung: backend/README.md → „AI Gateway“.');
   const skipped = [];
   for (const n of OPTIONAL) {
@@ -99,12 +159,15 @@ export function plan(mode, env, existing) {
     notes.push(`Optional übersprungen (kein GitHub-Secret gesetzt): ${skipped.map((n) => `\`${n}\``).join(', ')}. ` +
       'Das sind die Store-Prüfer für echte Käufe; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
   }
-  return { secrets, notes, errors, generated, webPurchase };
+  return { secrets, notes, errors, warnings, generated, webPurchase, llm };
 }
 
 const MISSING_HELP = {
-  AI_KEY: 'Der KI-Schlüssel für Guthaben: **`ANTHROPIC_API_KEY`** (Claude Haiku, Sonnet und Opus 5.5; console.anthropic.com → API Keys, ' +
-    'beginnt mit `sk-ant-`). Am besten mit Ausgabenlimit in der Anthropic-Konsole.',
+  AI_KEY: 'Kein KI-Anbieter vollständig: Für die gewählte Voreinstellung fehlt ein Schlüssel, und keine andere ist vollständig. ' +
+    'Je Anbieter: **`ANTHROPIC_API_KEY`** (console.anthropic.com → API Keys, `sk-ant-…`), **`OPENAI_API_KEY`** (platform.openai.com → API keys), ' +
+    '**`GEMINI_API_KEY`** (aistudio.google.com → Get API key), **`OPENROUTER_API_KEY`** (openrouter.ai → Keys). Workers AI (Voreinstellung `gratis`) ' +
+    'braucht keinen. Am besten mit Ausgabenlimit beim Anbieter. Anleitung: docs/anbieter-umstellen.md.',
+  LLM_PRESET: 'Unbekannte KI-Voreinstellung (Repo-Variable `LLM_PRESET` oder Auswahl): erlaubt sind die Namen unter `presets` in backend/llm-routing.jsonc.',
 };
 
 if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {
@@ -127,8 +190,15 @@ if (process.argv[1] && process.argv[1].endsWith('deploy-secrets.mjs')) {
     process.exit(1);
   }
   for (const n of r.generated) console.log(`::add-mask::${r.secrets[n]}`);
-  for (const v of Object.values(r.secrets)) for (const line of String(v).split('\n')) if (line.trim().length > 6) console.log(`::add-mask::${line.trim()}`);
+  for (const w of r.warnings) console.log(`::warning::${w.replace(/[`*]/g, '')}`);
+  for (const [k, v] of Object.entries(r.secrets)) if (k !== 'LLM_PRESET') for (const line of String(v).split('\n')) if (line.trim().length > 6) console.log(`::add-mask::${line.trim()}`);
   writeFileSync(outFile, JSON.stringify(r.secrets));
+  const llmLines = ['### KI-Anbieter', '',
+    ...r.warnings.map((w) => `> ⚠️ ${w}`), ...(r.warnings.length ? [''] : []),
+    r.llm?.name ? `- Voreinstellung: **${r.llm.name}** (${r.llm.source}${r.llm.name !== r.llm.requested ? `, gewünscht war „${r.llm.requested}“` : ''}) – ${ROUTING.presets[r.llm.name].description}`
+      : `- Voreinstellung: ${r.llm?.source ?? 'unbekannt'} (Details unten unter „Gesundheitsprüfung“)`,
+    ''];
+  appendFileSync(summaryFile, llmLines.join('\n') + '\n');
   appendFileSync(summaryFile, ['### Secrets', '', ...r.notes.map((n) => `- ${n}`), `- Übertragen: ${Object.keys(r.secrets).map((n) => `\`${n}\``).join(', ') || '–'}`, ''].join('\n') + '\n');
   if (r.secrets.ADMIN_SECRET) writeFileSync(`${outFile}.admin`, r.secrets.ADMIN_SECRET);
 }
