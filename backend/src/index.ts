@@ -112,14 +112,15 @@ function publicConfig(env: Env, cfg: Config) {
           {
             available: !!m,
             model: m?.id ?? '',
-            provider: m?.provider ?? null,
+            provider: m?.provider ?? '',
             displayName: m?.displayName ?? '',
             vendor: m?.vendor ?? '',
             label: m ? `${m.displayName} (${m.vendor})` : '',
             thinkingTokens: m?.thinkingTokens ?? 0,
             images: !!m && (m.images || !!fb?.images),
             fallback: fb ? { model: fb.id, provider: fb.provider, displayName: fb.displayName, vendor: fb.vendor } : null,
-            price: m ? cfg.prices[m.id] : null,
+            // Immer ein Preisobjekt: ältere Apps lesen `price` nicht nullable.
+            price: m ? cfg.prices[m.id] : { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 },
           },
         ];
       }),

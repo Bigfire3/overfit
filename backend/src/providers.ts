@@ -209,8 +209,9 @@ export function upstreamErrorFor(status: number, parsed: Record<string, unknown>
   // Anthropic/OpenAI/Gemini: { error: { message } }; Cloudflare (AI Gateway): { error: [{ code, message }] }; OpenRouter teils { error: "…" }.
   const detail = typeof err === 'string' ? err : Array.isArray(err) ? err.map((x) => x?.message).filter(Boolean).join('; ') : err?.message;
   const msg = detail || `KI-Anbieter antwortet mit HTTP ${status}`;
-  // 401/403: Schlüssel oder Gateway des Betreibers kaputt, nicht die Anfrage → wie ein Ausfall (Ausweichen, nichts abgebucht).
-  const unavailable = status < 400 || status >= 500 || status === 429 || status === 408 || status === 401 || status === 403;
+  // 401/403: Schlüssel oder Gateway des Betreibers kaputt; 404: Modell-ID in llm-routing.jsonc falsch oder abgekündigt;
+  // 402: Konto beim Anbieter leer (OpenRouter). Alles Betreiberfehler, nicht die Anfrage → wie ein Ausfall (Ausweichen, nichts abgebucht).
+  const unavailable = status < 400 || status >= 500 || [401, 402, 403, 404, 408, 429].includes(status);
   return new UpstreamError(unavailable, status, msg);
 }
 

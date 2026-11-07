@@ -84,8 +84,8 @@ describe('Adapter: Übersetzung Anthropic ↔ Anbieter', () => {
   });
 
   it('Fehler einheitlich: Ausfall (5xx, 429, 408, 401, 403) vs. Ablehnung (4xx), Meldung aus allen Formaten', () => {
-    for (const s of [500, 503, 529, 429, 408, 401, 403]) expect(upstreamErrorFor(s, null).unavailable, String(s)).toBe(true);
-    for (const s of [400, 404, 413, 422]) expect(upstreamErrorFor(s, null).unavailable, String(s)).toBe(false);
+    for (const s of [500, 503, 529, 429, 408, 401, 402, 403, 404]) expect(upstreamErrorFor(s, null).unavailable, String(s)).toBe(true);
+    for (const s of [400, 413, 422]) expect(upstreamErrorFor(s, null).unavailable, String(s)).toBe(false);
     expect(upstreamErrorFor(400, { error: { message: 'kaputt' } }).message).toBe('kaputt');
     expect(upstreamErrorFor(401, { error: [{ code: 1, message: 'gw' }] }).message).toBe('gw');
     expect(upstreamErrorFor(402, { error: 'kein Guthaben' }).message).toBe('kein Guthaben');
@@ -270,6 +270,11 @@ describe('/v1/config zeigt die wirksame Zuordnung', () => {
     });
     expect(r.body.modelNames['claude-sonnet-5-5']).toEqual({ displayName: 'Claude Sonnet 5.5', vendor: 'Anthropic' });
     expect(r.body.modelNames['@cf/meta/llama-3.1-8b-instruct']).toBeDefined();
+  });
+
+  it('Stufe ohne bereites Modell: price bleibt ein Objekt, provider ein String (ältere Apps parsen beides nicht nullable)', async () => {
+    const r = await rawFetch('/v1/config', baseEnv({ ANTHROPIC_API_KEY: undefined } as Partial<Env>));
+    expect(r.body.tiers.standard).toMatchObject({ available: false, provider: '', price: { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 } });
   });
 
   it('fehlender Schlüssel: Rückfall auf die nächste vollständige Voreinstellung', async () => {

@@ -98,6 +98,8 @@ export function plan(mode, env, existing) {
       const c = choosePreset(wanted, ready);
       llm = { ...c, source };
       if (!c.name) errors.push('AI_KEY');
+      // Produktion: zahlende Nutzer nicht still auf das Gratis-Modell schieben, nur weil ein Schlüssel fehlt.
+      else if (mode === 'production' && c.name === 'gratis' && wanted !== 'gratis') errors.push('AI_KEY');
       else if (c.name !== wanted) {
         warnings.push(`KI-Anbieter: „${wanted}“ (${source}) ist unvollständig, es fehlt ${c.missing.map((n) => `\`${n}\``).join(', ')}. ` +
           `Der Server nutzt stattdessen **„${c.name}“**, bis der Schlüssel als GitHub-Secret eingetragen und neu deployt ist.`);

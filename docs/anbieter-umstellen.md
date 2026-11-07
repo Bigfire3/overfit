@@ -30,7 +30,8 @@ aufgebraucht, antwortet das Ausweich-Modell Claude Haiku (wenn der Anthropic-Sch
 
 Die Auswahl bleibt gespeichert, auch für spätere automatische Deploys. Wer lieber eine feste Einstellung will: Repo-Variable
 `LLM_PRESET` (Settings → Secrets and variables → Actions → Variables) mit dem Namen anlegen; die gilt dann bei jedem Deploy
-mit „wie-bisher“ (eine Auswahl beim Start geht immer vor).
+mit „wie-bisher“, also auch bei jedem automatischen Deploy nach einem Merge, und überschreibt dann eine frühere Auswahl aus der
+Liste (eine Auswahl beim Start geht immer vor). Ohne Variable bleibt einfach die zuletzt gewählte.
 
 ## Schlüssel eintragen
 
@@ -47,8 +48,9 @@ Am besten beim Anbieter ein Ausgabenlimit setzen. Danach einmal „Backend deplo
 
 Der Deploy geht nicht still kaputt: Fehlt für die gewählte Voreinstellung ein Schlüssel, zeigt der Lauf eine gelbe Warnung
 („openai ist unvollständig, es fehlt OPENAI_API_KEY. Der Server nutzt stattdessen claude“), und der Server nimmt die erste
-vollständige Voreinstellung (Reihenfolge `fallbackOrder` in `backend/llm-routing.jsonc`). Ist gar keine vollständig, bricht der
-Deploy mit einer Anleitung ab.
+vollständige Voreinstellung (Reihenfolge `fallbackOrder` in `backend/llm-routing.jsonc`). Weil `gratis` keinen Schlüssel braucht,
+bleibt im Testbetrieb notfalls immer Workers AI übrig. **In Produktion** bricht der Deploy dagegen mit Anleitung ab, statt zahlende
+Nutzer ungefragt auf das Gratis-Modell zu schieben (außer du wählst `gratis` ausdrücklich).
 
 ## Preise und Modelle ändern
 

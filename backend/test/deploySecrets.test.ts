@@ -31,11 +31,14 @@ describe('scripts/deploy-secrets.mjs: KI-Schlüssel und Voreinstellung', () => {
     expect(p.warnings.join()).toContain('claude');
   });
 
-  it('ohne jeden Schlüssel bleibt nur Workers AI (gratis), mit Warnung', () => {
-    const p = full('production', {});
+  it('ohne jeden Schlüssel: Testbetrieb läuft mit Workers AI (gratis) und Warnung, Produktion bricht ab', () => {
+    const p = full('test', {});
     expect(p.errors).toEqual([]);
     expect(p.llm.name).toBe('gratis');
     expect(p.warnings.join()).toContain('ANTHROPIC_API_KEY');
+    expect(full('production', {}).errors).toContain('AI_KEY');
+    // Ausdrücklich gewählt ist gratis auch in Produktion erlaubt.
+    expect(full('production', { LLM_PRESET_INPUT: 'gratis' }).errors).toEqual([]);
   });
 
   it('Repo-Variable gilt, wenn nichts ausgewählt ist; Auswahl schlägt Variable', () => {
@@ -49,6 +52,13 @@ describe('scripts/deploy-secrets.mjs: KI-Schlüssel und Voreinstellung', () => {
     expect(p.secrets.LLM_PRESET).toBeUndefined();
   });
 
+  it('Auswahlliste im Workflow = alle Voreinstellungen der Datei', async () => {
+    const yml = (await import('../../.github/workflows/backend-deploy.yml?raw')).default as string;
+    const line = yml.split('\n').find((l) => l.includes('options: [wie-bisher'))!;
+    const options = line.slice(line.indexOf('[') + 1, line.indexOf(']')).split(',').map((x) => x.trim());
+    expect(options.slice(1).sort()).toEqual(Object.keys((await import('../scripts/deploy-secrets.mjs' as string)).ROUTING.presets).sort());
+  });
+
   it('unbekannte Voreinstellung → Fehler', () => {
     expect(full('test', { LLM_PRESET_VAR: 'quatsch', ANTHROPIC_API_KEY: 'a' }).errors).toContain('LLM_PRESET');
   });
@@ -57,7 +67,7 @@ describe('scripts/deploy-secrets.mjs: KI-Schlüssel und Voreinstellung', () => {
     const p = full('production', { ANTHROPIC_API_KEY: '   ' }, ['ANTHROPIC_API_KEY']);
     expect(p.secrets.ANTHROPIC_API_KEY).toBeUndefined();
     expect(p.llm.name).toBe('claude');
-    expect(full('production', { ANTHROPIC_API_KEY: '   ' }).llm.name).toBe('gratis');
+    expect(full('test', { ANTHROPIC_API_KEY: '   ' }).llm.name).toBe('gratis');
   });
 
   it('Rückfall-Regel stimmt mit dem Worker überein (src/routing.ts)', async () => {

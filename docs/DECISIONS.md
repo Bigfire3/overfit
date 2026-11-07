@@ -1438,3 +1438,15 @@ Fabian: „Ich möchte im Backend einfach zwischen den LLM Providern umstellen k
   dann antwortet das Ausweich-Modell (Haiku, teurer für den Betreiber, Nutzer zahlt den Llama-Preis). (3) `openai` nutzt GPT-5 auch für
   `pro` (kein eigenes, teureres Modell gewählt; bewusst ohne ungeprüfte Modell-IDs). (4) `gemini` hat nur ein Modell, also kein
   Ausweichen.
+- **Sonnet-Gegencheck (Befunde und Umgang):**
+  - Behoben: `/v1/config` schickte für eine Stufe ohne bereites Modell `price: null`/`provider: null`; die App (auch ältere) parst beides nicht
+    nullable, die ganze Config wäre gescheitert. Jetzt Nullpreis und leerer String, Test.
+  - Behoben: Ohne Schlüssel blieb wegen `gratis` immer eine „vollständige“ Voreinstellung, der versprochene Abbruch kam nie. Jetzt bricht
+    der **Produktions**-Deploy ab, statt ungefragt auf `gratis` zurückzufallen; im Testbetrieb bleibt der Rückfall mit Warnung. Doku angepasst.
+  - Behoben: HTTP 404 (falsche/abgekündigte Modell-ID in der Datei) und 402 (Anbieter-Konto leer, OpenRouter) gelten jetzt als Ausfall →
+    Ausweichen statt `upstream_rejected` für jeden Nutzer.
+  - Behoben: docs/backend-api.md beschreibt die neuen Felder; Test gleicht die Auswahlliste im Workflow mit den Voreinstellungen ab;
+    Doku sagt deutlich, dass die Repo-Variable eine Listen-Auswahl bei jedem automatischen Deploy überschreibt.
+  - Bewusst so: Die gespeicherte Config hängt nicht an der Backend-URL (Wechsel Test → Produktion ohne Netz zeigt kurz alte Namen/Preise,
+    beim nächsten Laden ersetzt); OpenRouter-Cache-Schreiben wird nicht getrennt gezählt (Overfit schickt dort kein `cache_control`);
+    alte App-Versionen zeigen bei neuen Modellen die Modell-ID statt des Namens (neue App liest `modelNames`).
