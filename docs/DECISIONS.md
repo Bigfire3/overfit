@@ -1280,3 +1280,8 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   - Behoben: Der antippbare Trainingsname bekommt `pressScale` wie alle tippbaren Elemente.
   - Verworfen: „Direkt starten“-Trainings hätten keine `templateId`. Falsch, denn beim Beenden entsteht das Workout und das Training wird ihm zugeordnet (`TemplateRepository`); „in diesem Workout“ greift also auch dort.
   - Bewusst offen: Die Werte werden einmal beim Öffnen der Workout-Seite geladen. Ein Training, das endet, während die Seite im Hintergrund liegt, erscheint erst beim nächsten Öffnen (die Seite wird nach einem Training ohnehin neu geöffnet). Ein leerer Name wird beim Speichern still durch den alten ersetzt (Platzhalter zeigt, dass das Feld leer ist). Feste Einrückung der Satzzeilen (Bildbreite 48 dp) und Import-Reihenfolge sind kosmetisch.
+
+## Story schließt sofort, „?“-Badge weg, Story nach Daten löschen (7.11.)
+- „?“-Badge am Übungsbild im Workout-Editor (ExerciseThumb) entfernt; das Bild bleibt tippbar (Übungsdetails). Kein Icon-Fallback „?“ in LineIcon vorhanden (andere „?“ im Code sind nur Platzhalter in Texten).
+- Ursache Ruckeln: Story-Route ist kein Tab, die Tab-Leiste kam erst nach dem Fade zurück. `ScreenMotion`: Wechsel Story → Tab ist instant (keine Animation), Leiste und Coach-Seite im selben Frame.
+- Ursache Story fehlte: `resetAll()` (Alle Daten löschen) ließ `overfit.coachStorySeen` stehen. Jetzt entfernt, Story kommt beim nächsten ersten Coach-Besuch wieder.

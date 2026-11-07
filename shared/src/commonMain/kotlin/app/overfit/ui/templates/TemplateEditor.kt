@@ -374,17 +374,13 @@ private fun ExerciseBlock(
     }
 }
 
-/** Exercise image with a small "?" in the corner: opens the exercise details. */
+/** Exercise image (tap opens the exercise details); no badge on it. */
 @Composable
 private fun ExerciseThumb(entry: DraftExercise, onDetails: () -> Unit) {
     val t = LocalStrings.current
     Box(Modifier.size(48.dp).clip(BlockShape.field).semantics { contentDescription = t.exerciseDetails(entry.exercise.name) }
         .pressableRow(onDetails)) {
         ExerciseImage(entry.exercise, size = 48.dp)
-        Box(
-            Modifier.align(Alignment.BottomEnd).padding(2.dp).size(16.dp).clip(CircleShape).background(Theme.colors.inverseBackground),
-            contentAlignment = Alignment.Center,
-        ) { Text("?", style = Theme.type.caption.copy(fontSize = 11.sp), tone = Tone.Inverse) }
     }
 }
 
