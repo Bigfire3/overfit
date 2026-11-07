@@ -52,6 +52,37 @@ Screenshots: `docs/screenshots/muskel-heatmap/`.
 4. Kalender → Tag → Training öffnen: Abschnitt „Trainierte Muskeln“ zeigt nur dieses Training, ohne Zeitraum-Chips.
 5. App auf Englisch: „Muscles trained“, „This week …“, Legende „High / Low“.
 
+## Coach-Tab als Chat (Session Coach-Chat, 7.11.)
+**Erledigt:** Der Coach-Tab ist ein Chat nach Fabians Entwurf: drei Vorschläge, Kontext-Chips „Profil“ (immer dabei, × pro Chat)
+und „Letztes Training“ (automatisch), „+“-Sheet (Fotos mit Nummern, Training, Workout, Verlauf 4 Wochen, Übung mit Bestwerten),
+Eingabeblock mit Modell-Chip und geschätzten Kosten, Antworten mit Markdown, Modell und Preis, Workout-Karte „Übernehmen“,
+„Frühere Chats“ (nur auf dem Gerät, löschen per Doppeltipp). Modell-Sheet „Overfit-Guthaben | Eigener Schlüssel“ mit kostenlosem
+Schlüssel-Test über die Modell-Liste des Anbieters, Guthaben-Popup (Kontostand, Aufladen, letzte Abrechnungen). Alles von der alten
+Coach-Seite liegt jetzt unter Einstellungen → Coach (Zugang, Guthaben, Standardmodell, automatische Auswertung, Coach-Profil,
+Coach-Anweisungen mit „Deine Ergänzung“, Gedächtnis, Auswertungen, Abrechnung, Prompts & Verbindungen, Story). Neue
+Grundanweisung (Personal Trainer, antwortet in der Sprache der Frage). Die Auswertung nach dem Training ist ein neuer Chat mit dem
+Training und „Werte mein Training aus“. DB v12 (Chat-Anhänge, Modell, Profil aus; Migration + Test). Details in DECISIONS.md.
+Screenshots: `docs/screenshots/coach-chat/`.
+**Offen:** Kamera-Kachel im „+“-Sheet (braucht Kamera-Zugriff per expect/actual, bis dahin nur Galerie); eine Chat-Frage ohne Netz wartet nicht
+wie früher die Auswertung in einer Warteschlange, sondern zeigt „Erneut versuchen“.
+
+### Bitte auf dem Handy testen (Coach-Chat)
+1. Coach-Tab: „Coach ⓘ“, rechts Liste und Stift; drei graue Vorschläge. Tipp auf einen Vorschlag setzt nur den Text ins Feld.
+2. Nach einem Training: Chips „Profil“ und „Push · heute“ über der Eingabe. Frage senden: Antwort links als Text, darunter Modell
+   und Preis (Guthaben) bzw. „… · eigener Schlüssel“. × am Profil-Chip, neue Frage: Profil geht für diesen Chat nicht mehr mit.
+3. Tipp auf „Profil“: Popup „Dein Profil“ (Ziel, Erfahrung, Tage, Größe, Gewicht aus dem Kalender, Equipment, Einschränkungen) → Speichern.
+4. „+“: Fotos antippen (Nummern 1, 2 …), „Verlauf“ oder ein Training wählen → „N hinzufügen“: Chips erscheinen, gesendete Nachricht
+   zeigt sie als kleine Karten über der Blase.
+5. „Mach mir ein neues Push-Workout“: Karte mit „Übernehmen“ → Workout wird wie ein Import übernommen.
+6. Modell-Chip: Sheet „Overfit-Guthaben | Eigener Schlüssel“. Eigener Schlüssel: Anbieter wählen, Schlüssel einfügen, „Testen“ →
+   „Schlüssel funktioniert · N Modelle gefunden“, Vorschläge antippen, „Übernehmen“. Falscher Schlüssel: verständliche Meldung.
+7. Mit Guthaben: Chip „x,xx €“ oben rechts → Popup mit Kontostand, „läuft nicht ab“, Aufladen, letzten Anfragen, „Alle Anfragen ansehen“.
+   Mit eigenem Schlüssel gibt es den Chip nicht.
+8. Liste-Icon: „Frühere Chats“, Chat öffnen, löschen per Doppeltipp (rot). Stift: neuer Chat.
+9. Einstellungen → Coach: alle Zeilen da; Coach-Anweisungen: Grundanweisung gekürzt, Ergänzung speichern; „Auf Standard zurück“ (Doppeltipp).
+10. Training beenden (automatische Auswertung an): Im Coach-Tab öffnet sich ein Chat „Werte mein Training aus“ mit dem Training.
+    Schalter aus: Abschluss zeigt den Hinweis, kein Chat.
+
 ## Hotfix: KI-Auswertung mit Guthaben (6.11.)
 **Erledigt:** Auswertungen über Guthaben scheiterten auf dem Testserver: Gemini Flash ohne Schlüssel, Claude über das (seit 2026 immer
 authentifizierte) Cloudflare AI Gateway mit 401, Lite-Modell bei Cloudflare abgekündigt. Backend geht ohne Gateway-Token direkt zum

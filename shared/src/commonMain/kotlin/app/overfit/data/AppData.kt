@@ -32,6 +32,7 @@ class AppData(
     val importer = TemplateImporter(exercises, templates, readSample)
     val catalog = CatalogSeeder(database, kv, readCatalog)
     val coachSettings = CoachSettingsStore(kv)
+    val coachChatPrefs = app.overfit.coach.CoachChatPrefsStore(kv).also { it.migrateLegacyInstructions(coachSettings) }
 
     /**
      * Emits whenever any training data changes (workouts, sets, photos, templates, exercises),
@@ -69,6 +70,7 @@ class AppData(
             database.bodyWeightDao().deleteAll()
         }
         coachSettings.reset()
+        coachChatPrefs.reset()
         workouts.photoFiles.list().forEach { workouts.photoFiles.delete(it) }
         kv.remove(CatalogSeeder.KEY_VERSION)
         kv.remove(KEY_SAMPLES_SEEDED)

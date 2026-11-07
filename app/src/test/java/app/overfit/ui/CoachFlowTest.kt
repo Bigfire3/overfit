@@ -32,6 +32,7 @@ import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,6 +58,9 @@ class CoachFlowTest {
 
     private val answer = """{"rating":8,"summary":"Starkes Training","positives":["Sauber"],"improvements":[],"tips":["Mehr schlafen"],"photo_feedback":null,"next_session":{"exercises":[{"exercise_id":"wg:bench-press","is_new":false,"rest_sec":90,"sets":[{"weight_kg":62.5,"reps":8,"duration_sec":null},{"weight_kg":62.5,"reps":8,"duration_sec":null}],"reason":"Alle Sätze geschafft"}],"note":null},"memory":"Ziel: Kraft."}"""
 
+    private val fake = FakeCoachTransport { _, _ -> CoachReply(answer, answer) }
+    private val workoutId = "w1"
+
     private fun setUp(withKey: Boolean, seedWorkout: Boolean = true): AppDependencies {
         store.setName("Fabi")
         store.completeOnboarding()
@@ -73,7 +77,6 @@ class CoachFlowTest {
                 data.workouts.finish(w, 3_600_000L)
             }
         }
-        val fake = FakeCoachTransport { _, _ -> CoachReply(answer, answer) }
         val deps = AppDependencies(
             store,
             Providers(HttpClient(MockEngine { respond("{}") })),
@@ -87,16 +90,38 @@ class CoachFlowTest {
     }
 
     @Test
-    fun reviewLastWorkoutAndAcceptPlan() {
+    fun sendToCoachOpensAReviewChatWithTheTrainingAttached() {
         setUp(withKey = true)
         compose.waitForTrainingTab()
-        compose.onNodeWithTag("tab:COACH").performClick()
+        // Profile → Coach → "Auswertungen" → "Letztes Training auswerten" → "An Coach senden" = new chat in the Coach tab.
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        waitFor("Auswertungen")
+        compose.onNodeWithText("Auswertungen").performScrollTo().performClick()
         waitFor("Letztes Training auswerten")
         compose.onNodeWithText("Letztes Training auswerten").performClick()
         waitFor("An Coach senden")
         compose.onNodeWithText("An Coach senden").performClick()
+        waitFor("Werte mein Training aus")
+        compose.waitUntilState(10_000) { fake.prompts.any { it.schemaName == app.overfit.coach.CoachChatSchema.NAME } }
+        val prompt = fake.prompts.last { it.schemaName == app.overfit.coach.CoachChatSchema.NAME }
+        assertTrue(prompt.dynamicSystem, prompt.dynamicSystem.contains("## Attached training"))
+        assertTrue(prompt.dynamicSystem, prompt.dynamicSystem.contains("Bench Press"))
+        val chats = runBlocking { data.database.coachChatDao().allChats() }
+        assertEquals(1, chats.size)
+    }
 
+    @Test
+    fun structuredReviewPlanCanStillBeAccepted() {
+        // Reviews from before the chat (and the review engine) still open from Profile → Coach → "Auswertungen".
+        val deps = setUp(withKey = true)
+        compose.waitForTrainingTab()
+        runBlocking { deps.coach.requestSessionReview(workoutId) }
+        deps.coach.processQueue()
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        waitFor("Auswertungen")
+        compose.onNodeWithText("Auswertungen").performScrollTo().performClick()
         waitFor("8/10")
+        compose.onAllNodes(hasText("8/10"))[0].performClick()
         waitFor("Mehr schlafen")
         waitFor("Bench Press", substring = true)
         compose.onNodeWithText("Alle annehmen").performClick()
@@ -113,7 +138,10 @@ class CoachFlowTest {
     fun withoutAccessTheDemoReviewIsOffered() {
         setUp(withKey = false)
         compose.waitForTrainingTab()
-        compose.onNodeWithTag("tab:COACH").performClick()
+        // Reviews moved into the settings: Profile → Coach → "Auswertungen".
+        compose.onNodeWithTag("tab:PROFILE").performClick()
+        waitFor("Auswertungen")
+        compose.onNodeWithText("Auswertungen").performScrollTo().performClick()
         waitFor("Letztes Training auswerten")
         compose.onNodeWithText("Letztes Training auswerten").performClick()
         waitFor("Kein KI-Zugang")
@@ -126,7 +154,7 @@ class CoachFlowTest {
     fun editingTheCoachMemory() {
         setUp(withKey = true, seedWorkout = false)
         compose.waitForTrainingTab()
-        compose.onNodeWithTag("tab:COACH").performClick()
+        compose.onNodeWithTag("tab:PROFILE").performClick()
         waitFor("Coach-Gedächtnis")
         compose.onNodeWithText("Coach-Gedächtnis").performScrollTo().performClick()
         waitFor("Was der Coach über dich weiß", substring = true)

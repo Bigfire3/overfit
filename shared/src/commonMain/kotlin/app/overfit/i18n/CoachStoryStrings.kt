@@ -4,8 +4,8 @@ package app.overfit.i18n
 class StoryPage(val title: String, val text: String, val action: String? = null)
 
 /**
- * Texts of the Coach story (opens from the "Coach" title of the Coach tab). Part of [CoachHubStrings] as `story`.
- * Page 1 = what the AI can evaluate, pages 2–4 = the ways to use it.
+ * Texts of the Coach story (opens from the "Coach ⓘ" title of the Coach tab and from the settings). Part of
+ * [CoachHubStrings] as `story`. Page 1 = the chat, pages 2–4 = the ways to use it (no invite programme any more).
  */
 class CoachStoryStrings(
     /** Accessibility label of the info button next to the title. */
@@ -27,22 +27,22 @@ val GermanCoachStory = CoachStoryStrings(
     back = "Zurück",
     progress = { page, total -> "Seite $page von $total" },
     whatItDoes = StoryPage(
-        "Dein Coach wertet aus",
-        "Trainings, Fortschritt und Gewichte. Er schlägt dir neue Workouts vor und beantwortet Fragen. Ohne Zugang siehst du eine Demo.",
+        "Frag deinen Coach",
+        "Im Chat: Dein Profil und dein letztes Training sind schon dabei, mit „+“ hängst du Fotos, Workouts oder deinen Verlauf an. Vorschläge übernimmst du mit einem Tipp. Ohne Zugang antwortet eine Demo.",
     ),
     ownKey = StoryPage(
         "Mit eigenem Schlüssel",
-        "Du trägst deinen API-Schlüssel ein. Deine Daten gehen direkt an den Anbieter, nicht über Overfit.",
+        "Anthropic, OpenAI, Google oder OpenRouter: Schlüssel eintragen, testen, Modell wählen. Alles geht direkt an den Anbieter, Overfit sieht weder Schlüssel noch Inhalte.",
         "Schlüssel einrichten",
     ),
     credit = StoryPage(
         "Mit Guthaben",
-        "Kein Schlüssel nötig: Du lädst Guthaben auf und zahlst nur, was eine Auswertung wirklich kostet.",
+        "Kein Schlüssel nötig: Claude Haiku, Sonnet oder Opus. Du lädst Guthaben auf, es läuft nicht ab, und jede Anfrage steht mit ihrem echten Preis in der Abrechnung.",
         "Zum Guthaben",
     ),
     subscription = StoryPage(
         "Mit deinem Abo",
-        "Kopiere fertige Prompts in Claude, ChatGPT oder Gemini und nutze dein normales Abo.",
+        "Kopiere fertige Prompts in Claude, ChatGPT oder Gemini und nutze dein normales Abo. Du findest sie in den Einstellungen unter „Coach“.",
         "Zu den Verbindungen",
     ),
 )
@@ -54,22 +54,22 @@ val EnglishCoachStory = CoachStoryStrings(
     back = "Back",
     progress = { page, total -> "Page $page of $total" },
     whatItDoes = StoryPage(
-        "Your coach evaluates",
-        "Workouts, progress and weights. It suggests new workouts and answers questions. Without access you see a demo.",
+        "Ask your coach",
+        "In the chat your profile and your last training are already attached; with \"+\" you add photos, workouts or your history. Apply suggestions with one tap. Without access a demo answers.",
     ),
     ownKey = StoryPage(
         "With your own key",
-        "Enter your API key. Your data goes straight to the provider, not through Overfit.",
+        "Anthropic, OpenAI, Google or OpenRouter: enter your key, test it, pick a model. Everything goes straight to the provider; Overfit sees neither your key nor your content.",
         "Set up key",
     ),
     credit = StoryPage(
         "With credit",
-        "No key needed: you top up credit and only pay what an analysis really costs.",
+        "No key needed: Claude Haiku, Sonnet or Opus. Top up credit, it never expires, and every request shows its real price in the billing list.",
         "Go to credit",
     ),
     subscription = StoryPage(
         "With your subscription",
-        "Copy ready-made prompts into Claude, ChatGPT or Gemini and use your normal subscription.",
+        "Copy ready-made prompts into Claude, ChatGPT or Gemini and use your normal subscription. You find them in the settings under \"Coach\".",
         "See connections",
     ),
 )

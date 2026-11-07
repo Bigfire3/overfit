@@ -426,6 +426,55 @@ class MigrationTest {
         }
     }
 
+    /**
+     * v11 → v12 (coach chat redesign): coach_chat.profileOff (default 0) and coach_chat_message.attachments / providerId /
+     * model (nullable). Existing chats and messages stay unchanged and read as "profile on, no attachments".
+     */
+    @Test
+    fun migration11to12KeepsChatsAndAddsAttachmentColumns() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v11 = helper.createDatabase(11)
+        v11.execSQL("INSERT INTO coach_chat (id, title, createdAt, updatedAt) VALUES ('c1', 'Frage', 10, 10)")
+        v11.execSQL(
+            "INSERT INTO coach_chat_message (id, chatId, fromUser, text, status, createdAt, workoutJson, photoIds, costMicro, servedModel, fallbackFrom, errorKind, demo) " +
+                "VALUES ('m1', 'c1', 1, 'Wie lief es?', 'DONE', 11, NULL, 'p1', NULL, NULL, NULL, NULL, 0)",
+        )
+        v11.close()
+        helper.runMigrationsAndValidate(12, OverfitDatabase.MIGRATIONS.toList()).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val dao = db.coachChatDao()
+            assertEquals(false, dao.chat("c1")!!.profileOff)
+            val old = dao.messages("c1").single()
+            assertEquals("Wie lief es?", old.text)
+            assertEquals("p1", old.photoIds)
+            assertEquals(null, old.attachments)
+            dao.upsertChat(dao.chat("c1")!!.copy(profileOff = true))
+            dao.upsertMessage(
+                CoachChatMessageEntity(
+                    "m2", "c1", fromUser = false, text = "Gut", status = "DONE", createdAt = 12,
+                    attachments = "[]", providerId = "ANTHROPIC", model = "claude-sonnet-5-5",
+                ),
+            )
+            assertEquals(true, dao.chat("c1")!!.profileOff)
+            val fresh = dao.messages("c1").first { it.id == "m2" }
+            assertEquals("claude-sonnet-5-5", fresh.model)
+            assertEquals("ANTHROPIC", fresh.providerId)
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

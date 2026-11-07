@@ -82,12 +82,12 @@ class CoachStoryTest {
 
         compose.onNodeWithTag("story:close").performClick()
         awaitStoryGone()
-        await("Prompts & Vorlagen".uppercase())
+        await("Wie lief mein Training?")
 
         // Away and back: no story by itself anymore.
         compose.onNodeWithTag("tab:PHOTOS").performClick()
         compose.onNodeWithTag("tab:COACH").performClick()
-        await("Prompts & Vorlagen".uppercase())
+        await("Wie lief mein Training?")
         assertFalse(storyShown())
     }
 
@@ -96,7 +96,7 @@ class CoachStoryTest {
         kv.put(AppStore.KEY_COACH_STORY_SEEN, "1")
         launch()
         compose.onNodeWithTag("tab:COACH").performClick()
-        await("Prompts & Vorlagen".uppercase())
+        await("Wie lief mein Training?")
         assertFalse(storyShown())
 
         compose.onNodeWithTag("coach:storyOpen").performClick()
@@ -117,7 +117,7 @@ class CoachStoryTest {
         await(s.subscription.title)
         tapRight()
         awaitStoryGone()
-        await("Prompts & Vorlagen".uppercase())
+        await("Wie lief mein Training?")
     }
 
     @Test

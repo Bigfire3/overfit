@@ -357,6 +357,35 @@ class CoachServiceTest {
     }
 
     @Test
+    fun backupRestoresChatPrefsAndMovesLegacyInstructions() = runBlocking {
+        val prefs = data.coachChatPrefs
+        prefs.setProfile(app.overfit.coach.AthleteProfile(goal = app.overfit.coach.TrainingGoal.STRENGTH, heightCm = 182))
+        prefs.setAddition("Antworte kurz.")
+        prefs.setAutoReview(false)
+        val backup = app.overfit.ui.coach.CoachBackup(coach, prefs)
+        val exported = requireNotNull(backup.export())
+
+        data.resetAll()
+        assertEquals(app.overfit.coach.CoachChatPrefs(), prefs.state.value)
+
+        backup.import(exported)
+        val restored = prefs.state.value
+        assertEquals(app.overfit.coach.TrainingGoal.STRENGTH, restored.profile.goal)
+        assertEquals(182, restored.profile.heightCm)
+        assertEquals("Antworte kurz.", restored.addition)
+        assertFalse(restored.autoReview)
+
+        // An older backup: a whole edited instruction, no chat settings → it becomes the addition.
+        data.resetAll()
+        val legacy = kotlinx.serialization.json.buildJsonObject {
+            put("settings", kotlinx.serialization.json.Json.encodeToJsonElement(app.overfit.coach.CoachSettings.serializer(), app.overfit.coach.CoachSettings(instructions = "Alt")))
+        }
+        backup.import(legacy)
+        assertEquals("Alt", prefs.state.value.addition)
+        assertNull(coach.settings.state.value.instructions)
+    }
+
+    @Test
     fun resetAllClearsCoachData() = runBlocking {
         seedFinishedWorkout()
         coach.requestSessionReview(sessionId)

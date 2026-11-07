@@ -1455,3 +1455,38 @@ Fabian: „Ich möchte im Backend einfach zwischen den LLM Providern umstellen k
   - Bewusst so: Die gespeicherte Config hängt nicht an der Backend-URL (Wechsel Test → Produktion ohne Netz zeigt kurz alte Namen/Preise,
     beim nächsten Laden ersetzt); OpenRouter-Cache-Schreiben wird nicht getrennt gezählt (Overfit schickt dort kein `cache_control`);
     alte App-Versionen zeigen bei neuen Modellen die Modell-ID statt des Namens (neue App liest `modelNames`).
+## Coach-Tab als Chat (Session Coach-Chat, 7.11.)
+Umsetzung des von Fabian freigegebenen Entwurfs (7 Bildschirme). Annahmen und Entscheidungen:
+- **Kontext nur, was mitgeschickt wird:** Der Chat schickt nicht mehr den ganzen Trainingsstand („Kontext kopieren“-Text) mit, sondern
+  das Profil (Chip „Profil“, standardmäßig an; × gilt für den Chat und wird in `coach_chat.profileOff` gespeichert) und die Anhänge.
+  Profil = Coach-Profil (Ziel, Erfahrung, Tage/Woche, Größe, Equipment, Einschränkungen), Name/Alter/Gewicht aus dem Kalender und das
+  Coach-Gedächtnis. Ohne Profil gehen nur App-Sprache, Einheiten und das Datum mit. Anhänge aller Fragen eines Chats bleiben im
+  System-Prompt (Folgefragen beziehen sich darauf), Fotos gehen nur mit der Frage, an der sie hängen. Ohne Anhang steht im Prompt, dass
+  nichts weiter angehängt ist und der Coach um „+“ bitten soll (passt zur Grundanweisung „nur mitgeschickte Daten, nichts erfinden“).
+- **Antwortsprache:** Grundanweisung „Antworte in der Sprache der Frage“; im Profilblock des Chats wird „Reply language“ zu „App language
+  … (answer in the language of the question)“. Auswertungen (ohne Frage) behalten die App-Sprache.
+- **Grundanweisung:** neuer Personal-Trainer-Text (DE/EN), die bisherigen Steigerungs-, Stagnations- und Calisthenics-Regeln stehen darin
+  weiter; Format- und Übungsregeln (`CoachChatSchema.RULES`, Beispiel, Übungsliste, `OUTPUT_RULES` der Auswertung) sind unverändert.
+  „Deine Ergänzung“ (eigener Speicher `overfit.coachChat.v1`) wird an jede Anfrage angehängt (Chat und Auswertung, jedes Modell, eigener
+  Schlüssel und Guthaben). Wer früher die ganze Anweisung bearbeitet hatte: Der Text wandert einmalig in die Ergänzung, damit nichts
+  verloren geht und trotzdem die neue Grundanweisung gilt.
+- **Schlüssel testen:** kostenlos über die Modell-Liste des Anbieters, direkt vom Gerät (Anthropic/OpenAI `GET /v1/models`, Google
+  `GET /v1beta/models` mit `x-goog-api-key`, nur Modelle mit `generateContent`, ohne `models/`-Präfix). OpenRouters Modell-Liste ist
+  öffentlich und sagt nichts über den Schlüssel: Dort prüft zuerst `GET /api/v1/key` den Schlüssel, dann kommt die Liste. OpenAI-Liste
+  ohne Audio/Bild/Embedding-Modelle. 402 = gültig, aber kein Guthaben beim Anbieter.
+- **Chat-Verlauf nur lokal:** Tabellen `coach_chat`/`coach_chat_message` (seit v6) bleiben auf dem Gerät (und im eigenen Backup); v12 ergänzt
+  `profileOff`, `attachments` (JSON), `providerId`, `model` (reine Ergänzung, AutoMigration, Test `migration11to12…`).
+- **Auswertung als Chat, ohne Warteschlange:** Die Auswertung nach dem Training ist ein Chat (neuer Chat, Training angehängt, „Werte mein
+  Training aus“, sofort gesendet, wenn die Einstellung an ist und KI-Zugang besteht; „Später“ im Abschluss überspringt sie einmal). Ohne
+  Netz wartet sie nicht mehr in der Warteschlange der alten Auswertung, sondern die Antwort zeigt den Fehlergrund und „Erneut versuchen“
+  (bewusst: ein Chat soll nicht später ungefragt Geld ausgeben). Alte strukturierte Auswertungen bleiben unter Einstellungen → Coach →
+  Auswertungen lesbar, inklusive „Alle annehmen“ für den Plan.
+- **Modell-Chip ändert den Zugang global:** Modell-Sheet im Chat und „KI-Zugang/Standardmodell“ in den Einstellungen sind dieselbe Auswahl
+  (eine Wahrheit, kein Modell pro Chat). Guthaben-Chip nur, wenn Guthaben der Zugang ist (mit eigenem Schlüssel keine Backend-Anfrage).
+  Preise im Guthaben-Teil des Sheets lädt die App erst, wenn Guthaben schon der Zugang ist oder die Person selbst auf „Overfit-Guthaben“
+  tippt (Opt-in wie „Guthaben ansehen“).
+- **Gegencheck (Sonnet, effort high):** behoben: Ergänzung fehlte bei Auswertungen; Chat-Daten wurden bei jedem Tab-Besuch neu gebaut
+  (Collector-Leck); Backup ohne Coach-Profil/Ergänzung; „Push · heute“ blieb im Verlauf stehen (Datum wird jetzt beim Anzeigen berechnet);
+  OpenRouter-Vorschläge zeigten nur exotische Modelle; Migration der alten Anweisung konnte lange Texte abschneiden. Weitere UI-Punkte
+  (gelöschter offener Chat, Entwurf überschreibt Getipptes, Foto-Obergrenze, Fehlergrund, Häkchen-Farbe, pressScale, Trennlinien,
+  Aufladen-Knöpfe, Größen-Prüfung, Tests für Prompts/„Im Chat nutzen“/Backup) im selben PR.

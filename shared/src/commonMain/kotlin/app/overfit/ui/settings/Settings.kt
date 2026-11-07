@@ -60,14 +60,12 @@ fun SettingsScreen(
     store: AppStore,
     providers: Providers,
     today: LocalDate,
-    onConnect: () -> Unit,
-    onCoachMemory: () -> Unit,
-    onCoach: () -> Unit = {},
     onAbout: () -> Unit,
     fuelSession: FuelSession,
-    onFuel: () -> Unit,
-    onAiCoach: () -> Unit = {},
-    onChatNotes: () -> Unit = {},
+    coach: app.overfit.coach.CoachService,
+    coachPrefs: app.overfit.coach.CoachChatPrefsStore,
+    chatFeature: app.overfit.chat.ChatFeature,
+    coachNav: CoachSettingsNav,
     restAlerts: RestAlerts,
     share: ShareDependencies,
     onReset: () -> Unit,
@@ -144,13 +142,8 @@ fun SettingsScreen(
         if (notificationsAllowed == false) Hint(t.notificationsDeniedHint)
         if (exactAllowed == false) Hint(t.exactAlarmHint)
 
-        // Everything about the coach and AI access lives in the Coach tab; here only the link (and Fuel, the wallet).
-        val hub = app.overfit.i18n.LocalCoachStrings.current.hub
-        PanelSection(t.ai) {
-            ListRow(hub.profileLink, onClick = onCoach)
-            FuelRow(fuelSession, fuelActive = state.providerId == app.overfit.ai.ProviderId.FUEL, onClick = onFuel)
-        }
-        Hint(hub.profileLinkHint)
+        // Everything about the coach and the AI access (the Coach tab is the chat).
+        CoachSettingsSection(state, providers, coach, coachPrefs, chatFeature, fuelSession, coachNav)
 
         PanelSection(t.app) {
             ListRow(t.about, onClick = onAbout)
@@ -218,7 +211,7 @@ private fun DeveloperSection(fuel: FuelAccess) {
 
 /** Profile → "Fuel · 4,20 €" (or "coming soon" / "Demo"). */
 @Composable
-private fun FuelRow(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit) {
+internal fun FuelRow(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit) {
     val f = LocalFuelStrings.current
     val demo by session.demo.collectAsStateWithLifecycle()
     val service = session.current()
