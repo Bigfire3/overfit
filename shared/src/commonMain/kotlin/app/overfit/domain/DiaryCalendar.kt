@@ -33,18 +33,23 @@ object DiaryCalendar {
     /** Months always shown besides the current one, even when empty (BeReal-style memories). */
     const val MIN_MONTHS_BACK = 3
 
+    /** Future months the calendar tab shows above the current one. */
+    const val MONTHS_AHEAD = 12
+
     /**
      * Months from [today]'s month back to the month of [earliest], newest first, as (year, month).
      * Empty months in between are included, and at least the last [MIN_MONTHS_BACK] months plus the
-     * current one, so the diary never shows a single lonely month.
+     * current one, so the diary never shows a single lonely month. [ahead] adds that many future months on top
+     * (calendar tab: [MONTHS_AHEAD]); the current month is then at index [ahead].
      */
-    fun months(earliest: LocalDate?, today: LocalDate): List<Pair<Int, Int>> {
+    fun months(earliest: LocalDate?, today: LocalDate, ahead: Int = 0): List<Pair<Int, Int>> {
         val start = earliest?.takeIf { it <= today } ?: today
         val floor = today.minus(DatePeriod(months = MIN_MONTHS_BACK))
         val from = if (start < floor) start else floor
         val out = mutableListOf<Pair<Int, Int>>()
-        var y = today.year
-        var m = today.monthNumber
+        val top = today.plus(DatePeriod(months = ahead.coerceAtLeast(0)))
+        var y = top.year
+        var m = top.monthNumber
         while (y > from.year || (y == from.year && m >= from.monthNumber)) {
             out += y to m
             if (m == 1) { m = 12; y-- } else m--

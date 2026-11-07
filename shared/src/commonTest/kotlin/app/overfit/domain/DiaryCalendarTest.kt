@@ -77,4 +77,22 @@ class DiaryCalendarTest {
         assertEquals(LocalDate(2026, 10, 26), DiaryCalendar.weekOf(LocalDate(2026, 11, 1), DayOfWeek.MONDAY))
         assertEquals(LocalDate(2026, 11, 1), DiaryCalendar.weekOf(LocalDate(2026, 11, 1), DayOfWeek.SUNDAY))
     }
+
+    @Test fun monthsAheadPutsTwelveFutureMonthsOnTopAndTodayAtIndexAhead() {
+        val today = LocalDate(2026, 11, 7)
+        val months = DiaryCalendar.months(null, today, DiaryCalendar.MONTHS_AHEAD)
+        assertEquals(12, DiaryCalendar.MONTHS_AHEAD)
+        assertEquals(2027 to 11, months.first()) // 12 months ahead, newest first
+        assertEquals(2026 to 11, months[DiaryCalendar.MONTHS_AHEAD])
+        assertEquals(2026 to 12, months[DiaryCalendar.MONTHS_AHEAD - 1])
+        assertEquals(2026 to 8, months.last()) // still at least three months back
+        assertEquals(12 + 1 + 3, months.size)
+        assertEquals(months, months.distinct())
+    }
+
+    @Test fun monthsAheadZeroKeepsOldBehaviour() {
+        val today = LocalDate(2026, 11, 7)
+        assertEquals(DiaryCalendar.months(null, today), DiaryCalendar.months(null, today, 0))
+        assertEquals(DiaryCalendar.months(null, today), DiaryCalendar.months(null, today, -3))
+    }
 }

@@ -19,6 +19,7 @@ data class Strings(
     val share: ShareStrings,
     val history: HistoryStrings,
     val photos: PhotoStrings,
+    val bodyWeight: BodyWeightStrings,
     val muscles: MuscleStrings,
 
     // Onboarding
@@ -260,6 +261,7 @@ val German = Strings(
     share = ShareGerman,
     history = HistoryGerman,
     photos = PhotoGerman,
+    bodyWeight = BodyWeightGerman,
     muscles = MuscleGerman,
     next = "Weiter",
     back = "Zurück",
@@ -481,6 +483,7 @@ val English = Strings(
     share = ShareEnglish,
     history = HistoryEnglish,
     photos = PhotoEnglish,
+    bodyWeight = BodyWeightEnglish,
     muscles = MuscleEnglish,
     next = "Continue",
     back = "Back",
