@@ -319,30 +319,19 @@ class DayWithOverfitTest {
             compose.onAllNodes(hasContentDescription("Tag ${realToday().dayOfMonth}, 1 Foto")).fetchSemanticsNodes().isNotEmpty()
         }
 
-        // --- Coach: the review request waits offline, goes out on the next app start ---------
-        compose.openCalendarDay(realToday().dayOfMonth)
-        waitFor("Push")
-        compose.onAllNodes(hasText("Push"))[0].performClick()
-        waitFor("Coach-Auswertung")
-        click("Coach-Auswertung")
-        waitFor("Wartet auf Verbindung")
+        // --- Coach: "Save" started the automatic review as a new chat (training attached, "Werte mein Training aus").
+        // Offline the answer fails; "Erneut versuchen" sends it once the network is back.
+        tab("Coach")
+        waitFor("Werte mein Training aus")
+        waitFor("Erneut versuchen")
         online = true
-        process++ // app restart → the queue is processed
-        compose.waitForTrainingTab()
-        compose.openCalendarDay(realToday().dayOfMonth)
-        waitFor("Push")
-        compose.onAllNodes(hasText("Push"))[0].performClick()
-        waitFor("Coach-Auswertung")
-        click("Coach-Auswertung")
-        waitFor("8/10")
-        waitFor("Mehr schlafen")
-        waitFor("Alle annehmen")
-        click("Alle annehmen")
-        waitFor("Plan übernommen. Das Workout ist angepasst.")
-        compose.waitUntilState(10_000) {
-            templates().any { t -> runBlocking { data.templates.get(t.id) }?.exercises?.any { e -> e.sets.firstOrNull()?.weightKg == 62.5 } == true }
-        }
-        back(); back()
+        click("Erneut versuchen")
+        waitFor("Hier ist ein Vorschlag für morgen.")
+        val reviewPrompt = coachTransport.prompts.last()
+        assertTrue(reviewPrompt.dynamicSystem, reviewPrompt.dynamicSystem.contains("## Attached training"))
+        assertEquals("Werte mein Training aus", reviewPrompt.user)
+        compose.onNodeWithTag("coach:new").performClick() // the chat part further down starts a fresh chat
+        waitFor("Wie lief mein Training?")
 
         // --- AI template: copy the prompt, import a sample answer from the clipboard --------
         tab("Workouts")

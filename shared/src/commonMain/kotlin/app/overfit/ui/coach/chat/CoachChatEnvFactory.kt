@@ -12,6 +12,7 @@ import app.overfit.i18n.stringsFor
 import app.overfit.ui.AppDependencies
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -27,8 +28,20 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
     val store = deps.store
     fun strings(): CoachChatStrings = coachChatStringsFor(store.state.value.language)
     fun label(row: HistoryRow): String = row.name + " · " + dayLabel(row.startedAt, deps.today(), strings(), store.state.value.language)
-    val access = deps.coach.access()
-    val model = (access as? CoachAccess.Ready)?.let { app.overfit.fuel.modelLabel(deps.coach.settings.state.value.model(it.providerId)) }
+    // Model chip and cost follow the access and the chosen model live. The cost needs the backend's price table: it is
+    // only asked while credit is the chosen access (own key: no backend request, OwnKeyPrivacyTest).
+    val access = kotlinx.coroutines.flow.combine(store.state, deps.coach.settings.state) { s, settings -> s to settings }
+    val modelLabel = access
+        .map { (s, settings) ->
+            app.overfit.ui.coach.modelChipLabel(s, settings, deps.providers.fuel.available, app.overfit.i18n.coachSettingsStringsFor(s.language))
+        }
+        .stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "")
+    val cost = access
+        .map { (s, settings) ->
+            val config = if (s.providerId == app.overfit.ai.ProviderId.FUEL) deps.providers.fuel.config() else null
+            app.overfit.ui.coach.chatCostEstimate(s, settings, config, s.language)
+        }
+        .stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
     return CoachChatEnv(
         chat = deps.coachChat,
         prefs = deps.data.coachChatPrefs,
@@ -63,8 +76,8 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
                 if (date == null) weight else strings().weightAsOf(weight, stringsFor(s.language).date(date))
             }
         },
-        modelLabel = MutableStateFlow(model ?: strings().noAccess),
-        costEstimate = MutableStateFlow(null),
+        modelLabel = modelLabel,
+        costEstimate = cost,
     )
 }
 

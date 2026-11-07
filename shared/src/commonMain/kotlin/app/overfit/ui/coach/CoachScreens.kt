@@ -89,6 +89,8 @@ class CoachNav(
     val memory: () -> Unit,
     val settings: () -> Unit,
     val openTemplate: (Long) -> Unit,
+    /** "Send to coach" on a training: a new chat with the training attached ("Review my training"). */
+    val reviewInChat: ((String) -> Unit)? = null,
 )
 
 // ---------------------------------------------------------------------------------------------
@@ -160,7 +162,12 @@ fun CoachSessionScreen(coach: CoachService, sessionId: String, unit: WeightUnit,
         Screen(
             header = { BackHeader(LocalStrings.current.back, nav.back) },
             footer = if (access is CoachAccess.Ready) {
-                { PrimaryButton(c.sendToCoach, onClick = { requested = true; coach.startSessionReview(sessionId) }) }
+                {
+                    PrimaryButton(c.sendToCoach, onClick = {
+                        val chat = nav.reviewInChat
+                        if (chat != null) chat(sessionId) else { requested = true; coach.startSessionReview(sessionId) }
+                    })
+                }
             } else null,
         ) {
             Title(c.reviewTitle)

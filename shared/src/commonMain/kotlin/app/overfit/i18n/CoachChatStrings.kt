@@ -35,6 +35,10 @@ class CoachChatStrings(
     val remove: (label: String) -> String,
     val photoN: (n: Int) -> String,
     val today: String,
+    /** Prefilled question of the automatic review after a training (new chat with the training attached). */
+    val reviewMyTraining: String,
+    /** Finish flow when the automatic review is switched off. */
+    val finishAutoOff: String,
     val yesterday: String,
     val close: String,
     val back: String,
@@ -113,6 +117,8 @@ val GermanCoachChat = CoachChatStrings(
     remove = { "$it entfernen" },
     photoN = { "Foto $it" },
     today = "heute",
+    reviewMyTraining = "Werte mein Training aus",
+    finishAutoOff = "Automatische Auswertung ist aus (Einstellungen → Coach). Im Coach-Tab ist dein Training schon angehängt.",
     yesterday = "gestern",
     close = "Schließen",
     back = "Zurück",
@@ -197,6 +203,8 @@ val EnglishCoachChat = CoachChatStrings(
     remove = { "Remove $it" },
     photoN = { "Photo $it" },
     today = "today",
+    reviewMyTraining = "Review my training",
+    finishAutoOff = "Automatic review is off (Settings → Coach). In the Coach tab your training is already attached.",
     yesterday = "yesterday",
     close = "Close",
     back = "Back",
