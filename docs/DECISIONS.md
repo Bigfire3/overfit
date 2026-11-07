@@ -1308,7 +1308,7 @@ möglichst genau sehen, wo, wann, was angefragt wurde“.
   Opus 4 $/20 $ je MTok, Cache-Lesen 0,01/0,20/0,20 $, Cache-Schreiben 1,25 × Eingabe. `MARKUP_BP` bleibt 2800.
 - **Ausweichen:** lite → standard, standard → lite, pro → standard. Nie ungefragt zu Opus. Berechnet wird wie bisher höchstens der Preis
   der gewählten Stufe; ein Fehlversuch kostet nichts. Die App wählt bei fehlender Stufe ebenso nie die teurere (standard → lite, lite → standard).
-- **Einladungsbonus** gilt für Haiku (`GIFT_TIER = lite`) statt Gemini Flash; die Kostenbremsen bleiben, greifen mit Haiku aber praktisch nie.
+- **Einladungsbonus:** zunächst auf Haiku umgestellt, am selben Tag auf Fabians Wunsch ganz entfernt (Abschnitt „Einladungen entfernt“).
 - **Gespeicherte Modellwahl:** `pro` hieß bis jetzt Claude Sonnet. Damit niemand plötzlich Opus-Preise zahlt, wird ein gespeichertes `pro`
   einmalig zu `standard` (= wieder Sonnet), auch beim Wiederherstellen alter Backups (`CoachSettings.claudeTiers`). Die Modellwahl bietet
   jetzt alle drei Modelle an.
@@ -1353,3 +1353,8 @@ Heckmeck. Entferne das mal komplett aus der App. Da soll nichts mehr zu finden s
 - **Dokumentation:** SPEC (Phase 9 gestrichen), monetization.md, backend-api.md, backend/README.md, PROGRESS.md und die Preisseite
   `web/preise/` sind angepasst. Die Kaufseite (`web/guthaben/`) bietet weiter Guthaben-Codes „als Geschenk“ an: das ist ein gekaufter Code,
   kein Empfehlungsprogramm, und bleibt.
+## Story schließt sofort, „?“-Badge weg, Story nach Daten löschen (7.11.)
+- „?“-Badge am Übungsbild im Workout-Editor (ExerciseThumb) entfernt; das Bild bleibt tippbar (Übungsdetails). Kein Icon-Fallback „?“ in LineIcon vorhanden (andere „?“ im Code sind nur Platzhalter in Texten).
+- Ursache Ruckeln: Story-Route ist kein Tab, die Tab-Leiste kam erst nach dem Fade zurück. `ScreenMotion`: Wechsel Story → Tab ist instant (keine Animation), Leiste und Coach-Seite im selben Frame.
+- Ursache Story fehlte: `resetAll()` (Alle Daten löschen) ließ `overfit.coachStorySeen` stehen. Jetzt entfernt, Story kommt beim nächsten ersten Coach-Besuch wieder.
+- Nachtrag: Tab- und Mini-Workout-Leiste bleiben versteckt, solange die Story noch in `visibleEntries` ist (ca. 3 Frames nach dem Schließen), damit sie nicht zuerst unter der Story auftauchen.

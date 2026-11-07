@@ -1159,3 +1159,11 @@ Offen / Hinweise:
 3. „Training starten“/„Speichern“: Text mittig im Knopf
 4. Profil → Benachrichtigungen → „Erlaubt“ antippen → Android-Benachrichtigungseinstellungen der App
 5. Schalter aus (grau gefüllt, kein Rand) noch klar erkennbar; Kalender „heute“ und Foto-Auswahl erkennbar
+
+## Session AY – Story schließt sofort, „?“ weg (7.11.)
+- Erledigt: „?“ am Übungsbild im Workout-Bearbeiten entfernt; Story schließt (Auto, X, Wischen, Zurück) ohne Animation; Story kommt nach „Alle Daten löschen“ beim ersten Coach-Besuch wieder (Flag wurde nicht zurückgesetzt).
+
+### Bitte auf dem Handy testen (Story, „?“)
+1. Workout → Stift → Bearbeiten: am Übungsbild kein „?“ mehr, Tipp aufs Bild öffnet weiter die Details
+2. Coach → Story bis zur letzten Seite: schließt sofort, Tab-Leiste und Coach-Seite sofort da, kein Hochspringen; ebenso X, Wischen nach unten, Zurück
+3. Profil → Alle Daten löschen → Onboarding → Coach-Tab: Story kommt automatisch; danach nur per Tipp auf „Coach ⓘ“
