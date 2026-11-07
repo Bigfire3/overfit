@@ -120,7 +120,7 @@ class CoachTabTest {
     }
 
     @Test
-    fun chatProposesAWorkoutThatOpensTheImportPreview() {
+    fun chatProposesAWorkoutThatOpensTheEditor() {
         setUp(withKey = true)
         input("coach:tabInput").performScrollTo().performTextInput("Neues Push-Workout bitte")
         compose.onNodeWithText("Senden").performScrollTo().performClick()
@@ -140,8 +140,9 @@ class CoachTabTest {
 
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Workout übernehmen").fetchSemanticsNodes().size == 2 }
         compose.onAllNodesWithText("Workout übernehmen")[1].performClick()
+        waitFor("Speichern")
         waitFor("Coach Oberkörper")
-        compose.onNodeWithText("Übernehmen").performClick()
+        compose.onNodeWithText("Speichern").performClick()
         compose.waitUntilState(10_000) { runBlocking { data.templates.templates.first() }.any { it.name == "Coach Oberkörper" } }
     }
 

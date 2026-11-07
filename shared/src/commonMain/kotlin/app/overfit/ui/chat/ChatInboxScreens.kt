@@ -35,7 +35,7 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
-import app.overfit.ui.share.PreviewScreen
+import app.overfit.ui.templates.EditorSeed
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.coroutines.launch
@@ -60,7 +60,7 @@ fun ChatInboxScreen(
     unit: WeightUnit,
     language: Language,
     onBack: () -> Unit,
-    onTemplate: (Long) -> Unit,
+    onEdit: (EditorSeed) -> Unit,
 ) {
     val t = LocalStrings.current
     val c = LocalChatStrings.current
@@ -70,10 +70,7 @@ fun ChatInboxScreen(
 
     val current = open
     if (current != null) {
-        TemplateProposalScreen(chat, current, unit, language, onBack = { open = null }, onDone = { id ->
-            open = null
-            id?.let(onTemplate)
-        })
+        TemplateProposalLoader(chat, current, unit, language, onBack = { open = null }, onEdit = { seed -> open = null; onEdit(seed) })
         return
     }
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
@@ -119,71 +116,50 @@ private fun NoteCard(chat: ChatFeature, item: InboxNote) {
     }
 }
 
-/** The chat's template proposal: the normal import preview, plus the chat's message and, when it replaces one, the diff. */
+/** The chat's template proposal opens in the normal workout editor (message and diff as hints, "Discard" at the top). */
 @Composable
-private fun TemplateProposalScreen(
+private fun TemplateProposalLoader(
     chat: ChatFeature,
     item: InboxTemplate,
     unit: WeightUnit,
     language: Language,
     onBack: () -> Unit,
-    onDone: (Long?) -> Unit,
+    onEdit: (EditorSeed) -> Unit,
 ) {
     val c = LocalChatStrings.current
     val t = LocalStrings.current
-    var proposal by remember(item.id) { mutableStateOf<TemplateProposal?>(null) }
     var invalid by remember(item.id) { mutableStateOf(false) }
-    var busy by remember(item.id) { mutableStateOf(false) }
-    // App scope: saving must not be cancelled when this screen leaves the composition.
+    // App scope: acknowledging must not be cancelled when this screen leaves the composition.
     val scope = chat.scope
     LaunchedEffect(item.id) {
         val p = chat.inbox.proposal(item)
-        if (p == null) invalid = true else proposal = p
-    }
-    val p = proposal
-    if (p == null) {
-        Screen(header = { BackHeader(t.back, onBack) }) {
-            if (invalid) {
-                Text(c.inboxInvalid, tone = Tone.Muted)
-                Spacer(Modifier.height(Space.m))
-                SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item); onDone(null) } })
-            }
-        }
-        return
-    }
-    val replaces = p.replaces
-    fun accept(replace: Boolean) {
-        if (busy) return
-        busy = true
-        scope.launch {
-            val id = chat.inbox.acceptTemplate(item, p, replace)
-            onDone(id)
-        }
-    }
-    PreviewScreen(
-        preview = p.preview,
-        unit = unit,
-        language = language,
-        busy = busy,
-        onBack = onBack,
-        acceptLabel = if (replaces != null) c.inboxUpdate else null,
-        intro = {
-            Text(c.inboxFrom(item.clientName.ifBlank { "Chat" }), style = Theme.type.caption, tone = Tone.Muted)
-            item.message?.let { Spacer(Modifier.height(Space.s)); Text(it) }
+        if (p == null) { invalid = true; return@LaunchedEffect }
+        val replaces = p.replaces
+        val hints = buildList {
+            add(c.inboxFrom(item.clientName.ifBlank { "Chat" }))
+            item.message?.let(::add)
             if (replaces != null) {
-                Spacer(Modifier.height(Space.m))
-                Text(c.diffTitle, style = Theme.type.label)
+                add(c.diffTitle)
                 val lines = TemplateDiff.lines(replaces, p.preview, c, unit, language)
-                if (lines.isEmpty()) Text(c.diffNone, tone = Tone.Muted)
-                lines.forEach { Text(it, style = Theme.type.caption) }
+                if (lines.isEmpty()) add(c.diffNone) else addAll(lines)
             }
-        },
-        footerExtra = {
-            if (replaces != null) SmallButton(c.inboxAsNew, tone = Tone.Default, onClick = { accept(false) })
-            SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item); onDone(null) } })
-        },
-        onAccept = { accept(replaces != null) },
-    )
+        }
+        onEdit(EditorSeed(
+            preview = p.preview,
+            hints = hints,
+            replaceId = replaces?.id,
+            discardLabel = c.inboxDiscard,
+            onDiscard = { chat.inbox.discard(item) },
+            onSaved = { chat.inbox.discard(item) },
+        ))
+    }
+    Screen(header = { BackHeader(t.back, onBack) }) {
+        if (invalid) {
+            Text(c.inboxInvalid, tone = Tone.Muted)
+            Spacer(Modifier.height(Space.m))
+            SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item); onBack() } })
+        }
+    }
 }
 
 /** Accepted notes without a workout (or all of them): "Notes from the chat". */

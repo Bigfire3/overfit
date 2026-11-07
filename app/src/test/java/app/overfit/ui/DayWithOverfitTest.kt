@@ -197,10 +197,9 @@ class DayWithOverfitTest {
             compose.onNodeWithContentDescription("Neues Workout").performClick()
             click("Workout importieren")
             click("Aus Zwischenablage importieren")
-            waitFor("Vorschau")
+            waitFor("Speichern") // the imported workout opens in the normal editor
             waitFor(name)
-            click("Übernehmen")
-            waitFor("Starten") // the imported workout opens in its plan screen
+            click("Speichern")
             compose.waitUntilState(10_000) { templates().size == 3 + listOf("Push", "Pull", "Legs").indexOf(name) + 1 }
         }
         assertEquals(6, templates().size)
@@ -353,9 +352,9 @@ class DayWithOverfitTest {
         share.clipboard = "Hier dein Plan:\n```json\n${AiPrompt.EXAMPLE}\n```"
         click("Workout importieren")
         click("Aus Zwischenablage importieren")
+        waitFor("Speichern")
         waitFor("Oberkörper A")
-        click("Übernehmen")
-        waitFor("Starten")
+        click("Speichern")
         compose.waitUntilState(10_000) { templates().any { it.name == "Oberkörper A" } }
 
         // --- Profile: Fuel demo + invite reveal, KI-Coach context ------------------
@@ -398,8 +397,9 @@ class DayWithOverfitTest {
         assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Fabi"))
         assertTrue(chatPrompt.dynamicSystem, chatPrompt.dynamicSystem.contains("Bench Press"))
         click("Workout übernehmen")
+        waitFor("Speichern")
         waitFor("Coach Push")
-        click("Übernehmen")
+        click("Speichern")
         compose.waitUntilState(10_000) { templates().any { it.name == "Coach Push" } }
         tab("Coach")
 

@@ -112,9 +112,9 @@ fun aiTemplateText(t: ShareStrings, profileHeader: String?): String =
 
 class ImportViewModel(private val importer: TemplateImporter, private val shortCodes: ShortCodeService = NoShortCodes) : ViewModel() {
     data class State(
+        /** Set once the content is read: the screen hands it to the workout editor and resets. */
         val preview: ImportPreview? = null,
         val error: ShareFailure? = null,
-        val busy: Boolean = false,
         /** Shown as a note instead of a failure reason (e.g. "this is a backup"). */
         val note: Boolean = false,
     )
@@ -123,22 +123,22 @@ class ImportViewModel(private val importer: TemplateImporter, private val shortC
     val state: StateFlow<State> = _state.asStateFlow()
     private var input: ShareParse.Ok? = null
 
-    /** Reads text from link, file, scan or clipboard and shows the preview. */
+    /** Reads text from link, file, scan or clipboard; the result opens in the workout editor. */
     fun handle(text: String?) {
         QrPayload.shortId(text.orEmpty())?.let { id ->
             viewModelScope.launch {
                 val training = runCatching { shortCodes.fetch(id) }.getOrNull()
-                if (training == null) _state.value = State(error = ShareFailure.NOT_OVERFIT) else showPreview(ShareParse.Ok(training))
+                if (training == null) _state.value = State(error = ShareFailure.NOT_OVERFIT) else openEditor(ShareParse.Ok(training))
             }
             return
         }
         when (val parsed = ShareFormat.parseInput(text.orEmpty())) {
             is ShareParse.Fail -> _state.value = State(error = parsed.reason)
-            is ShareParse.Ok -> showPreview(parsed)
+            is ShareParse.Ok -> openEditor(parsed)
         }
     }
 
-    private fun showPreview(parsed: ShareParse.Ok) {
+    private fun openEditor(parsed: ShareParse.Ok) {
         input = parsed
         viewModelScope.launch {
             val preview = importer.preview(parsed.training)
@@ -156,27 +156,14 @@ class ImportViewModel(private val importer: TemplateImporter, private val shortC
     }
 
     fun reset() { _state.value = State() }
-
-    fun accept(onDone: (Long) -> Unit) {
-        val preview = _state.value.preview ?: return
-        if (_state.value.busy) return
-        _state.update { it.copy(busy = true) }
-        viewModelScope.launch {
-            val id = importer.accept(preview)
-            _state.value = State()
-            onDone(id)
-        }
-    }
 }
 
 @Composable
 fun ImportScreen(
     viewModel: ImportViewModel,
     share: ShareDependencies,
-    unit: WeightUnit,
-    language: Language,
     onBack: () -> Unit,
-    onImported: (Long) -> Unit,
+    onImported: (ImportPreview) -> Unit,
 ) {
     val t = LocalStrings.current
     val s = t.share
@@ -190,11 +177,11 @@ fun ImportScreen(
 
     LaunchedEffect(pending) { share.inbox.consume()?.let { scanning = false; viewModel.handle(it) } }
 
-    val preview = state.preview
+    // The imported workout opens in the normal editor (nothing is saved before "Save").
+    LaunchedEffect(state.preview) { state.preview?.let { viewModel.reset(); onImported(it) } }
+
     when {
-        preview != null -> PreviewScreen(preview, unit, language, state.busy, onBack = viewModel::reset) {
-            viewModel.accept(onImported)
-        }
+        state.preview != null -> Screen {}
         scanning -> Screen(header = { BackHeader(t.back, { scanning = false }) }) {
             Title(s.scanQr)
             Spacer(Modifier.height(Space.s))
@@ -239,75 +226,6 @@ fun ImportScreen(
                 onCopy = { share.platform.copyText(it); aiCopied = true },
             )
             Hint(s.importFileHint)
-        }
-    }
-}
-
-@Composable
-internal fun PreviewScreen(
-    preview: ImportPreview,
-    unit: WeightUnit,
-    language: Language,
-    busy: Boolean,
-    onBack: () -> Unit,
-    acceptLabel: String? = null,
-    /** Extra content above the exercise list (e.g. the chat's message, the diff to the old template). */
-    intro: (@Composable ColumnScope.() -> Unit)? = null,
-    /** Extra actions below the primary button (e.g. "as new template", "discard"). */
-    footerExtra: (@Composable ColumnScope.() -> Unit)? = null,
-    onAccept: () -> Unit,
-) {
-    val t = LocalStrings.current
-    val s = t.share
-    Screen(
-        scroll = true,
-        header = { BackHeader(t.back, onBack) },
-        footer = {
-            PrimaryButton(acceptLabel ?: s.importAccept, onAccept, loading = busy)
-            footerExtra?.invoke(this)
-        },
-    ) {
-        Text(s.previewTitle, tone = Tone.Muted)
-        Spacer(Modifier.height(Space.s))
-        Title(preview.name)
-        Spacer(Modifier.height(Space.s))
-        Text(s.previewCounts(preview.exercises.size, preview.exercises.count { it.isNew }), tone = Tone.Muted)
-        preview.note?.let { Spacer(Modifier.height(Space.m)); Text(it, style = Theme.type.caption, tone = Tone.Muted) }
-        intro?.let { Spacer(Modifier.height(Space.m)); it(this) }
-        Spacer(Modifier.height(Space.l))
-        Panel { preview.exercises.forEach { PreviewRow(it, unit, language) } }
-        if (preview.newExerciseNames.isNotEmpty()) {
-            Hint(s.previewNewNote(preview.newExerciseNames))
-        }
-    }
-}
-
-@Composable
-private fun PreviewRow(line: PreviewExercise, unit: WeightUnit, language: Language) {
-    val s = LocalStrings.current.share
-    val first = line.sets.firstOrNull()
-    val detail = buildList {
-        add(s.previewSets(line.sets.size))
-        if (first != null) {
-            val value = buildList {
-                first.weightKg?.let { add(formatWeight(it, unit, language)) }
-                first.reps?.let { add("$it×") }
-                first.durationSec?.let { add(Numbers.formatDuration(it)) }
-            }.joinToString(" ")
-            if (value.isNotBlank()) add(value)
-        }
-    }.joinToString(" · ")
-    PanelItem {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(line.displayName, style = Theme.type.label)
-                Text(detail, style = Theme.type.caption, tone = Tone.Muted)
-            }
-            if (line.isNew) Text(s.previewNewTag.uppercase(), style = Theme.type.caption, tone = Tone.Default)
         }
     }
 }
