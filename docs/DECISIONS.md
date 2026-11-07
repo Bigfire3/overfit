@@ -1259,3 +1259,10 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
   - Behoben: Ein leeres Training zeigt nur seinen Namen statt „Alle Sätze erledigt“.
   - Behoben: Der Einstellungs-Hinweis hat auf iOS einen eigenen Text, denn dort gibt es nur die Meldung zum Pausenende.
   - Bewusst offen: Ändert man mitten im Training Sprache, Einheit oder Vibration, wird die Benachrichtigung erst bei der nächsten Änderung neu gezeichnet. Das ist selten, und wer die Einstellung ändert, hat die App ohnehin offen.
+
+## Ohne Rahmen, schwebende Knöpfe (7.11.)
+- Alle Rahmen entfernt (Panel, Block, Felder, Chips, Bildvorschau, Schalter aus, leere Checkbox/Kreis, Tag „heute“, Foto-Auswahl, Coach-Karten). Abgrenzung nur durch Flächen: `surface` auf Schwarz, verschachtelt `surfacePressed`. Panel-Zeilen bleiben durch 1 dp schwarze Lücke getrennt (Lesbarkeit). Auswahl im Kalender/Coach: gefüllte Fläche bzw. Tönung + Häkchen statt Rahmen. Ausnahme: das Sauna-Ring-Symbol (Zeichen, kein Rahmen).
+- `Screen`-Footer (scroll=true) schwebt über dem Inhalt: kein Balken, nur ein weicher Verlauf (0 → 85 % Schwarz) unter dem Knopf; Scrollinhalt hat am Ende Platz in Footer-Höhe. Nicht scrollende Screens (Chat, laufendes Training) behalten ihre feste Fußzeile.
+- Hauptknöpfe (alle `PillButton` in Standardhöhe) zentrieren Text + Icon; vorher linksbündig.
+- Zweiter Stift im Vorlagen-Editor neben dem Namen entfernt (Feld ist selbst editierbar). Regel: kein Icon ohne Aktion.
+- Profil → Benachrichtigungen „Erlaubt“ öffnet die System-Benachrichtigungseinstellungen (`RestAlerts.openNotificationSettings`). „Genaue Alarme“ zeigt die Zeile nur, wenn nicht erlaubt, und öffnet dann schon die Einstellung.

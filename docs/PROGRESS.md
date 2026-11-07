@@ -1104,3 +1104,13 @@ Offen / Hinweise:
 2. Workout öffnen → Stift oben rechts → Bearbeiten-Modus; unten nur „Starten“
 3. Training → „Beenden“ antippen → grün; „Training abbrechen“ und Mülleimer → rot
 4. Coach → Story: aktueller Balken läuft von links nach rechts, nächste Seite nach ca. 6 s; Tipp startet den Balken neu
+
+## Session AX – Ohne Rahmen (7.11.)
+- Erledigt: alle Rahmen app-weit weg (nur Flächen), Hauptknopf unten schwebt ohne Leiste, Knöpfe zentriert, funktionsloser Stift im Workout-Editor entfernt, Profil → Benachrichtigungen „Erlaubt“ öffnet die Systemeinstellungen. Belege `docs/screenshots/ohne-rahmen/vorher|nachher/`.
+
+### Bitte auf dem Handy testen (ohne Rahmen)
+1. Workouts, Workout ansehen, Kalender, Profil, Coach: nirgends mehr ein Rahmen um Karten, Felder, Chips
+2. Workout bearbeiten: nur ein Stift (oben), unten „Speichern“ schwebt ohne schwarze Leiste, Inhalt scrollt darunter
+3. „Training starten“/„Speichern“: Text mittig im Knopf
+4. Profil → Benachrichtigungen → „Erlaubt“ antippen → Android-Benachrichtigungseinstellungen der App
+5. Schalter aus (grau gefüllt, kein Rand) noch klar erkennbar; Kalender „heute“ und Foto-Auswahl erkennbar

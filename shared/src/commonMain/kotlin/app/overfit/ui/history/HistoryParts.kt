@@ -111,8 +111,7 @@ internal fun FeelingPicker(value: Int?, label: (Int) -> String, onChange: (Int?)
                 Modifier
                     .weight(1f)
                     .height(48.dp)
-                    .background(if (active) Theme.colors.inverseBackground else Color.Transparent, RoundedCornerShape(8.dp))
-                    .border(0.5.dp, if (active) Theme.colors.inverseBackground else Theme.colors.hairline, RoundedCornerShape(8.dp))
+                    .background(if (active) Theme.colors.inverseBackground else Theme.colors.surfacePressed, RoundedCornerShape(8.dp))
                     .semantics { selected = active; contentDescription = label(n) }
                     .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.RadioButton) {
                         onChange(if (active) null else n)

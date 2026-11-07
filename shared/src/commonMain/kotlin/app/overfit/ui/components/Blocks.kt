@@ -84,7 +84,7 @@ fun Block(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
     // Same card look as [FloatingCard] (fill + 1 dp outline): every exercise is its own card, running or not.
     Column(
         modifier.fillMaxWidth().clip(BlockShape.block).background(Theme.colors.surface)
-            .border(1.dp, Theme.colors.faint, BlockShape.block).padding(Space.s),
+            .padding(Space.s),
         content = content,
     )
 }
@@ -264,8 +264,7 @@ fun SetField(
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .clip(BlockShape.field)
-            .background(c.background)
-            .border(if (focused) 1.5.dp else 1.dp, if (focused) c.foreground else c.hairline, BlockShape.field)
+            .background(c.surfacePressed)
             .semantics { contentDescription = description },
         decorationBox = { inner ->
             Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = Space.xs), contentAlignment = Alignment.Center) {

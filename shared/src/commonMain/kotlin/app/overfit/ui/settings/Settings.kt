@@ -131,7 +131,7 @@ fun SettingsScreen(
 
         PanelSection(t.notifications) {
             when (notificationsAllowed) {
-                true -> ListRow(t.notificationsPermission, t.notificationsAllowed)
+                true -> ListRow(t.notificationsPermission, t.notificationsAllowed, onClick = restAlerts::openNotificationSettings)
                 false -> ListRow(t.notificationsPermission, t.exactAlarmAllow, onClick = restAlerts::allowNotifications)
                 null -> Unit
             }

@@ -167,7 +167,7 @@ fun MultilineInput(
             .textInputArea()
             .fillMaxWidth()
             .heightIn(min = minHeight)
-            .then(if (inPanel) Modifier.background(c.surface) else Modifier.clip(shape).background(c.surface).border(1.dp, c.hairline, shape))
+            .then(if (inPanel) Modifier.background(c.surface) else Modifier.clip(shape).background(c.surface))
             .padding(Space.m),
         decorationBox = { inner ->
             Box {

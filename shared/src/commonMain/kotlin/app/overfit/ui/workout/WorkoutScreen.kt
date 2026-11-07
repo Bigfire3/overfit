@@ -461,8 +461,7 @@ private fun CheckButton(done: Boolean, description: String, onClick: () -> Unit)
         Box(
             Modifier
                 .size(36.dp)
-                .background(if (done) Theme.colors.positive else Theme.colors.surface, CircleShape)
-                .then(if (done) Modifier else Modifier.border(1.dp, Theme.colors.faint, CircleShape)),
+                .background(if (done) Theme.colors.positive else Theme.colors.surfacePressed, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (done) LineIcon(Icon.Check, size = 22.dp, color = Color.White)
