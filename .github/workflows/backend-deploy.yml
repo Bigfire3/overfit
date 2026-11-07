@@ -307,10 +307,15 @@ jobs:
         run: |
           MICRO=$(awk -v e="$CREDIT_EUR" 'BEGIN { if (e !~ /^[0-9]+([.][0-9]+)?$/ || e + 0 > 10) exit 1; printf "%d", e * 1000000 }') || { echo "::error::credit_eur muss eine Zahl bis 10 sein"; exit 1; }
           [ -n "${ADMIN_SECRET_FILE:-}" ] || { echo "::error::Kein ADMIN_SECRET vorhanden"; exit 1; }
-          RES=$(curl -sS -w '\n%{http_code}' -X POST "$URL/v1/admin/credit" \
-            -H "authorization: Bearer $(cat "$ADMIN_SECRET_FILE")" -H 'content-type: application/json' \
-            -d "{\"amountMicro\": $MICRO, \"all\": true}")
-          CODE=$(echo "$RES" | tail -1); BODY=$(echo "$RES" | head -n -1)
+          # Ein eben gesetztes ADMIN_SECRET braucht ein paar Sekunden, bis es überall gilt: bei 401 kurz warten und erneut.
+          for i in $(seq 1 12); do
+            RES=$(curl -sS -w '\n%{http_code}' -X POST "$URL/v1/admin/credit" \
+              -H "authorization: Bearer $(cat "$ADMIN_SECRET_FILE")" -H 'content-type: application/json' \
+              -d "{\"amountMicro\": $MICRO, \"all\": true}")
+            CODE=$(echo "$RES" | tail -1); BODY=$(echo "$RES" | head -n -1)
+            [ "$CODE" = 401 ] || break
+            echo "Admin-Geheimnis noch nicht aktiv ($i/12) …"; sleep 5
+          done
           [ "$CODE" = 200 ] || { echo "::error::Gutschrift fehlgeschlagen ($CODE): $BODY"; exit 1; }
           {
             echo "### Test-Guthaben"
