@@ -42,12 +42,6 @@ const log = async (c: Client, qs = '') => {
 };
 const balance = async (c: Client) => (await c.call('GET', '/v1/account')).body.balanceMicro as number;
 
-async function redeem(inviter: Client, redeemer: Client) {
-  const token = (await inviter.call('POST', '/v1/invite/token')).body.token;
-  const ch = (await redeemer.call('POST', '/v1/invite/challenge')).body.challenge;
-  const r = await redeemer.call('POST', '/v1/invite/redeem', { token, attestation: { platform: 'google', token: `mock:${crypto.randomUUID()}`, challenge: ch } });
-  expect(r.status).toBe(200);
-}
 
 describe('Anfrage-Protokoll GET /v1/account/requests', () => {
   it('Erfolg: Zeit, Dauer, Zweck, Stufe, Modell, Token und abgebuchter Betrag; requestId passt zum Eintrag', async () => {
@@ -95,17 +89,6 @@ describe('Anfrage-Protokoll GET /v1/account/requests', () => {
     const rows = await c.env.DB.prepare('SELECT * FROM requests').all();
     const raw = JSON.stringify(rows.results);
     for (const s of [SECRET_PROMPT, SECRET_ANSWER, 'R0VIRUlNRVNGT1RP']) expect(raw).not.toContain(s);
-  });
-
-  it('geschenkte Auswertung: gift true, chargedMicro 0', async () => {
-    const inviter = await Client.create();
-    const friend = await Client.create();
-    await redeem(inviter, friend);
-    const r = await friend.call('POST', '/v1/messages', req('lite', 'review'));
-    expect(r.status).toBe(200);
-    expect(r.body.overfit).toMatchObject({ giftReview: true, costMicro: 0 });
-    const [e] = (await log(friend)).entries;
-    expect(e).toMatchObject({ id: r.body.overfit.requestId, status: 'ok', purpose: 'review', tier: 'lite', model: HAIKU, gift: true, chargedMicro: 0, inputTokens: 1200, outputTokens: 400 });
   });
 
   it('Ausweichen: fallback true, Wunsch- und tatsächliches Modell, Status und Grund des Ausfalls', async () => {

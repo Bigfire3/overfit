@@ -304,6 +304,8 @@ class AppDependencies(
 @Serializable data object AboutRoute
 @Serializable data object FuelRoute
 @Serializable data object LedgerRoute
+/** Every AI request ("Abrechnung"): time, purpose, model, tokens, cost, status. */
+@Serializable data object RequestLogRoute
 @Serializable data object RedeemCodeRoute
 @Serializable data object RecoveryRoute
 @Serializable data object InviteShowRoute
@@ -967,7 +969,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                         )
                     }
-                    composable<CoachSettingsRoute> { CoachSettingsScreen(deps.coach, onBack = nav::popBackStack) }
+                    composable<CoachSettingsRoute> { CoachSettingsScreen(deps.coach, onBack = nav::popBackStack, onRequestLog = { nav.navigate(RequestLogRoute) }) }
                     composable<CoachSessionRoute> { entry ->
                         CoachSessionScreen(deps.coach, entry.toRoute<CoachSessionRoute>().sessionId, state.profile.unit, state.language, coachNav)
                     }
@@ -989,6 +991,16 @@ fun OverfitApp(deps: AppDependencies) {
                             fuelActive = state.providerId == ProviderId.FUEL,
                             onRedeemCode = { nav.navigate(RedeemCodeRoute) },
                             distribution = deps.distribution,
+                            onRequestLog = { nav.navigate(RequestLogRoute) },
+                        )
+                    }
+                    composable<RequestLogRoute> {
+                        app.overfit.ui.fuel.RequestLogScreen(
+                            dao = deps.data.database.aiRequestDao(),
+                            session = deps.fuelSession,
+                            fuelActive = state.providerId == ProviderId.FUEL,
+                            clock = deps.clock,
+                            onBack = nav::popBackStack,
                         )
                     }
                     composable<RedeemCodeRoute> { RedeemCodeScreen(deps.fuelSession, onBack = nav::popBackStack) }

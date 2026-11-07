@@ -143,6 +143,17 @@ class OwnKeyPrivacyTest {
         waitFor("Direkt vom Anbieter.")
         compose.runOnIdle { backDispatcher!!.onBackPressed() } // the chat covers the tab bar
         waitFor("Prompts & Vorlagen")
+        // Coach settings → "Abrechnung": the chat request is listed from the device, the server log is not asked.
+        compose.onNodeWithText("Coach-Einstellungen").performScrollTo().performClick()
+        compose.onNodeWithText("Abrechnung").performScrollTo().performClick()
+        waitFor("über deinen Schlüssel · ok")
+        compose.onNodeWithText("Chat").assertExists()
+        compose.waitForIdle()
+        assertEquals("requests to the overfit backend: $requests", emptyList<String>(), backendRequests)
+        compose.runOnIdle { backDispatcher!!.onBackPressed() }
+        waitFor("Coach-Einstellungen")
+        compose.runOnIdle { backDispatcher!!.onBackPressed() }
+        waitFor("Prompts & Vorlagen")
         compose.onNodeWithTag("tab:PROFILE").performClick()
         waitFor("Guthaben")
         compose.waitForIdle()

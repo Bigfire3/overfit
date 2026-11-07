@@ -6,8 +6,9 @@
 //
 // - KI-Schlüssel: ANTHROPIC_API_KEY (alle Stufen: Haiku, Sonnet, Opus), aus GitHub oder schon im Worker. Pflicht, sonst Exit 1
 //   mit Anleitung. GEMINI_API_KEY wird nicht mehr gebraucht (nur Hinweis, falls noch gesetzt).
-// - INVITE_SIGNING_KEY, SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
-//   ein Zufallswert erzeugt. Fehlt INVITE_SIGNING_KEY, wird das alte GitHub-Secret (LEGACY_INVITE_SIGNING_KEY) übernommen. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
+// - SYNC_ENCRYPTION_KEY: GitHub-Secret, sonst bereits im Worker (bleibt unangetastet), sonst wird einmalig
+//   ein Zufallswert erzeugt. SYNC_ENCRYPTION_KEY wird nie überschrieben, wenn er schon im Worker steht und kein GitHub-Secret gesetzt ist.
+//   Einladungen gibt es nicht mehr (7.11.2026): INVITE_SIGNING_KEY wird nicht mehr gebraucht.
 // - ADMIN_SECRET (nur Testbetrieb): wird bei jedem Lauf neu erzeugt, außer ein GitHub-Secret ist gesetzt; der Workflow nutzt ihn sofort.
 // - Web-Kauf (Stripe): STRIPE_SECRET_KEY (sk_test_… im Testbetrieb, sk_live_… in Produktion), STRIPE_WEBHOOK_SECRET (whsec_…).
 //   In Produktion haben STRIPE_LIVE_SECRET_KEY / STRIPE_LIVE_WEBHOOK_SECRET Vorrang (Test- und Live-Werte parallel in GitHub).
@@ -21,13 +22,12 @@ import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 export const STRIPE = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
 
 export const OPTIONAL = [
-  'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME', 'PLAY_INTEGRITY_SERVICE_ACCOUNT',
-  'APPLE_IAP_KEY', 'APPLE_IAP_KEY_ID', 'APPLE_IAP_ISSUER_ID', 'APPLE_BUNDLE_ID', 'APPLE_APP_ATTEST_TEAM_ID',
+  'GOOGLE_PLAY_SERVICE_ACCOUNT', 'GOOGLE_PLAY_PACKAGE_NAME',
+  'APPLE_IAP_KEY', 'APPLE_IAP_KEY_ID', 'APPLE_IAP_ISSUER_ID', 'APPLE_BUNDLE_ID',
 ];
 
 const b64u = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 export const generators = {
-  INVITE_SIGNING_KEY: () => randomBytes(48).toString('base64'),
   SYNC_ENCRYPTION_KEY: () => b64u(randomBytes(32)),
   ADMIN_SECRET: () => randomBytes(32).toString('hex'),
 };
@@ -49,13 +49,8 @@ export function plan(mode, env, existing) {
     notes.push('`GEMINI_API_KEY` wird nicht mehr genutzt (Guthaben nur mit Claude) und kann in GitHub und im Worker gelöscht werden.');
   }
 
-  for (const n of ['INVITE_SIGNING_KEY', 'SYNC_ENCRYPTION_KEY']) {
+  for (const n of ['SYNC_ENCRYPTION_KEY']) {
     if (given(n)) secrets[n] = given(n);
-    // Früherer GitHub-Secret-Name (vor Session AD), vom Workflow als LEGACY_INVITE_SIGNING_KEY durchgereicht.
-    else if (n === 'INVITE_SIGNING_KEY' && given('LEGACY_INVITE_SIGNING_KEY')) {
-      secrets[n] = given('LEGACY_INVITE_SIGNING_KEY');
-      notes.push('`INVITE_SIGNING_KEY`: aus dem alten GitHub-Secret übernommen (darf gelöscht werden, sobald `INVITE_SIGNING_KEY` gesetzt ist).');
-    }
     else if (have.has(n)) notes.push(`\`${n}\`: bleibt wie im Worker gesetzt.`);
     else {
       secrets[n] = generators[n]();
@@ -102,7 +97,7 @@ export function plan(mode, env, existing) {
   }
   if (skipped.length) {
     notes.push(`Optional übersprungen (kein GitHub-Secret gesetzt): ${skipped.map((n) => `\`${n}\``).join(', ')}. ` +
-      'Das sind die Store-Prüfer für echte Käufe und Geräteprüfung für Einladungen; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
+      'Das sind die Store-Prüfer für echte Käufe; sie brauchen Play-/Apple-Konten. Im Testbetrieb nicht nötig.');
   }
   return { secrets, notes, errors, generated, webPurchase };
 }

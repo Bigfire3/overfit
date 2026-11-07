@@ -6,7 +6,6 @@ export interface Env {
   AI?: AiBinding;
   // Secrets (Pflicht: ANTHROPIC_API_KEY, alle Guthaben-Stufen sind Claude)
   ANTHROPIC_API_KEY?: string;
-  INVITE_SIGNING_KEY?: string;
   /** Hauptschlüssel für die Verschlüsselung der KI-Chat-Daten (≥ 32 zufällige Bytes, Base64url). */
   SYNC_ENCRYPTION_KEY?: string;
   GOOGLE_PLAY_SERVICE_ACCOUNT?: string;
@@ -57,23 +56,13 @@ export interface Env {
   CHAT_INBOX_MAX?: string;
   RL_MCP_PER_MIN?: string;
   DEV_MODE?: string;
-  ATTESTATION_MODE?: string;
   PURCHASE_MODE?: string;
   /** `test` = Testbetrieb (siehe README); alles andere = Produktion. Nur der exakte Wert `test` schaltet etwas frei. */
   DEPLOY_MODE?: string;
   /** Geheimnis für `POST /v1/admin/credit` (nur im Testbetrieb). */
   ADMIN_SECRET?: string;
-  TEST_STARTER_MICRO?: string;
   TEST_CREDIT_CAP_MICRO?: string;
   MARKUP_BP?: string;
-  INVITE_STARTER_REVIEWS?: string;
-  INVITE_REWARD_REVIEWS?: string;
-  INVITE_TOKEN_TTL_SEC?: string;
-  INVITE_MONTHLY_LIMIT_PER_INVITER?: string;
-  INVITE_GLOBAL_MONTHLY_BUDGET_REVIEWS?: string;
-  INVITE_GIFT_MONTHLY_COST_CAP_MICRO?: string;
-  INVITE_GIFT_MAX_COST_MICRO?: string;
-  INVITE_EXPIRY_DAYS?: string;
   MAX_TOKENS_CAP?: string;
   MAX_BODY_BYTES?: string;
   IMAGE_TOKENS_RESERVE?: string;
@@ -101,30 +90,15 @@ export interface Price {
 
 export interface Config {
   devMode: boolean;
-  /** Testbetrieb: keine Geräteprüfung, Test-Guthaben, niedrige Limits. Nie in Produktion. */
+  /** Testbetrieb: Test-Guthaben per Admin-Gutschrift, niedrige Limits. Nie in Produktion. */
   testMode: boolean;
-  /** Test-Startguthaben je neuem Konto (Mikro-Euro). */
-  testStarterMicro: number;
-  /** Obergrenze für alles Test-Guthaben zusammen (Startguthaben und Admin-Gutschriften). */
+  /** Obergrenze für alles Test-Guthaben zusammen (Admin-Gutschriften; früher auch Startguthaben). */
   testCreditCapMicro: number;
-  attestationMode: 'required' | 'mock';
   purchaseMode: 'required' | 'mock';
   aiGatewayId: string | null;
   upstreamTimeoutMs: number;
   upstreamBudgetMs: number;
   markupBp: number;
-  /** Geschenkte Auswertungen für den Eingeladenen / den Einladenden. */
-  inviteStarterReviews: number;
-  inviteRewardReviews: number;
-  inviteTokenTtlSec: number;
-  inviteMonthlyLimitPerInviter: number;
-  /** Höchstens so viele geschenkte Auswertungen werden je Monat vergeben (Einlösung zählt Start + Belohnung). */
-  inviteGlobalMonthlyBudgetReviews: number;
-  /** Harte Grenze: echte KI-Kosten (µ€) aller geschenkten Auswertungen im Monat; darüber zahlt das Guthaben. */
-  inviteGiftMonthlyCostCapMicro: number;
-  /** Eine Anfrage, deren reservierte Höchstkosten (Anbieterpreis) darüber liegen, zählt nicht als geschenkte Auswertung. */
-  inviteGiftMaxCostMicro: number;
-  inviteExpiryDays: number;
   maxTokensCap: number;
   maxBodyBytes: number;
   imageTokensReserve: number;

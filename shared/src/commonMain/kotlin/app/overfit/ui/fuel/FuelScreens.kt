@@ -81,6 +81,8 @@ fun FuelScreen(
     onRedeemCode: () -> Unit = {},
     /** How this build was installed; with `/v1/config` it decides whether "Top up on the web" is shown. */
     distribution: app.overfit.fuel.Distribution = app.overfit.fuel.Distribution.Sideload,
+    /** Opens the request log ("Abrechnung"); null = no row. */
+    onRequestLog: (() -> Unit)? = null,
 ) {
     val t = LocalFuelStrings.current
     val language = t.language
@@ -168,6 +170,7 @@ fun FuelScreen(
         }
 
         PanelSection(t.fuel) {
+            if (onRequestLog != null) ListRow(app.overfit.i18n.requestLogStringsFor(language).title, onClick = onRequestLog)
             ListRow(t.ledger, onClick = onLedger)
             ListRow(t.recovery, onClick = onRecovery)
         }
@@ -215,12 +218,10 @@ private fun Balance(account: FuelAccount, config: FuelConfig?, language: Languag
     }
 }
 
-/** Real name of the model the gifted reviews cover ("Gemini 3.6 Flash"). */
+/** Real name of the model the gifted reviews cover ("Claude Haiku 5.5"). */
 internal fun giftModelName(config: FuelConfig?): String {
-    val tier = config?.invite?.giftTier ?: app.overfit.ai.TIER_STANDARD
-    return config?.tiers?.get(tier)?.displayName?.takeIf { it.isNotEmpty() }
-        ?: app.overfit.fuel.modelOfTier(tier)?.let { app.overfit.fuel.modelShortName(it) }
-        ?: "Gemini Flash"
+    val tier = config?.invite?.giftTier ?: app.overfit.ai.TIER_LITE
+    return config?.tiers?.get(tier)?.displayName?.takeIf { it.isNotEmpty() } ?: "Claude Haiku 5.5"
 }
 
 /** Transactions, newest first, paged. */

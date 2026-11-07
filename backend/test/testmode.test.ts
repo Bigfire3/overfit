@@ -4,7 +4,7 @@ import { Client, baseEnv, rawFetch } from './helpers';
 const ADMIN = 'admin-secret-0123456789';
 // Echter Testbetrieb: kein Dev-Modus, keine Mocks, nur DEPLOY_MODE=test.
 const testEnv = (extra = {}) =>
-  baseEnv({ DEV_MODE: 'false', ATTESTATION_MODE: 'required', PURCHASE_MODE: 'required', DEPLOY_MODE: 'test', ADMIN_SECRET: ADMIN, INVITE_SIGNING_KEY: 'k'.repeat(40), ...extra });
+  baseEnv({ DEV_MODE: 'false', PURCHASE_MODE: 'required', DEPLOY_MODE: 'test', ADMIN_SECRET: ADMIN, ...extra });
 
 const credit = (e: ReturnType<typeof baseEnv>, body: unknown, secret: string | null = ADMIN) =>
   rawFetch('/v1/admin/credit', e, {
@@ -21,16 +21,30 @@ describe('Testbetrieb (DEPLOY_MODE=test)', () => {
     expect((await rawFetch('/v1/config', baseEnv({ DEV_MODE: 'false', DEPLOY_MODE: 'TEST' }))).body.mode).toBe('production');
   });
 
-  it('Neues Konto bekommt Test-Startguthaben, Produktion nicht', async () => {
+  it('Kein Startguthaben: neue Konten starten mit 0 €, auch im Testbetrieb (Fabian, 7.11.2026)', async () => {
     const c = await Client.create(testEnv());
-    expect((await c.call('GET', '/v1/account')).body.balanceMicro).toBe(1_000_000);
-    expect((await c.call('GET', '/v1/account/ledger')).body.entries[0].type).toBe('test_credit');
+    const acc = (await c.call('GET', '/v1/account')).body;
+    expect(acc.balanceMicro).toBe(0);
+    expect(acc.giftReviews).toBeUndefined();
+    expect(acc.invite).toBeUndefined();
+    expect((await c.call('GET', '/v1/account/ledger')).body.entries).toEqual([]);
     const p = await Client.create(baseEnv({ DEV_MODE: 'false' }));
     expect((await p.call('GET', '/v1/account')).body.balanceMicro).toBe(0);
   });
 
+  it('Test-Gutschrift läuft nie ab', async () => {
+    const e = testEnv();
+    const a = await Client.create(e);
+    expect((await credit(e, { amountMicro: 3_000_000, all: true })).status).toBe(200);
+    const acc = (await a.call('GET', '/v1/account')).body;
+    expect(acc.balanceMicro).toBe(3_000_000);
+    expect(acc.expiring).toEqual([]);
+    const lots = await e.DB.prepare('SELECT expires_at FROM lots').all<{ expires_at: number | null }>();
+    expect(lots.results.map((l) => l.expires_at)).toEqual([null]);
+  });
+
   it('Admin-Gutschrift: nur mit Geheimnis, nur Testbetrieb, begrenzt', async () => {
-    const e = testEnv({ TEST_STARTER_MICRO: '0' });
+    const e = testEnv();
     const a = await Client.create(e);
     const b = await Client.create(e);
     expect((await credit(e, { amountMicro: 1, all: true }, null)).status).toBe(401);
@@ -57,32 +71,13 @@ describe('Testbetrieb (DEPLOY_MODE=test)', () => {
     expect((await credit(testEnv({ ADMIN_SECRET: 'kurz' }), { amountMicro: 1, all: true }, 'kurz')).status).toBe(404);
   });
 
-  it('Einladung geht ohne Geräteprüfung mit Test-Token, genau einmal je Gerät', async () => {
-    const e = testEnv({ TEST_STARTER_MICRO: '0' });
-    const inviter = await Client.create(e);
-    const friend = await Client.create(e);
-    const go = async (who: Client, token?: string) => {
-      const t = (await inviter.call('POST', '/v1/invite/token')).body.token;
-      const ch = (await who.call('POST', '/v1/invite/challenge')).body.challenge;
-      return who.call('POST', '/v1/invite/redeem', {
-        token: t,
-        attestation: { platform: 'google', token: token ?? `test:${who.deviceId}`, challenge: ch },
-      });
-    };
-    const ok = await go(friend);
-    expect(ok.status).toBe(200);
-    expect(ok.body.grantedReviews).toBe(5);
-    expect((await go(await Client.create(e), `test:${friend.deviceId}`)).body.error.code).toBe('invite_device_used');
-    expect((await go(await Client.create(e), 'mock:x')).body.error.code).toBe('attestation_failed');
-  });
-
-  it('Produktion akzeptiert keine Test-Token', async () => {
-    const e = baseEnv({ DEV_MODE: 'false', INVITE_SIGNING_KEY: 'k'.repeat(40) });
-    const inviter = await Client.create(e);
-    const friend = await Client.create(e);
-    const t = (await inviter.call('POST', '/v1/invite/token')).body.token;
-    const ch = (await friend.call('POST', '/v1/invite/challenge')).body.challenge;
-    const r = await friend.call('POST', '/v1/invite/redeem', { token: t, attestation: { platform: 'google', token: `test:${friend.deviceId}`, challenge: ch } });
-    expect(r.body.error.code).toBe('attestation_unavailable');
+  it('Einladungen gibt es nicht mehr: alle /v1/invite-Pfade antworten 404, auch im Testbetrieb', async () => {
+    for (const e of [testEnv(), baseEnv({ DEV_MODE: 'false' }), baseEnv()]) {
+      const c = await Client.create(e);
+      for (const path of ['/v1/invite/token', '/v1/invite/challenge', '/v1/invite/redeem']) {
+        const r = await c.call('POST', path, path.endsWith('redeem') ? { token: 'x', attestation: { platform: 'google', token: `test:${c.deviceId}`, challenge: 'y' } } : undefined);
+        expect(r.status).toBe(404);
+      }
+    }
   });
 });

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client, baseEnv, fund, rawFetch } from './helpers';
 import { costMicro } from '../src/money';
-import { currentPrices, GIFT_TIER, TIERS, tierForModel, type Tier } from '../src/providers';
+import { currentPrices, TIERS, tierForModel, type Tier } from '../src/providers';
 import type { Env } from '../src/types';
 
 const MARKUP = 2800;
@@ -74,7 +74,7 @@ describe('Alle Stufen sind Claude über Anthropic', () => {
     expect(r.body.content[0].text).toBe(`antwort von ${model}`);
     const expected = at(tier);
     expect(r.body.overfit).toMatchObject({
-      costMicro: expected, tier, servedTier: tier, model, modelName: name, vendor: 'Anthropic', requestedModel: model, fallback: false, giftReview: false,
+      costMicro: expected, tier, servedTier: tier, model, modelName: name, vendor: 'Anthropic', requestedModel: model, fallback: false,
     });
     expect(await balance(c)).toBe(f.balanceMicro - expected);
     expect(await lastUsage(c)).toMatchObject({ type: 'usage', amountMicro: -expected, model, tier, inputTokens: 1000, outputTokens: 500 });
@@ -361,8 +361,8 @@ describe('/v1/config', () => {
     expect(all.body.tiers.standard).toMatchObject({ available: true, model: SONNET, vendor: 'Anthropic', images: true, fallback: 'lite' });
     expect(all.body.tiers.pro).toMatchObject({ available: true, model: OPUS, vendor: 'Anthropic', images: true, fallback: 'standard' });
     for (const t of ['lite', 'standard', 'pro'] as Tier[]) expect(all.body.tiers[t].price).toEqual(price(t));
-    expect(all.body.invite.giftTier).toBe('lite');
-    expect(GIFT_TIER).toBe('lite');
+    // Keine Einladungen mehr (Fabian, 7.11.2026).
+    expect(all.body.invite).toBeUndefined();
     const none = await rawFetch('/v1/config', baseEnv({ ANTHROPIC_API_KEY: undefined, GEMINI_API_KEY: 'gemini-key' } as Partial<Env>));
     for (const t of ['lite', 'standard', 'pro']) expect(none.body.tiers[t].available).toBe(false);
   });

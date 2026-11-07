@@ -26,8 +26,7 @@ export interface TierDef {
 }
 
 /**
- * lite = Claude Haiku 5.5 (kurze, günstige Anfragen: Auswertung während des Trainings, „Mit KI ausfüllen“, geschenkte
- * Auswertungen), standard = Claude Sonnet 5.5 (Voreinstellung: Coach-Auswertung und Chat), pro = Claude Opus 5.5 (teuer).
+ * lite = Claude Haiku 5.5 (kurze, günstige Anfragen, z. B. „Mit KI ausfüllen“), standard = Claude Sonnet 5.5 (Voreinstellung: Coach-Auswertung und Chat), pro = Claude Opus 5.5 (teuer).
  * Ausweichen geht nie zur teureren Stufe hoch, außer von Haiku zu Sonnet (berechnet wird ohnehin höchstens der Preis der
  * angefragten Stufe).
  */
@@ -38,8 +37,6 @@ export const TIERS: Record<Tier, TierDef> = {
 };
 export const TIER_NAMES: Tier[] = ['standard', 'pro', 'lite'];
 export const DEFAULT_TIER: Tier = 'standard';
-/** Stufe der geschenkten Coach-Auswertungen (Einladungsbonus): das günstigste Modell. */
-export const GIFT_TIER: Tier = 'lite';
 
 /**
  * Typische Token-Mengen je Aufgabe für die Kostenschätzung in der App, gemessen an den echten Prompts
