@@ -19,7 +19,7 @@ import app.overfit.data.TemplateRepository
 import app.overfit.data.WorkoutRepository
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.data.db.photoDay
-import app.overfit.domain.CustomExerciseInput
+import app.overfit.data.CustomExerciseInput
 import app.overfit.domain.Language
 import app.overfit.domain.PlannedSet
 import app.overfit.domain.SetValues

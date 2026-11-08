@@ -117,7 +117,7 @@ class WeightCalendarTest {
 
         // Into the past works as before; "Today" comes back from there too.
         compose.onNodeWithTag(DIARY_GRID_TAG).performScrollToIndex(16)
-        compose.onNodeWithText("Juni 2026").assertIsDisplayed()
+        compose.onNodeWithText("Juli 2026").assertIsDisplayed()
         compose.onNodeWithTag(TODAY_BUTTON_TAG).performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag(TODAY_BUTTON_TAG).fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("November 2026").assertIsDisplayed()

@@ -338,7 +338,8 @@ private fun WeekdayRow(weekStart: kotlinx.datetime.DayOfWeek) {
 
 private val CELL_GAP = 4.dp
 /** Width : height of a calendar day. */
-private const val CELL_ASPECT = 0.62f
+/** Height of a cell besides its square tile: number circle, gaps, marker row and the 2-dp padding top and bottom. */
+private val CELL_CHROME = DAY_NUMBER_SIZE + 2.dp + MARKER_GAP + MARKER_SIZE + 4.dp
 
 @Composable
 private fun MonthBlock(
@@ -362,12 +363,13 @@ private fun MonthBlock(
             style = Theme.type.title,
         )
         cells.chunked(7).forEach { week ->
-            // One height for the whole week (from the cell width), so every cell – and its marker row – lines up to
-            // the pixel; an aspect ratio per cell would round differently for 43 vs 44 px wide cells.
+            // One height for the whole week (square tile from the cell width plus fixed chrome), so every cell – and its
+            // marker row – lines up to the pixel; a size per cell would round differently for 43 vs 44 px wide cells.
             Row(
                 Modifier.fillMaxWidth().padding(bottom = CELL_GAP).layout { measurable, constraints ->
                     val cellWidth = (constraints.maxWidth - 6 * CELL_GAP.roundToPx()) / 7f
-                    val h = (cellWidth / CELL_ASPECT).roundToInt()
+                    // The tile is square (as wide as the cell), the rest is the fixed chrome.
+                    val h = (cellWidth + CELL_CHROME.toPx()).roundToInt()
                     val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
                     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
                 },

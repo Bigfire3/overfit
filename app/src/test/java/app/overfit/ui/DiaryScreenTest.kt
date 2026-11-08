@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.assertIsDisplayed
@@ -235,7 +236,9 @@ class DiaryScreenTest {
         // Photo day: ring next to the workout dot; training-only day: ring below the dot; no sauna: no ring.
         compose.onNode(hasContentDescription("Tag 2, 2 Fotos, Sauna") and ring, useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasContentDescription("Tag 1, Training") and !ring, useUnmergedTree = true).assertIsDisplayed()
-        compose.onNode(hasContentDescription("Tag 30, Training, Sauna") and ring, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        // October is the next month in the list (square tiles: it is below the screen until scrolled to).
+        compose.onNodeWithTag(app.overfit.ui.photos.DIARY_GRID_TAG).performScrollToIndex(app.overfit.domain.DiaryCalendar.MONTHS_AHEAD + 1)
+        compose.onNode(hasContentDescription("Tag 30, Training, Sauna") and ring, useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun noLegendWithoutSauna() {
