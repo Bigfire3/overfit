@@ -1,7 +1,11 @@
 package app.overfit.fuel
 
 import io.ktor.client.HttpClient
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.request.request
@@ -40,9 +44,21 @@ class FuelApi(
     private val signer: RequestSigner,
     private val nowSec: () -> Long = { Clock.System.now().epochSeconds },
     private val nonce: () -> String = ::randomNonce,
+    /** Timeout of every request except `POST /v1/messages`. */
+    private val requestTimeoutMs: Long = REQUEST_TIMEOUT_MS,
+    /** Timeout of `POST /v1/messages`: above the server's time budget (200 s), so the server answers first. */
+    private val messagesTimeoutMs: Long = MESSAGES_TIMEOUT_MS,
 ) : FuelService, SignedTransport {
     private val base = baseUrl.trim().trimEnd('/')
-    private val http = http.config { install(HttpTimeout) { requestTimeoutMillis = 130_000 } }
+    // Set every timeout explicitly: Ktor's OkHttp engine only takes over the values that are set, so without
+    // socketTimeoutMillis OkHttp's default read timeout of 10 s cut off every answer that took longer (Opus).
+    private val http = http.config {
+        install(HttpTimeout) {
+            requestTimeoutMillis = requestTimeoutMs
+            socketTimeoutMillis = requestTimeoutMs
+            connectTimeoutMillis = minOf(CONNECT_TIMEOUT_MS, requestTimeoutMs)
+        }
+    }
     // coerceInputValues: null for a field with a default (e.g. token counts of credit rows) reads as that default.
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
     private var skewSec = 0L
@@ -60,6 +76,7 @@ class FuelApi(
         signed: Boolean = true,
         rawBody: ByteArray? = null,
         rawType: ContentType = ContentType.Application.Json,
+        timeoutMs: Long = requestTimeoutMs,
     ): HttpResponse {
         val bytes = rawBody ?: body?.encodeToByteArray() ?: ByteArray(0)
         val build: HttpRequestBuilder.() -> Unit = {
@@ -76,13 +93,15 @@ class FuelApi(
                 setBody(bytes)
             }
             header(HttpHeaders.Accept, "application/json")
+            if (timeoutMs != requestTimeoutMs) timeout { requestTimeoutMillis = timeoutMs; socketTimeoutMillis = timeoutMs }
         }
         return try {
             http.request(base + path, build)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            throw FuelException("network", message = e.message)
+            // A slow answer is not a missing connection: the UI says "no answer in time", not "no connection".
+            throw FuelException(if (e.isTimeout()) "timeout" else "network", message = e.message)
         }
     }
 
@@ -92,9 +111,10 @@ class FuelApi(
         body: String? = null,
         rawBody: ByteArray? = null,
         rawType: ContentType = ContentType.Application.Json,
+        timeoutMs: Long = requestTimeoutMs,
     ): HttpResponse {
         ensureRegistered()
-        var response = send(method, path, body, rawBody = rawBody, rawType = rawType)
+        var response = send(method, path, body, rawBody = rawBody, rawType = rawType, timeoutMs = timeoutMs)
         for (attempt in 0 until 2) {
             if (response.status.value != 401) break
             val error = parseError(response)
@@ -106,14 +126,16 @@ class FuelApi(
                 }
                 else -> break
             }
-            response = send(method, path, body, rawBody = rawBody, rawType = rawType)
+            response = send(method, path, body, rawBody = rawBody, rawType = rawType, timeoutMs = timeoutMs)
         }
         return response
     }
 
     private suspend fun <T> parse(response: HttpResponse, read: (JsonElement) -> T): T {
         if (response.status.value !in 200..299) throw parseError(response)
-        val text = response.bodyAsText()
+        val text = try { response.bodyAsText() } catch (e: CancellationException) { throw e } catch (e: Exception) {
+            throw FuelException(if (e.isTimeout()) "timeout" else "network", message = e.message)
+        }
         return try {
             read(json.parseToJsonElement(text))
         } catch (e: Exception) {
@@ -180,7 +202,7 @@ class FuelApi(
         return parse(call(HttpMethod.Post, "/v1/codes/redeem", body)) { decode(it) }
     }
 
-    override suspend fun messages(bodyJson: String): FuelMessageResult = parse(call(HttpMethod.Post, "/v1/messages", bodyJson)) { element ->
+    override suspend fun messages(bodyJson: String): FuelMessageResult = parse(call(HttpMethod.Post, "/v1/messages", bodyJson, timeoutMs = messagesTimeoutMs)) { element ->
         val meta = element.jsonObject["overfit"]?.jsonObject
         FuelMessageResult(
             body = element,
@@ -198,6 +220,14 @@ class FuelApi(
         ).also { ModelNames.register(it) }
     }
 }
+
+private const val REQUEST_TIMEOUT_MS = 130_000L
+private const val MESSAGES_TIMEOUT_MS = 240_000L
+private const val CONNECT_TIMEOUT_MS = 20_000L
+
+private fun Throwable.isTimeout(): Boolean =
+    this is HttpRequestTimeoutException || this is ConnectTimeoutException || this is SocketTimeoutException ||
+        (cause?.takeIf { it !== this }?.isTimeout() ?: false)
 
 /** 16 random bytes as base64url (22 characters, matches `[A-Za-z0-9_-]{16,64}`). */
 fun randomNonce(): String = Random.nextBytes(16).toBase64Url()

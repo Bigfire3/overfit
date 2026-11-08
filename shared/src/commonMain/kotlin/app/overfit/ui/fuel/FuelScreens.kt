@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.domain.Language
@@ -178,6 +179,9 @@ private fun Balance(account: FuelAccount, language: Language, t: FuelStrings) {
         PanelItem {
             Text(t.balanceLabel, style = Theme.type.caption, tone = Tone.Muted)
             Text(t.creditAmount(formatEuro(account.balanceMicro, language)), style = Theme.type.title)
+            reservedNote(account.reservedMicro, t)?.let {
+                Text(it, Modifier.padding(top = Space.xs).testTag("fuel:reserved"), style = Theme.type.caption, tone = Tone.Muted)
+            }
         }
     }
 }
@@ -191,6 +195,8 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
     val service = session.current()
     val entries = remember { mutableStateListOf<LedgerEntry>() }
     var next by remember { mutableStateOf<Long?>(null) }
+    // Held for running requests (first page of newer servers); shown as its own row so the sum = balance + reserved.
+    var reserved by remember { mutableStateOf(0L) }
     var state by remember { mutableStateOf<Loaded<Unit>>(Loaded.Loading) }
     val scope = rememberCoroutineScope()
 
@@ -202,6 +208,7 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
                 val page = service.ledger(before)
                 entries += page.entries
                 next = page.next
+                if (before == null) reserved = page.reservedMicro
                 Loaded.Ready(Unit)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -210,11 +217,26 @@ fun LedgerScreen(session: FuelSession, onBack: () -> Unit) {
             }
         }
     }
-    androidx.compose.runtime.LaunchedEffect(service) { entries.clear(); load(null) }
+    androidx.compose.runtime.LaunchedEffect(service) { entries.clear(); reserved = 0; load(null) }
 
     Screen(scroll = true, header = { BackHeader(s.back, onBack) }) {
         Title(t.ledger)
         Spacer(Modifier.height(Space.l))
+        if (reserved > 0) {
+            Panel {
+                PanelItem {
+                    androidx.compose.foundation.layout.Row(
+                        Modifier.fillMaxWidth().testTag("ledger:reserved"),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                    ) {
+                        Text(t.ledgerReserved, Modifier.weight(1f).padding(end = Space.m))
+                        Text(t.creditAmount(formatEuro(-reserved, language)))
+                    }
+                }
+            }
+            Hint(t.ledgerReservedHint)
+            Spacer(Modifier.height(Space.m))
+        }
         if (entries.isEmpty() && state is Loaded.Ready) Text(t.ledgerEmpty, tone = Tone.Muted, modifier = Modifier.padding(top = Space.m))
         if (entries.isNotEmpty()) Panel { entries.forEach { e ->
             val w = app.overfit.i18n.webCreditStringsFor(language)

@@ -76,6 +76,24 @@ class FuelBasicsTest {
         assertEquals(4_200_000, a.balanceMicro)
         assertEquals("4,20 € Guthaben", app.overfit.ui.fuel.creditSummary(a, app.overfit.i18n.GermanFuel))
         assertEquals("€4.20 credit", app.overfit.ui.fuel.creditSummary(a, app.overfit.i18n.EnglishFuel))
+        assertEquals(0, a.reservedMicro) // older servers do not send it
+    }
+
+    @Test
+    fun reservationIsShownNextToTheBalance() {
+        val a = FuelAccount(balanceMicro = 4_200_000, reservedMicro = 610_000)
+        assertEquals("4,20 € Guthaben (0,61 € reserviert)", app.overfit.ui.fuel.creditSummary(a, app.overfit.i18n.GermanFuel))
+        assertEquals("€4.20 credit (€0.61 reserved)", app.overfit.ui.fuel.creditSummary(a, app.overfit.i18n.EnglishFuel))
+        assertEquals("(0,61 € reserviert)", app.overfit.ui.fuel.reservedNote(610_000, app.overfit.i18n.GermanFuel))
+        assertEquals(null, app.overfit.ui.fuel.reservedNote(0, app.overfit.i18n.GermanFuel))
+    }
+
+    @Test
+    fun requestLogTellsTimeoutFromNoConnection() {
+        val r = app.overfit.i18n.requestLogStringsFor(app.overfit.domain.Language.EN)
+        assertEquals("No answer in time", app.overfit.ui.fuel.errorText("timeout", r))
+        assertEquals("No answer in time", app.overfit.ui.fuel.errorText("TIMEOUT", r))
+        assertEquals("No connection", app.overfit.ui.fuel.errorText("network", r))
     }
 
     @Test

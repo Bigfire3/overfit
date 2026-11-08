@@ -171,6 +171,7 @@ Body: `{ "publicKey": "<base64url>" }`. → `201` (neu) oder `200` (schon regist
   "deviceId": "…", // nur bei /v1/devices
   "accountId": "…",
   "balanceMicro": 1000000,
+  "reservedMicro": 0,
   "purchasedMicro": 800000,
   "giftedMicro": 200000,
   "expiring": [],
@@ -180,7 +181,7 @@ Body: `{ "publicKey": "<base64url>" }`. → `201` (neu) oder `200` (schon regist
 ```
 `balanceMicro` = nutzbares Guthaben minus laufende Reservierungen; Guthaben läuft nie ab. `purchasedMicro` = gekauftes bzw. per Code eingelöstes Guthaben,
 `giftedMicro` = Gutschriften (Posten `test_credit`, alte `invite_bonus`/`invite_reward`; wird zuerst verbraucht). `expiring` ist seit 7.11.2026 immer leer
-(Migration 0009 hat alle Ablaufdaten entfernt). Die App zeigt nur `balanceMicro`. Die Felder `giftReviews` und `invite` gibt es nicht mehr.
+(Migration 0009 hat alle Ablaufdaten entfernt). `reservedMicro` = laufende Reservierungen (Anfragen beim KI-Anbieter, schon von `balanceMicro` abgezogen; verfallen spätestens nach 5 min). Die App zeigt `balanceMicro` und, falls > 0, `reservedMicro` als „(… reserviert)“. `GET /v1/account/ledger` liefert neben `entries`/`next` ebenfalls `balanceMicro` und `reservedMicro`: Summe aller Buchungen = `balanceMicro + reservedMicro`. Die Felder `giftReviews` und `invite` gibt es nicht mehr.
 Dasselbe Konto-Objekt liefern `/v1/devices` und `/v1/recovery/restore`.
 
 ### `PUT /v1/account/profile`

@@ -1,7 +1,12 @@
 import type { Env } from './types';
 import { randomId } from './crypto';
 
-export const HOLD_TTL_SEC = 15 * 60;
+/**
+ * Wie lange eine Reservierung zählt. Sie muss länger leben als die längste Anfrage (config.ts begrenzt das Zeitbudget beim
+ * Anbieter auf HOLD_TTL_SEC − 60 s), sonst könnten parallele Anfragen das Guthaben überziehen. Bis 8.11.2026 waren es 15 min:
+ * Brach eine Anfrage ab, ohne den Hold freizugeben (Worker vom Client-Abbruch mitgerissen), fehlte das Geld so lange.
+ */
+export const HOLD_TTL_SEC = 5 * 60;
 
 /** Geschenkte Euro-Posten (Startguthaben im Testbetrieb, Admin-Gutschrift, alte Euro-Einladungsboni). Alles andere ist gekauft. */
 export const GIFTED_LOT_KINDS = ['test_credit', 'invite_bonus', 'invite_reward'] as const;
@@ -30,6 +35,14 @@ export async function reserve(env: Env, accountId: string, amountMicro: number):
     .bind(accountId, now(), id, amountMicro)
     .run();
   return res.meta.changes > 0 ? id : null;
+}
+
+/** Summe der laufenden Reservierungen (µ€): Anfragen, die gerade beim KI-Anbieter laufen. */
+export async function reservedMicro(env: Env, accountId: string): Promise<number> {
+  const row = await env.DB.prepare(`SELECT COALESCE(SUM(amount_micro), 0) AS v FROM holds WHERE account_id = ?1 AND created_at > ?2 - ${HOLD_TTL_SEC}`)
+    .bind(accountId, now())
+    .first<{ v: number }>();
+  return row?.v ?? 0;
 }
 
 export async function release(env: Env, holdId: string): Promise<void> {

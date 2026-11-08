@@ -4,6 +4,8 @@ import app.overfit.ai.FuelProvider
 import app.overfit.ai.ProviderId
 import app.overfit.fuel.FuelException
 import io.ktor.client.HttpClient
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.header
@@ -193,10 +195,8 @@ private suspend fun postJson(http: HttpClient, url: String, body: JsonObject, he
         }
     } catch (e: CancellationException) {
         throw e
-    } catch (e: HttpRequestTimeoutException) {
-        throw CoachException(CoachErrorKind.TIMEOUT, e.message)
     } catch (e: Exception) {
-        throw CoachException(CoachErrorKind.NETWORK, e.message)
+        throw CoachException(if (e is HttpRequestTimeoutException || e is SocketTimeoutException || e is ConnectTimeoutException) CoachErrorKind.TIMEOUT else CoachErrorKind.NETWORK, e.message)
     }
     val text = try { response.bodyAsText() } catch (e: CancellationException) { throw e } catch (e: Exception) {
         throw CoachException(CoachErrorKind.NETWORK, e.message)
@@ -208,7 +208,10 @@ private suspend fun postJson(http: HttpClient, url: String, body: JsonObject, he
 private fun parseObject(text: String): JsonObject = runCatching { json.parseToJsonElement(text) as JsonObject }
     .getOrElse { throw CoachException(CoachErrorKind.SERVER, "Not JSON: ${text.take(200)}") }
 
-private fun HttpClient.withTimeout() = config { install(HttpTimeout) { requestTimeoutMillis = TIMEOUT_MS; connectTimeoutMillis = 20_000 } }
+// socketTimeoutMillis explicitly: otherwise OkHttp keeps its 10 s read timeout and long answers fail as "no connection".
+private fun HttpClient.withTimeout() = config {
+    install(HttpTimeout) { requestTimeoutMillis = TIMEOUT_MS; socketTimeoutMillis = TIMEOUT_MS; connectTimeoutMillis = 20_000 }
+}
 private const val TIMEOUT_MS = 150_000L
 
 class AnthropicCoach(http: HttpClient, private val apiKey: () -> String?) : CoachTransport {
@@ -380,10 +383,13 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
      */
     private fun fuelErrorKind(e: FuelException): CoachErrorKind = when {
         e.code == "network" -> CoachErrorKind.NETWORK
+        e.code == "timeout" -> CoachErrorKind.TIMEOUT
         e.code == "insufficient_funds" -> CoachErrorKind.NO_FUEL
         e.code == "not_configured" || e.code == "tier_unavailable" -> CoachErrorKind.SERVER
         e.code == "upstream_rejected" && e.details["upstreamStatus"] in AUTH_STATUSES -> CoachErrorKind.SERVER
         e.code == "rate_limited" || e.status == 429 -> CoachErrorKind.RATE_LIMIT
+        // The provider took too long (server says so since 8.11.2026): the true reason, not "provider unavailable".
+        e.code == "upstream_unavailable" && e.details["timeout"] == 1L -> CoachErrorKind.TIMEOUT
         e.status >= 500 || e.code == "upstream_unavailable" -> CoachErrorKind.SERVER
         e.status == 401 || e.status == 403 -> CoachErrorKind.AUTH
         else -> CoachErrorKind.BAD_REQUEST

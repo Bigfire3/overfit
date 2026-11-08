@@ -27,8 +27,9 @@ export const MODE_VARS = {
     MAX_TOKENS_CAP: '8192',
     RL_MESSAGES_PER_MIN: '5',
     RL_REGISTER_PER_HOUR_IP: '10',
-    // 8.11.: 20 € waren ausgeschöpft (Gutschriften kamen mit 0 € an), E2E nicht mehr möglich → 40 €.
-    TEST_CREDIT_CAP_MICRO: '40000000',
+    // Obergrenze aller Test-Gutschriften zusammen (alle Konten). 8.11.: 20 € ausgeschöpft → 40 €; am selben Tag wieder
+    // ausgeschöpft (credit_eur buchte 0 €, kein E2E mehr möglich) → 100 €. Echte Kosten entstehen nur durch Nutzung.
+    TEST_CREDIT_CAP_MICRO: '100000000',
   },
 };
 

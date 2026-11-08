@@ -59,6 +59,7 @@ import app.overfit.ui.fuel.Loaded
 import app.overfit.ui.fuel.formatRequestCost
 import app.overfit.ui.fuel.purposeLabel
 import app.overfit.ui.fuel.rememberLoaded
+import app.overfit.ui.fuel.reservedNote
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.coroutines.CancellationException
@@ -79,7 +80,8 @@ fun CreditChip(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit, m
     val demo by session.demo.collectAsStateWithLifecycle()
     val service = remember(demo) { session.current() }
     if (service == null || !(fuelActive || demo)) return
-    val language = LocalFuelStrings.current.language
+    val f = LocalFuelStrings.current
+    val language = f.language
     val s = coachSettingsStringsFor(language)
     val (account, _) = rememberLoaded(service) { service.account() }
     val text = when (val a = account) {
@@ -87,6 +89,8 @@ fun CreditChip(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit, m
         is Loaded.Failed -> "– €"
         Loaded.Loading -> "…"
     }
+    // The chip stays short; the reservation is read out and shown in the popup.
+    val reserved = (account as? Loaded.Ready)?.value?.let { reservedNote(it.reservedMicro, f) }
     val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
@@ -95,7 +99,7 @@ fun CreditChip(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit, m
             .heightIn(min = 36.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Theme.colors.surface)
-            .semantics { contentDescription = s.creditChip(text) }
+            .semantics { contentDescription = s.creditChip(text) + (reserved?.let { " $it" } ?: "") }
             .testTag("coach:credit")
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
@@ -147,7 +151,12 @@ fun CreditPopupContent(
             ) { LineIcon(Icon.Close, size = 20.dp, color = Theme.colors.muted) }
         }
         when (val a = account) {
-            is Loaded.Ready -> Text(a.value?.let { formatEuro(it.balanceMicro, language) } ?: "–", Modifier.testTag("credit:balance"), style = Theme.type.title)
+            is Loaded.Ready -> {
+                Text(a.value?.let { formatEuro(it.balanceMicro, language) } ?: "–", Modifier.testTag("credit:balance"), style = Theme.type.title)
+                a.value?.let { reservedNote(it.reservedMicro, f) }?.let {
+                    Text(it, Modifier.testTag("credit:reserved"), style = Theme.type.caption, tone = Tone.Muted)
+                }
+            }
             is Loaded.Failed -> Text(f.unreachable, tone = Tone.Muted)
             Loaded.Loading -> Text("…", style = Theme.type.title, tone = Tone.Muted)
         }

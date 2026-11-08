@@ -244,7 +244,14 @@ async function post(url: string, headers: Record<string, string>, body: unknown,
     const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
     throw new UpstreamError(true, 0, timeout ? 'Zeitüberschreitung beim KI-Anbieter' : 'KI-Anbieter nicht erreichbar', timeout);
   }
-  const text = await res.text();
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (e) {
+    // Das Zeitlimit kann auch beim Lesen der Antwort ablaufen: dann ebenfalls Ausfall statt interner Fehler.
+    const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    throw new UpstreamError(true, 0, timeout ? 'Zeitüberschreitung beim KI-Anbieter' : 'KI-Anbieter nicht erreichbar', timeout);
+  }
   let parsed: Record<string, unknown> | null = null;
   try {
     parsed = JSON.parse(text);

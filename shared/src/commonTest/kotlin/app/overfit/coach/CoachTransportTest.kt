@@ -344,6 +344,8 @@ class CoachTransportTest {
         }
         assertEquals(CoachErrorKind.NO_FUEL, kind(FuelException("insufficient_funds", 402)))
         assertEquals(CoachErrorKind.NETWORK, kind(FuelException("network")))
+        // A slow answer (e.g. Opus over the client timeout) is not "no connection".
+        assertEquals(CoachErrorKind.TIMEOUT, kind(FuelException("timeout")))
         assertEquals(CoachErrorKind.NETWORK, kind(RuntimeException("boom")))
         assertEquals(CoachErrorKind.RATE_LIMIT, kind(FuelException("x", 429)))
         assertEquals(CoachErrorKind.SERVER, kind(FuelException("x", 502)))
@@ -354,6 +356,9 @@ class CoachTransportTest {
         assertEquals(CoachErrorKind.SERVER, kind(FuelException("not_configured", 503)))
         assertEquals(CoachErrorKind.SERVER, kind(FuelException("upstream_rejected", 400, mapOf("upstreamStatus" to 401L))))
         assertEquals(CoachErrorKind.SERVER, kind(FuelException("upstream_unavailable", 502, mapOf("upstreamStatus" to 401L))))
+        // The server says the provider took too long (504 with timeout = 1): the true reason. Older servers without the flag: SERVER.
+        assertEquals(CoachErrorKind.TIMEOUT, kind(FuelException("upstream_unavailable", 504, mapOf("upstreamStatus" to 0L, "timeout" to 1L))))
+        assertEquals(CoachErrorKind.SERVER, kind(FuelException("upstream_unavailable", 504, mapOf("upstreamStatus" to 0L, "timeout" to 0L))))
         assertEquals(CoachErrorKind.BAD_REQUEST, kind(FuelException("upstream_rejected", 400, mapOf("upstreamStatus" to 400L))))
     }
 

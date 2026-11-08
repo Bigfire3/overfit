@@ -87,7 +87,7 @@ verursacht dir keine Kosten und geht gar nicht über das Backend. Im Testbetrieb
 **Testbetrieb (`mode = test`) – für Handys ohne Store-Konten.** Test und Produktion sind getrennte Instanzen (eigener Worker, Datenbank, Bucket),
 Testdaten gelangen nie in die Produktion; beim Wechsel auf `production` ändert sich die Adresse (Schritt 8 wiederholen).
 - Neue Konten starten mit 0 € (kein Startguthaben, auch nicht im Testbetrieb). Test-Guthaben: erst in der App Guthaben öffnen („Guthaben ansehen“
-  legt das Konto an), dann Run workflow mit `credit_eur` (z. B. `5`) → schreibt allen bestehenden Konten bis zu 10 € gut; es läuft nie ab. Alles Test-Guthaben zusammen ist auf 40 € gedeckelt (`TEST_CREDIT_CAP_MICRO` in `scripts/deploy-config.mjs`).
+  legt das Konto an), dann Run workflow mit `credit_eur` (z. B. `5`) → schreibt allen bestehenden Konten bis zu 10 € gut; es läuft nie ab. Alles Test-Guthaben zusammen ist auf 100 € gedeckelt (`TEST_CREDIT_CAP_MICRO` in `scripts/deploy-config.mjs`).
   Ist es aufgebraucht: Instanz zurücksetzen (Datenbank `overfit-test` im Dashboard unter Storage & Databases → D1 löschen, Workflow neu starten).
 - Käufe gibt es im Testbetrieb nicht (kein Store); Guthaben nur so. Niedrige Limits: 5 KI-Anfragen/Minute (`max_tokens` wie Produktion bis 8192; mehr wird gekappt, nicht abgelehnt).
 - Markierung: `GET /v1/config` liefert `"mode": "test"`, die App zeigt unter Guthaben „Testserver“. Der Workflow prüft, dass der Modus stimmt.
@@ -177,7 +177,7 @@ den gleichen OAuth-Ablauf.
 | `IMAGE_TOKENS_RESERVE` | 3000 | Pauschale Eingabe-Token je Bild bei der Reservierung |
 | `PRICE_TABLE` | Tabelle in `src/providers.ts` | JSON: `{"<modell>":{"in":…,"cacheRead":…,"cacheWrite":…,"out":…}}` in **µ€ je 1 Mio. Token**; überschreibt einzelne Modelle der Tabelle |
 | `AI_GATEWAY_ID` | leer (direkt) | Name des Cloudflare AI Gateways; setzt der Deploy-Workflow (`overfit` bzw. `overfit-test`) |
-| `UPSTREAM_TIMEOUT_MS` / `UPSTREAM_BUDGET_MS` | 100 000 / 140 000 | Zeitlimit je Anbieter-Versuch / für Anfrage samt Ausweichen |
+| `UPSTREAM_TIMEOUT_MS` / `UPSTREAM_BUDGET_MS` | 150 000 / 200 000 (höchstens 210 000) | Zeitlimit je Anbieter-Versuch / für Anfrage samt Ausweichen; bleibt unter dem App-Timeout (240 s) und der Lebensdauer einer Reservierung (5 min) |
 | `PACKAGES` | 5 € Guthaben für 6,99 € / 10 € für 13,99 € | JSON: `{"<store-produkt-id>":{"priceMicro":<Store-Preis>,"creditMicro":<Guthaben>}}`; ohne `creditMicro` gilt Guthaben = Preis |
 | `WEB_PACKAGES` | 5 € / 10 € / 20 € / 50 € | Pakete der Kaufseite, JSON `{"web.10":{"priceMicro":10000000}}`; Guthaben = Preis (1:1) |
 | `STRIPE_INVOICES` | aus | `on` = zu jedem Web-Kauf eine Stripe-Rechnung (PDF) mit §-19-Fußzeile; kostet bei Stripe extra (Repo-Variable) |
@@ -300,4 +300,4 @@ ADMIN_SECRET=… node scripts/usage-report.mjs https://<worker-domain> 2026-11-0
 - Guthaben als „Posten“ (`lots`): nichts verfällt (seit 7.11.2026, Migration 0009); Verbrauch zuerst Gutschriften, dann Gekauftes. Die
   Tabellen der früheren Einladungen (`invite_tokens_used`, `invite_redemptions`, `review_gifts`) bleiben bestehen, werden aber nicht genutzt. Reservierung =
   ein atomares `INSERT … SELECT … WHERE saldo ≥ betrag` (D1 serialisiert Schreibzugriffe) – parallele Anfragen können nicht überziehen.
-  Reservierungen älter als 15 min gelten als verwaist und zählen nicht mehr.
+  Reservierungen älter als 5 min gelten als verwaist und zählen nicht mehr (keine Anfrage läuft länger als 3,5 min). Jede Anfrage gibt ihre Reservierung in jedem Fehlerpfad sofort frei; trennt die App die Verbindung, läuft die Anfrage über `waitUntil` weiter und rechnet ab oder gibt frei.

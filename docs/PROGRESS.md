@@ -1278,3 +1278,16 @@ Offen / Hinweise:
 4. Profil → Guthaben → Abrechnung: Einträge „Chat“ und „Auswertung“ mit Modell und Betrag, Status OK; der alte fehlgeschlagene Chat-Eintrag kostete 0
 5. Die alte Fehlermeldung im Chat: „Retry“ → jetzt kommt eine Antwort
 6. Profil → Guthaben → Transactions: Liste mit Test-Gutschriften und Chat-/Auswertungs-Buchungen statt „Your credit can't be reached“
+
+## Session BF – Opus-Chat „No connection“, reservierte 0,61 € (8.11.)
+- Ursache: Die Android-App wartete auf eine Guthaben-Antwort nur 10 s (Standard der HTTP-Bibliothek, unser 130-s-Wert galt nur fürs Ganze). Opus braucht oft 10–35 s → App brach ab, zeigte „No connection“. Der Server wurde dabei mitten im Warten abgebrochen, die Vorab-Reservierung (~0,20 € je Anfrage) blieb 15 min stehen.
+- Geld verloren: nein. Nichts abgebucht, die 0,61 € kamen nach Ablauf der Reservierungen von selbst zurück.
+- Erledigt: App wartet bei Nachrichten bis 240 s (eigener Schlüssel 150 s), zeigt bei Zeitüberschreitung „Keine Antwort in der Zeit“ statt „No connection“; Server gibt Reservierungen in jedem Fehlerpfad frei, rechnet nach einem Abbruch noch bis 30 s ab, Reservierungen verfallen nach 5 statt 15 min; Kontostand zeigt laufende Reservierungen, Buchungsliste hat eine Zeile „Reserviert“. Test-Guthaben-Obergrenze 100 €. Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (Opus-Chat)
+1. Profil → Guthaben: Kontostand notieren (Transactions: Summe der Buchungen = Kontostand, keine Zeile „Reserviert“).
+2. Coach → Chat, Modell Claude Opus 5.5 (Guthaben), kurze Frage („Wie viele Ruhetage brauche ich?“) → Antwort nach wenigen Sekunden, darunter Kosten.
+3. Lange Frage („Schreib mir einen ausführlichen 12-Wochen-Plan …“) → Antwort nach bis zu ~40 s, kein „No connection“.
+4. Während 3 läuft: Guthaben-Popup öffnen → „(… € reserviert)“ neben dem Kontostand; nach der Antwort ist der Zusatz weg.
+5. Profil → Guthaben → Transactions: zwei neue Opus-Buchungen; Summe aller Buchungen = Kontostand. Anfrage-Protokoll: beide „OK“.
+6. Flugmodus an, Frage senden → „No connection“ (echtes Netzproblem); Flugmodus aus, „Retry“ → Antwort.
