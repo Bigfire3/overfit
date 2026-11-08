@@ -15,6 +15,18 @@
 | 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Alternativen (A/B) im Workout (Session BI, 8.11.)
+**Erledigt:** Im Workout ⋮ einer Übung → „Alternative hinzufügen“; die Alternative hat eigene Sätze. Im Training zeigt die Karte Chips
+mit den Varianten; voreingestellt ist die, die beim letzten Training dieses Workouts nicht dran war (A/B-Wechsel, reihum bei mehr).
+DB v14 (`template_exercise.variant`), Teilen/Export (`alt`), Backup und Coach/KI tragen Alternativen; alte Dateien bleiben lesbar.
+Screenshots: `docs/screenshots/workout-alternativen/`.
+
+### Bitte auf dem Handy testen (Alternativen)
+1. Workout öffnen, bei einer Übung ⋮ → „Add alternative“ → Übung wählen: In derselben Karte steht „Alternative“ mit eigenen Sätzen.
+2. Starten: Die Karte zeigt zwei Chips, die Hauptübung ist gewählt. Auf die Alternative tippen: Name und Sätze wechseln.
+3. Training mit der Hauptübung beenden, Workout erneut starten: Jetzt ist die Alternative vorgewählt (A/B-Wechsel).
+4. Einen Satz abhaken: Chips verschwinden. Workout teilen und auf einem zweiten Gerät/über die Zwischenablage importieren: Alternative ist dabei.
+
 ## Wenig tippen: Workout direkt bearbeiten, Start aus der Liste (Session BI, 8.11.)
 **Erledigt:** Workout-Ansicht und Editor sind ein Screen: Sätze, Name, Übungen direkt änderbar, wird automatisch gespeichert
 (kein Stift, kein Speichern), „Rückgängig“ nach Entfernen/Ersetzen, unten „Starten“. ▶ auf jeder Workout-Karte startet direkt.

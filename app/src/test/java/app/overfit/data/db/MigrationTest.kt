@@ -525,6 +525,64 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migration13to14KeepsTemplatesAndAddsVariant() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v13 = helper.createDatabase(13)
+        listOf("ex1" to "Bench", "ex2" to "Squat", "ex3" to "Dumbbell").forEach { (id, name) ->
+            v13.execSQL(
+                "INSERT INTO exercise (id, name, source, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType, defaultRestSec, isArchived, createdAt, updatedAt) " +
+                    "VALUES ('$id', '$name', 'CUSTOM', NULL, 'chest', '', NULL, 'WEIGHT_REPS', NULL, 0, 1, 2)",
+            )
+        }
+        v13.execSQL("INSERT INTO workout_template (id, name, note, position, createdAt, updatedAt) VALUES (1, 'Push', 'n', 0, 1, 2)")
+        v13.execSQL("INSERT INTO template_exercise (id, templateId, exerciseId, position, restSec, note) VALUES (10, 1, 'ex1', 0, 90, 'eng')")
+        v13.execSQL("INSERT INTO template_exercise (id, templateId, exerciseId, position, restSec, note) VALUES (11, 1, 'ex2', 1, NULL, NULL)")
+        v13.execSQL("INSERT INTO template_set (id, templateExerciseId, position, targetWeightKg, targetReps, targetDurationSec) VALUES (100, 10, 0, 60.0, 8, NULL)")
+        v13.execSQL("INSERT INTO template_set (id, templateExerciseId, position, targetWeightKg, targetReps, targetDurationSec) VALUES (101, 10, 1, 62.5, 6, NULL)")
+        v13.execSQL("INSERT INTO template_set (id, templateExerciseId, position, targetWeightKg, targetReps, targetDurationSec) VALUES (102, 11, 0, 100.0, 5, NULL)")
+        v13.close()
+        // Validates the migrated schema against schemas/.../14.json.
+        val v14 = helper.runMigrationsAndValidate(14, OverfitDatabase.MIGRATIONS.toList())
+        assertEquals(
+            listOf(0L, 0L),
+            v14.prepare("SELECT variant FROM template_exercise ORDER BY id").use { st -> buildList { while (st.step()) add(st.getLong(0)) } },
+        )
+        v14.close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val templates = app.overfit.data.TemplateRepository(db)
+            val t = templates.get(1)!!
+            assertEquals("Push", t.name)
+            assertEquals(listOf("Bench", "Squat"), t.exercises.map { it.exercise.name })
+            assertEquals(listOf(true, true), t.exercises.map { it.alternatives.isEmpty() })
+            assertEquals(90, t.exercises[0].restSec)
+            assertEquals("eng", t.exercises[0].note)
+            assertEquals(listOf(8, 6), t.exercises[0].sets.map { it.reps })
+            assertEquals(listOf("Bench", "Squat"), templates.templates.first().single().exerciseNames)
+
+            // A template with an alternative can be stored afterwards.
+            val dumbbell = db.exerciseDao().getAll(listOf("ex3")).single().toDomain()
+            val alt = app.overfit.domain.TemplateExercise(dumbbell, 60, null, listOf(app.overfit.domain.PlannedSet(30.0, 12)))
+            val withAlt = t.copy(exercises = listOf(t.exercises[0].copy(alternatives = listOf(alt)), t.exercises[1]))
+            templates.save(withAlt)
+            assertEquals(withAlt, templates.get(1))
+            assertEquals(listOf("Bench", "Squat"), templates.templates.first().single().exerciseNames)
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

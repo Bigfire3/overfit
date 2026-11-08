@@ -215,7 +215,12 @@ object CoachPromptBuilder {
     fun formatTemplate(t: Template): String = t.exercises.mapIndexed { i, e ->
         val type = e.exercise.trackingType
         val sets = e.sets.joinToString(", ") { formatSet(it, type) }
-        "${i + 1}. ${e.exercise.name} [${e.exercise.id}]${e.restSec?.let { " rest ${it}s" } ?: ""}: $sets"
+        val line = "${i + 1}. ${e.exercise.name} [${e.exercise.id}]${e.restSec?.let { " rest ${it}s" } ?: ""}: $sets"
+        // Alternatives (A/B): the user does one of them per training, alternating; each has its own sets.
+        line + e.alternatives.joinToString("") { a ->
+            "\n   alternative (done instead in other sessions): ${a.exercise.name} [${a.exercise.id}]${a.restSec?.let { " rest ${it}s" } ?: ""}: " +
+                a.sets.joinToString(", ") { formatSet(it, a.exercise.trackingType) }
+        }
     }.joinToString("\n")
 
     /** "80kg×8", "12 reps", "45s", "-20kg×8" (assisted), "20kg×45s". */

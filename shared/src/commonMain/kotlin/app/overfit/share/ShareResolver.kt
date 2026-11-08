@@ -21,6 +21,8 @@ data class PreviewExercise(
     val restSec: Int?,
     val note: String?,
     val sets: List<PlannedSet>,
+    /** Alternatives (A/B) of this exercise, resolved the same way. */
+    val alternatives: List<PreviewExercise> = emptyList(),
 ) {
     val displayName: String get() = exercise?.name ?: newExercise?.name.orEmpty()
     val isNew: Boolean get() = exercise == null
@@ -28,7 +30,7 @@ data class PreviewExercise(
 }
 
 data class ImportPreview(val name: String, val note: String?, val exercises: List<PreviewExercise>) {
-    val newExerciseNames: List<String> get() = exercises.filter { it.isNew }.map { it.displayName }.distinctBy { it.lowercase() }
+    val newExerciseNames: List<String> get() = exercises.flatMap { listOf(it) + it.alternatives }.filter { it.isNew }.map { it.displayName }.distinctBy { it.lowercase() }
 }
 
 /** Turns templates into the share format and back (resolving exercises against the local catalogue). */
@@ -36,7 +38,7 @@ object ShareMapper {
 
     fun fromTemplate(t: Template): SharedTraining {
         val custom = LinkedHashMap<String, SharedCustom>()
-        val exercises = t.exercises.map { te ->
+        fun shared(te: TemplateExercise): SharedExercise {
             val e = te.exercise
             val ref = if (e.isCustom) {
                 custom.getOrPut(e.id) {
@@ -53,7 +55,7 @@ object ShareMapper {
                     )
                 }.ref
             } else null
-            SharedExercise(
+            return SharedExercise(
                 id = if (ref == null) e.id else null,
                 ref = ref,
                 sets = te.sets.map { SharedSet(it.weightKg, it.reps, it.durationSec) },
@@ -61,6 +63,7 @@ object ShareMapper {
                 note = te.note,
             )
         }
+        val exercises = t.exercises.map { te -> shared(te).copy(alternatives = te.alternatives.map(::shared)) }
         return SharedTraining(name = t.name, note = t.note, exercises = exercises, custom = custom.values.toList())
     }
 
@@ -97,7 +100,7 @@ object ShareMapper {
         val byHash = catalog.filter { it.id.startsWith("wg:") }.associateBy { QrPayload.hashedId(it.id) }
         val index = ExerciseSearch.index(catalog)
         val customByRef = training.custom.associateBy { it.ref }
-        val lines = training.exercises.map { se ->
+        fun line(se: SharedExercise): PreviewExercise? {
             val sets = se.sets
             val custom = se.ref?.let { customByRef[it] }
             val known: Exercise? = when {
@@ -125,9 +128,9 @@ object ShareMapper {
                     CustomExerciseInput(it, inferTracking(sets), se.restSec)
                 } ?: se.id?.let { unknownId(it) }?.let { CustomExerciseInput(it, inferTracking(sets), se.restSec) }
             }
-            if (known == null && create == null) return@map null
+            if (known == null && create == null) return null
             val tracking = known?.trackingType ?: create!!.trackingType
-            PreviewExercise(
+            return PreviewExercise(
                 exercise = known,
                 newExercise = create,
                 restSec = se.restSec,
@@ -140,7 +143,8 @@ object ShareMapper {
                     )
                 },
             )
-        }.filterNotNull()
+        }
+        val lines = training.exercises.mapNotNull { se -> line(se)?.copy(alternatives = se.alternatives.mapNotNull(::line)) }
         return ImportPreview(training.name, training.note, lines)
     }
 
@@ -183,16 +187,19 @@ object ShareMapper {
 
     /** The exercises of [preview] that do not exist yet, by their temporary ID. */
     fun pendingInputs(preview: ImportPreview): Map<String, CustomExerciseInput> =
-        preview.exercises.mapNotNull { it.newExercise }.associateBy { PENDING_PREFIX + it.name.trim().lowercase() }
+        preview.exercises.flatMap { listOf(it) + it.alternatives }.mapNotNull { it.newExercise }.associateBy { PENDING_PREFIX + it.name.trim().lowercase() }
 
     /** The template for the editor: new exercises carry a temporary ID, nothing is created yet. */
     fun toDraftTemplate(preview: ImportPreview, id: Long = 0): Template = Template(
         id = id,
         name = preview.name,
         note = preview.note,
-        exercises = preview.exercises.map { line ->
-            val exercise = line.exercise ?: line.newExercise!!.let { it.toExercise(PENDING_PREFIX + it.name.trim().lowercase()) }
-            TemplateExercise(exercise, line.restSec, line.note, line.sets)
+        exercises = preview.exercises.map { slot ->
+            fun planned(line: PreviewExercise): TemplateExercise {
+                val exercise = line.exercise ?: line.newExercise!!.let { it.toExercise(PENDING_PREFIX + it.name.trim().lowercase()) }
+                return TemplateExercise(exercise, line.restSec, line.note, line.sets)
+            }
+            planned(slot).copy(alternatives = slot.alternatives.map(::planned))
         },
     )
 
@@ -201,12 +208,15 @@ object ShareMapper {
         id = 0,
         name = preview.name,
         note = preview.note,
-        exercises = preview.exercises.map { line ->
-            val exercise = line.exercise ?: run {
-                val c = line.newExercise!!
-                c.toExercise(createdIds.getValue(c.name.lowercase()))
+        exercises = preview.exercises.map { slot ->
+            fun planned(line: PreviewExercise): TemplateExercise {
+                val exercise = line.exercise ?: run {
+                    val c = line.newExercise!!
+                    c.toExercise(createdIds.getValue(c.name.lowercase()))
+                }
+                return TemplateExercise(exercise, line.restSec, line.note, line.sets)
             }
-            TemplateExercise(exercise, line.restSec, line.note, line.sets)
+            planned(slot).copy(alternatives = slot.alternatives.map(::planned))
         },
     )
 }

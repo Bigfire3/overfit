@@ -34,6 +34,8 @@ object ShareFormat {
     const val MAX_NAME = 80
     const val MAX_NOTE = 500
     const val MAX_REST_SEC = 3600
+    /** Alternatives per exercise (A/B weeks; more than a few make no sense). */
+    const val MAX_ALTERNATIVES = 5
 
     private val json = Json { prettyPrint = false }
 
@@ -46,24 +48,7 @@ object ShareFormat {
         put("kind", t.kind)
         put("name", t.name)
         t.note?.let { put("note", it) }
-        put("exercises", buildJsonArray {
-            t.exercises.forEach { e ->
-                add(buildJsonObject {
-                    e.ref?.let { put("ref", it) } ?: e.id?.let { put("id", it) } ?: e.name?.let { put("name", it) }
-                    e.restSec?.let { put("restSec", it) }
-                    e.note?.let { put("note", it) }
-                    put("sets", buildJsonArray {
-                        e.sets.forEach { s ->
-                            add(buildJsonObject {
-                                s.kg?.let { put("kg", it) }
-                                s.reps?.let { put("reps", it) }
-                                s.sec?.let { put("sec", it) }
-                            })
-                        }
-                    })
-                })
-            }
-        })
+        put("exercises", buildJsonArray { t.exercises.forEach { e -> add(exerciseElement(e)) } })
         if (t.custom.isNotEmpty()) {
             put("custom", buildJsonArray {
                 t.custom.forEach { c ->
@@ -82,6 +67,23 @@ object ShareFormat {
                 }
             })
         }
+    }
+
+    /** One exercise; its alternatives (A/B) as `alt`, an array of the same objects (older apps ignore the key). */
+    private fun exerciseElement(e: SharedExercise): JsonObject = buildJsonObject {
+        e.ref?.let { put("ref", it) } ?: e.id?.let { put("id", it) } ?: e.name?.let { put("name", it) }
+        e.restSec?.let { put("restSec", it) }
+        e.note?.let { put("note", it) }
+        put("sets", buildJsonArray {
+            e.sets.forEach { s ->
+                add(buildJsonObject {
+                    s.kg?.let { put("kg", it) }
+                    s.reps?.let { put("reps", it) }
+                    s.sec?.let { put("sec", it) }
+                })
+            }
+        })
+        if (e.alternatives.isNotEmpty()) put("alt", buildJsonArray { e.alternatives.forEach { add(exerciseElement(it)) } })
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -135,19 +137,24 @@ object ShareFormat {
                 note = o.str("note")?.trim()?.take(MAX_NOTE)?.takeIf { it.isNotEmpty() },
             )
         }
-        val parsed = exercises.mapNotNull { el ->
-            val o = el as? JsonObject ?: return@mapNotNull null
-            val ref = o.str("ref")?.takeIf { it.isNotBlank() }
-            val id = o.str("id")?.trim()?.takeIf { it.isNotEmpty() }
-            val ename = o.str("name")?.trim()?.take(MAX_NAME)?.takeIf { it.isNotEmpty() }
-            if (ref == null && id == null && ename == null) return@mapNotNull null
-            val sets = (o["sets"] as? JsonArray).orEmpty().take(MAX_SETS).mapNotNull { s ->
-                val so = s as? JsonObject ?: return@mapNotNull null
-                SharedSet(so.num("kg")?.coerceAtLeast(0.0), so.num("reps")?.roundToInt()?.coerceIn(0, 10_000), so.num("sec")?.roundToInt()?.coerceIn(0, 86_400))
-            }
-            SharedExercise(id, ename, ref, sets, o.num("restSec")?.roundToInt()?.coerceIn(0, 3600), o.str("note")?.takeIf { it.isNotBlank() })
-        }
+        val parsed = exercises.mapNotNull { el -> parseExercise(el, withAlternatives = true) }
         return ShareParse.Ok(SharedTraining(version, kind, name, root.str("note")?.takeIf { it.isNotBlank() }, parsed, custom))
+    }
+
+    /** One exercise object; `alt` (alternatives, since November 2026) only one level deep, at most [MAX_ALTERNATIVES]. */
+    private fun parseExercise(el: JsonElement, withAlternatives: Boolean): SharedExercise? {
+        val o = el as? JsonObject ?: return null
+        val ref = o.str("ref")?.takeIf { it.isNotBlank() }
+        val id = o.str("id")?.trim()?.takeIf { it.isNotEmpty() }
+        val ename = o.str("name")?.trim()?.take(MAX_NAME)?.takeIf { it.isNotEmpty() }
+        if (ref == null && id == null && ename == null) return null
+        val sets = (o["sets"] as? JsonArray).orEmpty().take(MAX_SETS).mapNotNull { s ->
+            val so = s as? JsonObject ?: return@mapNotNull null
+            SharedSet(so.num("kg")?.coerceAtLeast(0.0), so.num("reps")?.roundToInt()?.coerceIn(0, 10_000), so.num("sec")?.roundToInt()?.coerceIn(0, 86_400))
+        }
+        val alternatives = if (!withAlternatives) emptyList() else
+            (o["alt"] as? JsonArray).orEmpty().take(MAX_ALTERNATIVES).mapNotNull { parseExercise(it, withAlternatives = false) }
+        return SharedExercise(id, ename, ref, sets, o.num("restSec")?.roundToInt()?.coerceIn(0, 3600), o.str("note")?.takeIf { it.isNotBlank() }, alternatives)
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -225,6 +232,8 @@ data class SharedExercise(
     val sets: List<SharedSet> = emptyList(),
     val restSec: Int? = null,
     val note: String? = null,
+    /** Alternatives (A/B), key `alt`; only one level deep. */
+    val alternatives: List<SharedExercise> = emptyList(),
 )
 
 /**
