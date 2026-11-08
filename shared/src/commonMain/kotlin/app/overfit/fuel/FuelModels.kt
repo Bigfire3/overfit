@@ -23,9 +23,11 @@ import kotlinx.serialization.json.jsonPrimitive
 @Serializable
 data class FuelAccount(
     val accountId: String = "",
-    /** Available credit in µ€. */
+    /** Available credit in µ€ (running reservations already taken off). */
     val balanceMicro: Long = 0,
     val hasRecoveryCode: Boolean = false,
+    /** µ€ held for requests still running (already taken off [balanceMicro]); 0 from older servers. */
+    val reservedMicro: Long = 0,
 )
 
 @Serializable
@@ -71,8 +73,17 @@ data class LedgerEntry(
 /** How a ledger entry is labeled in the app: paid with real money, credited, used, refunded or deducted (`expired`). */
 enum class LedgerKind { Paid, Credited, Used, Refunded, Deducted }
 
+/**
+ * One page of the ledger. Newer servers also send the current [balanceMicro] and [reservedMicro] (held for running
+ * requests, already taken off the balance): sum of the entries = balance + reserved. Older servers send neither.
+ */
 @Serializable
-data class LedgerPage(val entries: List<LedgerEntry> = emptyList(), val next: Long? = null)
+data class LedgerPage(
+    val entries: List<LedgerEntry> = emptyList(),
+    val next: Long? = null,
+    val balanceMicro: Long? = null,
+    val reservedMicro: Long = 0,
+)
 
 /** One entry of the server's request log (`GET /v1/account/requests`): metadata only, never prompt or answer. */
 @Serializable

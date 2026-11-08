@@ -344,6 +344,8 @@ class CoachTransportTest {
         }
         assertEquals(CoachErrorKind.NO_FUEL, kind(FuelException("insufficient_funds", 402)))
         assertEquals(CoachErrorKind.NETWORK, kind(FuelException("network")))
+        // A slow answer (e.g. Opus over the client timeout) is not "no connection".
+        assertEquals(CoachErrorKind.TIMEOUT, kind(FuelException("timeout")))
         assertEquals(CoachErrorKind.NETWORK, kind(RuntimeException("boom")))
         assertEquals(CoachErrorKind.RATE_LIMIT, kind(FuelException("x", 429)))
         assertEquals(CoachErrorKind.SERVER, kind(FuelException("x", 502)))

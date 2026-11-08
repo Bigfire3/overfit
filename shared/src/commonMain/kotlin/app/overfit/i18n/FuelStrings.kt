@@ -27,6 +27,11 @@ class FuelStrings(
     val balanceLabel: String,
     /** Credit as an amount: always "X € Guthaben", never a bare euro amount (real money is a price). */
     val creditAmount: (amount: String) -> String,
+    /** Next to the balance while requests are running: "(0,61 € reserviert)". */
+    val reservedNote: (amount: String) -> String,
+    /** Top row of the ledger while requests are running. */
+    val ledgerReserved: String,
+    val ledgerReservedHint: String,
     val topUp: String,
     /** Heading above the store packages. */
     val storeChannel: String,
@@ -96,6 +101,10 @@ val GermanFuel = FuelStrings(
     retry = "Erneut versuchen",
     balanceLabel = "Guthaben",
     creditAmount = { "$it Guthaben" },
+    reservedNote = { "($it reserviert)" },
+    ledgerReserved = "Reserviert für laufende Anfragen",
+    ledgerReservedHint = "Für laufende Anfragen ist dieser Betrag nur vorgemerkt. Endet die Anfrage, wird nur der echte Preis " +
+        "gebucht und der Rest kommt zurück, spätestens nach 5 Minuten.",
     topUp = "Guthaben aufladen",
     storeChannel = "App Store und Google Play",
     storePackage = { credit, price -> "$credit Guthaben · $price (inkl. Store-Gebühr)" },
@@ -159,6 +168,10 @@ val EnglishFuel = FuelStrings(
     retry = "Try again",
     balanceLabel = "Credit",
     creditAmount = { "$it credit" },
+    reservedNote = { "($it reserved)" },
+    ledgerReserved = "Reserved for running requests",
+    ledgerReservedHint = "This amount is only set aside for requests that are still running. When a request ends, only the " +
+        "actual cost is booked and the rest comes back, after 5 minutes at the latest.",
     topUp = "Top up credit",
     storeChannel = "App Store and Google Play",
     storePackage = { credit, price -> "$credit credit · $price (incl. store fee)" },

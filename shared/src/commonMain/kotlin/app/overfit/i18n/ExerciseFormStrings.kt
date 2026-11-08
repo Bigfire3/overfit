@@ -39,7 +39,8 @@ val GermanExerciseForm = ExerciseFormStrings(
     aiNeedName = "Erst den Namen eingeben",
     aiError = { kind ->
         when (kind) {
-            CoachErrorKind.NETWORK, CoachErrorKind.TIMEOUT -> "Keine Verbindung. Nochmal versuchen oder selbst ausfüllen."
+            CoachErrorKind.NETWORK -> "Keine Verbindung. Nochmal versuchen oder selbst ausfüllen."
+            CoachErrorKind.TIMEOUT -> "Keine Antwort in der Zeit. Nochmal versuchen oder selbst ausfüllen."
             CoachErrorKind.NO_FUEL -> "Guthaben reicht nicht. Bitte selbst ausfüllen."
             CoachErrorKind.AUTH -> "Der API-Key wurde abgelehnt. Prüfe ihn unter Profil → KI verbinden."
             CoachErrorKind.NO_ACCESS -> "Kein KI-Zugang eingerichtet."
@@ -69,7 +70,8 @@ val EnglishExerciseForm = ExerciseFormStrings(
     aiNeedName = "Enter the name first",
     aiError = { kind ->
         when (kind) {
-            CoachErrorKind.NETWORK, CoachErrorKind.TIMEOUT -> "No connection. Try again or fill in yourself."
+            CoachErrorKind.NETWORK -> "No connection. Try again or fill in yourself."
+            CoachErrorKind.TIMEOUT -> "No answer in time. Try again or fill in yourself."
             CoachErrorKind.NO_FUEL -> "Not enough credit. Please fill in yourself."
             CoachErrorKind.AUTH -> "The API key was rejected. Check it under Profile → Connect AI."
             CoachErrorKind.NO_ACCESS -> "No AI access set up."

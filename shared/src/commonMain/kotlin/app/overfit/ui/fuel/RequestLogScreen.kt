@@ -193,7 +193,7 @@ internal fun errorText(code: String?, r: RequestLogStrings): String = when (code
     "internal_error" -> r.errInternal
     "rate_limited", CoachErrorKind.RATE_LIMIT.name -> r.errRateLimit
     "network", CoachErrorKind.NETWORK.name -> r.errNetwork
-    CoachErrorKind.TIMEOUT.name -> r.errTimeout
+    "timeout", CoachErrorKind.TIMEOUT.name -> r.errTimeout
     CoachErrorKind.SERVER.name -> r.errServer
     CoachErrorKind.NO_ACCESS.name -> r.errNoAccess
     CoachErrorKind.AUTH.name -> r.errAuth

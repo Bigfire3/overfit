@@ -133,6 +133,70 @@ class FuelApiTest {
     }
 
     @Test
+    fun slowAnswerBecomesTimeoutNotNetwork() = runTest {
+        val engine = MockEngine { req ->
+            if (req.url.encodedPath == "/v1/devices") respond("""{$ACCOUNT_BODY}""", HttpStatusCode.OK, json)
+            else { kotlinx.coroutines.delay(5_000); respond("{}", HttpStatusCode.OK, json) }
+        }
+        val api = FuelApi(HttpClient(engine), "https://fuel.test", RequestSigner(FakeKey()), requestTimeoutMs = 50, messagesTimeoutMs = 50)
+        assertEquals("timeout", assertFailsWith<FuelException> { api.account() }.code)
+        assertEquals("timeout", assertFailsWith<FuelException> { api.messages("""{"model":"m","max_tokens":10,"messages":[]}""") }.code)
+    }
+
+    @Test
+    fun messagesGetTheirOwnLongerTimeout() = runTest {
+        val engine = MockEngine { req ->
+            when (req.url.encodedPath) {
+                "/v1/devices" -> respond("""{$ACCOUNT_BODY}""", HttpStatusCode.OK, json)
+                "/v1/messages" -> { kotlinx.coroutines.delay(300); respond("""{"content":[],"overfit":{"costMicro":1,"balanceMicro":2}}""", HttpStatusCode.OK, json) }
+                else -> { kotlinx.coroutines.delay(300); respond(ACCOUNT, HttpStatusCode.OK, json) }
+            }
+        }
+        val api = FuelApi(HttpClient(engine), "https://fuel.test", RequestSigner(FakeKey()), requestTimeoutMs = 100, messagesTimeoutMs = 5_000)
+        assertEquals(2, api.messages("""{"model":"m","max_tokens":10,"messages":[]}""").balanceMicro)
+        assertEquals("timeout", assertFailsWith<FuelException> { api.account() }.code)
+    }
+
+    @Test
+    fun connectTimeoutIsTimeout() = runTest {
+        val engine = MockEngine { throw io.ktor.client.network.sockets.ConnectTimeoutException("connect timed out") }
+        val api = FuelApi(HttpClient(engine), "https://fuel.test", RequestSigner(FakeKey()))
+        assertEquals("timeout", assertFailsWith<FuelException> { api.account() }.code)
+    }
+
+    @Test
+    fun accountReadsReservation() = runTest {
+        val with = api { req ->
+            if (req.url.encodedPath == "/v1/devices") HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
+            else HttpStatusCode.OK to """{"accountId":"a1","balanceMicro":3590000,"reservedMicro":610000,"hasRecoveryCode":true}"""
+        }.account()
+        assertEquals(3_590_000, with.balanceMicro)
+        assertEquals(610_000, with.reservedMicro)
+        val without = api { req ->
+            if (req.url.encodedPath == "/v1/devices") HttpStatusCode.OK to """{$ACCOUNT_BODY}""" else HttpStatusCode.OK to ACCOUNT
+        }.account()
+        assertEquals(0, without.reservedMicro)
+    }
+
+    @Test
+    fun ledgerPageReadsBalanceAndReservation() = runTest {
+        val row = """{"id":12,"ts":1,"type":"usage","amountMicro":-6956}"""
+        val with = api { req ->
+            if (req.url.encodedPath == "/v1/devices") HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
+            else HttpStatusCode.OK to """{"entries":[$row],"next":null,"balanceMicro":3590000,"reservedMicro":610000}"""
+        }.ledger(null)
+        assertEquals(3_590_000L, with.balanceMicro)
+        assertEquals(610_000, with.reservedMicro)
+        assertEquals(1, with.entries.size)
+        val without = api { req ->
+            if (req.url.encodedPath == "/v1/devices") HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
+            else HttpStatusCode.OK to """{"entries":[$row],"next":null}"""
+        }.ledger(null)
+        assertEquals(null, without.balanceMicro)
+        assertEquals(0, without.reservedMicro)
+    }
+
+    @Test
     fun ledgerQueryIsPartOfTheSignedPath() = runTest {
         val key = FakeKey()
         val api = api(key) { req ->

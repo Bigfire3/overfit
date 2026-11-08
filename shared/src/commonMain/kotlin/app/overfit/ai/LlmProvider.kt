@@ -138,7 +138,8 @@ class FuelProvider(
         } catch (e: CancellationException) {
             throw e
         } catch (e: FuelException) {
-            if (e.code == "network" || e.status >= 500) KeyValidation.NETWORK else KeyValidation.INVALID
+            // A timeout says nothing about the account either: "could not check", not "invalid".
+            if (e.code == "network" || e.code == "timeout" || e.status >= 500) KeyValidation.NETWORK else KeyValidation.INVALID
         } catch (_: Exception) {
             KeyValidation.NETWORK
         }

@@ -33,6 +33,12 @@ fun <T> rememberLoaded(key: Any?, block: suspend () -> T): Pair<Loaded<T>, () ->
     return state.value to { nonce++ }
 }
 
-/** "4,20 € Guthaben". */
-fun creditSummary(account: app.overfit.fuel.FuelAccount, t: FuelStrings): String =
-    t.creditAmount(app.overfit.fuel.formatEuro(account.balanceMicro, t.language))
+/** "4,20 € Guthaben", while requests run "4,20 € Guthaben (0,61 € reserviert)". */
+fun creditSummary(account: app.overfit.fuel.FuelAccount, t: FuelStrings): String {
+    val balance = t.creditAmount(app.overfit.fuel.formatEuro(account.balanceMicro, t.language))
+    return reservedNote(account.reservedMicro, t)?.let { "$balance $it" } ?: balance
+}
+
+/** "(0,61 € reserviert)" while credit is held for running requests, else null. */
+fun reservedNote(reservedMicro: Long, t: FuelStrings): String? =
+    if (reservedMicro > 0) t.reservedNote(app.overfit.fuel.formatEuro(reservedMicro, t.language)) else null
