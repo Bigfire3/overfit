@@ -19,6 +19,8 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 internal object ScreenMotion {
     const val OUT_MS = 90
     const val IN_MS = 150
+    /** Longest time taps are swallowed while two screens are visible (fade-through plus a margin), see AppScaffold. */
+    const val MAX_BLOCK_MS = (OUT_MS + IN_MS + 160).toLong()
 
     private fun NavDestination.isTab() = Tab.entries.any { hasRoute(it.routeClass) }
     private fun NavDestination.isStory() = hasRoute(CoachStoryRoute::class)
