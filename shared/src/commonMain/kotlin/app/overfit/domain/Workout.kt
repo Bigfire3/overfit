@@ -22,7 +22,12 @@ data class Workout(
     val note: String? = null,
 ) {
     val completedSets: Int get() = exercises.sumOf { e -> e.sets.count { it.completed } }
-    val totalSets: Int get() = exercises.sumOf { it.sets.size }
+
+    /** Sets that count: all sets, but of a skipped exercise only the ones already done. */
+    val totalSets: Int get() = exercises.sumOf { it.countedSets }
+
+    /** Nothing is open any more (every set done or its exercise skipped) and there is at least one exercise. */
+    val allDone: Boolean get() = exercises.isNotEmpty() && nextOpenSet() == null
 
     fun exercise(id: String): WorkoutExercise? = exercises.firstOrNull { it.id == id }
 
@@ -43,7 +48,8 @@ data class Workout(
         val flat = exercises.flatMap { e -> e.sets.map { SetRef(e, it) } }
         val start = afterSetId?.let { id -> flat.indexOfFirst { it.set.id == id } } ?: -1
         val ordered = if (start < 0) flat else flat.drop(start + 1) + flat.take(start + 1)
-        return ordered.firstOrNull { !it.set.completed }
+        // Sets of a skipped exercise are not open: "Log next set" and the notification pass over them.
+        return ordered.firstOrNull { !it.set.completed && !it.exercise.skipped }
     }
 
     fun withName(name: String) = copy(name = name)
@@ -116,6 +122,12 @@ data class Workout(
         list.add(to, list.removeAt(from))
         return copy(exercises = list)
     }
+
+    /**
+     * "Skip today" ([skipped] = true) or undo it. The sets stay as they are (done ones keep counting), the open ones no
+     * longer count as open, so the workout can be finished without them. The saved workout keeps the exercise.
+     */
+    fun setSkipped(exerciseId: String, skipped: Boolean) = updateExercise(exerciseId) { it.copy(skipped = skipped) }
 
     fun setExerciseNote(exerciseId: String, note: String) = updateExercise(exerciseId) { it.copy(note = note) }
 
@@ -224,8 +236,13 @@ data class WorkoutExercise(
     /** For [ExerciseOrigin.REPLACED]: the exercise that was planned here. */
     val replacedExerciseId: String? = null,
     val sets: List<WorkoutSet>,
+    /** "Skip today": the open sets of this exercise do not count; stored with the training (v13). */
+    val skipped: Boolean = false,
 ) {
     val completedSets: Int get() = sets.count { it.completed }
+
+    /** Sets that count towards the workout: of a skipped exercise only the ones already done. */
+    val countedSets: Int get() = if (skipped) completedSets else sets.size
 
     /** Rest after a set of this exercise: template → exercise → global default. */
     fun restSec(globalDefault: Int): Int = restSec ?: exercise.defaultRestSec ?: globalDefault

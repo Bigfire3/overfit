@@ -16,6 +16,8 @@ object WorkoutPlan {
         val exercises = workout.exercises.map { we ->
             val index = unmatched.indexOfFirst { it.exercise.id == we.exercise.id }
             val match = if (index >= 0) unmatched.removeAt(index) else null
+            // Skipped today: the plan keeps the exercise exactly as it was (its sets were not trained).
+            if (we.skipped && match != null) return@map match
             TemplateExercise(
                 exercise = we.exercise,
                 restSec = we.restSec ?: match?.restSec,

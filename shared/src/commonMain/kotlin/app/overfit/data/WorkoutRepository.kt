@@ -220,6 +220,7 @@ class WorkoutRepository(
                     note = e.note.trim().ifEmpty { null },
                     origin = e.origin,
                     replacedExerciseId = e.replacedExerciseId,
+                    skipped = e.skipped,
                 )
             },
         )
@@ -357,6 +358,7 @@ internal fun SessionWithExercises.toDomain(): Workout {
                 note = e.entry.note.orEmpty(),
                 origin = e.entry.origin,
                 replacedExerciseId = e.entry.replacedExerciseId,
+                skipped = e.entry.skipped,
                 sets = e.sets.sortedBy { it.position }.map { s ->
                     WorkoutSet(
                         id = s.id,

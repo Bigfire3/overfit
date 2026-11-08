@@ -475,6 +475,56 @@ class MigrationTest {
         }
     }
 
+    /**
+     * v12 → v13 ("skip today"): session_exercise.skipped (NOT NULL, default 0). Existing trainings keep every exercise,
+     * set and value and read as "nothing skipped"; a skipped exercise can be stored afterwards.
+     */
+    @Test
+    fun migration12to13KeepsTrainingsAndAddsSkipped() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v12 = helper.createDatabase(12)
+        v12.execSQL(
+            "INSERT INTO exercise (id, name, source, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType, defaultRestSec, isArchived, createdAt, updatedAt) " +
+                "VALUES ('ex1', 'Bench', 'CUSTOM', NULL, 'chest', '', NULL, 'WEIGHT_REPS', NULL, 0, 1, 2)",
+        )
+        v12.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt, sauna) " +
+                "VALUES ('w1', 'Push', 7, 'FINISHED', 1000, 5000, 'gut', 4, NULL, 'NONE', NULL, NULL, NULL, 5000, 1)",
+        )
+        v12.execSQL("INSERT INTO session_exercise (id, sessionId, exerciseId, position, restSec, note, origin, replacedExerciseId) VALUES ('se1', 'w1', 'ex1', 0, 90, 'eng', 'PLANNED', NULL)")
+        v12.execSQL(
+            "INSERT INTO set_entry (id, sessionExerciseId, position, targetWeightKg, targetReps, targetDurationSec, weightKg, reps, durationSec, completed, completedAt, rpe) " +
+                "VALUES ('s1', 'se1', 0, 60.0, 8, NULL, 62.5, 8, NULL, 1, 2000, NULL)",
+        )
+        v12.close()
+        helper.runMigrationsAndValidate(13, OverfitDatabase.MIGRATIONS.toList()).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val dao = db.workoutDao()
+            val row = dao.get("w1")!!
+            assertEquals("Push", row.session.name)
+            val e = row.exercises.single()
+            assertEquals(false, e.entry.skipped)
+            assertEquals("eng", e.entry.note)
+            assertEquals(62.5, e.sets.single().weightKg!!, 0.0)
+            assertEquals(true, e.sets.single().completed)
+            dao.insertExercises(listOf(SessionExerciseEntity("se2", "w1", "ex1", 1, null, null, app.overfit.domain.ExerciseOrigin.PLANNED, null, skipped = true)))
+            assertEquals(listOf(false, true), dao.get("w1")!!.exercises.sortedBy { it.entry.position }.map { it.entry.skipped })
+        } finally {
+            db.close()
+        }
+    }
+
     private suspend fun SQLiteConnection.count(table: String): Long =
         prepare("SELECT COUNT(*) FROM $table").use { it.step(); it.getLong(0) }
 

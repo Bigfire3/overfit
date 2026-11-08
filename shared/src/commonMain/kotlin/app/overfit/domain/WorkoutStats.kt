@@ -12,8 +12,10 @@ data class WorkoutSummary(
     val completedSets: Int,
     val totalSets: Int,
     val volumeKg: Double,
-    /** Planned sets left open. */
+    /** Planned sets left open (not counting exercises skipped on purpose, see [skippedExercises]). */
     val skippedSets: Int,
+    /** Exercises marked "skip today". */
+    val skippedExercises: Int = 0,
     val addedExercises: Int,
     val replacedExercises: Int,
     val records: List<PersonalRecord>,
@@ -99,7 +101,8 @@ object WorkoutStats {
             completedSets = workout.completedSets,
             totalSets = workout.totalSets,
             volumeKg = volume(done.values.flatMap { it.second }),
-            skippedSets = workout.exercises.sumOf { e -> e.sets.count { !it.completed } },
+            skippedSets = workout.exercises.filterNot { it.skipped }.sumOf { e -> e.sets.count { !it.completed } },
+            skippedExercises = workout.exercises.count { it.skipped },
             addedExercises = workout.exercises.count { it.origin == ExerciseOrigin.ADDED },
             replacedExercises = workout.exercises.count { it.origin == ExerciseOrigin.REPLACED },
             records = records,
