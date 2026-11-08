@@ -17,6 +17,18 @@ class CoachChatStrings(
     val suggestions: List<String>,
     val placeholder: String,
     val send: String,
+    /** Screen reader text of the send button with its price: "Senden, ≈ 2,6 ct". */
+    val sendWithPrice: (price: String) -> String,
+    /** Send button with the user's own key, price unknown. */
+    val priceOwnKey: String,
+    /** Send button with the user's own key and a known list price: "eigener Schlüssel · ≈ 2,1 ct". */
+    val priceOwnKeyCost: (cost: String) -> String,
+    /** Send button without AI access (the demo answers). */
+    val priceDemo: String,
+    /** Finish flow: card that opens the chat with this training attached (nothing is sent before the user taps send). */
+    val reviewCard: String,
+    /** Line under the card. */
+    val reviewCardHint: String,
     val addContext: String,
     /** Screen readers: "Modell: Claude Sonnet 5.5". */
     val modelChip: (label: String) -> String,
@@ -35,10 +47,8 @@ class CoachChatStrings(
     val remove: (label: String) -> String,
     val photoN: (n: Int) -> String,
     val today: String,
-    /** Prefilled question of the automatic review after a training (new chat with the training attached). */
+    /** Prefilled question of the review after a training (new chat with the training attached, sent by the user). */
     val reviewMyTraining: String,
-    /** Finish flow when the automatic review is switched off. */
-    val finishAutoOff: String,
     val yesterday: String,
     val close: String,
     val back: String,
@@ -101,6 +111,12 @@ val GermanCoachChat = CoachChatStrings(
     suggestions = listOf("Wie lief mein Training?", "Was mache ich nächstes Mal?", "Wo trete ich auf der Stelle?"),
     placeholder = "Frag deinen Coach …",
     send = "Senden",
+    sendWithPrice = { "Senden, $it" },
+    priceOwnKey = "eigener Schlüssel",
+    priceOwnKeyCost = { "eigener Schlüssel · $it" },
+    priceDemo = "Demo · kostenlos",
+    reviewCard = "Training auswerten lassen",
+    reviewCardHint = "Öffnet den Coach-Chat mit diesem Training. Gesendet wird erst, wenn du selbst auf Senden tippst.",
     addContext = "Kontext hinzufügen",
     modelChip = { "Modell: $it" },
     thinking = "Denkt nach …",
@@ -118,7 +134,6 @@ val GermanCoachChat = CoachChatStrings(
     photoN = { "Foto $it" },
     today = "heute",
     reviewMyTraining = "Werte mein Training aus",
-    finishAutoOff = "Automatische Auswertung ist aus (Einstellungen → Coach). Im Coach-Tab ist dein Training schon angehängt.",
     yesterday = "gestern",
     close = "Schließen",
     back = "Zurück",
@@ -187,6 +202,12 @@ val EnglishCoachChat = CoachChatStrings(
     suggestions = listOf("How did my training go?", "What should I do next time?", "Where am I stuck?"),
     placeholder = "Ask your coach …",
     send = "Send",
+    sendWithPrice = { "Send, $it" },
+    priceOwnKey = "own key",
+    priceOwnKeyCost = { "own key · $it" },
+    priceDemo = "Demo · free",
+    reviewCard = "Get this training reviewed",
+    reviewCardHint = "Opens the coach chat with this training attached. Nothing is sent until you tap send yourself.",
     addContext = "Add context",
     modelChip = { "Model: $it" },
     thinking = "Thinking …",
@@ -204,7 +225,6 @@ val EnglishCoachChat = CoachChatStrings(
     photoN = { "Photo $it" },
     today = "today",
     reviewMyTraining = "Review my training",
-    finishAutoOff = "Automatic review is off (Settings → Coach). In the Coach tab your training is already attached.",
     yesterday = "yesterday",
     close = "Close",
     back = "Back",

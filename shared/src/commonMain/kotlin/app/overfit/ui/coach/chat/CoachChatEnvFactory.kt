@@ -28,22 +28,28 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
     val store = deps.store
     fun strings(): CoachChatStrings = coachChatStringsFor(store.state.value.language)
     fun training(row: HistoryRow) = ChatAttachment.Training(row.id, row.name, row.startedAt)
-    // Model chip and cost follow the access and the chosen model live. The cost needs the backend's price table: it is
-    // only asked while credit is the chosen access (own key: no backend request, OwnKeyPrivacyTest).
+    // Model chip and pricing follow the access and the chosen model live. The price table comes from the backend: it is
+    // only asked while credit is the chosen access (own key: only the config already on the device, OwnKeyPrivacyTest).
     val access = kotlinx.coroutines.flow.combine(store.state, deps.coach.settings.state) { s, settings -> s to settings }
     // Credit: the model name comes from the backend's /v1/config (tiers can point to any vendor); the built-in name of
     // the tier is only the fallback while the config is unknown.
     val chip = access
         .map { (s, settings) ->
-            val config = if (s.providerId == app.overfit.ai.ProviderId.FUEL) deps.providers.fuel.config() else null
+            val fuel = s.providerId == app.overfit.ai.ProviderId.FUEL
+            val config = if (fuel) deps.providers.fuel.config() else null
             val fallback = app.overfit.ui.coach.modelChipLabel(s, settings, deps.providers.fuel.available, app.overfit.i18n.coachSettingsStringsFor(s.language))
             val tier = config?.tiers?.get(settings.model(app.overfit.ai.ProviderId.FUEL))
             val name = tier?.let { it.displayName.ifEmpty { app.overfit.fuel.modelShortName(it.model) } }?.takeIf { it.isNotBlank() }
-            (name ?: fallback) to app.overfit.ui.coach.chatCostEstimate(s, settings, config, s.language)
+            val pricing = when {
+                fuel && deps.providers.fuel.available -> app.overfit.coach.ChatPricing.credit(config, settings.model(app.overfit.ai.ProviderId.FUEL))
+                !fuel && s.hasApiKey -> app.overfit.coach.ChatPricing.ownKey(deps.providers.fuel.storedConfig(), settings.model(s.providerId))
+                else -> app.overfit.coach.ChatPricing.Demo
+            }
+            (name ?: fallback) to pricing
         }
-        .stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "" to null)
+        .stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "" to app.overfit.coach.ChatPricing.Unknown)
     val modelLabel = chip.map { it.first }.stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "")
-    val cost = chip.map { it.second }.stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
+    val pricing = chip.map { it.second }.stateIn(deps.data.scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, app.overfit.coach.ChatPricing.Unknown)
     return CoachChatEnv(
         chat = deps.coachChat,
         prefs = deps.data.coachChatPrefs,
@@ -62,7 +68,7 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
                     val old = bests[e.exercise.id]
                     if (old == null || score > old.score) {
                         bests[e.exercise.id] = Best(
-                            e.exercise.id, e.exercise.name, ChatContext.setText(best, type, s.profile.unit, s.language), score)
+                            e.exercise.id, e.exercise.name, ChatContext.setText(best, type, s.profile.unit, s.language, bodyweightMark = false), score)
                     }
                 }
             }
@@ -79,7 +85,7 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
             }
         },
         modelLabel = modelLabel,
-        costEstimate = cost,
+        pricing = pricing,
     )
 }
 

@@ -361,7 +361,6 @@ class CoachServiceTest {
         val prefs = data.coachChatPrefs
         prefs.setProfile(app.overfit.coach.AthleteProfile(goal = app.overfit.coach.TrainingGoal.STRENGTH, heightCm = 182))
         prefs.setAddition("Antworte kurz.")
-        prefs.setAutoReview(false)
         val backup = app.overfit.ui.coach.CoachBackup(coach, prefs)
         val exported = requireNotNull(backup.export())
 
@@ -373,7 +372,8 @@ class CoachServiceTest {
         assertEquals(app.overfit.coach.TrainingGoal.STRENGTH, restored.profile.goal)
         assertEquals(182, restored.profile.heightCm)
         assertEquals("Antworte kurz.", restored.addition)
-        assertFalse(restored.autoReview)
+        // The removed automatic-review switch is not in new backups.
+        assertFalse(exported.toString(), exported.toString().contains("autoReview"))
 
         // An older backup: a whole edited instruction, no chat settings → it becomes the addition.
         data.resetAll()

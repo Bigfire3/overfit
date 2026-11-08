@@ -26,8 +26,8 @@ class CoachChatEnv(
     val latestWeight: () -> String?,
     /** Text of the model chip ("Claude Sonnet 5.5", "Kein KI-Zugang"). */
     val modelLabel: StateFlow<String>,
-    /** Estimated cost of the next question ("≈ 2 ct"), null = nothing shown. */
-    val costEstimate: StateFlow<String?>,
+    /** How the next question is priced (credit, own key, demo); follows access and model live. */
+    val pricing: StateFlow<app.overfit.coach.ChatPricing>,
 )
 
 /**

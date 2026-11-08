@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.ai.ProviderId
@@ -72,9 +73,11 @@ class CoachFlowTest {
                 templateId = data.templates.save(
                     Template(0, "Push", null, listOf(TemplateExercise(bench, restSec = 60, note = null, sets = List(2) { PlannedSet(60.0, 8) }))),
                 )
-                var w = Workout.fromTemplate(requireNotNull(data.templates.get(templateId)), 1_000L, id = "w1")
-                w.exercises.forEach { e -> e.sets.forEach { w = w.completeSet(it.id, 2_000L) } }
-                data.workouts.finish(w, 3_600_000L)
+                // An hour ago, so the calendar shows it today.
+                val start = System.currentTimeMillis() - 3_600_000L
+                var w = Workout.fromTemplate(requireNotNull(data.templates.get(templateId)), start, id = "w1")
+                w.exercises.forEach { e -> e.sets.forEach { w = w.completeSet(it.id, start + 1_000L) } }
+                data.workouts.finish(w, start + 1_800_000L)
             }
         }
         val deps = AppDependencies(
@@ -82,32 +85,67 @@ class CoachFlowTest {
             Providers(HttpClient(MockEngine { respond("{}") })),
             data,
             versionName = "0.1.test",
-            today = { LocalDate(2026, 11, 3) },
+            // The real day: the calendar does not open days after "today".
+            today = { realToday() },
             coachTransport = { fake },
         )
         compose.setContent { OverfitApp(deps) }
         return deps
     }
 
+    // Fabian 8.11.: "wenn man jetzt ein Workout abschließt, dann geht es ja direkt los, ohne dass man nochmal gefragt wird."
     @Test
-    fun sendToCoachOpensAReviewChatWithTheTrainingAttached() {
-        setUp(withKey = true)
+    fun finishOffersAReviewCardThatOnlyOpensTheChat() {
+        val deps = setUp(withKey = true)
         compose.waitForTrainingTab()
-        // Profile → Coach → "Auswertungen" → "Letztes Training auswerten" → "An Coach senden" = new chat in the Coach tab.
-        compose.onNodeWithTag("tab:PROFILE").performClick()
-        waitFor("Auswertungen")
-        compose.onNodeWithText("Auswertungen").performScrollTo().performClick()
-        waitFor("Letztes Training auswerten")
-        compose.onNodeWithText("Letztes Training auswerten").performClick()
-        waitFor("An Coach senden")
-        compose.onNodeWithText("An Coach senden").performClick()
-        waitFor("Werte mein Training aus")
+        // Training tab → "Push" → "Starten" → "Beenden" (two taps) → finish flow.
+        waitFor("Push", substring = true)
+        compose.onNodeWithText("Push", substring = true).performClick()
+        waitFor("Starten")
+        compose.onNodeWithText("Starten").performClick()
+        waitFor("Beenden")
+        compose.onNodeWithText("Beenden").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
+        waitForTag("finish:review")
+        compose.onNodeWithTag("finish:review").performScrollTo()
+        waitFor("Training auswerten lassen")
+        waitFor("eigener Schlüssel")
+        compose.waitForIdle()
+        assertTrue(fake.prompts.isEmpty())
+
+        // Tap: saves the finish flow and opens the chat with the training attached; still nothing sent.
+        // Last item of the screen: after performScrollTo it may sit under the floating "Speichern"; tap it by its action.
+        compose.onNodeWithTag("finish:review").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        waitForTag("coach:input")
+        compose.waitUntil(10_000) { compose.onAllNodes(hasSetTextAction() and hasText("Werte mein Training aus")).fetchSemanticsNodes().isNotEmpty() }
+        waitForTag("chip:training")
+        compose.waitForIdle()
+        assertTrue(fake.prompts.isEmpty())
+        assertTrue(runBlocking { data.database.coachChatDao().allChats() }.isEmpty())
+
+        // The user sends it.
+        compose.onNodeWithTag("coach:send").performClick()
         compose.waitUntilState(10_000) { fake.prompts.any { it.schemaName == app.overfit.coach.CoachChatSchema.NAME } }
         val prompt = fake.prompts.last { it.schemaName == app.overfit.coach.CoachChatSchema.NAME }
         assertTrue(prompt.dynamicSystem, prompt.dynamicSystem.contains("## Attached training"))
-        assertTrue(prompt.dynamicSystem, prompt.dynamicSystem.contains("Bench Press"))
-        val chats = runBlocking { data.database.coachChatDao().allChats() }
-        assertEquals(1, chats.size)
+        assertEquals("Werte mein Training aus", prompt.user)
+    }
+
+    @Test
+    fun sendToCoachOnATrainingOpensTheChatWithoutSending() {
+        setUp(withKey = true)
+        compose.waitForTrainingTab()
+        // Calendar → today → training → "Coach-Auswertung" → "An Coach senden" = the chat with the training, not sent.
+        openToday()
+        waitFor("Push")
+        compose.onAllNodes(hasText("Push"))[0].performClick()
+        waitFor("Coach-Auswertung")
+        compose.onNodeWithText("Coach-Auswertung").performScrollTo().performClick()
+        waitFor("An Coach senden")
+        compose.onNodeWithText("An Coach senden").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasSetTextAction() and hasText("Werte mein Training aus")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        assertTrue(fake.prompts.isEmpty())
     }
 
     @Test
@@ -138,12 +176,12 @@ class CoachFlowTest {
     fun withoutAccessTheDemoReviewIsOffered() {
         setUp(withKey = false)
         compose.waitForTrainingTab()
-        // Reviews moved into the settings: Profile → Coach → "Auswertungen".
-        compose.onNodeWithTag("tab:PROFILE").performClick()
-        waitFor("Auswertungen")
-        compose.onNodeWithText("Auswertungen").performScrollTo().performClick()
-        waitFor("Letztes Training auswerten")
-        compose.onNodeWithText("Letztes Training auswerten").performClick()
+        // Calendar → today → training → "Coach-Auswertung".
+        openToday()
+        waitFor("Push")
+        compose.onAllNodes(hasText("Push"))[0].performClick()
+        waitFor("Coach-Auswertung")
+        compose.onNodeWithText("Coach-Auswertung").performScrollTo().performClick()
         waitFor("Kein KI-Zugang")
         compose.onNodeWithText("Demo-Auswertung ansehen").performClick()
         waitFor("Demo · Beispielinhalt, nicht vom Coach")
@@ -163,6 +201,15 @@ class CoachFlowTest {
         compose.onNodeWithText("Speichern").performClick()
         compose.waitUntilState(10_000) { runBlocking { database.coachDao().currentMemory() }?.text == "Ziel: 100 kg Bankdrücken" }
     }
+
+    /** Calendar → today. The first visit of the calendar scrolls to today; a second tap on the tab after that is safe. */
+    private fun openToday() {
+        compose.onNodeWithTag("tab:PHOTOS").performClick()
+        compose.waitForIdle()
+        compose.openCalendarDay(realToday().dayOfMonth)
+    }
+
+    private fun waitForTag(tag: String) = compose.waitUntil(10_000) { compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
 
     private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {
         compose.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty()

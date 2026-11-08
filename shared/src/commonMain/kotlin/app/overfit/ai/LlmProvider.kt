@@ -176,6 +176,12 @@ class FuelProvider(
         }
     }
 
+    /**
+     * The config that is already on the device (cached or stored), without asking the server. Used where no backend
+     * request may happen, e.g. the price estimate with the user's own key (OwnKeyPrivacyTest).
+     */
+    fun storedConfig(): FuelConfig? = cached?.second ?: stored()
+
     /** Forgets the cached config, e.g. after the backend said a tier is not available (keys changed on the server). */
     fun invalidateConfig() {
         cached = null

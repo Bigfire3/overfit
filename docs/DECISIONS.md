@@ -1563,3 +1563,53 @@ Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Konto
   der Rückkehr weiter), `textInputArea`/`clearFocusOutsideTextInput`, `ConfirmArea`, `pressScale` (lesen Gesten nur, verbrauchen nichts;
   ACTION_CANCEL beendet die Geste und `awaitEachGesture` beginnt neu), Activity-Konfiguration (`singleTop`, Benachrichtigung mit
   `SINGLE_TOP|CLEAR_TOP` → `onNewIntent`, keine zweite Instanz).
+
+## Coach/KI: frühere Chats, Preis vor jeder Anfrage, Gewichte nicht anzweifeln (8.11., Session BH, Teil 1)
+Fabians Feedback vom 8.11. (Zitate in PROGRESS.md), Vorgaben der Koordination. Teil 2 (ein Coach-Einstieg überall) folgt als eigener PR.
+- **Frühere Chats als eigener Screen:** Ein Tipp in „Frühere Chats“ öffnet den Chat vollständig in einem eigenen Screen (`CoachOpenChatRoute`,
+  derselbe Chat-Composable wie der Tab, mit Zurück-Pfeil und Titel statt Story/Liste/Neu): Fragen mit Anhang-Karten, Antworten mit
+  Workout-Karte, Modell und Preis. Man kann dort weiterschreiben (Verlauf geht mit). Bisher wurde der Chat per Übergabe an den Tab
+  „zurückgereicht“ (Request + `popBackStack`); auf dem Handy kam davon nichts an (vermutlich der Tipp-Blocker aus #99 bzw. die
+  Übergabe beim Zurückgehen). Der eigene Screen braucht keine Übergabe mehr. Anfragen von außen (Auswertungs-Karte, Prompts) gehen
+  weiter nur an den Tab, nie in einen geöffneten alten Chat.
+- **Keine KI-Anfrage ohne Tipp:**
+  - Die automatische Auswertung nach dem Training ist weg, ebenso der Schalter. Der Abschluss-Screen zeigt eine Karte „Training
+    auswerten lassen · ≈ X ct“ (bzw. „· eigener Schlüssel“, ohne Zugang „· Demo · kostenlos“). Ein Tipp speichert wie „Speichern“ und
+    öffnet den Coach-Tab mit dem Training als Chip und „Werte mein Training aus“ im Feld. Gesendet wird erst mit dem Senden-Knopf.
+  - „An Coach senden“ auf der Auswertungsseite eines Trainings öffnet ebenfalls nur den Chat.
+  - Die alte Offline-Warteschlange der strukturierten Auswertung wird nicht mehr beim Start bzw. im Vordergrund abgearbeitet:
+    `CoachService.parkQueue()` setzt noch wartende Zeilen auf „fehlgeschlagen“, „Erneut versuchen“ ist ein Tipp.
+  - „Letztes Training auswerten“ und „Fortschritt bewerten“ (Einstellungen → Coach → Auswertungen) sind entfernt. Die Seite ist nur
+    noch das Archiv der alten Auswertungen.
+- **Prefs-Migration:** `CoachChatPrefs.autoReview` gestrichen. Gespeichertes JSON mit dem Schlüssel wird beim Laden ohne ihn neu
+  geschrieben, alles andere bleibt (Profil, Ergänzung). Kaputtes JSON bleibt unangetastet. Alte Backups mit dem Feld lassen sich
+  weiter einspielen (`ignoreUnknownKeys`). Test `removedAutoReviewSwitchIsMigratedAway`. Keine DB-Änderung.
+- **Senden-Knopf mit Preis:** Der Knopf ist eine weiße Pille „≈ 2,6 ct ↑“ (eigener Schlüssel: „eigener Schlüssel“ bzw.
+  „eigener Schlüssel · ≈ 2,1 ct“, ohne Zugang „Demo · kostenlos“). Solange die Preistabelle unbekannt ist, steht dort nur der Pfeil.
+  Der Screenreader liest „Senden, ≈ 2,6 ct“.
+- **Preis-Schätzung aus dem echten Prompt** (`coach/ChatCost.kt`, `CoachChatService.estimate`):
+  - Gebaut wird genau der System-Prompt wie beim Senden: Grundanweisung, Regeln, Beispiel, Übungsliste, Profil, Anhänge aller Fragen
+    des Chats, Verlauf (letzte 20), Frage, Schema. Gezählt wird mit 3,5 Zeichen je Token (gemischt DE/EN/JSON, ohne Tokenizer).
+  - Fotos: Die App verkleinert auf 1500 px lange Kante (3:4 → 1125 × 1500). (B × H) / 750 = 2250 Token, Anthropic skaliert über
+    ~1600 Token herunter, also 1600 je Foto.
+  - Ausgabe: typische Antwortlänge aus `/v1/config.usageProfiles.chat` (sonst 500) plus die Denk-Token der Stufe.
+  - Preis: Listenpreis der gewählten Stufe aus `/v1/config` plus Aufschlag. Das Ausweich-Modell wird nie teurer abgerechnet
+    (Backend nimmt das günstigere), daher reicht der Stufenpreis als Obergrenze.
+  - Eingabe zum vollen Preis, obwohl der statische Teil bei Folgefragen aus dem Cache kommt: Die Schätzung liegt eher etwas zu hoch
+    als zu niedrig (bewusst, „≈“).
+  - Neu gebaut wird bei Wechsel von Chat, Anhängen, Profil-Chip oder neuer Nachricht. Getipptes wird live dazugezählt.
+  - Eigener Schlüssel: kein Backend-Aufruf (`storedConfig()` liest nur, was schon auf dem Gerät liegt). Kennt die gespeicherte
+    Config das Modell, steht der Listenpreis ohne Aufschlag dabei, sonst nur „eigener Schlüssel“.
+  - Tests: mehr Fotos und Anhänge sowie längerer Verlauf ergeben eine höhere Schätzung, Schätzen sendet nichts, Preistexte.
+  - Die bisherige Pauschale (`chatCostEstimate`, typische 6700 Token) ist entfernt. Die Stufenliste im Modell-Sheet behält die typischen
+    Werte (Vergleich der Modelle).
+- **Gewichte nicht anzweifeln** (`coach/WeightRules.kt`):
+  - Fester englischer Regelblock in jedem Coach-Prompt (Chat und Auswertung), nicht bearbeitbar, damit keine eigene Anweisung ihn
+    verdrängt: Gewicht = Einstellung am Gerät bzw. Steckgewicht, nie umgerechnet. Nie „falsch/vergessen/unrealistisch“ nennen, keine
+    eigenen Zahlen. 0 kg („BW“) ist gültig. Fortschritt nur innerhalb derselben Übung bzw. desselben Geräts. Steigerung in den Schritten
+    des Nutzers.
+  - Die Grundanweisung (DE/EN) sagt dasselbe kurz.
+  - Daten: Jede Übung trägt den Gerätetyp aus dem Katalog in Klammern ((machine), (cable), (free weight), (bodyweight), (band)) in
+    Training, Verlauf, Workout, Übung und der Auswertung. 0-kg-Sätze heißen „BW×12“ statt „0×12“.
+  - „Kontext kopieren“ (externe Chats) bekommt einen Satz dazu (`ctxWeights`).
+  - Die Unterzeile im „+“-Sheet (UI) bleibt bei „0×12“.

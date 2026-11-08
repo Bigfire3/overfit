@@ -43,6 +43,8 @@ fun ComposeTestRule.openCalendarDay(dayOfMonth: Int, dayWord: String = "Tag", se
         node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().any { it == "$dayWord $dayOfMonth" || it.startsWith("$dayWord $dayOfMonth,") }
     }
     waitUntil(20_000) { onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+    // The tap blocker of a screen change (AppScaffold, "nav-transition") must be gone, or the tap on the day is swallowed.
+    waitUntil(20_000) { onAllNodes(hasTestTag("nav-transition")).fetchSemanticsNodes().isEmpty() }
     // Newest month first: the current month holds the first match.
     onAllNodes(matcher).onFirst().performScrollTo().performClick()
     waitUntil(20_000) { onAllNodes(hasText(sectionTitle, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty() }

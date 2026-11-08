@@ -51,15 +51,24 @@ class ModelChipTest {
     }
 
     @Test
-    fun costOnlyWithCredit() {
-        val fuel = state(ProviderId.FUEL, key = false)
+    fun sendButtonShowsThePrice() {
+        val s = app.overfit.i18n.coachChatStringsFor(Language.DE)
+        val tokens = app.overfit.coach.TokenEstimate(6_700, 0)
+        val credit = app.overfit.coach.ChatPricing.credit(config, "standard")
         // 6 700 in × 1,84 € + 500 out × 9,20 € per million tokens, +28 % → 2,17 ct.
-        assertEquals("≈ 2,2 ct", chatCostEstimate(fuel, CoachSettings(), config, Language.DE))
-        assertEquals("≈ 2.2 ¢", chatCostEstimate(fuel, CoachSettings(), config, Language.EN))
-        // Unavailable tier, unknown config, own key, no access: no estimate.
-        assertNull(chatCostEstimate(fuel, CoachSettings(models = mapOf("FUEL" to "pro")), config, Language.DE))
-        assertNull(chatCostEstimate(fuel, CoachSettings(), null, Language.DE))
-        assertNull(chatCostEstimate(state(ProviderId.ANTHROPIC, key = true), CoachSettings(), config, Language.DE))
-        assertNull(chatCostEstimate(state(ProviderId.OPENROUTER, key = false), CoachSettings(), config, Language.DE))
+        assertEquals("≈ 2,2 ct", app.overfit.ui.coach.chat.sendPriceLabel(credit, tokens, s, Language.DE))
+        assertEquals("≈ 2.2 ¢", app.overfit.ui.coach.chat.sendPriceLabel(credit, tokens, app.overfit.i18n.coachChatStringsFor(Language.EN), Language.EN))
+        // A photo (1600 tokens) makes it dearer.
+        val photo = app.overfit.ui.coach.chat.sendPriceLabel(credit, tokens.copy(imageTokens = 1_600), s, Language.DE)
+        assertEquals("≈ 2,5 ct", photo)
+        // Unavailable tier / unknown config: no price yet (only the arrow).
+        assertNull(app.overfit.ui.coach.chat.sendPriceLabel(app.overfit.coach.ChatPricing.credit(config, "pro"), tokens, s, Language.DE))
+        assertNull(app.overfit.ui.coach.chat.sendPriceLabel(app.overfit.coach.ChatPricing.credit(null, "standard"), tokens, s, Language.DE))
+        // Own key: "eigener Schlüssel", with the list price (no markup) when the stored config knows the model.
+        val known = app.overfit.coach.ChatPricing.ownKey(config, "claude-sonnet-5-5")
+        assertEquals("eigener Schlüssel · ≈ 1,7 ct", app.overfit.ui.coach.chat.sendPriceLabel(known, tokens, s, Language.DE))
+        val unknown = app.overfit.coach.ChatPricing.ownKey(null, "gpt-5")
+        assertEquals("eigener Schlüssel", app.overfit.ui.coach.chat.sendPriceLabel(unknown, tokens, s, Language.DE))
+        assertEquals("Demo · kostenlos", app.overfit.ui.coach.chat.sendPriceLabel(app.overfit.coach.ChatPricing.Demo, tokens, s, Language.DE))
     }
 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.ai.Providers
@@ -138,7 +139,7 @@ class CoachChatShotTest {
         templateNames = flowOf(setOf("Push")),
         latestWeight = { "82,4 kg · Stand 02.11." },
         modelLabel = MutableStateFlow("Claude Sonnet 5.5"),
-        costEstimate = MutableStateFlow("≈ 2 ct"),
+        pricing = MutableStateFlow(app.overfit.coach.ChatPricing.Credit(app.overfit.fuel.TierPrice(1_840_000, 9_200_000), 2_800, 500)),
     )
 
     private fun render(content: @Composable () -> Unit) {
@@ -261,5 +262,47 @@ class CoachChatShotTest {
         render { CoachHistoryScreen(d.coachChat, onOpen = {}, onBack = {}) }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("history:item").fetchSemanticsNodes().size == 2 }
         save("05-fruehere-chats")
+    }
+
+    // --- Session BH (8.11.): earlier chat opened, price on the send button, review card after the training ------------
+
+    @Test
+    fun openedEarlierChat() {
+        val d = deps()
+        runBlocking { d.coachChat.sendNow("c1", ChatSendRequest("Wie lief mein Training heute?", listOf(push, ChatAttachment.Photo("p1", "Foto 1")))) }
+        val e = env(d)
+        render { CoachChatTabScreen(e, null, {}, onHistory = {}, onStory = {}, onModelChip = {}, onApplyWorkout = {}, openedChatId = "c1") }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("chat:workout").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("coach:price", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        save("bh-01-frueherer-chat")
+    }
+
+    @Test
+    fun priceWithoutAndWithPhotos() {
+        val e = env(deps())
+        render { Tab(e, ChatOpenRequest(draft = "Wie sieht meine Technik aus?", attachments = listOf(push))) }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("coach:price", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        save("bh-02-preis-ohne-fotos")
+    }
+
+    @Test
+    fun priceWithPhotos() {
+        val e = env(deps())
+        val photos = listOf(ChatAttachment.Photo("p1", "Foto 1"), ChatAttachment.Photo("p2", "Foto 2"))
+        render { Tab(e, ChatOpenRequest(draft = "Wie sieht meine Technik aus?", attachments = listOf(push) + photos)) }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("coach:price", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        save("bh-03-preis-mit-zwei-fotos")
+    }
+
+    @Test
+    fun finishReviewCard() {
+        val e = env(deps())
+        render {
+            androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 24.dp)) {
+                app.overfit.ui.coach.CoachFinishSection(e, "s1", onReview = {})
+            }
+        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("≈", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        save("bh-04-abschluss-karte")
     }
 }

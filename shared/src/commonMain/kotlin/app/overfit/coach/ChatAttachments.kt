@@ -108,14 +108,16 @@ object ChatAttachmentText {
         tpl.exercises.forEach { e ->
             val type = e.exercise.trackingType
             val sets = e.sets.joinToString(", ") { s ->
-                val weight = s.weightKg?.takeIf { type.usesWeight }?.let { Numbers.formatWeight(it, src.unit, src.language) }
+                val weight = s.weightKg?.takeIf { type.usesWeight }?.let {
+                    if (it == 0.0) ChatContext.BODYWEIGHT else Numbers.formatWeight(it, src.unit, src.language)
+                }
                 when {
                     type.usesReps && weight != null -> "$weight×${s.reps ?: "?"}"
                     type.usesReps -> "${s.reps ?: "?"}×"
                     else -> Numbers.formatDuration(s.durationSec ?: 0)
                 }
             }
-            sb.append("- ${e.exercise.name} [${e.exercise.id}]: ${e.sets.size} sets ($sets)")
+            sb.append("- ${WeightRules.name(e.exercise.name, e.exercise.equipment)} [${e.exercise.id}]: ${e.sets.size} sets ($sets)")
             e.restSec?.let { sb.append(", rest $it s") }
             e.note?.takeIf { it.isNotBlank() }?.let { sb.append(" – ").append(it.trim()) }
             sb.append('\n')
@@ -144,15 +146,17 @@ object ChatAttachmentText {
         data class Point(val at: Long, val set: app.overfit.domain.WorkoutSet, val type: app.overfit.domain.TrackingType)
         val points = mutableListOf<Point>()
         var name = a.label
+        var equipment: app.overfit.domain.Equipment? = null
         for (r in finished(src).sortedBy { it.workout.startedAt }) {
             for (e in r.workout.exercises) {
                 if (e.exercise.id != a.exerciseId) continue
                 name = e.exercise.name
+                equipment = e.exercise.equipment
                 val best = e.sets.filter { it.completed }.maxByOrNull { ChatContext.score(it, e.exercise.trackingType) } ?: continue
                 points += Point(r.workout.startedAt, best, e.exercise.trackingType)
             }
         }
-        val sb = StringBuilder("## Attached exercise: $name [${a.exerciseId}]\n")
+        val sb = StringBuilder("## Attached exercise: ${WeightRules.name(name, equipment)} [${a.exerciseId}]\n")
         if (points.isEmpty()) return sb.append("Not trained yet.").toString()
         val type = points.first().type
         val best = points.maxBy { ChatContext.score(it.set, it.type) }

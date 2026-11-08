@@ -39,6 +39,8 @@ object ChatContext {
     /** The text stays small enough to paste into any chat. */
     const val MAX_CHARS = 12_000
     const val MAX_TEMPLATES = 15
+    /** Marks 0 kg in the AI data (valid: bodyweight, assisted or without added weight). */
+    const val BODYWEIGHT = "BW"
 
     /** [task] null = only the status, without the answer instructions (coach chat, prompts with their own ask). */
     fun build(input: ContextInput, t: ChatStrings, example: String): String = status(input, t, t.ctxTask(example))
@@ -52,6 +54,7 @@ object ChatContext {
         out.appendLine("## ${t.ctxProfile}")
         aiProfileFacts(input.profile, input.weights, input.today, input.language)?.let { out.appendLine(it) }
         out.appendLine("${t.ctxUnits}: ${if (unit == WeightUnit.KG) "kg" else "lb"} · ${t.ctxToday(input.today.toString())}")
+        out.appendLine(t.ctxWeights)
         out.appendLine()
 
         input.memory?.takeIf { it.isNotBlank() }?.let {
@@ -107,19 +110,26 @@ object ChatContext {
         for (e in w.exercises) {
             val done = e.sets.filter { it.completed }
             if (done.isEmpty()) continue
-            sb.append("  ").append(e.exercise.name).append(": ")
+            sb.append("  ").append(app.overfit.coach.WeightRules.name(e.exercise.name, e.exercise.equipment)).append(": ")
                 .append(done.joinToString(", ") { setText(it, e.exercise.trackingType, unit, language) }).append('\n')
         }
         w.note?.takeIf { it.isNotBlank() }?.let { sb.append("  ").append(it.trim()).append('\n') }
         return sb.toString()
     }
 
-    fun setText(s: WorkoutSet, type: TrackingType, unit: WeightUnit, language: Language): String {
+    /**
+     * One set for the AI: "70×10", "BW×12" (0 kg = bodyweight/no added weight, a valid entry, see [app.overfit.coach.WeightRules]).
+     * [bodyweightMark] false shows "0×12" (UI sub lines).
+     */
+    fun setText(s: WorkoutSet, type: TrackingType, unit: WeightUnit, language: Language, bodyweightMark: Boolean = true): String {
         val a = s.actual
-        val weight = a.weightKg?.takeIf { type.usesWeight }?.let { Numbers.formatWeight(it, unit, language) }
+        val weight = a.weightKg?.takeIf { type.usesWeight }?.let {
+            if (bodyweightMark && it == 0.0) BODYWEIGHT else Numbers.formatWeight(it, unit, language)
+        }
         return when {
             type.usesReps && weight != null -> "$weight×${a.reps ?: "?"}"
             type.usesReps -> "${a.reps ?: "?"}×"
+            type.usesTime && weight == BODYWEIGHT -> "$weight, ${Numbers.formatDuration(a.durationSec ?: 0)}"
             type.usesTime && weight != null -> "$weight ${unit.symbol}, ${Numbers.formatDuration(a.durationSec ?: 0)}"
             else -> Numbers.formatDuration(a.durationSec ?: 0)
         }
@@ -134,7 +144,7 @@ object ChatContext {
                 val done = e.sets.filter { it.completed }
                 if (done.isEmpty()) continue
                 val best = done.maxByOrNull { score(it, e.exercise.trackingType) } ?: continue
-                byExercise.getOrPut(e.exercise.name) { mutableListOf() } +=
+                byExercise.getOrPut(app.overfit.coach.WeightRules.name(e.exercise.name, e.exercise.equipment)) { mutableListOf() } +=
                     Point(r.workout.startedAt, setText(best, e.exercise.trackingType, unit, language), score(best, e.exercise.trackingType))
             }
         }

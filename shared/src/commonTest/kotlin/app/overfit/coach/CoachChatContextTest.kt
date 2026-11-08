@@ -130,12 +130,27 @@ class CoachChatContextTest {
         assertEquals("Sei streng.", prefs.state.value.addition)
 
         prefs.setProfile(AthleteProfile(daysPerWeek = 12, heightCm = 20))
-        prefs.setAutoReview(false)
         val reloaded = CoachChatPrefsStore(kv).state.value
         assertEquals(7, reloaded.profile.daysPerWeek)
         assertEquals(null, reloaded.profile.heightCm)
-        assertFalse(reloaded.autoReview)
         assertEquals("Sei streng.", reloaded.addition)
+    }
+
+    // 8.11.: the automatic review switch is gone; stored prefs keep everything else and lose the key on the next start.
+    @Test
+    fun removedAutoReviewSwitchIsMigratedAway() {
+        val kv = InMemoryKeyValueStore()
+        kv.put(CoachChatPrefsStore.KEY, """{"profile":{"daysPerWeek":3},"addition":"Kurz bitte.","autoReview":false}""")
+        val prefs = CoachChatPrefsStore(kv).state.value
+        assertEquals(3, prefs.profile.daysPerWeek)
+        assertEquals("Kurz bitte.", prefs.addition)
+        val stored = kv.get(CoachChatPrefsStore.KEY)!!
+        assertFalse(stored.contains("autoReview"), stored)
+        assertTrue(stored.contains("Kurz bitte."), stored)
+        // Broken JSON stays untouched (defaults in memory, nothing overwritten).
+        val broken = InMemoryKeyValueStore().apply { put(CoachChatPrefsStore.KEY, "{kaputt") }
+        assertEquals(CoachChatPrefs(), CoachChatPrefsStore(broken).state.value)
+        assertEquals("{kaputt", broken.get(CoachChatPrefsStore.KEY))
     }
 
     // --- Service: what goes along -------------------------------------------------------------
@@ -207,6 +222,38 @@ class CoachChatContextTest {
         code = "upstream_rejected"
         s.sendNow("d", ChatSendRequest("Again"))
         assertEquals(3, calls)
+    }
+
+    // Fabian 8.11.: "Ein Bild kostet ja viel mehr, als wenn man kein Bild mitschickt."
+    @Test
+    fun estimateGrowsWithPhotosAttachmentsAndHistoryAndSendsNothing() = runTest {
+        val s = service()
+        val plain = s.estimate(null, ChatSendRequest("Wie lief es?"))
+        val onePhoto = s.estimate(null, ChatSendRequest("Wie lief es?", listOf(ChatAttachment.Photo("p1"))))
+        val twoPhotos = s.estimate(null, ChatSendRequest("Wie lief es?", listOf(ChatAttachment.Photo("p1"), ChatAttachment.Photo("p2"))))
+        // Attachments as the real text blocks (the fake [service] only joins labels).
+        val real = CoachChatService(
+            dao = dao, access = { CoachAccess.Ready(ProviderId.ANTHROPIC) }, transport = { fake }, model = { "claude-sonnet-5-5" },
+            parts = { req -> ChatPromptParts("ROLE", "PROFILE", ChatAttachmentText.build(req.attachments, sources, t), emptyList()) },
+            photos = { emptyList() }, demo = { ChatAnswer("Demo", null) }, scope = CoroutineScope(Dispatchers.Unconfined), clock = { 1000L },
+        )
+        val realPlain = real.estimate(null, ChatSendRequest("Wie lief es?"))
+        val training = real.estimate(null, ChatSendRequest("Wie lief es?", listOf(ChatAttachment.Training("w1", "Push"))))
+        val history = real.estimate(null, ChatSendRequest("Wie lief es?", listOf(ChatAttachment.Training("w1", "Push"), ChatAttachment.History(4))))
+        assertTrue(onePhoto.inputTokens > plain.inputTokens)
+        assertTrue(twoPhotos.inputTokens > onePhoto.inputTokens)
+        assertEquals(2 * ChatTokens.image(), twoPhotos.imageTokens)
+        // (A tiny training replaces the "nothing attached" note, so only more attachments are compared.)
+        assertTrue(history.inputTokens > training.inputTokens)
+        assertTrue(history.inputTokens > realPlain.inputTokens)
+        assertTrue(plain.plusText("Und noch eine lange Frage dazu?").inputTokens > plain.inputTokens)
+        // Profile off: a smaller system prompt.
+        assertTrue(s.estimate(null, ChatSendRequest("Wie lief es?", includeProfile = false)).inputTokens <= plain.inputTokens)
+        // A chat with history costs more than a fresh one.
+        s.sendNow("c", ChatSendRequest("Erste Frage"))
+        assertTrue(s.estimate("c", ChatSendRequest("Wie lief es?")).inputTokens > plain.inputTokens)
+        // Estimating never sends.
+        assertEquals(1, fake.prompts.size)
     }
 
     @Test

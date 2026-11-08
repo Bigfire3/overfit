@@ -15,6 +15,31 @@
 | 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Coach/KI Teil 1: frühere Chats, Preis vor jeder Anfrage, Gewichte (8.11., Session BH)
+Fabian: „im Chatfenster [kann man] die vergangenen Chats zwar sehen, aber man kann da nicht rein“, „ich will auch, dass man vorher
+gefragt wird, wenn wirklich eine KI-Anfrage geschickt wird … Man sieht keinen Preis … Ein Bild kostet ja viel mehr“, „dass bei 0 Kilo …
+ich vergessen hätte zu tracken oder dass ich bei 70 Kilo an der Maschine Bizeps Curl, dass das nicht stimmen würde“.
+**Erledigt:** Frühere Chats öffnen sich vollständig in einem eigenen Screen (Anhänge, Workout-Karte, Modell, Preis; weiterschreiben geht).
+Keine KI-Anfrage mehr ohne Tipp: Auto-Auswertung samt Schalter entfernt (Prefs migriert), Abschluss-Screen mit Karte „Training auswerten
+lassen · ≈ X ct“, die nur den Chat mit dem Training öffnet, alte Warteschlange sendet nicht mehr von selbst. Senden-Knopf zeigt immer den
+geschätzten Preis, berechnet aus dem echten Prompt (System-Prompt, Profil, Anhänge, Verlauf, Frage, Fotos à ~1600 Token, Antwort),
+live bei jeder Änderung. Gewichte: feste Regel in jedem Coach-Prompt, Gerätetyp je Übung in den Daten, 0 kg als „BW“. Details in DECISIONS.md.
+Tests: `ChatCost`/`estimate…` in `CoachChatContextTest`, `ModelChipTest.sendButtonShowsThePrice`, `WeightRulesTest`,
+`CoachFlowTest.finishOffersAReviewCardThatOnlyOpensTheChat`, `CoachTabTest` (frühere Chats, Preis), `DayWithOverfitTest`.
+Screenshots: `docs/screenshots/coach-ki/`.
+**Offen:** Teil 2 (ein Coach-Symbol überall statt verstreuter KI-Knöpfe, Chat als Sheet mit Kontext, Änderungen übernehmen).
+
+### Bitte auf dem Handy testen (Coach/KI Teil 1)
+1. Coach → Listen-Icon „Frühere Chats“ → einen Chat antippen: Er öffnet sich ganz (Fragen mit Anhang-Karten, Antworten mit Modell und
+   Preis). Eine Frage schreiben → Antwort kommt im selben Chat. Zurück-Pfeil → wieder die Liste.
+2. Senden-Knopf: zeigt „≈ x ct“ (Guthaben) bzw. „eigener Schlüssel“. „+“ → zwei Fotos anhängen: Der Preis steigt deutlich (je Foto
+   ~0,5 ct mit Sonnet). Fotos wieder entfernen: Preis sinkt.
+3. Training beenden: Kein Chat startet von selbst. Unten Karte „Training auswerten lassen · ≈ x ct“. Antippen → Coach-Tab mit Chip
+   „Push · heute“ und „Werte mein Training aus“ im Feld; erst Senden schickt ab.
+4. Einstellungen → Coach: Der Schalter „Automatische Auswertung“ ist weg.
+5. Ein Training mit 0 kg (z. B. Dips) und eine Maschinen-Übung auswerten lassen: Der Coach nennt die Werte nicht „vergessen“ oder
+   „unrealistisch“ und rechnet von deinen Zahlen aus weiter.
+
 ## Einladungen, Startguthaben und Verfall entfernt (7.11.2026)
 **Erledigt:** Fabians Entscheidung (Zitat in DECISIONS.md): Das Empfehlungsprogramm ist komplett aus der App (Android und iOS) entfernt:
 „Freunde einladen“, „Einladung einlösen“, QR/Link `overfit://invite`, Reveal-Animation, geschenkte Auswertungen (Zähler, Hinweise,
