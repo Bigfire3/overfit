@@ -39,6 +39,8 @@ data class ChatMessage(
     val photoIds: List<String>,
     val costMicro: Long?,
     val errorKind: CoachErrorKind?,
+    /** Failed answer: the credit server's error code (e.g. `upstream_rejected`) or the [CoachErrorKind] name. */
+    val errorCode: String? = null,
     val demo: Boolean,
     /** Credit: model ID that answered, and the chosen model if a replacement answered. */
     val servedModel: String? = null,
@@ -337,7 +339,7 @@ class CoachChatService(
             // The row stays SENDING; [recover] marks it failed on the next start.
             throw e
         } catch (e: CoachException) {
-            dao.upsertMessage(asked.copy(status = ChatMessageStatus.FAILED.name, errorKind = e.kind.name))
+            dao.upsertMessage(asked.copy(status = ChatMessageStatus.FAILED.name, errorKind = e.serverCode ?: e.kind.name))
         } catch (e: Exception) {
             dao.upsertMessage(asked.copy(status = ChatMessageStatus.FAILED.name, errorKind = CoachErrorKind.SERVER.name))
         }
@@ -348,7 +350,7 @@ class CoachChatService(
         val reply = try {
             transport.send(prompt, model, structured = true)
         } catch (e: CoachException) {
-            if (e.kind != CoachErrorKind.BAD_REQUEST) throw e
+            if (!e.retryWithoutStructured) throw e
             transport.send(prompt, model, structured = false)
         }
         if (reply.refused || reply.text.isBlank()) throw CoachException(CoachErrorKind.INVALID_ANSWER)
@@ -387,6 +389,7 @@ private fun CoachChatMessageEntity.toMessage() = ChatMessage(
     photoIds = photoIds?.split(',')?.filter { it.isNotEmpty() }.orEmpty(),
     costMicro = costMicro,
     errorKind = errorKind?.let { k -> CoachErrorKind.entries.firstOrNull { it.name == k } },
+    errorCode = errorKind,
     demo = demo,
     servedModel = servedModel,
     fallbackFrom = fallbackFrom,

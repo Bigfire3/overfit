@@ -397,4 +397,57 @@ class CoachTransportTest {
     fun fuelWithoutServiceIsNoAccess() = runTest {
         assertEquals(CoachErrorKind.NO_ACCESS, errorKind { FuelCoach(FuelProvider { null }).send(prompt, "m") })
     }
+
+    // Fabian 8.11.: the test server allows max_tokens 2048; the chat sent 4000 and the review 8000 → 400
+    // invalid_max_tokens, shown as "Provider rejected the request". The body now follows the server's limit.
+    private fun chatPrompt(images: List<CoachImage> = emptyList()) = CoachChatPrompt.build(
+        ChatPromptParts("Coach rules", "Profile: 80 kg, goal muscle", "Last training: Push day", listOf("bench" to "Bench press")),
+        listOf(PromptTurn(true, "Earlier question"), PromptTurn(false, "Earlier answer")),
+        "How was my last workout?",
+        images,
+    )
+
+    private suspend fun sentBody(config: FuelConfig?, p: CoachPrompt): JsonObject {
+        val fake = FakeFuel(config) { FuelMessageResult(fuelAnswer, 1, 1) }
+        FuelCoach(FuelProvider { fake }).send(p, "standard")
+        return Json.parseToJsonElement(fake.lastBody!!).jsonObject
+    }
+
+    @Test
+    fun fuelCapsMaxTokensAtTheServerLimit() = runTest {
+        val test = tiers("standard", "pro", "lite").copy(maxTokensCap = 2048)
+        val chat = sentBody(test, chatPrompt(listOf(CoachImage("Front", byteArrayOf(1, 2, 3)))))
+        assertEquals(2048, chat["max_tokens"]!!.jsonPrimitive.content.toInt())
+        assertEquals("chat", chat["overfit"]!!.jsonObject["purpose"]!!.jsonPrimitive.content)
+        // Shape the Messages API accepts: system apart, alternating roles ending with the user, no empty text, JPEG image.
+        val messages = chat["messages"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("user", "assistant", "user"), messages.map { it["role"]!!.jsonPrimitive.content })
+        assertTrue(messages.none { it["role"]!!.jsonPrimitive.content == "system" })
+        val last = messages.last()["content"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("text", "image", "text"), last.map { it["type"]!!.jsonPrimitive.content })
+        assertEquals("image/jpeg", last[1]["source"]!!.jsonObject["media_type"]!!.jsonPrimitive.content)
+        assertTrue(last.filter { it["type"]!!.jsonPrimitive.content == "text" }.all { it["text"]!!.jsonPrimitive.content.isNotBlank() })
+        val review = sentBody(test, prompt.copy(review = true))
+        assertEquals(2048, review["max_tokens"]!!.jsonPrimitive.content.toInt())
+        // Production (8192): the prompt's own limit; config not reachable: unchanged, the backend caps.
+        assertEquals(CoachChatSchema.MAX_TOKENS, sentBody(tiers("standard").copy(maxTokensCap = 8192), chatPrompt())["max_tokens"]!!.jsonPrimitive.content.toInt())
+        assertEquals(CoachModels.MAX_TOKENS, sentBody(null, prompt)["max_tokens"]!!.jsonPrimitive.content.toInt())
+    }
+
+    @Test
+    fun emptyHistoryTurnsAreLeftOut() {
+        val p = prompt.copy(history = listOf(PromptTurn(true, "Q"), PromptTurn(false, "  "), PromptTurn(true, "Q2"), PromptTurn(false, "A2")))
+        val messages = anthropicBody(p, "claude-sonnet-5-5", true)["messages"]!!.jsonArray
+        assertTrue(messages.none { (it.jsonObject["content"] as? JsonPrimitive)?.content?.isBlank() == true })
+        assertEquals(4, messages.size)
+    }
+
+    @Test
+    fun backendValidationErrorsAreNotRepeatedWithoutStructuredOutput() {
+        assertFalse(CoachException(CoachErrorKind.BAD_REQUEST, serverCode = "invalid_max_tokens").retryWithoutStructured)
+        assertFalse(CoachException(CoachErrorKind.BAD_REQUEST, serverCode = "invalid_request").retryWithoutStructured)
+        assertTrue(CoachException(CoachErrorKind.BAD_REQUEST, serverCode = "upstream_rejected").retryWithoutStructured)
+        assertTrue(CoachException(CoachErrorKind.BAD_REQUEST).retryWithoutStructured)
+        assertFalse(CoachException(CoachErrorKind.SERVER).retryWithoutStructured)
+    }
 }

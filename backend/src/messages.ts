@@ -50,10 +50,13 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
   // `model` ist eine Stufe (standard | pro | lite); alte App-Versionen schicken die Modell-ID (→ deren Stufe).
   const tier = typeof body.model === 'string' ? tierForModel(body.model, env) : null;
   if (!tier) throw new ApiError(400, 'model_not_allowed', 'Stufe nicht erlaubt', { allowed: TIER_NAMES });
-  const maxTokens = body.max_tokens;
-  if (!Number.isInteger(maxTokens) || (maxTokens as number) < 1 || (maxTokens as number) > cfg.maxTokensCap) {
+  // Mehr als die Obergrenze wird gekappt statt abgelehnt: Die App schickt 4000 (Chat) bzw. 8000 (Auswertung), der
+  // Testserver erlaubt nur MAX_TOKENS_CAP (vor dem 8.11. kam dort 400 invalid_max_tokens → „Provider rejected the request“).
+  if (!Number.isInteger(body.max_tokens) || (body.max_tokens as number) < 1) {
     throw new ApiError(400, 'invalid_max_tokens', `max_tokens muss 1..${cfg.maxTokensCap} sein`, { max: cfg.maxTokensCap });
   }
+  const maxTokens = Math.min(body.max_tokens as number, cfg.maxTokensCap);
+  body.max_tokens = maxTokens;
   if (body.stream) throw new ApiError(400, 'streaming_not_supported', 'Streaming wird nicht unterstützt');
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
     throw new ApiError(400, 'invalid_request', 'messages fehlt');
@@ -116,15 +119,21 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     const code = !(e instanceof UpstreamError) ? 'internal_error' : e.timeout || e.status === 0 || e.unavailable ? 'upstream_unavailable' : 'upstream_rejected';
     const requestId = await logRequest(env, {
       ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: code,
-      fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: failureLabel(firstFailure) ?? (substituted ? NO_IMAGES : null),
+      fallbackFromStatus: firstFailure?.status ?? null,
+      // Der endgültige Fehler des Anbieters als Code („HTTP 400 invalid_request_error“), nie dessen Text; der Status des ersten
+      // Versuchs steht nach einem Ausweichen schon in fallbackFromStatus.
+      fallbackReason: failureLabel(e instanceof UpstreamError ? e : null) ?? (substituted ? NO_IMAGES : null),
     });
     if (!(e instanceof UpstreamError)) throw e;
     if (e.timeout || e.status === 0) {
       throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status, requestId });
     }
     if (!e.unavailable) {
-      throw new ApiError(400, 'upstream_rejected', e.message || 'KI-Anbieter hat die Anfrage abgelehnt, nichts abgebucht', {
+      // Nur Status und Fehlercode des Anbieters, nicht sein Fehlertext (kann Teile der Anfrage wiederholen).
+      console.warn('upstream_rejected', served.provider, served.id, e.status, e.code ?? '-');
+      throw new ApiError(400, 'upstream_rejected', `KI-Anbieter hat die Anfrage abgelehnt (HTTP ${e.status}${e.code ? ` ${e.code}` : ''}), nichts abgebucht`, {
         upstreamStatus: e.status,
+        ...(e.code ? { upstreamCode: e.code } : {}),
         requestId,
       });
     }
@@ -182,5 +191,5 @@ function failureLabel(e: UpstreamError | null): string | null {
   if (!e) return null;
   if (e.timeout) return 'Zeitüberschreitung';
   if (e.status === 0) return 'nicht erreichbar';
-  return `HTTP ${e.status}`;
+  return e.code && e.code !== String(e.status) ? `HTTP ${e.status} ${e.code}` : `HTTP ${e.status}`;
 }

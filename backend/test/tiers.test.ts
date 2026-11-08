@@ -255,7 +255,9 @@ describe('Ausweichen bei Ausfall', () => {
     const f = await fund(c);
     const r = await c.call('POST', '/v1/messages', body('standard'));
     expect(r.status).toBe(400);
-    expect(r.body.error).toMatchObject({ code: 'upstream_rejected', message: 'schema unsupported', details: { upstreamStatus: 400 } });
+    expect(r.body.error).toMatchObject({ code: 'upstream_rejected', details: { upstreamStatus: 400 } });
+    // Fehlertext des Anbieters geht nicht an die App (kann Teile der Anfrage wiederholen), nur Status und Code.
+    expect(r.body.error.message).not.toContain('schema unsupported');
     expect(anthropic).toHaveBeenCalledTimes(1);
     expect(await balance(c)).toBe(f.balanceMicro);
   });

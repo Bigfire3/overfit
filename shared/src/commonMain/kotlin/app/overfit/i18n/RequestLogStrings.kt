@@ -47,6 +47,8 @@ class RequestLogStrings(
     val tokens: (input: String, output: String) -> String,
     val cache: (read: String, write: String) -> String,
     val duration: (seconds: String) -> String,
+    /** Failed request: the provider's status and error code (e.g. "HTTP 400 invalid_request_error"), never its text. */
+    val providerError: (code: String) -> String,
     /** Fallback: first model did not answer (free), a replacement answered, charged at the cheaper of the two prices. */
     val fallback: (requested: String, reason: String?, served: String) -> String,
     val sourceDevice: String,
@@ -92,6 +94,7 @@ val GermanRequestLog = RequestLogStrings(
     tokens = { i, o -> "Tokens: $i ein · $o aus" },
     cache = { r, w -> "Cache: $r gelesen · $w geschrieben" },
     duration = { "Dauer: $it s" },
+    providerError = { "Antwort des Anbieters: $it" },
     fallback = { requested, reason, served ->
         "Zuerst $requested: nicht verfügbar${reason?.let { " ($it)" } ?: ""}, nicht berechnet · " +
             "Geantwortet hat $served, berechnet zum Preis des günstigeren der beiden Modelle"
@@ -138,6 +141,7 @@ val EnglishRequestLog = RequestLogStrings(
     tokens = { i, o -> "Tokens: $i in · $o out" },
     cache = { r, w -> "Cache: $r read · $w written" },
     duration = { "Duration: $it s" },
+    providerError = { "Provider response: $it" },
     fallback = { requested, reason, served ->
         "First $requested: not available${reason?.let { " ($it)" } ?: ""}, not charged · " +
             "$served answered, charged at the price of the cheaper of the two models"

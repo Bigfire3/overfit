@@ -23,10 +23,12 @@ export const MODE_VARS = {
   production: { DEPLOY_MODE: 'production' },
   test: {
     DEPLOY_MODE: 'test',
-    MAX_TOKENS_CAP: '2048',
+    // Wie Produktion (8.11.): mit 2048 wurden Chat (4000) und Auswertung (8000) abgelehnt bzw. abgeschnitten.
+    MAX_TOKENS_CAP: '8192',
     RL_MESSAGES_PER_MIN: '5',
     RL_REGISTER_PER_HOUR_IP: '10',
-    TEST_CREDIT_CAP_MICRO: '20000000',
+    // 8.11.: 20 € waren ausgeschöpft (Gutschriften kamen mit 0 € an), E2E nicht mehr möglich → 40 €.
+    TEST_CREDIT_CAP_MICRO: '40000000',
   },
 };
 

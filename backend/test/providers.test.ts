@@ -216,7 +216,7 @@ describe('Ausweichen über Anbietergrenzen', () => {
     expect(await balance(c)).toBe(f.balanceMicro - expected);
     expect(await lastRequest(c)).toMatchObject({ requestedModel: 'claude-sonnet-5-5', requestedProvider: 'anthropic', model: 'gemini-3.6-flash', provider: 'gemini', fallbackFromStatus: 529 });
     const ledger = (await c.call('GET', '/v1/account/ledger')).body.entries[0];
-    expect(ledger).toMatchObject({ type: 'usage', model: 'gemini-3.6-flash', requestedModel: 'claude-sonnet-5-5', fallback: 1, amountMicro: -expected });
+    expect(ledger).toMatchObject({ type: 'usage', model: 'gemini-3.6-flash', requestedModel: 'claude-sonnet-5-5', fallback: true, amountMicro: -expected });
   });
 
   it('gemischt: Gemini (lite) fällt aus → Haiku antwortet, berechnet höchstens den Gemini-Preis', async () => {
@@ -281,5 +281,19 @@ describe('/v1/config zeigt die wirksame Zuordnung', () => {
     const r = await rawFetch('/v1/config', env('openai', { OPENAI_API_KEY: undefined }));
     expect(r.body.preset).toBe('claude');
     expect(r.body.tiers.standard.model).toBe('claude-sonnet-5-5');
+  });
+});
+
+describe('providerErrorCode: nur der Code, nie der Text', () => {
+  it('liest Anthropic, OpenAI, Gemini und Cloudflare', async () => {
+    const { providerErrorCode, upstreamErrorFor } = await import('../src/providers');
+    expect(providerErrorCode({ type: 'error', error: { type: 'invalid_request_error', message: 'max_tokens: too large' } })).toBe('invalid_request_error');
+    expect(providerErrorCode({ error: { message: 'x', type: 'invalid_request_error', code: 'model_not_found' } })).toBe('model_not_found');
+    expect(providerErrorCode({ error: { code: 400, message: 'x', status: 'INVALID_ARGUMENT' } })).toBe('INVALID_ARGUMENT');
+    expect(providerErrorCode({ error: [{ code: 2005, message: 'x' }] })).toBe('2005');
+    expect(providerErrorCode({ error: { type: 'Bad input: secret prompt text' } })).toBeNull();
+    expect(providerErrorCode(null)).toBeNull();
+    const e = upstreamErrorFor(400, { type: 'error', error: { type: 'invalid_request_error', message: 'm' } });
+    expect(e).toMatchObject({ unavailable: false, status: 400, code: 'invalid_request_error' });
   });
 });

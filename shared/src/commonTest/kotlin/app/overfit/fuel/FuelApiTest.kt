@@ -144,6 +144,24 @@ class FuelApiTest {
         assertEquals("/v1/account/ledger?limit=20&before=30", key.signed.last().lines()[2])
     }
 
+    // Fabian 8.11.: "Transactions" said the credit can't be reached although the balance showed 3.50 €. D1 sends
+    // `fallback` as 0/1 and NULL tokens for credit rows; the page has to read the rows exactly as the server sends them.
+    @Test
+    fun ledgerReadsRowsAsD1SendsThem() = runTest {
+        val api = api { req ->
+            if (req.url.encodedPath == "/v1/devices") HttpStatusCode.OK to """{$ACCOUNT_BODY}"""
+            else HttpStatusCode.OK to """{"entries":[
+              {"id":3,"ts":1794146000,"type":"usage","amountMicro":-6956,"model":"claude-haiku-5-5","tier":"lite","source":null,"inputTokens":1000,"cacheReadTokens":0,"cacheWriteTokens":0,"outputTokens":500,"fallback":1,"requestedModel":"claude-sonnet-5-5","reviews":null,"category":"used"},
+              {"id":2,"ts":1794140000,"type":"test_credit","amountMicro":1000000,"model":null,"tier":null,"source":null,"inputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"outputTokens":null,"fallback":0,"requestedModel":null,"reviews":null,"category":"gifted"}
+            ],"next":null}"""
+        }
+        val page = api.ledger(before = null, limit = 50)
+        assertEquals(2, page.entries.size)
+        assertEquals(true, page.entries[0].fallback)
+        assertEquals(false, page.entries[1].fallback)
+        assertEquals(0, page.entries[1].inputTokens)
+    }
+
     @Test
     fun accessUsesOverrideThenBuildUrl() {
         val kv = app.overfit.data.InMemoryKeyValueStore()

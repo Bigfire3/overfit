@@ -43,7 +43,8 @@ class FuelApi(
 ) : FuelService, SignedTransport {
     private val base = baseUrl.trim().trimEnd('/')
     private val http = http.config { install(HttpTimeout) { requestTimeoutMillis = 130_000 } }
-    private val json = Json { ignoreUnknownKeys = true }
+    // coerceInputValues: null for a field with a default (e.g. token counts of credit rows) reads as that default.
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
     private var skewSec = 0L
     private val registerLock = Mutex()
     private var registered = false

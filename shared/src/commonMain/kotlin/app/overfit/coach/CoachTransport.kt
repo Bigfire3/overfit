@@ -65,7 +65,14 @@ class CoachException(
     val serverRequestId: Long? = null,
     /** Credit: the server's error code (e.g. `insufficient_funds`). */
     val serverCode: String? = null,
-) : Exception(message ?: kind.name)
+) : Exception(message ?: kind.name) {
+    /**
+     * A 400 that might go away without structured output (some OpenRouter models reject `response_format`). Not when
+     * the Overfit backend itself refused the request (e.g. `invalid_max_tokens`): the same request would fail again.
+     */
+    val retryWithoutStructured: Boolean
+        get() = kind == CoachErrorKind.BAD_REQUEST && (serverCode == null || serverCode == "upstream_rejected")
+}
 
 /** Sends a [CoachPrompt] to one provider. */
 interface CoachTransport {
@@ -116,7 +123,8 @@ fun anthropicBody(prompt: CoachPrompt, model: String, structured: Boolean): Json
         add(buildJsonObject { put("type", "text"); put("text", prompt.dynamicSystem) })
     }
     putJsonArray("messages") {
-        prompt.history.forEach { turn ->
+        // Empty turns are rejected by the Messages API ("text content blocks must be non-empty").
+        prompt.history.filter { it.text.isNotBlank() }.forEach { turn ->
             add(buildJsonObject { put("role", if (turn.fromUser) "user" else "assistant"); put("content", turn.text) })
         }
         add(buildJsonObject {
@@ -247,7 +255,7 @@ open class ChatCompletionsCoach(
                     add(buildJsonObject { put("type", "text"); put("text", prompt.dynamicSystem) })
                 }
             })
-            prompt.history.forEach { turn ->
+            prompt.history.filter { it.text.isNotBlank() }.forEach { turn ->
                 add(buildJsonObject { put("role", if (turn.fromUser) "user" else "assistant"); put("content", turn.text) })
             }
             add(buildJsonObject {
@@ -323,10 +331,15 @@ class GeminiCoach(http: HttpClient, apiKey: () -> String?) :
  * Fuel: the Anthropic body through our backend, which maps it onto the provider of the tier and reports cost and the
  * new balance. [model] is the tier (standard | pro | lite); a tier the backend does not offer falls back to the next.
  */
-/** Anthropic body plus Overfit's own `overfit.purpose` (the backend strips it before the provider sees it). */
-fun fuelBody(prompt: CoachPrompt, tier: String, structured: Boolean): JsonObject {
+/**
+ * Anthropic body plus Overfit's own `overfit.purpose` (the backend strips it before the provider sees it). `max_tokens`
+ * never exceeds the server's [maxTokensCap] (`/v1/config`): the test server allows only 2048, and older backends
+ * reject anything above with 400 `invalid_max_tokens` (Fabian 8.11.: "Provider rejected the request" in the chat).
+ */
+fun fuelBody(prompt: CoachPrompt, tier: String, structured: Boolean, maxTokensCap: Int? = null): JsonObject {
     val base = anthropicBody(prompt, tier, structured)
-    return JsonObject(base + ("overfit" to buildJsonObject { put("purpose", prompt.effectivePurpose.wire) }))
+    val maxTokens = maxTokensCap?.let { minOf(prompt.outputMaxTokens, it) } ?: prompt.outputMaxTokens
+    return JsonObject(base + ("max_tokens" to JsonPrimitive(maxTokens)) + ("overfit" to buildJsonObject { put("purpose", prompt.effectivePurpose.wire) }))
 }
 
 class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
@@ -335,13 +348,13 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
         if (!fuel.available) throw CoachException(CoachErrorKind.NO_ACCESS)
         val result = try {
             try {
-                fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured).toString())
+                fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured, fuel.maxTokensCap()).toString())
             } catch (e: FuelException) {
                 // The cached config (or none, when it could not be loaded) promised a tier the server does not offer
                 // (e.g. its key was removed): reload the config once and send to a tier that is there.
                 if (e.code != "tier_unavailable") throw e
                 fuel.invalidateConfig()
-                fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured).toString())
+                fuel.messages(fuelBody(prompt, fuel.resolveTier(model), structured, fuel.maxTokensCap()).toString())
             }
         } catch (e: CancellationException) {
             throw e

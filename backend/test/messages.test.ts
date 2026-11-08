@@ -85,10 +85,43 @@ describe('POST /v1/messages', () => {
     const c = await Client.create();
     await fund(c);
     expect((await c.call('POST', '/v1/messages', body({ model: 'gpt-x' }))).body.error.code).toBe('model_not_allowed');
-    expect((await c.call('POST', '/v1/messages', body({ max_tokens: 999999 }))).body.error.code).toBe('invalid_max_tokens');
+    expect((await c.call('POST', '/v1/messages', body({ max_tokens: 0 }))).body.error.code).toBe('invalid_max_tokens');
+    expect((await c.call('POST', '/v1/messages', body({ max_tokens: 12.5 }))).body.error.code).toBe('invalid_max_tokens');
     expect((await c.call('POST', '/v1/messages', body({ max_tokens: undefined }))).body.error.code).toBe('invalid_max_tokens');
     expect((await c.call('POST', '/v1/messages', body({ stream: true }))).body.error.code).toBe('streaming_not_supported');
     expect(upstream).not.toHaveBeenCalled();
+  });
+
+  // Fabian 8.11.: Der Testserver (MAX_TOKENS_CAP 2048) lehnte den Coach-Chat (max_tokens 4000) und die Auswertung (8000)
+  // mit 400 invalid_max_tokens ab, die App zeigte „Provider rejected the request“. Jetzt wird gekappt.
+  it('max_tokens über der Obergrenze wird gekappt statt abgelehnt (echte Chat-Anfrage der App)', async () => {
+    const c = await Client.create(baseEnv({ MAX_TOKENS_CAP: '2048' }));
+    await fund(c);
+    const chat = {
+      model: 'standard',
+      max_tokens: 4000,
+      system: [
+        { type: 'text', text: 'Rules and exercise list', cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: 'Profile: 80 kg' },
+      ],
+      messages: [
+        { role: 'user', content: 'Earlier question' },
+        { role: 'assistant', content: 'Earlier answer' },
+        { role: 'user', content: [{ type: 'text', text: 'Photo: Front' }, { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: '/9j/4AAQ' } }, { type: 'text', text: 'How was my last workout?' }] },
+      ],
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false } } },
+      overfit: { purpose: 'chat' },
+    };
+    const r = await c.call('POST', '/v1/messages', chat);
+    expect(r.status).toBe(200);
+    const sent = JSON.parse(upstream.mock.calls[0][1].body);
+    expect(sent.max_tokens).toBe(2048);
+    expect(sent.overfit).toBeUndefined();
+    expect(sent.model).toBe('claude-sonnet-5-5');
+    // Auswertung: 8000
+    const r2 = await c.call('POST', '/v1/messages', { ...chat, max_tokens: 8000, overfit: { purpose: 'review' } });
+    expect(r2.status).toBe(200);
+    expect(JSON.parse(upstream.mock.calls[1][1].body).max_tokens).toBe(2048);
   });
 
   it('parallele Anfragen können das Guthaben nicht überziehen', async () => {

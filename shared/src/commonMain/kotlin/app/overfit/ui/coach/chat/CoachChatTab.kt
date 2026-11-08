@@ -447,7 +447,7 @@ private fun CoachMessage(m: ChatMessage, templateNames: Set<String>, s: CoachCha
             ChatMessageStatus.FAILED -> {
                 Text(s.failed, tone = Tone.Muted)
                 // Why: key, model / rejected request, credit, connection, provider (same wording as the request log).
-                val reason = app.overfit.ui.fuel.errorText((m.errorKind ?: app.overfit.coach.CoachErrorKind.SERVER).name, app.overfit.i18n.requestLogStringsFor(language))
+                val reason = app.overfit.ui.fuel.errorText(m.errorCode ?: app.overfit.coach.CoachErrorKind.SERVER.name, app.overfit.i18n.requestLogStringsFor(language))
                 Text(reason, Modifier.testTag("chat:error"), style = Theme.type.caption, tone = Tone.Muted)
                 Spacer(Modifier.height(Space.xs))
                 SmallButton(s.retry, { onRetry(m.id) })

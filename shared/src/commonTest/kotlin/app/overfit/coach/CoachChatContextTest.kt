@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
@@ -183,6 +184,29 @@ class CoachChatContextTest {
         assertFalse(contexts.last().includeProfile)
         s.sendNow("d", ChatSendRequest("Neu"))
         assertTrue(fake.prompts.last().dynamicSystem.startsWith("PROFILE ON"))
+    }
+
+    // Fabian 8.11.: the credit server refused the chat (400 invalid_max_tokens); the app repeated it without structured
+    // output and showed "Provider rejected the request (e.g. unknown model)".
+    @Test
+    fun backendRefusalIsNotRepeatedAndTheBubbleKeepsTheServerCode() = runTest {
+        var calls = 0
+        var code = "invalid_max_tokens"
+        val failing = FakeCoachTransport(ProviderId.FUEL) { _, _ -> calls++; throw CoachException(CoachErrorKind.BAD_REQUEST, serverCode = code) }
+        val s = CoachChatService(
+            dao = dao, access = { CoachAccess.Ready(ProviderId.FUEL) }, transport = { failing }, model = { "standard" },
+            parts = { ChatPromptParts("ROLE", "PROFILE", "", emptyList()) }, photos = { emptyList() }, demo = { ChatAnswer("Demo", null) },
+            scope = CoroutineScope(Dispatchers.Unconfined), clock = { 1000L },
+        )
+        s.sendNow("c", ChatSendRequest("How was my workout?"))
+        assertEquals(1, calls)
+        val failed = s.messages("c").first().last()
+        assertEquals(ChatMessageStatus.FAILED, failed.status)
+        assertEquals("invalid_max_tokens", failed.errorCode)
+        // A real provider refusal may still be tried once without structured output (OpenRouter models).
+        code = "upstream_rejected"
+        s.sendNow("d", ChatSendRequest("Again"))
+        assertEquals(3, calls)
     }
 
     @Test

@@ -153,6 +153,8 @@ private fun RequestCard(e: AiRequestEntity, r: RequestLogStrings, language: Lang
                     val served = e.servedModel
                     if (served != null && served != e.requestedModel) {
                         add(r.fallback(modelShortName(e.requestedModel), e.fallbackReason, modelShortName(served)))
+                    } else if (failed && !e.fallbackReason.isNullOrBlank()) {
+                        add(r.providerError(e.fallbackReason!!))
                     }
                     add(e.serverId?.let { r.sourceServer(it) } ?: r.sourceDevice)
                 }

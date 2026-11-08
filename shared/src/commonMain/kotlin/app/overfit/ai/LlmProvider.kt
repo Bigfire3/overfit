@@ -217,6 +217,9 @@ class FuelProvider(
         return order.firstOrNull { tiers[it]?.available == true } ?: wanted
     }
 
+    /** Highest `max_tokens` the backend accepts (`/v1/config`; the test server allows fewer than production). Null = unknown. */
+    suspend fun maxTokensCap(): Int? = config()?.maxTokensCap?.takeIf { it > 0 }
+
     /** Sends an Anthropic Messages request through Fuel; the result carries cost and new balance. */
     suspend fun messages(bodyJson: String): FuelMessageResult =
         (service() ?: throw FuelException("not_configured", 503)).messages(bodyJson).also { ModelNames.register(it) }
