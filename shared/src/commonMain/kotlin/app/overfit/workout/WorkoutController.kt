@@ -7,6 +7,7 @@ import app.overfit.domain.SetValues
 import app.overfit.domain.Template
 import app.overfit.domain.WeightUnit
 import app.overfit.domain.Workout
+import app.overfit.domain.WorkoutPlan
 import app.overfit.i18n.stringsFor
 import app.overfit.platform.HapticPattern
 import app.overfit.platform.Haptics
@@ -128,7 +129,7 @@ class WorkoutController(
         } else {
             showNotice(w)
         }
-        scope.launch { loadLastTime(w.exercises.map { it.exercise.id }) }
+        scope.launch { loadLastTime(w.exercises.flatMap { e -> listOf(e.exercise.id) + e.variants.map { it.exercise.id } }) }
     }
 
     // --- Start / end ---------------------------------------------------------------------------
@@ -148,11 +149,25 @@ class WorkoutController(
     /** Starts a workout from [template] (target values, gaps filled from last time). */
     suspend fun startFromTemplate(template: Template): Boolean {
         if (workout != null) return false
-        val ids = template.exercises.map { it.exercise.id }.distinct()
+        val ids = template.exercises.flatMap { slot -> slot.variants.map { it.exercise.id } }.distinct()
         val last = loadLastTime(ids)
+        // Exercises with alternatives: the variant after the one done last time in this workout (A/B weeks).
+        val variants = template.exercises.withIndex().filter { it.value.alternatives.isNotEmpty() }.associate { (i, slot) ->
+            val variantIds = slot.variants.map { it.exercise.id }
+            val lastDone = runCatching { store.lastVariant(template.id, variantIds) }.getOrNull()
+            i to WorkoutPlan.nextVariant(variantIds, lastDone)
+        }
         if (workout != null) return false
-        begin(Workout.fromTemplate(template, clock(), last))
+        begin(Workout.fromTemplate(template, clock(), last, variants = variants))
         return true
+    }
+
+    /** Chip in the exercise card: do another variant (alternative) of this exercise today. */
+    suspend fun switchVariant(entryId: String, variant: Int) {
+        val e = workout?.exercise(entryId) ?: return
+        val target = e.variants.getOrNull(variant) ?: return
+        val last = loadLastTime(listOf(target.exercise.id))[target.exercise.id].orEmpty()
+        edit { it.switchVariant(entryId, variant, last) }
     }
 
     private fun begin(w: Workout) {

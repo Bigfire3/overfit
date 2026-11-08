@@ -132,6 +132,18 @@ data class Workout(
      */
     fun setSkipped(exerciseId: String, skipped: Boolean) = updateExercise(exerciseId) { it.copy(skipped = skipped) }
 
+    /**
+     * Switches an exercise with alternatives to its variant [variant] (index into [WorkoutExercise.variants]): exercise,
+     * rest, note and sets come from that variant (targets from the plan, gaps from [last] = its last time). Only while
+     * none of its sets is done; otherwise (or for an unknown index) nothing changes.
+     */
+    fun switchVariant(exerciseId: String, variant: Int, last: List<SetValues>, idGen: () -> String = ::newId) =
+        updateExercise(exerciseId) { e ->
+            val v = e.variants.getOrNull(variant) ?: return@updateExercise e
+            if (e.sets.any { it.completed } || v.exercise.id == e.exercise.id) return@updateExercise e
+            e.copy(exercise = v.exercise, restSec = v.restSec, note = v.note.orEmpty(), sets = plannedSets(v, last, idGen))
+        }
+
     fun setExerciseNote(exerciseId: String, note: String) = updateExercise(exerciseId) { it.copy(note = note) }
 
     fun setExerciseRest(exerciseId: String, restSec: Int?) = updateExercise(exerciseId) { it.copy(restSec = restSec) }
@@ -163,26 +175,34 @@ data class Workout(
             lastTime: Map<String, List<SetValues>> = emptyMap(),
             id: String = newId(),
             idGen: () -> String = ::newId,
+            /** Chosen variant per exercise index (0 = the exercise, 1… = its alternatives); missing = 0. */
+            variants: Map<Int, Int> = emptyMap(),
         ) = Workout(
             id = id,
             name = template.name,
             templateId = template.id,
             startedAt = now,
-            exercises = template.exercises.map { te ->
-                val last = lastTime[te.exercise.id].orEmpty()
+            exercises = template.exercises.mapIndexed { index, slot ->
+                val all = slot.variants
+                val te = all.getOrNull(variants[index] ?: 0) ?: all.first()
                 WorkoutExercise(
                     id = idGen(),
                     exercise = te.exercise,
                     restSec = te.restSec,
                     note = te.note.orEmpty(),
                     origin = ExerciseOrigin.PLANNED,
-                    sets = te.sets.mapIndexed { i, planned ->
-                        val target = planned.orElse(last.getOrNull(i) ?: SetValues()).fitTo(te.exercise.trackingType)
-                        WorkoutSet(idGen(), target = target, actual = target)
-                    },
+                    sets = plannedSets(te, lastTime[te.exercise.id].orEmpty(), idGen),
+                    variants = if (all.size > 1) all else emptyList(),
                 )
             },
         )
+
+        /** Sets of a planned exercise: targets from the plan, gaps from last time; actual = target (check off directly). */
+        fun plannedSets(te: TemplateExercise, last: List<SetValues>, idGen: () -> String = ::newId): List<WorkoutSet> =
+            te.sets.mapIndexed { i, planned ->
+                val target = planned.orElse(last.getOrNull(i) ?: SetValues()).fitTo(te.exercise.trackingType)
+                WorkoutSet(idGen(), target = target, actual = target)
+            }
 
         /**
          * Entry for an exercise added during the workout: one set per set from last time (with
@@ -241,7 +261,15 @@ data class WorkoutExercise(
     val sets: List<WorkoutSet>,
     /** "Skip today": the open sets of this exercise do not count; stored with the training (v13). */
     val skipped: Boolean = false,
+    /**
+     * All variants of this planned exercise (the exercise and its alternatives, from the saved workout) when it has
+     * alternatives, else empty. Not stored with the training: a running one gets them again from its workout.
+     */
+    val variants: List<TemplateExercise> = emptyList(),
 ) {
+    /** Index of the current exercise in [variants], or -1. */
+    val variantIndex: Int get() = variants.indexOfFirst { it.exercise.id == exercise.id }
+
     val completedSets: Int get() = sets.count { it.completed }
 
     /** Sets that count towards the workout: of a skipped exercise only the ones already done. */

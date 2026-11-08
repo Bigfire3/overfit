@@ -155,7 +155,24 @@ class WorkoutRepository(
     /** Called after a workout was saved, finished or deleted (KI-Chat sync); `finished` = ended or discarded. */
     var onChanged: ((id: String, finished: Boolean) -> Unit)? = null
 
-    override suspend fun loadActive(): Workout? = dao.getActive()?.toDomain()
+    /**
+     * The running training. Its exercises with alternatives get their variants again from the saved workout (they are
+     * not stored with the training), so the chip to switch survives a process kill.
+     */
+    override suspend fun loadActive(): Workout? {
+        val w = dao.getActive()?.toDomain() ?: return null
+        val template = w.templateId?.let { db.templateDao().getWithExercises(it)?.toDomain() } ?: return w
+        val slots = template.exercises.filter { it.alternatives.isNotEmpty() }.toMutableList()
+        if (slots.isEmpty()) return w
+        return w.copy(exercises = w.exercises.map { e ->
+            if (e.origin != app.overfit.domain.ExerciseOrigin.PLANNED) return@map e
+            val i = slots.indexOfFirst { slot -> slot.variants.any { it.exercise.id == e.exercise.id } }
+            if (i < 0) e else e.copy(variants = slots.removeAt(i).variants)
+        })
+    }
+
+    override suspend fun lastVariant(templateId: Long, exerciseIds: List<String>): String? =
+        if (exerciseIds.isEmpty()) null else dao.lastVariant(templateId, exerciseIds)
 
     suspend fun get(id: String): Workout? = dao.get(id)?.toDomain()
 

@@ -62,7 +62,15 @@ data class TemplateExercise(
     val restSec: Int?,
     val note: String?,
     val sets: List<PlannedSet>,
-)
+    /**
+     * Alternatives to this exercise (A/B weeks): each with its own sets, rest and note. In a training one of
+     * [variants] is chosen (by default the one not done last time). Alternatives have no alternatives themselves.
+     */
+    val alternatives: List<TemplateExercise> = emptyList(),
+) {
+    /** This exercise first, then its alternatives (the order the training rotates through). */
+    val variants: List<TemplateExercise> get() = listOf(copy(alternatives = emptyList())) + alternatives
+}
 
 data class PlannedSet(
     val weightKg: Double? = null,

@@ -128,6 +128,9 @@ class TemplateEditorViewModel(
     /** Exercise that the picker result replaces (replace mode). */
     var pendingReplaceKey: Long? = null
 
+    /** Exercise that gets the picker result as an alternative ("Add alternative"). */
+    var pendingAlternativeKey: Long? = null
+
     init {
         viewModelScope.launch {
             if (seed != null) {
@@ -219,9 +222,12 @@ class TemplateEditorViewModel(
         if (ids.isEmpty()) return
         val replaceKey = pendingReplaceKey
         pendingReplaceKey = null
+        val alternativeKey = pendingAlternativeKey
+        pendingAlternativeKey = null
         viewModelScope.launch {
             val picked = exercises.getAll(ids)
-            if (replaceKey != null) picked.firstOrNull()?.let { ex -> undoable(UndoKind.Replaced) { it.replaceExercise(replaceKey, ex) } }
+            if (alternativeKey != null) picked.firstOrNull()?.let { ex -> edit { it.addAlternative(alternativeKey, ex) } }
+            else if (replaceKey != null) picked.firstOrNull()?.let { ex -> undoable(UndoKind.Replaced) { it.replaceExercise(replaceKey, ex) } }
             else edit { it.addExercises(picked) }
         }
     }
@@ -263,9 +269,12 @@ class TemplateEditorViewModel(
             if (pendingExercises.isNotEmpty()) {
                 // New exercises of the import (only those still in the workout) are created now.
                 val created = HashMap<String, String>()
+                suspend fun resolve(te: app.overfit.domain.TemplateExercise): app.overfit.domain.TemplateExercise {
+                    val input = pendingExercises[te.exercise.id] ?: return te
+                    return te.copy(exercise = te.exercise.copy(id = created.getOrPut(te.exercise.id) { exercises.createCustom(input) }))
+                }
                 template = template.copy(exercises = template.exercises.map { te ->
-                    val input = pendingExercises[te.exercise.id] ?: return@map te
-                    te.copy(exercise = te.exercise.copy(id = created.getOrPut(te.exercise.id) { exercises.createCustom(input) }))
+                    resolve(te).copy(alternatives = te.alternatives.map { resolve(it) })
                 })
             }
             val id = templates.save(template)
@@ -343,7 +352,7 @@ fun TemplateEditorScreen(
     val showUndo = undo?.after == draft && undo != null
 
     // "Last time" per exercise, loaded once per set of exercises (not on every typed value).
-    val exerciseIds = if (state.loading) null else draft.exercises.map { it.exercise.id }.distinct()
+    val exerciseIds = if (state.loading) null else draft.allExercises.map { it.exercise.id }.distinct()
     var last by remember { mutableStateOf<Map<String, LastPerformance?>>(emptyMap()) }
     LaunchedEffect(exerciseIds) {
         val missing = exerciseIds.orEmpty().filter { it !in last && !it.startsWith(ShareMapper.PENDING_PREFIX) }
@@ -433,7 +442,7 @@ fun TemplateEditorScreen(
                 }
                 Text(caption, style = Theme.type.caption, tone = Tone.Muted)
                 // Notes of an import (new exercises, chat message, diff): short, only when they apply.
-                val newNames = draft.exercises.filter { it.exercise.id.startsWith(ShareMapper.PENDING_PREFIX) }
+                val newNames = draft.allExercises.filter { it.exercise.id.startsWith(ShareMapper.PENDING_PREFIX) }
                     .map { it.exercise.name }.distinctBy { it.lowercase() }
                 viewModel.seed?.hints?.forEach { Text(it, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
                 if (newNames.isNotEmpty()) Text(t.share.importNewNote(newNames), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
@@ -453,16 +462,17 @@ fun TemplateEditorScreen(
                     entry = entry,
                     unit = unit,
                     language = language,
-                    last = last[entry.exercise.id],
+                    last = { last[it] },
                     expanded = entry.key !in collapsed,
                     isFirst = index == 0,
                     isLast = index == draft.exercises.lastIndex,
                     onToggle = { collapsed = if (entry.key in collapsed) collapsed - entry.key else collapsed + entry.key },
                     onEdit = viewModel::edit,
-                    onRemoveSet = { setKey -> viewModel.removeSet(entry.key, setKey) },
-                    onRemove = { viewModel.removeExercise(entry.key) },
-                    onReplace = { viewModel.pendingReplaceKey = entry.key; onReplaceExercise() },
-                    onDetails = { if (!entry.exercise.id.startsWith(ShareMapper.PENDING_PREFIX)) onExerciseDetails(entry.exercise.id) },
+                    onRemoveSet = { exerciseKey, setKey -> viewModel.removeSet(exerciseKey, setKey) },
+                    onRemove = { viewModel.removeExercise(it) },
+                    onReplace = { viewModel.pendingReplaceKey = it; onReplaceExercise() },
+                    onAddAlternative = { viewModel.pendingAlternativeKey = entry.key; onReplaceExercise() },
+                    onDetails = { e -> if (!e.exercise.id.startsWith(ShareMapper.PENDING_PREFIX)) onExerciseDetails(e.exercise.id) },
                 )
             }
             item(key = "actions") {
@@ -485,20 +495,22 @@ private fun ExerciseBlock(
     entry: DraftExercise,
     unit: WeightUnit,
     language: Language,
-    last: LastPerformance?,
+    last: (exerciseId: String) -> LastPerformance?,
     expanded: Boolean,
     isFirst: Boolean,
     isLast: Boolean,
     onToggle: () -> Unit,
     onEdit: ((TemplateDraft) -> TemplateDraft) -> Unit,
-    onRemoveSet: (setKey: Long) -> Unit,
-    onRemove: () -> Unit,
-    onReplace: () -> Unit,
-    onDetails: () -> Unit,
+    onRemoveSet: (exerciseKey: Long, setKey: Long) -> Unit,
+    /** Removes the exercise or one of its alternatives (by key; undoable). */
+    onRemove: (key: Long) -> Unit,
+    /** Replaces the exercise or one of its alternatives (by key) with a picked one. */
+    onReplace: (key: Long) -> Unit,
+    onAddAlternative: () -> Unit,
+    onDetails: (DraftExercise) -> Unit,
 ) {
     val t = LocalStrings.current
     val key = entry.key
-    val type = entry.exercise.trackingType
     Block(modifier) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(BlockShape.row).pressableRow(onToggle).dragHandle(reorder, key)
@@ -507,70 +519,113 @@ private fun ExerciseBlock(
         ) {
             LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
             Spacer(Modifier.width(Space.s))
-            ExerciseThumb(entry, onDetails)
+            ExerciseThumb(entry) { onDetails(entry) }
             Spacer(Modifier.width(Space.m))
-            Column(Modifier.weight(1f)) {
-                Text(entry.exercise.name, style = Theme.type.label, maxLines = 2)
-                val rest = entry.rest.toIntOrNull()?.let { t.restSummary(Numbers.formatDuration(it)) }
-                Text(listOfNotNull(t.setCount(entry.sets.size), rest).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
-                // What was done last time (as in the running training), so a target can be set right here.
-                last?.sets?.takeIf { it.isNotEmpty() }?.let { sets ->
-                    Text(t.lastTime(WorkoutFormat.lastTime(sets, type, unit, language, t)), style = Theme.type.caption, tone = Tone.Muted, maxLines = 2)
-                }
-            }
+            ExerciseCaption(entry, unit, language, last(entry.exercise.id), Modifier.weight(1f))
             MoreMenu(
                 t.moreActions(entry.exercise.name),
                 buildList {
-                    add(MenuItem(t.replace, onClick = onReplace))
+                    add(MenuItem(t.training.addAlternative, onClick = onAddAlternative))
+                    add(MenuItem(t.replace) { onReplace(key) })
                     if (!isFirst) add(MenuItem(t.moveUp) { onEdit { it.moveExercise(key, -1) } })
                     if (!isLast) add(MenuItem(t.moveDown) { onEdit { it.moveExercise(key, 1) } })
-                    add(MenuItem(t.remove, destructive = true, onClick = onRemove))
+                    add(MenuItem(t.remove, destructive = true) { onRemove(key) })
                 },
             )
         }
-        if (expanded) {
-            Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                SetColumnsHeader(t.setColumn, setColumnLabels(type, unit, t))
-                val focus = remember { mutableMapOf<Any, FocusRequester>() }
-                fun focusOf(id: Any) = focus.getOrPut(id) { FocusRequester() }
-                entry.sets.forEachIndexed { i, set ->
-                    androidx.compose.runtime.key(set.key) {
-                        SetRow(
-                            i + 1, type, unit, set,
-                            onChange = { transform -> onEdit { it.updateSet(key, set.key, transform) } },
-                            focusRequester = focusOf(set.key),
-                            next = entry.sets.getOrNull(i + 1)?.let { focusOf(it.key) },
-                        ) {
-                            onRemoveSet(set.key)
-                        }
+        if (expanded) ExerciseEditor(entry, unit, onEdit) { onRemoveSet(key, it) }
+        // Alternatives (A/B): same card, each with its own sets; the training picks one of them.
+        entry.alternatives.forEach { alt ->
+            androidx.compose.runtime.key(alt.key) {
+                Spacer(Modifier.height(Space.s))
+                Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).testTag("alternative:${alt.exercise.id}"), verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.width(20.dp + Space.s))
+                    ExerciseThumb(alt) { onDetails(alt) }
+                    Spacer(Modifier.width(Space.m))
+                    Column(Modifier.weight(1f)) {
+                        Text(t.training.alternative, style = Theme.type.caption, tone = Tone.Muted)
+                        ExerciseCaption(alt, unit, language, last(alt.exercise.id), Modifier.fillMaxWidth())
                     }
-                }
-                BlockButton(t.addSet, { onEdit { it.addSet(key) } }, inBlock = true)
-                // Rest time and note each on their own line: the note gets the full width (3 lines) instead of a narrow column.
-                Column(Modifier.fillMaxWidth().padding(top = Space.xs)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(t.restTime, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
-                        SmallInput(
-                            entry.rest,
-                            { v -> onEdit { it.setRest(key, v) } },
-                            unit = t.secondsUnit,
-                            placeholder = t.restDefault,
-                            description = t.restTime,
-                            modifier = Modifier.width(96.dp),
-                        )
-                    }
-                    SmallInput(
-                        entry.note,
-                        { v -> onEdit { it.setNote(key, v.take(300)) } },
-                        unit = "",
-                        placeholder = t.note,
-                        keyboardType = KeyboardType.Text,
-                        align = TextAlign.Start,
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
+                    MoreMenu(
+                        t.moreActions(alt.exercise.name),
+                        listOf(
+                            MenuItem(t.replace) { onReplace(alt.key) },
+                            MenuItem(t.remove, destructive = true) { onRemove(alt.key) },
+                        ),
                     )
                 }
+                if (expanded) ExerciseEditor(alt, unit, onEdit) { onRemoveSet(alt.key, it) }
             }
+        }
+    }
+}
+
+/** Name, "3 sets · rest" and what was done last time (as in the running training). */
+@Composable
+private fun ExerciseCaption(entry: DraftExercise, unit: WeightUnit, language: Language, last: LastPerformance?, modifier: Modifier) {
+    val t = LocalStrings.current
+    val type = entry.exercise.trackingType
+    Column(modifier) {
+        Text(entry.exercise.name, style = Theme.type.label, maxLines = 2)
+        val rest = entry.rest.toIntOrNull()?.let { t.restSummary(Numbers.formatDuration(it)) }
+        Text(listOfNotNull(t.setCount(entry.sets.size), rest).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
+        last?.sets?.takeIf { it.isNotEmpty() }?.let { sets ->
+            Text(t.lastTime(WorkoutFormat.lastTime(sets, type, unit, language, t)), style = Theme.type.caption, tone = Tone.Muted, maxLines = 2)
+        }
+    }
+}
+
+/** Set rows, "+ Add set", rest time and note of one exercise (or alternative). */
+@Composable
+private fun ExerciseEditor(
+    entry: DraftExercise,
+    unit: WeightUnit,
+    onEdit: ((TemplateDraft) -> TemplateDraft) -> Unit,
+    onRemoveSet: (setKey: Long) -> Unit,
+) {
+    val t = LocalStrings.current
+    val key = entry.key
+    val type = entry.exercise.trackingType
+    Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        SetColumnsHeader(t.setColumn, setColumnLabels(type, unit, t))
+        val focus = remember { mutableMapOf<Any, FocusRequester>() }
+        fun focusOf(id: Any) = focus.getOrPut(id) { FocusRequester() }
+        entry.sets.forEachIndexed { i, set ->
+            androidx.compose.runtime.key(set.key) {
+                SetRow(
+                    i + 1, type, unit, set,
+                    onChange = { transform -> onEdit { it.updateSet(key, set.key, transform) } },
+                    focusRequester = focusOf(set.key),
+                    next = entry.sets.getOrNull(i + 1)?.let { focusOf(it.key) },
+                ) {
+                    onRemoveSet(set.key)
+                }
+            }
+        }
+        BlockButton(t.addSet, { onEdit { it.addSet(key) } }, inBlock = true)
+        // Rest time and note each on their own line: the note gets the full width (3 lines) instead of a narrow column.
+        Column(Modifier.fillMaxWidth().padding(top = Space.xs)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(t.restTime, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
+                SmallInput(
+                    entry.rest,
+                    { v -> onEdit { it.setRest(key, v) } },
+                    unit = t.secondsUnit,
+                    placeholder = t.restDefault,
+                    description = t.restTime,
+                    modifier = Modifier.width(96.dp),
+                )
+            }
+            SmallInput(
+                entry.note,
+                { v -> onEdit { it.setNote(key, v.take(300)) } },
+                unit = "",
+                placeholder = t.note,
+                keyboardType = KeyboardType.Text,
+                align = TextAlign.Start,
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

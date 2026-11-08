@@ -88,6 +88,10 @@ data class TemplateExerciseEntity(
     /** Rest time in this template; null = the exercise's rest time or the global default. */
     val restSec: Int?,
     val note: String?,
+    /**
+     * 0 = the exercise of this position, 1, 2 … = its alternatives (same [position]; v14). Older rows are all 0.
+     */
+    @ColumnInfo(defaultValue = "0") val variant: Int = 0,
 )
 
 /** Planned set with target values. Which fields are used depends on the exercise's tracking type. */

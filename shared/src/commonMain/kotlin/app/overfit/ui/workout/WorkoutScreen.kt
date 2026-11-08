@@ -12,6 +12,9 @@ import app.overfit.ui.components.MoreMenu
 import app.overfit.ui.components.SetField
 import app.overfit.ui.components.SetRowSurface
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import app.overfit.ui.components.Chip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.border
@@ -323,6 +326,21 @@ private fun ExerciseSection(
                     MenuItem(t.remove, destructive = true) { controller.edit { it.removeExercise(entry.id) } },
                 ),
             )
+        }
+        // Alternatives (A/B): one chip per variant, the current one filled. Switching is possible until a set of
+        // it is done; the default is the variant not done last time (chosen at the start).
+        if (entry.variants.size > 1 && entry.sets.none { it.completed }) {
+            val scope = rememberCoroutineScope()
+            androidx.compose.runtime.CompositionLocalProvider(app.overfit.ui.components.LocalInPanel provides true) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("variants:${entry.id}"),
+                    horizontalArrangement = Arrangement.spacedBy(Space.xs),
+                ) {
+                    entry.variants.forEachIndexed { i, v ->
+                        Chip(v.exercise.name, i == entry.variantIndex, { scope.launch { controller.switchVariant(entry.id, i) } })
+                    }
+                }
+            }
         }
         if (expanded) {
             Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
