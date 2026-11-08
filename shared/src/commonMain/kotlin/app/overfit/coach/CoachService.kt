@@ -21,6 +21,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.minus
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -345,17 +346,20 @@ class CoachService(
         var ctx = buildContext(row.kind, row.sessionId)
         val images = mutableListOf<CoachImage>()
         if (settings.state.value.sendPhotos) {
+            // Photos belong to calendar days (v13): the reviewed training's day, or the newest day with a photo.
             val latest = when (row.kind) {
-                ReviewKind.SESSION -> ctx.current?.let { c -> dao.firstPhotoOf(c.id) }?.let { it.startedAt to it.fileName }
-                ReviewKind.PROGRESS -> dao.latestPhotoBefore(clock())?.let { it.startedAt to it.fileName }
+                ReviewKind.SESSION -> ctx.current?.let { c -> dao.firstPhotoOfDay(dateOf(c.startedAt)) }
+                ReviewKind.PROGRESS -> dao.latestPhotoOnOrBefore(dateOf(clock()))
             }
-            if (latest != null) photos.load(latest.second)?.let { images += CoachImage(dateOf(latest.first), it) }
+            if (latest != null) photos.load(latest.fileName)?.let { images += CoachImage(latest.day, it) }
             if (images.isNotEmpty()) {
-                val compare = dao.latestPhotoBefore(latest!!.first - COMPARE_MS)
+                val compareDay = kotlinx.datetime.LocalDate.parse(latest!!.day)
+                    .minus(kotlinx.datetime.DatePeriod(days = COMPARE_DAYS)).toString()
+                val compare = dao.latestPhotoOnOrBefore(compareDay)
                 val bytes = compare?.fileName?.let { photos.load(it) }
                 if (compare != null && bytes != null) {
-                    images += CoachImage(dateOf(compare.startedAt), bytes)
-                    ctx = ctx.copy(comparisonPhotoDate = dateOf(compare.startedAt))
+                    images += CoachImage(compare.day, bytes)
+                    ctx = ctx.copy(comparisonPhotoDate = compare.day)
                 }
                 ctx = ctx.copy(photoToday = true)
             }
@@ -459,7 +463,7 @@ class CoachService(
         private const val RECENT_WEEKS = 8
         private const val RECENT_LIMIT = 40
         private const val WEEK_MS = 7L * 24 * 3600 * 1000
-        private const val COMPARE_MS = 28L * 24 * 3600 * 1000
+        private const val COMPARE_DAYS = 28
 
         @OptIn(ExperimentalUuidApi::class)
         private fun newId() = Uuid.random().toString()

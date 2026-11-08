@@ -38,6 +38,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlinx.datetime.minus
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
@@ -123,6 +124,37 @@ class CoachServiceTest {
     }
 
     private suspend fun benchSets() = requireNotNull(data.templates.get(templateId)).exercises.first { it.exercise.id == "wg:bench-press" }
+
+    /**
+     * Photos belong to the day (DB v13): the session review sends the first photo of the training's day (a day photo
+     * without a training link) and the newest photo at least 4 weeks older as comparison, also one without training.
+     */
+    @Test
+    fun sessionReviewSendsPhotoOfTheTrainingDayAndAComparisonPhoto() = runBlocking {
+        seedFinishedWorkout()
+        data.coachSettings.setSendPhotos(true)
+        val loaded = mutableListOf<String>()
+        val withPhotos = CoachService(
+            dao = dao, templates = data.templates, exercises = data.exercises, settings = data.coachSettings,
+            access = { CoachAccess.Ready(ProviderId.ANTHROPIC) }, transport = { fake },
+            profile = { CoachProfile("Name: Fabi", Language.DE) }, defaultInstructions = { "Du bist Coach." },
+            scope = scope, clock = { time.incrementAndGet() },
+            photos = app.overfit.coach.CoachPhotoLoader { name -> loaded += name; name.encodeToByteArray() },
+        )
+        val started = dao.session(sessionId)!!.session.startedAt
+        val day = kotlinx.datetime.LocalDate.parse(app.overfit.data.db.photoDay(started))
+        val wDao = db.workoutDao()
+        wDao.insertPhoto(app.overfit.data.db.WorkoutPhotoEntity("today", null, "today.jpg", started + 10, 0, day.toString()))
+        wDao.insertPhoto(app.overfit.data.db.WorkoutPhotoEntity("near", null, "near.jpg", 0, 0, day.minus(kotlinx.datetime.DatePeriod(days = 10)).toString()))
+        wDao.insertPhoto(app.overfit.data.db.WorkoutPhotoEntity("old", null, "old.jpg", 0, 0, day.minus(kotlinx.datetime.DatePeriod(days = 30)).toString()))
+
+        val id = withPhotos.requestSessionReview(sessionId)
+        awaitStatus(id, ReviewStatus.DONE)
+
+        val images = fake.prompts.last().images
+        assertEquals(listOf(day.toString(), day.minus(kotlinx.datetime.DatePeriod(days = 30)).toString()), images.map { it.label })
+        assertEquals(listOf("today.jpg", "old.jpg"), loaded)
+    }
 
     @Test
     fun happyPath() = runBlocking {

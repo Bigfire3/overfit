@@ -58,7 +58,7 @@ class WorkoutEditRepositoryTest {
         var w = workoutOf("w1", a, PlannedSet(50.0, 10), PlannedSet(52.5, 8), PlannedSet(55.0, 6))
         w.exercises[0].sets.forEach { w = w.completeSet(it.id, 2000) }
         workouts.finish(w, endedAt = 9000)
-        workouts.addPhoto("w1", byteArrayOf(1, 2), takenAt = 5000)
+        workouts.addPhoto(dayOf(1000), byteArrayOf(1, 2), takenAt = 5000)
 
         val sets = w.exercises[0].sets
         var edited = w.setValues(sets[0].id, SetValues(60.0, 10))
@@ -86,7 +86,6 @@ class WorkoutEditRepositoryTest {
         assertEquals(3, row.completedSets)
         assertEquals(60.0 * 10 + 52.5 * 8 + 70.0 * 5, row.volumeKg, 0.001)
         assertTrue(row.sauna)
-        assertEquals(1, row.photoCount)
 
         val logged = workouts.exerciseSets(a.id).first()
         assertEquals(listOf(60.0, 52.5, 70.0), logged.map { it.weightKg })
@@ -113,17 +112,18 @@ class WorkoutEditRepositoryTest {
         val a = custom("A")
         val w = workoutOf("w1", a, PlannedSet(50.0, 10))
         workouts.finish(w, endedAt = 9000)
-        val withTraining = workouts.addPhoto("w1", byteArrayOf(1), takenAt = 5000)
-        val free = workouts.addPhoto(null, byteArrayOf(2), takenAt = 7000)
-        assertNull(free.sessionId)
+        // Since v13 every new photo belongs to its day, never to a training.
+        val first = workouts.addPhoto(dayOf(1000), byteArrayOf(1), takenAt = 5000)
+        val second = workouts.addPhoto(dayOf(1000), byteArrayOf(2), takenAt = 7000)
+        assertNull(first.sessionId)
+        assertNull(second.sessionId)
 
         val diary = workouts.photos.first()
         assertEquals(2, diary.size)
-        val freeRow = diary.single { it.photo.id == free.id }
-        assertNull(freeRow.workoutName)
-        assertEquals("T-w1", diary.single { it.photo.id == withTraining.id }.workoutName)
-        assertEquals(setOf(free.id, withTraining.id), workouts.allPhotos().map { it.id }.toSet())
-        assertEquals(1, workouts.history.first().single().photoCount)
+        assertTrue(diary.all { it.workoutName == null && it.photo.date == dayOf(1000) })
+        assertEquals(setOf(first.id, second.id), workouts.allPhotos().map { it.id }.toSet())
+        // The training shows the photos of its day.
+        assertEquals(listOf(first.id, second.id), workouts.getFinished("w1")!!.photos.map { it.id })
     }
 
     @Test
@@ -132,7 +132,10 @@ class WorkoutEditRepositoryTest {
         var w = workoutOf("w1", a, PlannedSet(50.0, 10))
         w = w.completeSet(w.exercises[0].sets[0].id, 2000)
         workouts.finish(w, endedAt = 9000)
-        val photo = workouts.addPhoto("w1", byteArrayOf(1, 2), takenAt = 5000)
+        // A legacy photo of the training (before v13).
+        db.workoutDao().insertPhoto(app.overfit.data.db.WorkoutPhotoEntity("legacy", "w1", "legacy.jpg", 5000, 0, dayOf(1000).toString()))
+        workouts.photoFiles.write("legacy.jpg", byteArrayOf(1, 2))
+        val photo = workouts.allPhotos().single()
 
         workouts.deleteWorkout("w1")
 
@@ -194,4 +197,6 @@ class WorkoutEditRepositoryTest {
         // Same source as "last time" in the running workout.
         assertEquals(anywhere.sets, workouts.lastSets(a.id))
     }
+
+    private fun dayOf(ms: Long) = kotlinx.datetime.LocalDate.parse(app.overfit.data.db.photoDay(ms))
 }

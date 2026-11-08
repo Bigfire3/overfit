@@ -148,6 +148,11 @@ data class BPhoto(
     val file: String,
     val takenAt: Long,
     val position: Int = 0,
+    /**
+     * Calendar day the photo belongs to (ISO date, app DB v13 and later). Missing in older backups: then the day the
+     * training started (photo of a training) or the day it was taken.
+     */
+    val day: String? = null,
 )
 
 @Serializable
@@ -203,7 +208,7 @@ class BackupService(
     suspend fun export(): ByteArray {
         val wDao = db.workoutDao()
         val photos = wDao.allPhotos()
-        val bPhotos = photos.map { BPhoto(it.id, it.sessionId, it.fileName, it.takenAt, it.position) }
+        val bPhotos = photos.map { BPhoto(it.id, it.sessionId, it.fileName, it.takenAt, it.position, it.day.ifEmpty { null }) }
         val json = BackupJson(
             createdAt = clock(),
             appVersion = appVersion,
@@ -348,11 +353,15 @@ class BackupService(
                     },
                 )
             }
-            val workoutIds = json.workouts.map { it.id }.toSet()
+            val workoutStarts = json.workouts.associate { it.id to it.startedAt }
+            // Every photo with its file is kept: one whose training is not in the backup stays a photo of its day.
             wDao.insertPhotos(
-                json.photos.filter { (it.workoutId == null || it.workoutId in workoutIds) && preview.photoBytes.containsKey(it.file) }
+                json.photos.filter { preview.photoBytes.containsKey(it.file) }
                     .distinctBy { it.id }
-                    .map { WorkoutPhotoEntity(it.id, it.workoutId, it.file, it.takenAt, it.position) },
+                    .map { p ->
+                        val workoutId = p.workoutId?.takeIf { it in workoutStarts }
+                        WorkoutPhotoEntity(p.id, workoutId, p.file, p.takenAt, p.position, backupPhotoDay(p, workoutStarts))
+                    },
             )
         }
         val files = data.workouts.photoFiles
@@ -400,3 +409,11 @@ private fun BExercise.toEntity(type: TrackingType): ExerciseEntity {
         defaultRestSec = defaultRestSec, isArchived = isArchived, createdAt = createdAt, updatedAt = updatedAt, note = note,
     )
 }
+
+/**
+ * Day of a photo from a backup: its stored day (v13), else – older backups – the day its training started (where the
+ * training detail showed it), else the day it was taken. Days are in the device time zone like the calendar.
+ */
+fun backupPhotoDay(photo: BPhoto, workoutStarts: Map<String, Long>, zone: kotlinx.datetime.TimeZone = kotlinx.datetime.TimeZone.currentSystemDefault()): String =
+    photo.day?.takeIf { runCatching { kotlinx.datetime.LocalDate.parse(it) }.isSuccess }
+        ?: app.overfit.data.db.photoDay(photo.workoutId?.let { workoutStarts[it] } ?: photo.takenAt, zone)

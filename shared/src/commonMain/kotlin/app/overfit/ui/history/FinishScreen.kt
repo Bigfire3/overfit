@@ -1,5 +1,7 @@
 package app.overfit.ui.history
 
+import app.overfit.ui.photos.DayPhotoGrid
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -85,7 +87,10 @@ fun FinishScreen(
         value = if (summary != null && finished != null) FinishData(summary, finished) else null
         if (value == null) onClose()
     }
-    val photos by remember(workoutId) { workouts.observePhotosOf(workoutId) }.collectAsStateWithLifecycle(emptyList())
+    // Photos belong to the training's day (v13): shown and added for that day.
+    val day = data?.finished?.workout?.startedAt?.let { localDateTime(it).date }
+    val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
+        .collectAsStateWithLifecycle(emptyList())
 
     var feeling by rememberSaveable { mutableStateOf<Int?>(null) }
     var sauna by rememberSaveable { mutableStateOf<Boolean?>(null) }
@@ -105,13 +110,6 @@ fun FinishScreen(
         }
     }
     var saving by remember { mutableStateOf(false) }
-
-    val picker = rememberPhotoPicker { bytes ->
-        appScope.launch {
-            val jpeg = withContext(Dispatchers.Default) { prepareJpeg(bytes) } ?: return@launch
-            workouts.addPhoto(workoutId, jpeg)
-        }
-    }
 
     val save = {
         if (!saving) {
@@ -174,23 +172,13 @@ fun FinishScreen(
         SectionTitle(h.note)
         MultilineInput(note, { note = it.take(2000) }, h.notePlaceholder)
 
-        SectionTitle(h.photos)
-        if (photos.isNotEmpty()) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-                photos.forEachIndexed { i, p ->
-                    PhotoThumb(
-                        p, h.photoDescription(i + 1),
-                        removeLabel = h.removePhoto,
-                        onRemove = { appScope.launch { workouts.deletePhoto(p.id) } },
-                    )
-                }
-            }
-            Spacer(Modifier.height(Space.s))
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-            if (picker.canTakePhoto) SmallButton(h.takePhoto, picker.takePhoto, tone = Tone.Default)
-            SmallButton(h.pickPhoto, picker.pickFromLibrary, tone = Tone.Default)
-        }
+        SectionTitle(h.dayPhotos)
+        if (day != null) DayPhotoGrid(
+            photos,
+            onAdd = { bytes -> addDayPhoto(workouts, appScope, day, bytes) },
+            onOpen = null,
+            onRemove = { id -> appScope.launch { workouts.deletePhoto(id) } },
+        )
         Hint(h.photosPrivate)
 
         Spacer(Modifier.height(Space.l))

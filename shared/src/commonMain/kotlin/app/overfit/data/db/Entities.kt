@@ -253,15 +253,20 @@ data class SessionWithExercises(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("sessionId"), Index("takenAt")],
+    indices = [Index("sessionId"), Index("takenAt"), Index("day")],
 )
 data class WorkoutPhotoEntity(
     @PrimaryKey val id: String,
-    /** Training the photo belongs to; null = a photo added to a calendar day without a training (v9). */
+    /**
+     * Legacy link to the training the photo was added to (before v13), kept for old data; null = photo of a
+     * calendar day. Since v13 photos belong to the [day], new photos never get a training.
+     */
     val sessionId: String?,
     val fileName: String,
     val takenAt: Long,
     val position: Int,
+    /** Calendar day the photo belongs to, ISO `yyyy-MM-dd` (v13). Fixed when stored, so it never wanders with the time zone. */
+    @ColumnInfo(defaultValue = "") val day: String = "",
 )
 
 /** Row of the history list: a finished workout with its key numbers. */
@@ -290,6 +295,7 @@ data class PhotoRow(
     val takenAt: Long,
     val position: Int,
     val sessionName: String?,
+    val day: String,
 )
 
 /** A completed set of one exercise in a finished workout (progress, best values). */
