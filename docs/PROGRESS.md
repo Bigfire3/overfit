@@ -15,6 +15,19 @@
 | 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Wenig tippen: Workout direkt bearbeiten, Start aus der Liste (Session BI, 8.11.)
+**Erledigt:** Workout-Ansicht und Editor sind ein Screen: Sätze, Name, Übungen direkt änderbar, wird automatisch gespeichert
+(kein Stift, kein Speichern), „Rückgängig“ nach Entfernen/Ersetzen, unten „Starten“. ▶ auf jeder Workout-Karte startet direkt.
+Neues Workout öffnet sich nach „Speichern“. Vergangene Trainings bleiben Ansicht + Stift. Tipp-Zählung in DECISIONS.md.
+Tests: `FewerTapsTest` (+ angepasste UI-Tests). Screenshots: `docs/screenshots/workout-direkt-bearbeiten/`.
+
+### Bitte auf dem Handy testen (Wenig tippen)
+1. Workouts-Tab: rechts auf jeder Karte ein weißer ▶; antippen startet das Training sofort.
+2. Karte antippen: Workout mit allen Sätzen als Felder, oben Teilen/Löschen, unten „Start“. Gewicht ändern, Zurück, wieder öffnen: Wert ist gespeichert.
+3. Wert ändern und direkt „Start“: Training startet mit dem neuen Wert.
+4. ⋮ → „Remove“ bei einer Übung: unten „Exercise removed · Undo“; Undo bringt sie zurück.
+5. „+“ → neues Workout erstellen → Save: das neue Workout ist offen, „Start“ unten.
+
 ## Übung auslassen, „Training beenden“ unten (Session BI, 8.11.)
 **Erledigt:** Im laufenden Training ⋮ einer Übung → „Heute auslassen“: Karte eingeklappt und gedimmt („Ausgelassen“), „Nicht auslassen“
 macht es rückgängig. Offene Sätze ausgelassener Übungen zählen nicht als offen. Ist nichts mehr offen, wird der schwebende Knopf unten
