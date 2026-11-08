@@ -18,6 +18,7 @@ data class Strings(
     val comingSoon: String,
     val share: ShareStrings,
     val history: HistoryStrings,
+    val training: TrainingStrings,
     val photos: PhotoStrings,
     val bodyWeight: BodyWeightStrings,
     val muscles: MuscleStrings,
@@ -260,6 +261,7 @@ private val ENGLISH_MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "J
 val German = Strings(
     share = ShareGerman,
     history = HistoryGerman,
+    training = TrainingGerman,
     photos = PhotoGerman,
     bodyWeight = BodyWeightGerman,
     muscles = MuscleGerman,
@@ -482,6 +484,7 @@ val German = Strings(
 val English = Strings(
     share = ShareEnglish,
     history = HistoryEnglish,
+    training = TrainingEnglish,
     photos = PhotoEnglish,
     bodyWeight = BodyWeightEnglish,
     muscles = MuscleEnglish,

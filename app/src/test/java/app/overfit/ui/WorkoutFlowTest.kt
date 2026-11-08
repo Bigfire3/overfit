@@ -112,8 +112,8 @@ class WorkoutFlowTest {
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("Überspringen")).fetchSemanticsNodes().isEmpty() }
         assertNull(alerts.pending)
         compose.onNodeWithText("Nächsten Satz loggen").performClick()
-        waitFor("Alle Sätze erledigt")
-        compose.onNodeWithText("Alle Sätze erledigt").assertIsNotEnabled()
+        // Nothing open any more: the floating button now finishes the training (double tap, green).
+        waitFor("Training beenden")
 
         // Finish (two taps) → finish flow (summary, note) → save → start; stored as finished
         val id = requireNotNull(deps.workout.state.value.workout).id

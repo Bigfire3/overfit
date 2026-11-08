@@ -40,6 +40,19 @@ Screenshots: `docs/screenshots/coach-ki/`.
 5. Ein Training mit 0 kg (z. B. Dips) und eine Maschinen-Übung auswerten lassen: Der Coach nennt die Werte nicht „vergessen“ oder
    „unrealistisch“ und rechnet von deinen Zahlen aus weiter.
 
+## Übung auslassen, „Training beenden“ unten (Session BI, 8.11.)
+**Erledigt:** Im laufenden Training ⋮ einer Übung → „Heute auslassen“: Karte eingeklappt und gedimmt („Ausgelassen“), „Nicht auslassen“
+macht es rückgängig. Offene Sätze ausgelassener Übungen zählen nicht als offen. Ist nichts mehr offen, wird der schwebende Knopf unten
+zu „Training beenden“ (Doppeltipp, grün beim ersten Tipp). Gespeichert bleibt die Übung als ausgelassen markiert (DB v13), das Workout
+behält sie unverändert; Trainingsdetail, Beenden-Screen, Coach und KI-Chat sehen „ausgelassen“. Tests: `SkipExerciseTest`,
+`SkipAndFinishTest`, `MigrationTest.migration12to13…`, `WorkoutFlowTest`. Screenshots: `docs/screenshots/training-auslassen/`.
+
+### Bitte auf dem Handy testen (Auslassen, Finish)
+1. Workout starten, bei einer Übung ⋮ → „Skip today“: Karte wird eine gedimmte Zeile „Skipped“, oben zählt „x/y done“ ohne ihre Sätze.
+2. „Don't skip“ antippen: Übung ist wieder normal mit allen Sätzen.
+3. Alle übrigen Sätze abhaken (oder „Log next set“): Unten steht jetzt „Finish workout“; erster Tipp färbt grün, zweiter beendet.
+4. Beenden-Screen zeigt „1 exercise skipped“; Kalender → Training: Übung mit „Skipped“. Das Workout enthält die Übung weiterhin.
+
 ## Einladungen, Startguthaben und Verfall entfernt (7.11.2026)
 **Erledigt:** Fabians Entscheidung (Zitat in DECISIONS.md): Das Empfehlungsprogramm ist komplett aus der App (Android und iOS) entfernt:
 „Freunde einladen“, „Einladung einlösen“, QR/Link `overfit://invite`, Reveal-Animation, geschenkte Auswertungen (Zähler, Hinweise,

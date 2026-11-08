@@ -192,6 +192,8 @@ data class SessionExerciseEntity(
     val origin: ExerciseOrigin,
     /** Set when [origin] is REPLACED: the exercise that was planned. No foreign key on purpose. */
     val replacedExerciseId: String?,
+    /** "Skip today" in the running training (v13): its open sets do not count, the saved workout keeps it. */
+    @ColumnInfo(defaultValue = "0") val skipped: Boolean = false,
 )
 
 /** A set: target (planned) vs. actual values. Which fields count depends on the tracking type. */

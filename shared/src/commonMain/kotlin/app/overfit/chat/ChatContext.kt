@@ -109,6 +109,13 @@ object ChatContext {
         val sb = StringBuilder("- $title\n")
         for (e in w.exercises) {
             val done = e.sets.filter { it.completed }
+            // A skipped exercise stays visible with its marker (and whatever was done before skipping).
+            if (e.skipped) {
+                sb.append("  ").append(app.overfit.coach.WeightRules.name(e.exercise.name, e.exercise.equipment)).append(" (").append(app.overfit.i18n.stringsFor(language).training.skipped).append(')')
+                if (done.isNotEmpty()) sb.append(": ").append(done.joinToString(", ") { setText(it, e.exercise.trackingType, unit, language) })
+                sb.append('\n')
+                continue
+            }
             if (done.isEmpty()) continue
             sb.append("  ").append(app.overfit.coach.WeightRules.name(e.exercise.name, e.exercise.equipment)).append(": ")
                 .append(done.joinToString(", ") { setText(it, e.exercise.trackingType, unit, language) }).append('\n')
