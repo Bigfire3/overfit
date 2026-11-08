@@ -1291,3 +1291,16 @@ Offen / Hinweise:
 4. Während 3 läuft: Guthaben-Popup öffnen → „(… € reserviert)“ neben dem Kontostand; nach der Antwort ist der Zusatz weg.
 5. Profil → Guthaben → Transactions: zwei neue Opus-Buchungen; Summe aller Buchungen = Kontostand. Anfrage-Protokoll: beide „OK“.
 6. Flugmodus an, Frage senden → „No connection“ (echtes Netzproblem); Flugmodus aus, „Retry“ → Antwort.
+
+## Session BG – Nach App-Wechsel keine Tipps möglich (8.11.)
+- Ursache: Beim Wechsel zwischen Screens legt die App kurz eine unsichtbare Fläche über alles, damit ein Doppeltipp nichts doppelt öffnet.
+  Eine angefangene und abgebrochene Zurück-Geste (Wisch vom Rand; mit Gestensteuerung auch beim App-Wechsel) ließ diese Fläche für immer
+  liegen. Zurück beendete die Geste, dann ging es wieder.
+- Erledigt: Die Fläche liegt jetzt höchstens 0,4 s. Test `ResumeTapTest` (vor dem Fix rot, danach grün). Details in docs/DECISIONS.md.
+
+### Bitte auf dem Handy testen (App-Wechsel)
+1. Training läuft → Spotify öffnen → zurück zu Overfit → sofort Satz abhaken: Haken reagiert
+2. Satz abhaken (Pause läuft) → Home → Pausen-Benachrichtigung antippen → Training offen, sofort tippen (z. B. „Überspringen“) reagiert
+3. Coach-Chat, ins Textfeld tippen (Tastatur offen) → App wechseln → zurück → Senden-Knopf, Chip oder Liste antippen reagiert
+4. Kalender, Muskel-Sheet öffnen → App wechseln → zurück → Sheet antippen bzw. daneben tippen (schließt) reagiert
+5. Im Training vom linken Rand etwas reinwischen und wieder loslassen (Zurück-Geste abbrechen) → Satz abhaken reagiert sofort

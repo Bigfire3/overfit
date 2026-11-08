@@ -74,6 +74,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.toRoute
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
@@ -1160,10 +1161,19 @@ private fun AppScaffold(
     // Tab switches have no transition (ScreenMotion), so they never block: only a fade between other screens does.
     val screens = visible.filter { it.destination !is androidx.navigation.NavGraph }
     val transitioning = screens.size > 1 && !screens.all { e -> Tab.entries.any { e.destination.hasRoute(it.routeClass) } }
+    // ...but only as long as a fade can take. A back gesture that is started and then cancelled (edge swipe, app
+    // switch with gesture navigation) leaves the previous screen "visible" for good: navigation prepares it for
+    // the predictive back animation and never marks it finished. Without this limit every tap was swallowed until
+    // Back was pressed (owner: "nach App-Wechsel stuck, erst Zurück, dann geht es wieder").
+    val screenKey = screens.map { it.id }
+    var blockExpired by remember(screenKey) { mutableStateOf(false) }
+    LaunchedEffect(screenKey, transitioning) {
+        if (transitioning) { delay(ScreenMotion.MAX_BLOCK_MS); blockExpired = true }
+    }
     Column(Modifier.fillMaxSize().background(Theme.colors.background)) {
         Box(Modifier.weight(1f)) {
             content()
-            if (transitioning) Box(Modifier.matchParentSize().testTag("nav-transition").pointerInput(Unit) {
+            if (transitioning && !blockExpired) Box(Modifier.matchParentSize().testTag("nav-transition").pointerInput(Unit) {
                 awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
             })
         }

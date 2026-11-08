@@ -1541,3 +1541,25 @@ Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Konto
   210 s statt 240 s (sonst Gleichstand mit dem App-Timeout bei gesetzter Variable). Bewusst so: 30-s-Grenze von `waitUntil` (siehe oben);
   alte App-Versionen brechen weiter nach 10 s ab (erst die neue APK behebt das); Test-Guthaben-Obergrenze nur Testserver (keine echten
   Kosten außer durch Nutzung); Reservierungs-Anzeigen nur über die Formatierung getestet, kein Robolectric-Screenshot.
+
+## App nach App-Wechsel „stuck“ (8.11., Session BG)
+- **Symptom (Owner):** Zurück in Overfit aus einer anderen App reagiert kein Tipp, erst nach einmal Zurück geht es wieder.
+- **Ursache:** `AppScaffold` legt während eines Screen-Wechsels eine unsichtbare Fläche über alles, die jeden Tipp schluckt (gegen
+  Doppeltipps beim Überblenden). Sie war an „mehr als ein Screen in `visibleEntries`“ gebunden. Die App zielt auf Android 16+ (targetSdk 37),
+  dort ist Predictive Back an: Beginnt eine Zurück-Geste (Wisch vom Rand; mit Gestensteuerung auch beim App-Wechsel), bereitet Navigation
+  den vorherigen Screen vor. Wird die Geste abgebrochen (losgelassen, oder vom System abgebrochen, während die App im Hintergrund ist),
+  markiert navigation-compose 2.10 den vorbereiteten Screen nie als fertig → zwei sichtbare Einträge für immer → Blocker dauerhaft aktiv.
+  Erst Zurück vollendet die Geste (Screen wird geschlossen/minimiert), danach ist wieder nur ein Screen sichtbar.
+- **Fix:** Der Blocker gilt höchstens `ScreenMotion.MAX_BLOCK_MS` (Ausblenden 90 + Einblenden 150 + 160 ms Puffer) ab dem Moment, in dem
+  sich die sichtbaren Screens ändern. Doppeltipp-Schutz beim echten Überblenden bleibt (UiFeedbackTest), ein hängengebliebener Zustand
+  kann nie mehr länger blockieren. Verworfen: Predictive Back per Manifest abschalten (`enableOnBackInvokedCallback=false`, bei neuen
+  targetSdks nicht verlässlich und nimmt die System-Animation) und den Navigations-Eintrag selbst „abschließen“ (keine öffentliche API).
+- **Reproduktion:** `ResumeTapTest` (Robolectric, ActivityScenario): Zurück-Geste starten und abbrechen, im Vordergrund und während die
+  Activity gestoppt ist → danach Satz abhaken. Vor dem Fix rot (Tipp kommt nie an), danach grün. Ebenfalls abgedeckt (waren schon grün):
+  Rückkehr über die Pausen-Benachrichtigung bei minimiertem Training, App-Wechsel mitten im Überblenden, App-Wechsel während der Geste
+  ohne Abbruch. Welche Systemgeste genau beim Wechsel die Zurück-Geste beginnt, lässt sich ohne Gerät nicht beobachten; der Fix greift
+  unabhängig davon.
+- **Geprüft und ausgeschlossen:** Sheets/Popups (`BottomSheet`, `CenterPopup`: Scrim existiert nur bei `visible`, Exit-Animation läuft nach
+  der Rückkehr weiter), `textInputArea`/`clearFocusOutsideTextInput`, `ConfirmArea`, `pressScale` (lesen Gesten nur, verbrauchen nichts;
+  ACTION_CANCEL beendet die Geste und `awaitEachGesture` beginnt neu), Activity-Konfiguration (`singleTop`, Benachrichtigung mit
+  `SINGLE_TOP|CLEAR_TOP` → `onNewIntent`, keine zweite Instanz).
