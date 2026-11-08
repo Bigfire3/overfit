@@ -102,7 +102,7 @@ private fun AddTile(icon: Icon, label: String, size: Dp, onClick: () -> Unit, mo
     ) {
         LineIcon(icon)
         Spacer(Modifier.height(Space.xs))
-        Text(label, style = Theme.type.caption.copy(textAlign = TextAlign.Center), tone = Tone.Muted)
+        Text(label, Modifier.fillMaxWidth(), style = Theme.type.caption.copy(textAlign = TextAlign.Center), tone = Tone.Muted)
     }
 }
 
