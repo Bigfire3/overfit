@@ -12,6 +12,7 @@ import app.overfit.ui.components.MoreMenu
 import app.overfit.ui.components.SetField
 import app.overfit.ui.components.SetRowSurface
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
@@ -245,6 +246,7 @@ private fun WorkoutFooter(
     onJumpToNext: (String) -> Unit,
 ) {
     val t = LocalStrings.current
+    val finishScope = rememberCoroutineScope()
     val rest = workout.rest
     if (rest != null && !rest.isOver(now.value)) {
         RestBar(
@@ -258,13 +260,24 @@ private fun WorkoutFooter(
             onJumpToNext = onJumpToNext,
         )
     }
-    val allDone = workout.totalSets > 0 && workout.nextOpenSet() == null
-    PrimaryButton(
-        if (allDone) t.allSetsDone else t.logNextSet,
-        onClick = { controller.logNextSet() },
-        enabled = workout.totalSets > 0 && !allDone,
-    )
+    // Nothing open any more (every set done or its exercise skipped): the floating button finishes the training,
+    // green on the first tap, saved on the second (same double tap as "Finish" at the top).
+    if (workout.allDone) {
+        ConfirmButton(
+            t.training.finishTraining,
+            onConfirm = { finishScope.launch { controller.finish() } },
+            modifier = Modifier.fillMaxWidth().testTag(FINISH_BUTTON_TAG),
+            primary = true,
+            kind = ConfirmKind.Complete,
+        )
+    } else {
+        PrimaryButton(t.logNextSet, onClick = { controller.logNextSet() }, enabled = workout.totalSets > 0)
+    }
 }
+
+/** Test tag of the floating "Finish workout" button (shown once nothing is open). */
+const val FINISH_BUTTON_TAG = "workout-finish-bottom"
+
 
 @Composable
 private fun ExerciseSection(
@@ -283,6 +296,10 @@ private fun ExerciseSection(
 ) {
     val t = LocalStrings.current
     val type = entry.exercise.trackingType
+    if (entry.skipped) {
+        SkippedSection(modifier, entry, onUnskip = { controller.edit { it.setSkipped(entry.id, false) } }, onDetails = onDetails)
+        return
+    }
     Block(modifier) {
         ExerciseCardHeader(
             entry.exercise,
@@ -301,6 +318,7 @@ private fun ExerciseSection(
             MoreMenu(
                 t.moreActions(entry.exercise.name),
                 listOf(
+                    MenuItem(t.training.skipToday) { controller.edit { it.setSkipped(entry.id, true) } },
                     MenuItem(t.replace, onClick = onReplace),
                     MenuItem(t.remove, destructive = true) { controller.edit { it.removeExercise(entry.id) } },
                 ),
@@ -336,6 +354,26 @@ private fun ExerciseSection(
                 NoteField(entry.id, entry.note) { v -> controller.edit { it.setExerciseNote(entry.id, v.take(300)) } }
             }
         }
+    }
+}
+
+/**
+ * A skipped exercise: collapsed and dimmed, "Skipped" (plus the sets done before), "Don't skip" brings it back.
+ * Its open sets no longer count, so the training can be finished without them.
+ */
+@Composable
+private fun SkippedSection(modifier: Modifier, entry: WorkoutExercise, onUnskip: () -> Unit, onDetails: () -> Unit) {
+    val t = LocalStrings.current
+    Block(modifier.testTag("skipped:${entry.id}")) {
+        // Only the exercise is dimmed; the button to take it back in stays fully visible, below the name so both fit.
+        Box(Modifier.fillMaxWidth().alpha(0.45f)) {
+            ExerciseCardHeader(
+                entry.exercise,
+                listOf(listOfNotNull(t.training.skipped, entry.completedSets.takeIf { it > 0 }?.let { t.setsDone(it, entry.sets.size) }).joinToString(" · ")),
+                onDetails = onDetails,
+            )
+        }
+        BlockButton(t.training.unskip, onUnskip, Modifier.padding(top = Space.xs), icon = null, inBlock = true)
     }
 }
 

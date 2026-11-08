@@ -30,7 +30,7 @@ import androidx.room.useWriterConnection
         BodyWeightEntity::class,
         AiRequestEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
     // v1 → v2 adds the workout tables, v2 → v3 the photo table, v3 → v4 the coach tables (nothing is dropped or rewritten).
     // v4 → v5 is manual ([MIGRATION_4_5]): free-exercise-db removed, exercise.note added.
@@ -43,11 +43,13 @@ import androidx.room.useWriterConnection
     // v10 → v11 adds the AI request log `ai_request` (pure addition).
     // v11 → v12 adds coach_chat.profileOff (NOT NULL, default 0) and coach_chat_message.attachments / providerId / model
     // (nullable) for the chat redesign (pure addition).
+    // v12 → v13 adds session_exercise.skipped (NOT NULL, default 0 = not skipped; "skip today", pure addition).
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
         AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7),
         AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11), AutoMigration(from = 11, to = 12),
+        AutoMigration(from = 12, to = 13),
     ],
 )
 @TypeConverters(Converters::class)
