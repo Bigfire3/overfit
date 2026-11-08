@@ -80,10 +80,24 @@ export async function ledgerPage(env: Env, accountId: string, url: URL) {
      FROM ledger WHERE account_id = ? AND id < ? ORDER BY id DESC LIMIT ?`,
   )
     .bind(accountId, before, limit)
-    .all<{ id: number; type: string; amountMicro: number; reviews: number | null }>();
+    .all<{
+      id: number; type: string; amountMicro: number; reviews: number | null; fallback: number | null;
+      inputTokens: number | null; cacheReadTokens: number | null; cacheWriteTokens: number | null; outputTokens: number | null;
+    }>();
   // category: paid (bezahlt) | gifted (geschenkt) | used (verbraucht) | refunded (erstattet) | expired (verfallen)
-  const entries = rows.results.map((r) => ({ ...r, category: ledgerCategory(r.type, r.amountMicro, r.reviews) }));
-  return { entries, next: entries.length === limit ? entries[entries.length - 1].id : null };
+  // D1 liefert `fallback` als 0/1 und NULL-Token bei Gutschriften; die App liest Boolean und Zahlen (Fabian 8.11.:
+  // „Transactions“ meldete „can't be reached“, weil `"fallback":0` kein Boolean ist).
+  const entries = rows.results.map((r) => ({
+    ...r,
+    fallback: !!r.fallback,
+    inputTokens: r.inputTokens ?? 0,
+    cacheReadTokens: r.cacheReadTokens ?? 0,
+    cacheWriteTokens: r.cacheWriteTokens ?? 0,
+    outputTokens: r.outputTokens ?? 0,
+    category: ledgerCategory(r.type, r.amountMicro, r.reviews),
+  }));
+  const next = rows.results.length === limit ? rows.results[rows.results.length - 1].id : null;
+  return { entries, next };
 }
 
 // ---- Wiederherstellungscode ----

@@ -1268,6 +1268,7 @@ Offen / Hinweise:
 
 ## Session BE – Guthaben-Fehler im Coach-Chat behoben (8.11.)
 - Ursache: Der Testserver erlaubte höchstens 2048 Antwort-Token, die App fragt im Chat 4000 und bei der Auswertung 8000 an → Server lehnte ab, bevor die KI gefragt wurde („Provider rejected the request“). Nichts berechnet.
+- Zweiter Fehler: „Transactions“ meldete „can't be reached“, weil der Server Ledger-Zeilen roh lieferte (0/1 statt true/false). Server und App korrigiert.
 - Erledigt: Backend kappt statt abzulehnen (Testserver jetzt 8192 wie Produktion), App hält sich an das Server-Limit, keine sinnlose Wiederholung, verständlichere Fehlermeldung im Chat, Anbieter-Fehlercode (ohne Text) in der Abrechnung. Test-Guthaben-Obergrenze 40 €. Details in docs/DECISIONS.md.
 
 ### Bitte auf dem Handy testen (Coach-Chat über Guthaben)
@@ -1276,3 +1277,4 @@ Offen / Hinweise:
 3. Training beenden → Coach-Auswertung über Guthaben kommt vollständig
 4. Profil → Guthaben → Abrechnung: Einträge „Chat“ und „Auswertung“ mit Modell und Betrag, Status OK; der alte fehlgeschlagene Chat-Eintrag kostete 0
 5. Die alte Fehlermeldung im Chat: „Retry“ → jetzt kommt eine Antwort
+6. Profil → Guthaben → Transactions: Liste mit Test-Gutschriften und Chat-/Auswertungs-Buchungen statt „Your credit can't be reached“

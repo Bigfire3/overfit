@@ -1,7 +1,16 @@
 package app.overfit.fuel
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -33,7 +42,8 @@ data class LedgerEntry(
     val cacheReadTokens: Long = 0,
     val cacheWriteTokens: Long = 0,
     val outputTokens: Long = 0,
-    /** A replacement model answered (the price of the chosen model, [tier], was charged). */
+    /** A replacement model answered (the price of the chosen model, [tier], was charged). Older servers send 0/1. */
+    @Serializable(with = LenientBooleanSerializer::class)
     val fallback: Boolean = false,
     /** Model ID that was chosen (and charged) on a fallback, if the server sends it; else derived from [tier]. */
     val requestedModel: String? = null,
@@ -213,3 +223,16 @@ data class FuelMessageResult(
 /** Error from the backend or on the way there. [code] is the API error code (or a local one like "network"). */
 class FuelException(val code: String, val status: Int = 0, val details: Map<String, Long> = emptyMap(), message: String? = null) :
     Exception(message ?: code)
+
+/**
+ * Boolean that also reads 0/1 and null: D1 returns SQLite integers, and backends before 8.11. sent the ledger's
+ * `fallback` column as is ("Transactions" then failed with "credit can't be reached").
+ */
+object LenientBooleanSerializer : KSerializer<Boolean> {
+    override val descriptor = PrimitiveSerialDescriptor("LenientBoolean", PrimitiveKind.BOOLEAN)
+    override fun serialize(encoder: Encoder, value: Boolean) = encoder.encodeBoolean(value)
+    override fun deserialize(decoder: Decoder): Boolean {
+        val p = (decoder as? JsonDecoder)?.decodeJsonElement() as? JsonPrimitive ?: return decoder.decodeBoolean()
+        return p.booleanOrNull ?: p.longOrNull?.let { it != 0L } ?: false
+    }
+}

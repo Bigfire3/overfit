@@ -59,6 +59,10 @@ describe('Testbetrieb (DEPLOY_MODE=test)', () => {
     const accountId = (await b.call('GET', '/v1/account')).body.accountId;
     expect((await credit(e, { amountMicro: 2_000_000, accountId })).body.totalMicro).toBe(2_000_000);
     expect((await b.call('GET', '/v1/account')).body.balanceMicro).toBe(7_000_000);
+    // Ledger so, wie die App ihn liest (Fabian 8.11.: `"fallback":0` und null-Token ließen „Transactions“ scheitern).
+    const led = (await b.call('GET', '/v1/account/ledger')).body.entries;
+    expect(led[0]).toMatchObject({ type: 'test_credit', fallback: false, inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, category: 'gifted' });
+    for (const row of led) expect(typeof row.fallback).toBe('boolean');
     // Obergrenze für alles Test-Guthaben (20 €): 10 + 2 = 12 vergeben, mehr als 8 geht nicht
     const rest = await credit(e, { amountMicro: 10_000_000, all: true });
     expect(rest.body.totalMicro).toBe(8_000_000);
