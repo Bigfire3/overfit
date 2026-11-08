@@ -128,6 +128,14 @@ describe('Anfrage-Protokoll GET /v1/account/requests', () => {
     anthropic.mockImplementation(async () => Response.json({ error: { message: `rejected: ${SECRET_PROMPT}` } }, { status: 400 }));
     await c.call('POST', '/v1/messages', req('lite'));
     expect((await log(c)).entries[0]).toMatchObject({ errorCode: 'upstream_rejected', fallbackReason: 'HTTP 400' });
+    // Ausweichen und dann Ablehnung: der endgültige Fehler mit Code, der erste Status in fallbackFromStatus.
+    anthropic.mockImplementation(async (_u: string, init: any) =>
+      sentModel(init) === HAIKU
+        ? Response.json({ type: 'error', error: { type: 'invalid_request_error', message: SECRET_PROMPT } }, { status: 400 })
+        : Response.json({ error: { message: SECRET_PROMPT } }, { status: 503 }),
+    );
+    await c.call('POST', '/v1/messages', req('standard'));
+    expect((await log(c)).entries[0]).toMatchObject({ errorCode: 'upstream_rejected', fallbackFromStatus: 503, fallbackReason: 'HTTP 400 invalid_request_error' });
     const raw = JSON.stringify((await c.env.DB.prepare('SELECT * FROM requests').all()).results);
     expect(raw).not.toContain(SECRET_PROMPT);
   });

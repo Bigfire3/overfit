@@ -120,8 +120,9 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     const requestId = await logRequest(env, {
       ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: code,
       fallbackFromStatus: firstFailure?.status ?? null,
-      // Ohne Ausweichen steht hier der Fehler des Anbieters als Code („HTTP 400 invalid_request_error“), nie dessen Text.
-      fallbackReason: failureLabel(firstFailure) ?? (substituted ? NO_IMAGES : null) ?? failureLabel(e instanceof UpstreamError ? e : null),
+      // Der endgültige Fehler des Anbieters als Code („HTTP 400 invalid_request_error“), nie dessen Text; der Status des ersten
+      // Versuchs steht nach einem Ausweichen schon in fallbackFromStatus.
+      fallbackReason: failureLabel(e instanceof UpstreamError ? e : null) ?? (substituted ? NO_IMAGES : null),
     });
     if (!(e instanceof UpstreamError)) throw e;
     if (e.timeout || e.status === 0) {
@@ -190,5 +191,5 @@ function failureLabel(e: UpstreamError | null): string | null {
   if (!e) return null;
   if (e.timeout) return 'Zeitüberschreitung';
   if (e.status === 0) return 'nicht erreichbar';
-  return e.code ? `HTTP ${e.status} ${e.code}` : `HTTP ${e.status}`;
+  return e.code && e.code !== String(e.status) ? `HTTP ${e.status} ${e.code}` : `HTTP ${e.status}`;
 }
