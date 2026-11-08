@@ -32,6 +32,8 @@ export function derFromRaw(raw: Uint8Array): Uint8Array {
 
 export class Client {
   deviceId = '';
+  /** Ausführungskontext für worker.fetch; Tests können `waitUntil` mitschneiden. */
+  ctx: ExecutionContext = ctx;
   constructor(
     public keys: CryptoKeyPair,
     public publicRaw: Uint8Array,
@@ -68,7 +70,7 @@ export class Client {
   async call(method: string, path: string, body?: unknown, over: { ts?: number; nonce?: string } = {}) {
     const text = body === undefined ? '' : JSON.stringify(body);
     const headers = { ...(await this.sign(method, path, text, over)), 'content-type': 'application/json' };
-    const res = await worker.fetch(new Request('https://x.test' + path, { method, headers, body: text || undefined }), this.env, ctx);
+    const res = await worker.fetch(new Request('https://x.test' + path, { method, headers, body: text || undefined }), this.env, this.ctx);
     return { status: res.status, body: (await res.json()) as any, headers: res.headers };
   }
 

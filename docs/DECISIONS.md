@@ -1504,3 +1504,34 @@ Umsetzung des von Fabian freigegebenen Entwurfs (7 Bildschirme). Annahmen und En
 - **Anbieter-Ablehnung (echte 400):** weiterhin kein Ausweich-Modell (eine kaputte Anfrage scheitert dort genauso, nur doppelt), nichts berechnet. Neu: Die App bekommt nur Status und Fehlercode des Anbieters (`upstreamStatus`, `upstreamCode`, z. B. `invalid_request_error`), nicht mehr dessen Fehlertext (kann Teile der Anfrage wiederholen). Das Protokoll speichert „HTTP 400 invalid_request_error“ in `fallback_reason`; die Abrechnung zeigt es aufgeklappt als „Provider response: …“.
 - **Test-Guthaben-Obergrenze 20 € → 40 €** (nur Testserver): Die 20 € waren ausgeschöpft, neue Gutschriften kamen mit 0 € an, damit war kein E2E mehr möglich. Echte Kosten entstehen nur durch Nutzung, nicht durch die Gutschrift.
 - **Zweiter Fehler „Transactions“: „Your credit can't be reached“ trotz Guthaben.** `/v1/account/ledger` gab die D1-Zeilen roh zurück: `fallback` als 0/1 (App erwartet Boolean) und `null`-Token bei Gutschriften. Das Parsen in der App scheiterte, die Seite zeigte „nicht erreichbar“. Mit einem App-Test auf die echte Zeilenform reproduziert. Behoben auf beiden Seiten: Der Server schickt `fallback` als Boolean und 0 statt null (hilft der installierten APK sofort nach dem Deploy). Die App liest 0/1 und null tolerant (`LenientBooleanSerializer`, `coerceInputValues`), falls ein älterer Server antwortet.
+
+## Opus-Chat „No connection“ und reservierte 0,61 € (8.11.2026)
+Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Kontostand 4,89 € statt erwarteter ~5,50 €.
+- **Ursache:** Die App (Android, Ktor + OkHttp) setzte für das Guthaben-Backend nur `requestTimeoutMillis` (130 s). Ktor gibt an OkHttp
+  nur gesetzte Werte weiter, also galt OkHttps Standard-**Lese-Timeout von 10 s**. `/v1/messages` sendet erst, wenn die KI fertig ist;
+  Opus braucht dafür 5–35 s (gegen den Testserver gemessen: kurz 5–7 s, lang 34 s für 3390 Token), Haiku/Llama/Sonnet meist unter 10 s.
+  Nach 10 s brach die App ab und meldete den `SocketTimeoutException` als „network“ → „No connection“. Ein Test mit echtem OkHttp gegen
+  einen lokalen Server, der 11 s wartet, zeigt das (`FuelOkHttpTimeoutTest`). Gleiches galt für den eigenen Schlüssel (`CoachTransport`,
+  auch dort nur Gesamt-Timeout) und auf iOS (Darwin, Standard 60 s).
+- **Warum Geld fehlte:** Jede Anfrage reserviert vorab den Höchstbetrag (Opus, 4000 Token Ausgabe, Aufschlag: ~0,20 €). Trennt der
+  Client, bricht Cloudflare den Worker mitten im Warten ab: weder Abrechnung noch Freigabe noch Protokolleintrag. Die Reservierung zählte
+  dann bis zu ihrem Verfall (15 min) gegen den Kontostand: 3 × ~0,20 € = 0,61 €. **Nichts wurde abgebucht** (keine Opus-Buchung, keine
+  Opus-Zeile im Server-Protokoll), das Geld war nach 15 min von selbst wieder da. Gegen den Testserver nachgestellt (Client bricht nach
+  10 s ab: Reservierung steht, kein Protokoll, keine Buchung; nach Verfall wieder voller Kontostand).
+- **App:** Lese- und Verbindungs-Timeout jetzt ausdrücklich gesetzt (Nachrichten 240 s, andere Aufrufe 130 s, Verbindung 20 s; eigener
+  Schlüssel 150 s). Zeitüberschreitungen heißen „timeout“ statt „network“: Die Blase zeigt „Keine Antwort in der Zeit“, „No connection“
+  nur noch bei echten Netzfehlern.
+- **Backend, Reservierung:** (1) `try/finally` in `handleMessages` gibt die Reservierung in jedem Pfad frei, der nicht abrechnet
+  (Ausnahme, Fehler in `settle`, Anbieterfehler, Zeitüberschreitung). (2) `/v1/messages` läuft über `ctx.waitUntil`: Trennt die App,
+  rechnet der Worker noch bis zu 30 s weiter ab (gemessen: Abbruch nach 3 s, Antwort kam nach 5 s → sauber abgerechnet und protokolliert,
+  die Antwort sieht die App dann nicht; sie steht als „OK“ im Protokoll). Dauert es länger, bricht Cloudflare trotzdem ab – deshalb
+  (3) Lebensdauer einer Reservierung 15 → **5 min**, und das Zeitbudget beim Anbieter ist auf 4 min gedeckelt (Standard 150 s pro Versuch,
+  200 s gesamt, unter dem App-Timeout von 240 s), damit der Server immer vor der App antwortet und eine laufende Reservierung nie verfällt.
+  Verworfen: Durable Object/Queue, um nach einem Abbruch beliebig lange weiterzurechnen (eigene Infrastruktur für einen Fall, der nach dem
+  App-Fix nur bei echtem Netzverlust auftritt; dann trägt der Betreiber höchstens die Anbieterkosten dieser einen Antwort, der Nutzer zahlt nichts).
+- **Anzeige:** `/v1/account` und `/v1/account/ledger` liefern `reservedMicro` (ledger zusätzlich `balanceMicro`). Die App zeigt laufende
+  Reservierungen neben dem Kontostand („4,89 € (0,61 € reserviert)“) und als eigene Zeile in der Buchungsliste. Summe der Buchungen =
+  Kontostand + Reservierungen (Backend-Test, E2E).
+- **Fabians Konto:** keine Gutschrift nötig, die 0,61 € kamen mit dem Verfall der Reservierungen zurück (spätestens 15:35 UTC). Für das
+  E2E lief `backend-deploy` mit `credit_eur` 5: Das schreibt allen Testkonten 5 € gut, also auch Fabian.
+- **Test-Guthaben-Obergrenze 40 € → 100 €:** am selben Tag wieder ausgeschöpft (`credit_eur` buchte 0 €, kein E2E möglich).
