@@ -133,7 +133,9 @@ class FuelApi(
 
     private suspend fun <T> parse(response: HttpResponse, read: (JsonElement) -> T): T {
         if (response.status.value !in 200..299) throw parseError(response)
-        val text = response.bodyAsText()
+        val text = try { response.bodyAsText() } catch (e: CancellationException) { throw e } catch (e: Exception) {
+            throw FuelException(if (e.isTimeout()) "timeout" else "network", message = e.message)
+        }
         return try {
             read(json.parseToJsonElement(text))
         } catch (e: Exception) {

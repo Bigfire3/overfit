@@ -388,6 +388,8 @@ class FuelCoach(private val fuel: FuelProvider) : CoachTransport {
         e.code == "not_configured" || e.code == "tier_unavailable" -> CoachErrorKind.SERVER
         e.code == "upstream_rejected" && e.details["upstreamStatus"] in AUTH_STATUSES -> CoachErrorKind.SERVER
         e.code == "rate_limited" || e.status == 429 -> CoachErrorKind.RATE_LIMIT
+        // The provider took too long (server says so since 8.11.2026): the true reason, not "provider unavailable".
+        e.code == "upstream_unavailable" && e.details["timeout"] == 1L -> CoachErrorKind.TIMEOUT
         e.status >= 500 || e.code == "upstream_unavailable" -> CoachErrorKind.SERVER
         e.status == 401 || e.status == 403 -> CoachErrorKind.AUTH
         else -> CoachErrorKind.BAD_REQUEST

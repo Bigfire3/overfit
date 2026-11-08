@@ -45,6 +45,7 @@ describe('Reservierungen', () => {
     const r = await c.call('POST', '/v1/messages', body);
     expect(r.status).toBe(504);
     expect(r.body.error.code).toBe('upstream_unavailable');
+    expect(r.body.error.details.timeout).toBe(1);
     expect(await account(c)).toMatchObject({ balanceMicro: f.balanceMicro, reservedMicro: 0 });
     const log = (await c.call('GET', '/v1/account/requests')).body.entries[0];
     expect(log).toMatchObject({ status: 'failed', errorCode: 'upstream_unavailable', chargedMicro: 0, fallbackReason: 'Zeitüberschreitung' });
@@ -128,6 +129,7 @@ describe('Reservierungen', () => {
     expect(cfg.upstreamTimeoutMs).toBeLessThanOrEqual(cfg.upstreamBudgetMs);
     expect(cfg.upstreamBudgetMs).toBeLessThan(240_000);
     expect(MAX_UPSTREAM_BUDGET_MS).toBeLessThan(HOLD_TTL_SEC * 1000);
+    expect(MAX_UPSTREAM_BUDGET_MS).toBeLessThan(240_000);
     const big = getConfig(baseEnv({ UPSTREAM_TIMEOUT_MS: '900000', UPSTREAM_BUDGET_MS: '900000' }));
     expect(big.upstreamBudgetMs).toBe(MAX_UPSTREAM_BUDGET_MS);
     expect(big.upstreamTimeoutMs).toBe(MAX_UPSTREAM_BUDGET_MS);

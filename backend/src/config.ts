@@ -2,8 +2,8 @@ import type { Config, Env, Price } from './types';
 import { currentPrices } from './providers';
 import { HOLD_TTL_SEC } from './ledger';
 
-/** Höchstes Zeitbudget beim KI-Anbieter: eine Minute Luft bis zum Verfall der Reservierung. */
-export const MAX_UPSTREAM_BUDGET_MS = (HOLD_TTL_SEC - 60) * 1000;
+/** Höchstes Zeitbudget beim KI-Anbieter (210 s): unter dem App-Timeout (240 s) und 90 s vor dem Verfall der Reservierung. */
+export const MAX_UPSTREAM_BUDGET_MS = (HOLD_TTL_SEC - 90) * 1000;
 
 /**
  * Einziger Aufschlag auf alle Modellpreise (Basispunkte). Herleitung und Tabellen: docs/monetization.md „Rechnung“.

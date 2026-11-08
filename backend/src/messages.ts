@@ -131,7 +131,7 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
       });
       if (!(e instanceof UpstreamError)) throw e;
       if (e.timeout || e.status === 0) {
-        throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status, requestId });
+        throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status, requestId, timeout: e.timeout ? 1 : 0 });
       }
       if (!e.unavailable) {
         // Nur Status und Fehlercode des Anbieters, nicht sein Fehlertext (kann Teile der Anfrage wiederholen).

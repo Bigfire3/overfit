@@ -1525,7 +1525,7 @@ Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Konto
   (Ausnahme, Fehler in `settle`, Anbieterfehler, Zeitüberschreitung). (2) `/v1/messages` läuft über `ctx.waitUntil`: Trennt die App,
   rechnet der Worker noch bis zu 30 s weiter ab (gemessen: Abbruch nach 3 s, Antwort kam nach 5 s → sauber abgerechnet und protokolliert,
   die Antwort sieht die App dann nicht; sie steht als „OK“ im Protokoll). Dauert es länger, bricht Cloudflare trotzdem ab – deshalb
-  (3) Lebensdauer einer Reservierung 15 → **5 min**, und das Zeitbudget beim Anbieter ist auf 4 min gedeckelt (Standard 150 s pro Versuch,
+  (3) Lebensdauer einer Reservierung 15 → **5 min**, und das Zeitbudget beim Anbieter ist auf 210 s gedeckelt (Standard 150 s pro Versuch,
   200 s gesamt, unter dem App-Timeout von 240 s), damit der Server immer vor der App antwortet und eine laufende Reservierung nie verfällt.
   Verworfen: Durable Object/Queue, um nach einem Abbruch beliebig lange weiterzurechnen (eigene Infrastruktur für einen Fall, der nach dem
   App-Fix nur bei echtem Netzverlust auftritt; dann trägt der Betreiber höchstens die Anbieterkosten dieser einen Antwort, der Nutzer zahlt nichts).
@@ -1535,3 +1535,9 @@ Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Konto
 - **Fabians Konto:** keine Gutschrift nötig, die 0,61 € kamen mit dem Verfall der Reservierungen zurück (spätestens 15:35 UTC). Für das
   E2E lief `backend-deploy` mit `credit_eur` 5: Das schreibt allen Testkonten 5 € gut, also auch Fabian.
 - **Test-Guthaben-Obergrenze 40 € → 100 €:** am selben Tag wieder ausgeschöpft (`credit_eur` buchte 0 €, kein E2E möglich).
+- **Sonnet-Gegencheck (Befunde und Umgang):** behoben: Zeitüberschreitung beim Anbieter (504) zeigte in der App „Anbieter nicht
+  erreichbar“; der Server schickt jetzt `details.timeout = 1`, die App zeigt „Keine Antwort in der Zeit“. Behoben: Lese-Fehler des
+  Antwort-Bodys (App) und Zeitlimit beim Lesen der Anbieter-Antwort (Backend) liefen am Timeout-Handling vorbei. Behoben: Budget-Obergrenze
+  210 s statt 240 s (sonst Gleichstand mit dem App-Timeout bei gesetzter Variable). Bewusst so: 30-s-Grenze von `waitUntil` (siehe oben);
+  alte App-Versionen brechen weiter nach 10 s ab (erst die neue APK behebt das); Test-Guthaben-Obergrenze nur Testserver (keine echten
+  Kosten außer durch Nutzung); Reservierungs-Anzeigen nur über die Formatierung getestet, kein Robolectric-Screenshot.
