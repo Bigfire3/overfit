@@ -89,7 +89,7 @@ Testdaten gelangen nie in die Produktion; beim Wechsel auf `production` ändert 
 - Neue Konten starten mit 0 € (kein Startguthaben, auch nicht im Testbetrieb). Test-Guthaben: erst in der App Guthaben öffnen („Guthaben ansehen“
   legt das Konto an), dann Run workflow mit `credit_eur` (z. B. `5`) → schreibt allen bestehenden Konten bis zu 10 € gut; es läuft nie ab. Alles Test-Guthaben zusammen ist auf 20 € gedeckelt (`TEST_CREDIT_CAP_MICRO`).
   Ist es aufgebraucht: Instanz zurücksetzen (Datenbank `overfit-test` im Dashboard unter Storage & Databases → D1 löschen, Workflow neu starten).
-- Käufe gibt es im Testbetrieb nicht (kein Store); Guthaben nur so. Niedrige Limits: `max_tokens` 2048, 5 KI-Anfragen/Minute.
+- Käufe gibt es im Testbetrieb nicht (kein Store); Guthaben nur so. Niedrige Limits: 5 KI-Anfragen/Minute (`max_tokens` wie Produktion bis 8192; mehr wird gekappt, nicht abgelehnt).
 - Markierung: `GET /v1/config` liefert `"mode": "test"`, die App zeigt unter Guthaben „Testserver“. Der Workflow prüft, dass der Modus stimmt.
 - Sicherheit: Der Testmodus braucht `DEPLOY_MODE=test` (exakt). Die Admin-Gutschrift gibt es nur dort und nur mit `ADMIN_SECRET`; in Produktion antwortet
   der Pfad 404 und ein `test:`-Token wird abgelehnt (beides in `backend/test/testmode.test.ts`).

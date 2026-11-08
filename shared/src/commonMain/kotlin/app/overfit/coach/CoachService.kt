@@ -235,7 +235,7 @@ class CoachService(
             val reply = try {
                 transport.send(prompt, model, structured)
             } catch (e: CoachException) {
-                if (e.kind == CoachErrorKind.BAD_REQUEST && structured && attempt == 0) {
+                if (e.retryWithoutStructured && structured && attempt == 0) {
                     structured = false
                     return@repeat
                 }

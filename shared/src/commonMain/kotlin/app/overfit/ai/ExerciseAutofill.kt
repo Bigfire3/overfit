@@ -62,7 +62,7 @@ class ExerciseAutofill(private val gateway: AiGateway) {
             val reply = try {
                 gateway.send(ExerciseAutofillPrompt.build(clean, language, structured), structured, light = true)
             } catch (e: CoachException) {
-                if (e.kind == CoachErrorKind.BAD_REQUEST && structured && attempt == 0) {
+                if (e.retryWithoutStructured && structured && attempt == 0) {
                     structured = false
                     return@repeat
                 }

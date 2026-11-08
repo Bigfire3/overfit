@@ -98,9 +98,25 @@ export class UpstreamError extends Error {
     public status: number,
     message: string,
     public timeout = false,
+    /** Fehlercode des Anbieters ohne Inhalt, z. B. `invalid_request_error` (Anthropic), `INVALID_ARGUMENT` (Gemini). */
+    public code: string | null = null,
   ) {
     super(message);
   }
+}
+
+/** Kurzer Fehlercode aus der Fehlerantwort eines Anbieters (nur [A-Za-z0-9_.-], höchstens 60 Zeichen), sonst null. */
+export function providerErrorCode(parsed: Record<string, unknown> | null): string | null {
+  const err = parsed?.error;
+  const first = Array.isArray(err) ? err[0] : err;
+  const o = first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
+  // Anthropic: error.type; OpenAI: error.code bzw. error.type; Gemini: error.status; Cloudflare: error[0].code (Zahl).
+  // Ein Text-`code` ist am genauesten (OpenAI `model_not_found`); eine Zahl als `code` (Gemini: 400) nur als letzte Wahl.
+  for (const v of [typeof o?.code === 'string' ? o.code : null, o?.status, o?.type, o?.code]) {
+    const s = typeof v === 'number' ? String(v) : typeof v === 'string' ? v : '';
+    if (/^[A-Za-z0-9_.-]{1,60}$/.test(s) && s !== 'error') return s;
+  }
+  return null;
 }
 
 export interface CallOptions {
@@ -212,7 +228,7 @@ export function upstreamErrorFor(status: number, parsed: Record<string, unknown>
   // 401/403: Schlüssel oder Gateway des Betreibers kaputt; 404: Modell-ID in llm-routing.jsonc falsch oder abgekündigt;
   // 402: Konto beim Anbieter leer (OpenRouter). Alles Betreiberfehler, nicht die Anfrage → wie ein Ausfall (Ausweichen, nichts abgebucht).
   const unavailable = status < 400 || status >= 500 || [401, 402, 403, 404, 408, 429].includes(status);
-  return new UpstreamError(unavailable, status, msg);
+  return new UpstreamError(unavailable, status, msg, false, providerErrorCode(parsed));
 }
 
 async function post(url: string, headers: Record<string, string>, body: unknown, timeoutMs: number): Promise<Record<string, unknown>> {

@@ -118,10 +118,16 @@ describe('Anfrage-Protokoll GET /v1/account/requests', () => {
     const r = await c.call('POST', '/v1/messages', req('lite'));
     expect(r.body.overfit.fallbackReason).toBe('HTTP 503');
     expect((await log(c)).entries[0].fallbackReason).toBe('HTTP 503');
-    // Fehlschlag ohne Ausweichen: kein Grund gespeichert, nur der Fehlercode.
+    // Fehlschlag ohne Ausweichen: Status und Fehlercode des Anbieters, nie sein Text.
+    anthropic.mockImplementation(async () => Response.json({ type: 'error', error: { type: 'invalid_request_error', message: `rejected: ${SECRET_PROMPT}` } }, { status: 400 }));
+    const rejected = await c.call('POST', '/v1/messages', req('lite'));
+    expect(rejected.body.error.details).toMatchObject({ upstreamStatus: 400, upstreamCode: 'invalid_request_error' });
+    expect(JSON.stringify(rejected.body)).not.toContain(SECRET_PROMPT);
+    expect((await log(c)).entries[0]).toMatchObject({ errorCode: 'upstream_rejected', fallbackReason: 'HTTP 400 invalid_request_error' });
+    // Ohne Code im Fehler nur der Status.
     anthropic.mockImplementation(async () => Response.json({ error: { message: `rejected: ${SECRET_PROMPT}` } }, { status: 400 }));
     await c.call('POST', '/v1/messages', req('lite'));
-    expect((await log(c)).entries[0]).toMatchObject({ errorCode: 'upstream_rejected', fallbackReason: null });
+    expect((await log(c)).entries[0]).toMatchObject({ errorCode: 'upstream_rejected', fallbackReason: 'HTTP 400' });
     const raw = JSON.stringify((await c.env.DB.prepare('SELECT * FROM requests').all()).results);
     expect(raw).not.toContain(SECRET_PROMPT);
   });
