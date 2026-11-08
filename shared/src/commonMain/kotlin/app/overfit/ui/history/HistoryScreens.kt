@@ -77,10 +77,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** One finished training in a list (calendar day): name, time, sets, volume (photos belong to the day, v13). */
+/**
+ * One finished training on its calendar day, already "opened": name, time, the key numbers and one line per exercise
+ * (sets done and the best set), so the day usually needs no second tap. A tap opens the full detail (all sets, edit,
+ * share, delete). [workout] is null while loading – then only the head is shown.
+ */
 @Composable
-internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, onOpen: (String) -> Unit) {
-    val h = LocalStrings.current.history
+internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, onOpen: (String) -> Unit, workout: Workout? = null) {
+    val t = LocalStrings.current
+    val h = t.history
     val meta = listOfNotNull(
         row.endedAt?.let { WorkoutFormat.elapsed(it - row.startedAt) },
         h.setCount(row.completedSets),
@@ -88,19 +93,32 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
         h.sauna.takeIf { row.sauna },
     ).joinToString(" · ")
     // Each training is its own floating card (Fabian: lists of standalone things as cards).
-    FloatingCard(onClick = { onOpen(row.id) }) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = Space.m, vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(row.name, Modifier.weight(1f), style = Theme.type.label, maxLines = 1)
-                    Spacer(Modifier.width(Space.m))
-                    Text(clockTime(row.startedAt), style = Theme.type.caption, tone = Tone.Muted)
-                }
-                Spacer(Modifier.height(2.dp))
-                Text(meta, style = Theme.type.caption, tone = Tone.Muted)
+    FloatingCard(Modifier.testTag("day-training-${row.id}"), onClick = { onOpen(row.id) }) {
+        Column(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = Space.m, vertical = Space.m)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(row.name, Modifier.weight(1f), style = Theme.type.label, maxLines = 1)
+                Spacer(Modifier.width(Space.m))
+                Text(clockTime(row.startedAt), style = Theme.type.caption, tone = Tone.Muted)
+                Spacer(Modifier.width(Space.s))
+                LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
             }
-            Spacer(Modifier.width(Space.m))
-            LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+            Spacer(Modifier.height(2.dp))
+            Text(meta, style = Theme.type.caption, tone = Tone.Muted)
+            val exercises = workout?.exercises.orEmpty()
+            if (exercises.isNotEmpty()) {
+                Spacer(Modifier.height(Space.s))
+                exercises.forEach { e ->
+                    val done = e.sets.filter { it.completed }
+                    val best = done.maxWithOrNull(compareBy<app.overfit.domain.WorkoutSet>({ it.actual.weightKg ?: 0.0 }, { it.actual.reps ?: 0 }, { it.actual.durationSec ?: 0 }))
+                    val bestText = best?.let { WorkoutFormat.values(it.actual, e.exercise.trackingType, unit, language, t) }.orEmpty()
+                    val right = if (done.isEmpty()) h.notDone else listOf(h.setCount(done.size), bestText).filter { it.isNotEmpty() }.joinToString(" · ")
+                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(e.exercise.name, Modifier.weight(1f), style = Theme.type.caption, maxLines = 1)
+                        Spacer(Modifier.width(Space.s))
+                        Text(right, style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
+                    }
+                }
+            }
         }
     }
 }
