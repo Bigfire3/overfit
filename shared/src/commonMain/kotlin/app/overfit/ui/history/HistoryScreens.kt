@@ -109,7 +109,13 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
                 Spacer(Modifier.height(Space.s))
                 exercises.forEach { e ->
                     val done = e.sets.filter { it.completed }
-                    val best = done.maxWithOrNull(compareBy<app.overfit.domain.WorkoutSet>({ it.actual.weightKg ?: 0.0 }, { it.actual.reps ?: 0 }, { it.actual.durationSec ?: 0 }))
+                    // Best set by what the exercise measures: weight first (only if it uses weight), then reps, then time.
+                    val type = e.exercise.trackingType
+                    val best = done.maxWithOrNull(compareBy<app.overfit.domain.WorkoutSet>(
+                        { if (type.usesWeight) it.actual.weightKg ?: 0.0 else 0.0 },
+                        { if (type.usesReps) it.actual.reps ?: 0 else 0 },
+                        { if (type.usesTime) it.actual.durationSec ?: 0 else 0 },
+                    ))
                     val bestText = best?.let { WorkoutFormat.values(it.actual, e.exercise.trackingType, unit, language, t) }.orEmpty()
                     val right = if (done.isEmpty()) h.notDone else listOf(h.setCount(done.size), bestText).filter { it.isNotEmpty() }.joinToString(" · ")
                     Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {

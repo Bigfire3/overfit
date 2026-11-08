@@ -198,7 +198,8 @@ fun PhotosScreen(
             DiaryStats(historyList.size, photoList.size, streak)
             val anySauna = days.values.any { it.sauna }
             val anyWeight = days.values.any { it.weightKg != null }
-            if (anySauna || anyWeight) DiaryLegend(anySauna, anyWeight)
+            // The legend explains the grid's markers; the list shows no markers.
+            if (!asList && (anySauna || anyWeight)) DiaryLegend(anySauna, anyWeight)
             Spacer(Modifier.height(Space.s))
             if (!asList) {
                 WeekdayRow(weekStart)
@@ -337,7 +338,6 @@ private fun WeekdayRow(weekStart: kotlinx.datetime.DayOfWeek) {
 }
 
 private val CELL_GAP = 4.dp
-/** Width : height of a calendar day. */
 /** Height of a cell besides its square tile: number circle, gaps, marker row and the 2-dp padding top and bottom. */
 private val CELL_CHROME = DAY_NUMBER_SIZE + 2.dp + MARKER_GAP + MARKER_SIZE + 4.dp
 
