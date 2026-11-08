@@ -96,88 +96,100 @@ export async function handleMessages(env: Env, cfg: Config, device: Device, body
     });
   }
 
-  // Erst das Modell der Stufe, bei Ausfall einmal das Ausweich-Modell (auch bei einem anderen Anbieter, falls bereit und noch Zeit ist).
-  const started = Date.now();
-  const opts = (timeoutMs: number, fallback: boolean) => ({ timeoutMs, hasImages: images > 0, tier, fallback });
-  let served: ModelDef = first;
-  let firstFailure = null as UpstreamError | null;
-  const substituted = first !== requested;
-  let result;
-  try {
+  // Ab hier gehört die Reservierung dieser Anfrage: Sie endet in jedem Fall, entweder als Abbuchung (settle) oder freigegeben
+  // (finally), auch bei Ausnahmen, Fehlern beim Protokoll oder in settle. Bis 8.11.2026 blieb sie bei unerwarteten Fehlern hängen.
+  let settled = false;
+  const runReserved = async (): Promise<Response> => {
+    // Erst das Modell der Stufe, bei Ausfall einmal das Ausweich-Modell (auch bei einem anderen Anbieter, falls bereit und noch Zeit ist).
+    const started = Date.now();
+    const opts = (timeoutMs: number, fallback: boolean) => ({ timeoutMs, hasImages: images > 0, tier, fallback });
+    let served: ModelDef = first;
+    let firstFailure = null as UpstreamError | null;
+    const substituted = first !== requested;
+    let result;
     try {
-      result = await callModel(env, cfg, first, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, cfg.upstreamBudgetMs), substituted));
+      try {
+        result = await callModel(env, cfg, first, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, cfg.upstreamBudgetMs), substituted));
+      } catch (e) {
+        const left = cfg.upstreamBudgetMs - (Date.now() - started);
+        if (!(e instanceof UpstreamError) || !e.unavailable || !second || left < 15_000) throw e;
+        console.warn('fallback', tier, first.id, '→', second.id, e.status, e.message);
+        firstFailure = e;
+        served = second;
+        result = await callModel(env, cfg, second, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, left), true));
+      }
     } catch (e) {
-      const left = cfg.upstreamBudgetMs - (Date.now() - started);
-      if (!(e instanceof UpstreamError) || !e.unavailable || !second || left < 15_000) throw e;
-      console.warn('fallback', tier, first.id, '→', second.id, e.status, e.message);
-      firstFailure = e;
-      served = second;
-      result = await callModel(env, cfg, second, body, maxTokens as number, opts(Math.min(cfg.upstreamTimeoutMs, left), true));
-    }
-  } catch (e) {
-    await release(env, holdId);
-    const code = !(e instanceof UpstreamError) ? 'internal_error' : e.timeout || e.status === 0 || e.unavailable ? 'upstream_unavailable' : 'upstream_rejected';
-    const requestId = await logRequest(env, {
-      ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: code,
-      fallbackFromStatus: firstFailure?.status ?? null,
-      // Der endgültige Fehler des Anbieters als Code („HTTP 400 invalid_request_error“), nie dessen Text; der Status des ersten
-      // Versuchs steht nach einem Ausweichen schon in fallbackFromStatus.
-      fallbackReason: failureLabel(e instanceof UpstreamError ? e : null) ?? (substituted ? NO_IMAGES : null),
-    });
-    if (!(e instanceof UpstreamError)) throw e;
-    if (e.timeout || e.status === 0) {
-      throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status, requestId });
-    }
-    if (!e.unavailable) {
-      // Nur Status und Fehlercode des Anbieters, nicht sein Fehlertext (kann Teile der Anfrage wiederholen).
-      console.warn('upstream_rejected', served.provider, served.id, e.status, e.code ?? '-');
-      throw new ApiError(400, 'upstream_rejected', `KI-Anbieter hat die Anfrage abgelehnt (HTTP ${e.status}${e.code ? ` ${e.code}` : ''}), nichts abgebucht`, {
-        upstreamStatus: e.status,
-        ...(e.code ? { upstreamCode: e.code } : {}),
-        requestId,
+      await release(env, holdId);
+      settled = true;
+      const code = !(e instanceof UpstreamError) ? 'internal_error' : e.timeout || e.status === 0 || e.unavailable ? 'upstream_unavailable' : 'upstream_rejected';
+      const requestId = await logRequest(env, {
+        ...log, durationMs: Date.now() - t0, status: 'failed', errorCode: code,
+        fallbackFromStatus: firstFailure?.status ?? null,
+        // Der endgültige Fehler des Anbieters als Code („HTTP 400 invalid_request_error“), nie dessen Text; der Status des ersten
+        // Versuchs steht nach einem Ausweichen schon in fallbackFromStatus.
+        fallbackReason: failureLabel(e instanceof UpstreamError ? e : null) ?? (substituted ? NO_IMAGES : null),
       });
+      if (!(e instanceof UpstreamError)) throw e;
+      if (e.timeout || e.status === 0) {
+        throw new ApiError(504, 'upstream_unavailable', `${e.message}, nichts abgebucht`, { upstreamStatus: e.status, requestId });
+      }
+      if (!e.unavailable) {
+        // Nur Status und Fehlercode des Anbieters, nicht sein Fehlertext (kann Teile der Anfrage wiederholen).
+        console.warn('upstream_rejected', served.provider, served.id, e.status, e.code ?? '-');
+        throw new ApiError(400, 'upstream_rejected', `KI-Anbieter hat die Anfrage abgelehnt (HTTP ${e.status}${e.code ? ` ${e.code}` : ''}), nichts abgebucht`, {
+          upstreamStatus: e.status,
+          ...(e.code ? { upstreamCode: e.code } : {}),
+          requestId,
+        });
+      }
+      throw new ApiError(502, 'upstream_unavailable', e.message || 'KI-Anbieter nicht verfügbar, nichts abgebucht', { upstreamStatus: e.status, requestId });
     }
-    throw new ApiError(502, 'upstream_unavailable', e.message || 'KI-Anbieter nicht verfügbar, nichts abgebucht', { upstreamStatus: e.status, requestId });
-  }
 
-  const usage = result.usage;
-  const fallback = served !== requested;
-  const reason = failureLabel(firstFailure) ?? (substituted ? NO_IMAGES : null);
-  // Abgerechnet wird aus den echten Token, und zwar zum günstigeren Preis von Stufen-Modell und antwortendem Modell
-  // (Ausweichen auf ein teureres Modell trägt die Marge). Ohne Nutzungsangabe sicherheitshalber der reservierte Höchstbetrag.
-  const servedPrice = cfg.prices[served.id];
-  const cost = usage ? Math.min(costMicro(usage, servedPrice, cfg.markupBp), costMicro(usage, price, cfg.markupBp)) : hold;
-  const entry = {
-    model: served.id,
-    tier,
-    input: usage?.input_tokens ?? 0,
-    cacheRead: usage?.cache_read_input_tokens ?? 0,
-    cacheWrite: usage?.cache_creation_input_tokens ?? 0,
-    output: usage?.output_tokens ?? 0,
-    providerCostMicro: usage ? costMicro(usage, servedPrice, 0) : null,
-    fallback,
-    photo: images > 0,
-    requestedModel: requested.id,
-  };
-  const charged = await settle(env, device.accountId, holdId, hold, cost, entry);
-  const requestId = await logRequest(env, {
-    ...log, durationMs: Date.now() - t0, status: 'ok', model: served.id, provider: served.provider,
-    fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: reason,
-    input: entry.input, cacheRead: entry.cacheRead, cacheWrite: entry.cacheWrite, output: entry.output, chargedMicro: charged,
-  });
-  const balance = await availableMicro(env, device.accountId);
-  return Response.json(
-    {
-      ...result.body,
-      overfit: {
-        costMicro: charged, balanceMicro: balance, currency: 'EUR', tier, servedTier: fallback ? (TIER_NAMES.find((t) => all[t].primary?.id === served.id) ?? tier) : tier,
-        model: served.id, modelName: served.displayName, vendor: served.vendor, provider: served.provider,
-        requestedModel: requested.id, requestedModelName: requested.displayName, requestedVendor: requested.vendor, requestedProvider: requested.provider,
-        fallback, fallbackReason: reason, purpose, requestId,
+    const usage = result.usage;
+    const fallback = served !== requested;
+    const reason = failureLabel(firstFailure) ?? (substituted ? NO_IMAGES : null);
+    // Abgerechnet wird aus den echten Token, und zwar zum günstigeren Preis von Stufen-Modell und antwortendem Modell
+    // (Ausweichen auf ein teureres Modell trägt die Marge). Ohne Nutzungsangabe sicherheitshalber der reservierte Höchstbetrag.
+    const servedPrice = cfg.prices[served.id];
+    const cost = usage ? Math.min(costMicro(usage, servedPrice, cfg.markupBp), costMicro(usage, price, cfg.markupBp)) : hold;
+    const entry = {
+      model: served.id,
+      tier,
+      input: usage?.input_tokens ?? 0,
+      cacheRead: usage?.cache_read_input_tokens ?? 0,
+      cacheWrite: usage?.cache_creation_input_tokens ?? 0,
+      output: usage?.output_tokens ?? 0,
+      providerCostMicro: usage ? costMicro(usage, servedPrice, 0) : null,
+      fallback,
+      photo: images > 0,
+      requestedModel: requested.id,
+    };
+    const charged = await settle(env, device.accountId, holdId, hold, cost, entry);
+    settled = true;
+    const requestId = await logRequest(env, {
+      ...log, durationMs: Date.now() - t0, status: 'ok', model: served.id, provider: served.provider,
+      fallbackFromStatus: firstFailure?.status ?? null, fallbackReason: reason,
+      input: entry.input, cacheRead: entry.cacheRead, cacheWrite: entry.cacheWrite, output: entry.output, chargedMicro: charged,
+    });
+    const balance = await availableMicro(env, device.accountId);
+    return Response.json(
+      {
+        ...result.body,
+        overfit: {
+          costMicro: charged, balanceMicro: balance, currency: 'EUR', tier, servedTier: fallback ? (TIER_NAMES.find((t) => all[t].primary?.id === served.id) ?? tier) : tier,
+          model: served.id, modelName: served.displayName, vendor: served.vendor, provider: served.provider,
+          requestedModel: requested.id, requestedModelName: requested.displayName, requestedVendor: requested.vendor, requestedProvider: requested.provider,
+          fallback, fallbackReason: reason, purpose, requestId,
+        },
       },
-    },
-    { headers: { 'x-overfit-cost-micro': String(charged), 'x-overfit-balance-micro': String(balance) } },
-  );
+      { headers: { 'x-overfit-cost-micro': String(charged), 'x-overfit-balance-micro': String(balance) } },
+    );
+  };
+  try {
+    return await runReserved();
+  } finally {
+    if (!settled) await release(env, holdId).catch((e) => console.error('hold: Freigabe fehlgeschlagen', e instanceof Error ? e.message : String(e)));
+  }
 }
 
 /** Grund, wenn ein Foto-Auftrag gleich beim Ausweich-Modell landet (das Modell der Stufe kann keine Bilder). */

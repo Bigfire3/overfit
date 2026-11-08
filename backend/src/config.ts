@@ -1,5 +1,9 @@
 import type { Config, Env, Price } from './types';
 import { currentPrices } from './providers';
+import { HOLD_TTL_SEC } from './ledger';
+
+/** Höchstes Zeitbudget beim KI-Anbieter: eine Minute Luft bis zum Verfall der Reservierung. */
+export const MAX_UPSTREAM_BUDGET_MS = (HOLD_TTL_SEC - 60) * 1000;
 
 /**
  * Einziger Aufschlag auf alle Modellpreise (Basispunkte). Herleitung und Tabellen: docs/monetization.md „Rechnung“.
@@ -59,8 +63,11 @@ export function getConfig(env: Env): Config {
     testCreditCapMicro: int(env.TEST_CREDIT_CAP_MICRO, 20_000_000),
     purchaseMode: mock(env.PURCHASE_MODE),
     aiGatewayId: env.AI_GATEWAY_ID?.trim() || null,
-    upstreamTimeoutMs: int(env.UPSTREAM_TIMEOUT_MS, 100_000, 1000),
-    upstreamBudgetMs: int(env.UPSTREAM_BUDGET_MS, 140_000, 1000),
+    // Zeit für das erste Modell und für den ganzen Verlauf samt Ausweichen. Das Budget bleibt unter der Lebensdauer einer
+    // Reservierung (HOLD_TTL_SEC) und unter dem Timeout der App für /v1/messages (FuelApi: 240 s), damit der Server immer
+    // zuerst antwortet (8.11.2026: App gab nach 130 s auf, Server wartete bis 140 s → „No connection“, Reservierung hing).
+    upstreamTimeoutMs: Math.min(int(env.UPSTREAM_TIMEOUT_MS, 150_000, 1000), MAX_UPSTREAM_BUDGET_MS),
+    upstreamBudgetMs: Math.min(int(env.UPSTREAM_BUDGET_MS, 200_000, 1000), MAX_UPSTREAM_BUDGET_MS),
     markupBp: int(env.MARKUP_BP, DEFAULT_MARKUP_BP),
     maxTokensCap: int(env.MAX_TOKENS_CAP, 8192, 1),
     maxBodyBytes: int(env.MAX_BODY_BYTES, 8 * 1024 * 1024, 1024),

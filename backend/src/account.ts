@@ -1,7 +1,7 @@
 import { ApiError } from './errors';
 import type { Config, Device, Env } from './types';
 import { b64uEncode, randomId, sha256, hex } from './crypto';
-import { availableMicro, balanceBreakdown, expiringLots, grantStatements, ledgerCategory, now } from './ledger';
+import { availableMicro, balanceBreakdown, expiringLots, grantStatements, ledgerCategory, now, reservedMicro } from './ledger';
 
 export function json(req: Uint8Array): Record<string, unknown> {
   try {
@@ -20,6 +20,8 @@ export async function accountSummary(env: Env, cfg: Config, accountId: string) {
   return {
     accountId,
     balanceMicro: await availableMicro(env, accountId),
+    /** Laufende Reservierungen (Anfragen beim KI-Anbieter), schon von `balanceMicro` abgezogen; Buchungen = balance + reserved. */
+    reservedMicro: await reservedMicro(env, accountId),
     /** Gekauft vs. geschenkt (Test-Gutschrift, alte Start-/Einladungsboni); Geschenktes wird zuerst verbraucht. */
     ...(await balanceBreakdown(env, accountId)),
     expiring: await expiringLots(env, accountId),
@@ -97,7 +99,8 @@ export async function ledgerPage(env: Env, accountId: string, url: URL) {
     category: ledgerCategory(r.type, r.amountMicro, r.reviews),
   }));
   const next = rows.results.length === limit ? rows.results[rows.results.length - 1].id : null;
-  return { entries, next };
+  // Kontostand dazu, damit die Liste aufgeht: Summe aller Buchungen = balanceMicro + reservedMicro.
+  return { entries, next, balanceMicro: await availableMicro(env, accountId), reservedMicro: await reservedMicro(env, accountId) };
 }
 
 // ---- Wiederherstellungscode ----

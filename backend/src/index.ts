@@ -248,7 +248,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     case '/v1/messages':
       if (method !== 'POST') throw wrongMethod();
       await rateLimit(env, `msg:${device.id}`, cfg.rlMessagesPerMin, 60);
-      return handleMessages(env, cfg, device, body);
+      return messagesSurvivingDisconnect(ctx, handleMessages(env, cfg, device, body));
     case '/v1/purchases/verify':
       if (method !== 'POST') throw wrongMethod();
       await sensitive();
@@ -272,6 +272,17 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
       await rateLimit(env, `restoreip:${clientIp(req)}`, cfg.rlSensitivePerHour * 3, 3600);
       return Response.json(await restoreAccount(env, cfg, device, String(json(body).code ?? '')));
   }
+}
+
+/**
+ * Trennt die App die Verbindung, während der Worker noch auf den KI-Anbieter wartet, bricht Cloudflare die Anfrage ab, außer
+ * es läuft noch etwas über `waitUntil`. So rechnet der Worker trotzdem sauber ab (echte Kosten, wenn die Antwort kommt) oder gibt
+ * die Reservierung frei, statt mittendrin stehen zu bleiben (8.11.2026: drei Opus-Anfragen, Reservierung hing 15 min).
+ * Cloudflare gewährt nach dem Trennen bis zu 30 s; was länger dauert, deckt die kurze Lebensdauer der Reservierung ab.
+ */
+export function messagesSurvivingDisconnect(ctx: ExecutionContext, work: Promise<Response>): Promise<Response> {
+  ctx.waitUntil(work.then(() => undefined, () => undefined));
+  return work;
 }
 
 export default {
