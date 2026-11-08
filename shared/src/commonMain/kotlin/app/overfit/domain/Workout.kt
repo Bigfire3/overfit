@@ -26,8 +26,11 @@ data class Workout(
     /** Sets that count: all sets, but of a skipped exercise only the ones already done. */
     val totalSets: Int get() = exercises.sumOf { it.countedSets }
 
-    /** Nothing is open any more (every set done or its exercise skipped) and there is at least one exercise. */
-    val allDone: Boolean get() = exercises.isNotEmpty() && nextOpenSet() == null
+    /**
+     * Nothing is open any more (every set done or its exercise skipped) and there was something to do: at least one
+     * set or one skipped exercise (exercises whose sets were all removed do not count).
+     */
+    val allDone: Boolean get() = exercises.any { it.skipped || it.sets.isNotEmpty() } && nextOpenSet() == null
 
     fun exercise(id: String): WorkoutExercise? = exercises.firstOrNull { it.id == id }
 

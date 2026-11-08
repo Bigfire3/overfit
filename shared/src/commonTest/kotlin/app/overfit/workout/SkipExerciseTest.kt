@@ -72,3 +72,22 @@ class SkipExerciseTest {
         assertEquals(1, s.totalSets)
     }
 }
+
+class SkipExerciseEdgeTest {
+    @Test
+    fun exercisesWithoutSets_doNotCountAsDone() {
+        val w = Workout.empty("x", 0).addExercise(Workout.added(exercise("a"), emptyList()))
+        val noSets = w.removeSet(w.exercises[0].sets[0].id).let { it.removeSet(it.exercises[0].sets[0].id) }.let { it.removeSet(it.exercises[0].sets[0].id) }
+        assertFalse(noSets.allDone)
+        assertTrue(noSets.setSkipped(noSets.exercises[0].id, true).allDone)
+    }
+
+    @Test
+    fun addedThenSkipped_doesNotJoinThePlan() {
+        val template = templateOf(entry(exercise("bench"), null, planned(50.0, 10)))
+        var w = Workout.fromTemplate(template, 0)
+        w = w.addExercise(Workout.added(exercise("row"), emptyList()))
+        w = w.setSkipped(w.exercises[1].id, true)
+        assertSame(template, WorkoutPlan.adopt(template, w))
+    }
+}
