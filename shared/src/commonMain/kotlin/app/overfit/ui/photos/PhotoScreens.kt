@@ -515,13 +515,16 @@ private fun ViewerInfo(
     val h = t.history
     val white = Color.White
     val dim = white.copy(alpha = 0.6f)
+    // Photos belong to their day (v13): the training is the old link, else the day's last training.
     val sessionId = item.photo.sessionId
+        ?: history?.filter { dateOf(it.startedAt) == item.photo.date }?.maxByOrNull { it.startedAt }?.id
     val row = history?.firstOrNull { it.id == sessionId }
+    val workoutName = item.workoutName ?: row?.name
     val summary by produceState<WorkoutSummary?>(null, sessionId) { value = sessionId?.let { loadSummary(it) } }
     Column(Modifier.fillMaxWidth().padding(horizontal = Space.l, vertical = Space.m)) {
-        BasicText(t.date(dateOf(item.photo.takenAt)), style = Theme.type.label.copy(color = white))
+        BasicText(t.date(item.photo.date), style = Theme.type.label.copy(color = white))
         // A photo of a day without a training has no workout line and no "view workout".
-        item.workoutName?.let { BasicText(p.viewerWorkout(it), style = Theme.type.caption.copy(color = dim)) }
+        workoutName?.let { BasicText(p.viewerWorkout(it), style = Theme.type.caption.copy(color = dim)) }
         val facts = buildList {
             val end = row?.endedAt
             if (row != null && end != null) add("${p.viewerDuration} ${Numbers.formatDuration(((end - row.startedAt) / 1000).toInt())}")
@@ -534,7 +537,7 @@ private fun ViewerInfo(
             BasicText(p.viewerBests, style = Theme.type.caption.copy(color = dim))
             records.take(3).forEach { BasicText(recordText(it, unit, language, t), style = Theme.type.caption.copy(color = white)) }
         }
-        if (sessionId != null && item.workoutName != null) {
+        if (sessionId != null && workoutName != null) {
             Spacer(Modifier.height(Space.s))
             ViewerAction(p.toWorkout, white) { onWorkout(sessionId) }
         }
@@ -569,7 +572,7 @@ fun PhotoCompareScreen(photos: List<DiaryPhoto>?, firstId: String, secondId: Str
         }
         Spacer(Modifier.height(Space.l))
         Hairline()
-        val days = dateOf(a.photo.takenAt).daysUntil(dateOf(b.photo.takenAt))
+        val days = a.photo.date.daysUntil(b.photo.date)
         Text(
             if (days == 0) p.sameDay else p.daysApart(kotlin.math.abs(days)),
             Modifier.padding(vertical = Space.m),
@@ -581,7 +584,7 @@ fun PhotoCompareScreen(photos: List<DiaryPhoto>?, firstId: String, secondId: Str
 @Composable
 private fun ComparePane(item: DiaryPhoto, modifier: Modifier) {
     val t = LocalStrings.current
-    val date = t.date(dateOf(item.photo.takenAt))
+    val date = t.date(item.photo.date)
     Column(modifier) {
         AsyncImage(
             item.photo.path,

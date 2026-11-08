@@ -1587,3 +1587,8 @@ Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Konto
 - **Coach:** Auswertung mit Körperfotos nimmt das erste Foto vom Tag des Trainings bzw. das neueste Foto bis heute, Vergleichsfoto = neuestes
   Foto mindestens 28 Tage davor, jeweils auch Fotos ohne Training (vorher nur Trainingsfotos). Bild-Beschriftung = Tag des Fotos, auch bei
   Chat-Anhängen. `ChatAttachment.Photo` (per Foto-ID) unverändert. Mit Session BH abgestimmt (per Nachricht).
+- **Bewusst so (Sonnet-Gegencheck):** Der Tag eines Fotos ist fest. Ändert man später die Startzeit eines Trainings über Mitternacht,
+  bleibt das Foto am alten Tag. Der KI-Chat-Sync (`ChatSync`) schickt weiter `takenAt` und die Alt-`sessionId`; das Backend kennt keinen
+  Tag, das bleibt unverändert (keine neue Anfrage, `OwnKeyPrivacyTest` unberührt). `HistoryRow.photoCount` zählt nur noch Altfotos mit
+  Training und wird nirgends mehr angezeigt (bleibt, weil das Entfernen viele Tests ohne Nutzen ändert). Vollbild und Vergleich zeigen
+  das Datum des Foto-Tages; „Training ansehen“ im Vollbild führt bei neuen Fotos zum letzten Training ihres Tages.
