@@ -26,6 +26,7 @@ fun SessionWithExercises.toRecord(): SessionRecord = SessionRecord(
             note = e.entry.note.orEmpty(),
             origin = e.entry.origin,
             replacedExerciseId = e.entry.replacedExerciseId,
+            skipped = e.entry.skipped,
             sets = e.sets.sortedBy { it.position }.map { s ->
                 WorkoutSet(
                     id = s.id,

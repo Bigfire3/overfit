@@ -123,7 +123,7 @@ internal fun createCoachChat(
         ids.mapNotNull { id ->
             val photo = all[id] ?: return@mapNotNull null
             val jpeg = data.workouts.readPhoto(photo)?.let { prepareJpeg(it, maxEdge = 1500) } ?: return@mapNotNull null
-            // Label = the photo's calendar day (v13), the same day the calendar shows it on.
+            // Label = the photo's calendar day (v14), the same day the calendar shows it on.
             app.overfit.coach.CoachImage(photo.date.toString(), jpeg)
         }
     },

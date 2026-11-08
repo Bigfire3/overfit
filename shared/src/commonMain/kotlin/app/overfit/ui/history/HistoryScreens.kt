@@ -77,7 +77,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** One finished training in a list (calendar day): name, time, sets, volume (photos belong to the day, v13). */
+/** One finished training in a list (calendar day): name, time, sets, volume (photos belong to the day, v14). */
 @Composable
 internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, onOpen: (String) -> Unit) {
     val h = LocalStrings.current.history
@@ -146,7 +146,7 @@ fun WorkoutDetailScreen(
             }
         }
     }
-    // Photos belong to the training's day (v13): the detail shows them all and adds new ones to that day.
+    // Photos belong to the training's day (v14): the detail shows them all and adds new ones to that day.
     val day = data?.finished?.workout?.startedAt?.let { localDateTime(it).date }
     val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
         .collectAsStateWithLifecycle(emptyList())
@@ -219,7 +219,7 @@ fun WorkoutDetailScreen(
         if (w.exercises.isNotEmpty()) Spacer(Modifier.height(Space.l))
         Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
             w.exercises.forEach { e ->
-                val marker = when (e.origin) {
+                val marker = if (e.skipped) t.training.skipped else when (e.origin) {
                     ExerciseOrigin.ADDED -> h.markerAdded
                     ExerciseOrigin.REPLACED -> h.markerReplaced
                     ExerciseOrigin.PLANNED -> null
@@ -230,7 +230,9 @@ fun WorkoutDetailScreen(
                         listOfNotNull(listOfNotNull(t.setsDone(e.sets.count { it.completed }, e.sets.size), marker).joinToString(" · ")),
                         onDetails = { onExerciseDetails(e.exercise.id) },
                     )
+                    // A skipped exercise shows only what was done before it was skipped.
                     e.sets.forEachIndexed { i, s ->
+                        if (e.skipped && !s.completed) return@forEachIndexed
                         val v = if (s.completed || s.actual != SetValues()) s.actual else s.target
                         val text = WorkoutFormat.values(v, e.exercise.trackingType, unit, language, t).ifEmpty { "–" }
                         val tone = if (s.completed) Tone.Default else Tone.Muted

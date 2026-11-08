@@ -8,7 +8,7 @@ import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Photos belong to their day (v13); only the time stamp depends on whether the day is today. */
+/** Photos belong to their day (v14); only the time stamp depends on whether the day is today. */
 class DayPhotoTargetTest {
     private val zone = TimeZone.currentSystemDefault()
     private val today = LocalDate(2026, 5, 20)

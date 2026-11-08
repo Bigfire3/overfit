@@ -123,6 +123,8 @@ data class BWorkoutExercise(
     val origin: String = "PLANNED",
     val replacedExerciseId: String? = null,
     val sets: List<BSet> = emptyList(),
+    /** "Skip today" (DB v13); missing in older backups = not skipped. Older apps ignore it. */
+    val skipped: Boolean = false,
 )
 
 /** Set: target values (`t*`) and, for workouts, actual values. */
@@ -149,7 +151,7 @@ data class BPhoto(
     val takenAt: Long,
     val position: Int = 0,
     /**
-     * Calendar day the photo belongs to (ISO date, app DB v13 and later). Missing in older backups: then the day the
+     * Calendar day the photo belongs to (ISO date, app DB v14 and later). Missing in older backups: then the day the
      * training started (photo of a training) or the day it was taken.
      */
     val day: String? = null,
@@ -234,7 +236,7 @@ class BackupService(
                     exercises = w.exercises.sortedBy { it.entry.position }.map { e ->
                         BWorkoutExercise(
                             id = e.entry.id, exerciseId = e.entry.exerciseId, restSec = e.entry.restSec, note = e.entry.note,
-                            origin = e.entry.origin.name, replacedExerciseId = e.entry.replacedExerciseId,
+                            origin = e.entry.origin.name, replacedExerciseId = e.entry.replacedExerciseId, skipped = e.entry.skipped,
                             sets = e.sets.sortedBy { it.position }.map {
                                 BSet(
                                     id = it.id, tKg = it.targetWeightKg, tReps = it.targetReps, tSec = it.targetDurationSec,
@@ -338,7 +340,7 @@ class BackupService(
                 )
                 wDao.insertExercises(
                     w.exercises.mapIndexed { i, e ->
-                        SessionExerciseEntity(e.id, w.id, e.exerciseId, i, e.restSec, e.note, enumOr(e.origin, ExerciseOrigin.PLANNED), e.replacedExerciseId)
+                        SessionExerciseEntity(e.id, w.id, e.exerciseId, i, e.restSec, e.note, enumOr(e.origin, ExerciseOrigin.PLANNED), e.replacedExerciseId, e.skipped)
                     },
                 )
                 wDao.insertSets(
@@ -411,7 +413,7 @@ private fun BExercise.toEntity(type: TrackingType): ExerciseEntity {
 }
 
 /**
- * Day of a photo from a backup: its stored day (v13), else – older backups – the day its training started (where the
+ * Day of a photo from a backup: its stored day (v14), else – older backups – the day its training started (where the
  * training detail showed it), else the day it was taken. Days are in the device time zone like the calendar.
  */
 fun backupPhotoDay(photo: BPhoto, workoutStarts: Map<String, Long>, zone: kotlinx.datetime.TimeZone = kotlinx.datetime.TimeZone.currentSystemDefault()): String =

@@ -346,7 +346,7 @@ class CoachService(
         var ctx = buildContext(row.kind, row.sessionId)
         val images = mutableListOf<CoachImage>()
         if (settings.state.value.sendPhotos) {
-            // Photos belong to calendar days (v13): the reviewed training's day, or the newest day with a photo.
+            // Photos belong to calendar days (v14): the reviewed training's day, or the newest day with a photo.
             val latest = when (row.kind) {
                 ReviewKind.SESSION -> ctx.current?.let { c -> dao.firstPhotoOfDay(dateOf(c.startedAt)) }
                 ReviewKind.PROGRESS -> dao.latestPhotoOnOrBefore(dateOf(clock()))

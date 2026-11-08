@@ -132,7 +132,7 @@ class WorkoutEditRepositoryTest {
         var w = workoutOf("w1", a, PlannedSet(50.0, 10))
         w = w.completeSet(w.exercises[0].sets[0].id, 2000)
         workouts.finish(w, endedAt = 9000)
-        // A legacy photo of the training (before v13).
+        // A legacy photo of the training (before v14).
         db.workoutDao().insertPhoto(app.overfit.data.db.WorkoutPhotoEntity("legacy", "w1", "legacy.jpg", 5000, 0, dayOf(1000).toString()))
         workouts.photoFiles.write("legacy.jpg", byteArrayOf(1, 2))
         val photo = workouts.allPhotos().single()

@@ -26,7 +26,7 @@ internal data class DiaryDay(
     val sauna get() = workouts.any { it.sauna }
 }
 
-/** Days with a photo, a workout or a body weight. A photo belongs to its day ([app.overfit.data.WorkoutPhoto.date], v13). */
+/** Days with a photo, a workout or a body weight. A photo belongs to its day ([app.overfit.data.WorkoutPhoto.date], v14). */
 internal fun buildDiaryDays(
     photos: List<DiaryPhoto>,
     history: List<HistoryRow>,
@@ -40,7 +40,7 @@ internal fun buildDiaryDays(
 
 /**
  * Time stamp of a photo added to [date] (day view, training detail, finish screen): now for today, noon of the day for
- * earlier days. The photo belongs to [date] anyway (stored day, v13); the time only orders the day's photos.
+ * earlier days. The photo belongs to [date] anyway (stored day, v14); the time only orders the day's photos.
  */
 internal fun dayPhotoTakenAt(date: LocalDate, today: LocalDate, now: Long): Long =
     if (date == today) now else LocalDateTime(date, LocalTime(12, 0)).toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()

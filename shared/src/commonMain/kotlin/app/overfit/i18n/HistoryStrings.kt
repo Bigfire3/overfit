@@ -26,7 +26,7 @@ data class HistoryStrings(
     val takePhoto: String,
     val pickPhoto: String,
     val photosPrivate: String,
-    /** Photo section of the training detail and the finish screen (photos belong to the day, v13). */
+    /** Photo section of the training detail and the finish screen (photos belong to the day, v14). */
     val dayPhotos: String,
     val dayPhotosHint: String,
     val removePhoto: String,

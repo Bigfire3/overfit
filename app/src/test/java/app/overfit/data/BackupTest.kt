@@ -152,11 +152,11 @@ class BackupTest {
         }
         fill()
         data.workouts.allPhotos().forEach { data.workouts.deletePhoto(it.id) }
-        // Only legacy photos of trainings (before DB v13): still v1, so an older app keeps reading the backup.
+        // Only legacy photos of trainings (before DB v14): still v1, so an older app keeps reading the backup.
         db.workoutDao().insertPhoto(app.overfit.data.db.WorkoutPhotoEntity("legacy", "w1", "legacy.jpg", 21_000, 0, app.overfit.data.db.photoDay(10_000)))
         photos.write("legacy.jpg", byteArrayOf(1))
         assertEquals(1, version(backup.export()))
-        // A photo of a day (every new photo since v13): v2, an older app says "update the app" instead of failing.
+        // A photo of a day (every new photo since v14): v2, an older app says "update the app" instead of failing.
         data.workouts.addPhoto(kotlinx.datetime.LocalDate(2026, 11, 3), byteArrayOf(1), takenAt = 7_000)
         assertEquals(2, version(backup.export()))
     }
@@ -176,7 +176,7 @@ class BackupTest {
         val original = json
         val photo = Regex("\\{\"id\":\"[^\"]+\",\"file\":\"([^\"]+)\"[^}]*\\}").find(json)!!
         val fileName = photo.groupValues[1]
-        // As an app before v13 wrote it: linked to the training, no day, taken three days after the training.
+        // As an app before v14 wrote it: linked to the training, no day, taken three days after the training.
         json = json.replace(photo.value, "{\"id\":\"old1\",\"workoutId\":\"w1\",\"file\":\"$fileName\",\"takenAt\":$later,\"position\":0}," +
             "{\"id\":\"old2\",\"file\":\"$fileName\",\"takenAt\":$noTraining,\"position\":0}," +
             "{\"id\":\"old3\",\"workoutId\":\"gone\",\"file\":\"$fileName\",\"takenAt\":$later,\"position\":1}")

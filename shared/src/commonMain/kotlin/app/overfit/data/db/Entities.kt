@@ -192,6 +192,8 @@ data class SessionExerciseEntity(
     val origin: ExerciseOrigin,
     /** Set when [origin] is REPLACED: the exercise that was planned. No foreign key on purpose. */
     val replacedExerciseId: String?,
+    /** "Skip today" in the running training (v13): its open sets do not count, the saved workout keeps it. */
+    @ColumnInfo(defaultValue = "0") val skipped: Boolean = false,
 )
 
 /** A set: target (planned) vs. actual values. Which fields count depends on the tracking type. */
@@ -258,14 +260,14 @@ data class SessionWithExercises(
 data class WorkoutPhotoEntity(
     @PrimaryKey val id: String,
     /**
-     * Legacy link to the training the photo was added to (before v13), kept for old data; null = photo of a
-     * calendar day. Since v13 photos belong to the [day], new photos never get a training.
+     * Legacy link to the training the photo was added to (before v14), kept for old data; null = photo of a
+     * calendar day. Since v14 photos belong to the [day], new photos never get a training.
      */
     val sessionId: String?,
     val fileName: String,
     val takenAt: Long,
     val position: Int,
-    /** Calendar day the photo belongs to, ISO `yyyy-MM-dd` (v13). Fixed when stored, so it never wanders with the time zone. */
+    /** Calendar day the photo belongs to, ISO `yyyy-MM-dd` (v14). Fixed when stored, so it never wanders with the time zone. */
     @ColumnInfo(defaultValue = "") val day: String = "",
 )
 

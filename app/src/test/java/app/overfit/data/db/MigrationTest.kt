@@ -478,16 +478,66 @@ class MigrationTest {
     }
 
     /**
-     * v12 → v13: photos belong to a calendar day. Every photo keeps its row and file and gets its day:
+     * v12 → v13 ("skip today"): session_exercise.skipped (NOT NULL, default 0). Existing trainings keep every exercise,
+     * set and value and read as "nothing skipped"; a skipped exercise can be stored afterwards.
+     */
+    @Test
+    fun migration12to13KeepsTrainingsAndAddsSkipped() = runBlocking<Unit> {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val v12 = helper.createDatabase(12)
+        v12.execSQL(
+            "INSERT INTO exercise (id, name, source, imageRef, primaryMuscles, secondaryMuscles, equipment, trackingType, defaultRestSec, isArchived, createdAt, updatedAt) " +
+                "VALUES ('ex1', 'Bench', 'CUSTOM', NULL, 'chest', '', NULL, 'WEIGHT_REPS', NULL, 0, 1, 2)",
+        )
+        v12.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt, sauna) " +
+                "VALUES ('w1', 'Push', 7, 'FINISHED', 1000, 5000, 'gut', 4, NULL, 'NONE', NULL, NULL, NULL, 5000, 1)",
+        )
+        v12.execSQL("INSERT INTO session_exercise (id, sessionId, exerciseId, position, restSec, note, origin, replacedExerciseId) VALUES ('se1', 'w1', 'ex1', 0, 90, 'eng', 'PLANNED', NULL)")
+        v12.execSQL(
+            "INSERT INTO set_entry (id, sessionExerciseId, position, targetWeightKg, targetReps, targetDurationSec, weightKg, reps, durationSec, completed, completedAt, rpe) " +
+                "VALUES ('s1', 'se1', 0, 60.0, 8, NULL, 62.5, 8, NULL, 1, 2000, NULL)",
+        )
+        v12.close()
+        helper.runMigrationsAndValidate(13, OverfitDatabase.MIGRATIONS.toList()).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*OverfitDatabase.MIGRATIONS)
+            .build()
+        try {
+            val dao = db.workoutDao()
+            val row = dao.get("w1")!!
+            assertEquals("Push", row.session.name)
+            val e = row.exercises.single()
+            assertEquals(false, e.entry.skipped)
+            assertEquals("eng", e.entry.note)
+            assertEquals(62.5, e.sets.single().weightKg!!, 0.0)
+            assertEquals(true, e.sets.single().completed)
+            dao.insertExercises(listOf(SessionExerciseEntity("se2", "w1", "ex1", 1, null, null, app.overfit.domain.ExerciseOrigin.PLANNED, null, skipped = true)))
+            assertEquals(listOf(false, true), dao.get("w1")!!.exercises.sortedBy { it.entry.position }.map { it.entry.skipped })
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
+     * v13 → v14: photos belong to a calendar day. Every photo keeps its row and file and gets its day:
      * a training photo the training's start day (also when taken after midnight or added days later),
      * a photo without training the day it was taken. The test runs in a fixed zone so "after midnight" is exact.
      */
     @Test
-    fun migration12to13GivesEveryPhotoItsDayWithoutLosingOne() = runBlocking<Unit> {
+    fun migration13to14GivesEveryPhotoItsDayWithoutLosingOne() = runBlocking<Unit> {
         val zone = kotlinx.datetime.TimeZone.of("Europe/Berlin")
         fun at(iso: String) = kotlinx.datetime.LocalDateTime.parse(iso).toInstant(zone).toEpochMilliseconds()
         val migration = photoDayMigration(zone)
-        val migrations = OverfitDatabase.MIGRATIONS.map { if (it.startVersion == 12) migration else it }
+        val migrations = OverfitDatabase.MIGRATIONS.map { if (it.startVersion == 13) migration else it }
         val helper = MigrationTestHelper(
             InstrumentationRegistry.getInstrumentation(),
             dbFile,
@@ -496,20 +546,20 @@ class MigrationTest {
             { OverfitDatabaseConstructor.initialize() },
         )
         val start = at("2026-11-07T23:30:00")
-        val v12 = helper.createDatabase(12)
-        v12.execSQL(
+        val v13 = helper.createDatabase(13)
+        v13.execSQL(
             "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt, sauna) " +
                 "VALUES ('w1', 'Push', NULL, 'FINISHED', $start, ${start + 4_000_000}, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 1, 0)",
         )
         // Taken after midnight right after the training, added three days later in the old training detail,
         // and a photo of a day without a training.
-        v12.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p1', 'w1', 'p1.jpg', ${at("2026-11-08T00:45:00")}, 0)")
-        v12.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p2', 'w1', 'p2.jpg', ${at("2026-11-10T09:00:00")}, 1)")
-        v12.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p3', NULL, 'p3.jpg', ${at("2026-11-09T23:59:00")}, 0)")
-        v12.close()
+        v13.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p1', 'w1', 'p1.jpg', ${at("2026-11-08T00:45:00")}, 0)")
+        v13.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p2', 'w1', 'p2.jpg', ${at("2026-11-10T09:00:00")}, 1)")
+        v13.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p3', NULL, 'p3.jpg', ${at("2026-11-09T23:59:00")}, 0)")
+        v13.close()
 
-        // Validates the migrated schema against schemas/.../13.json.
-        helper.runMigrationsAndValidate(13, migrations).close()
+        // Validates the migrated schema against schemas/.../14.json.
+        helper.runMigrationsAndValidate(14, migrations).close()
 
         val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
             .setDriver(driver)

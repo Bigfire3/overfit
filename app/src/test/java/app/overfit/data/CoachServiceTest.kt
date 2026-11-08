@@ -126,7 +126,7 @@ class CoachServiceTest {
     private suspend fun benchSets() = requireNotNull(data.templates.get(templateId)).exercises.first { it.exercise.id == "wg:bench-press" }
 
     /**
-     * Photos belong to the day (DB v13): the session review sends the first photo of the training's day (a day photo
+     * Photos belong to the day (DB v14): the session review sends the first photo of the training's day (a day photo
      * without a training link) and the newest photo at least 4 weeks older as comparison, also one without training.
      */
     @Test
