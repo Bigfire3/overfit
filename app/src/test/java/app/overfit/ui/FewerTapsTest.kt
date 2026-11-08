@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -109,6 +111,49 @@ class FewerTapsTest {
         waitFor("0/2 erledigt", substring = true)
         assertEquals(65.0, runBlocking { data.templates.get(id) }!!.exercises.single().sets[1].weightKg)
     }
+
+    @Test
+    fun invalidValue_firstBackExplains_secondBackDiscards() {
+        val id = launch()
+        compose.onNodeWithText("Push").performClick()
+        waitFor("Starten")
+        compose.onNodeWithContentDescription("Gewicht Satz 1").performTextReplacement("6,,5")
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        // Not stored and not left: the footer says why.
+        waitFor("Nicht gespeichert", substring = true)
+        compose.onNodeWithText("Starten").assertExists()
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        compose.waitForTrainingTab()
+        assertEquals(60.0, runBlocking { data.templates.get(id) }!!.exercises.single().sets.first().weightKg)
+    }
+
+    @Test
+    fun replaceLeftWithBack_thenAdd_addsInsteadOfReplacing() {
+        val id = launch()
+        compose.onNodeWithText("Push").performClick()
+        waitFor("Starten")
+        compose.onAllNodes(hasContentDescription("Weitere Aktionen für Bench Press", substring = true))[0].performClick()
+        waitFor("Ersetzen")
+        compose.onNodeWithText("Ersetzen").performClick()
+        waitFor("Übung ersetzen")
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        waitFor("Starten")
+        compose.onNodeWithText("Übung hinzufügen").performScrollTo().performClick()
+        waitFor("Übungen hinzufügen")
+        // Pick some squat (any exercise but Bench Press): search for it, the list is long.
+        compose.onNodeWithText("Suchen, z. B. Klimmzug").performTextInput("belt")
+        waitFor("Belt Squat")
+        compose.onAllNodes(hasText("Belt Squat"))[0].performClick()
+        compose.onNodeWithText("1 hinzufügen").performClick()
+        waitFor("Starten")
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        compose.waitForTrainingTab()
+        compose.waitUntilState { runBlocking { data.templates.get(id) }!!.exercises.size == 2 }
+        assertEquals("wg:bench-press", runBlocking { data.templates.get(id) }!!.exercises.first().exercise.id)
+    }
+
+    private fun hasClickActionAndText(text: String) =
+        androidx.compose.ui.test.hasClickAction() and hasText(text, substring = true)
 
     private fun shot(name: String) {
         val dir = System.getenv("SCREENSHOT_DIR") ?: return
