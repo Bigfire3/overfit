@@ -87,7 +87,7 @@ fun FinishScreen(
         value = if (summary != null && finished != null) FinishData(summary, finished) else null
         if (value == null) onClose()
     }
-    // Photos belong to the training's day (v13): shown and added for that day.
+    // Photos belong to the training's day (v14): shown and added for that day.
     val day = data?.finished?.workout?.startedAt?.let { localDateTime(it).date }
     val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
         .collectAsStateWithLifecycle(emptyList())
@@ -202,8 +202,10 @@ internal fun SummaryRows(
         ListRow(h.exercisesLabel, s.exerciseCount.toString())
         extra()
     }
-    if (s.skippedSets > 0 || s.addedExercises > 0 || s.replacedExercises > 0) {
-        Hint(h.deviations(s.skippedSets, s.addedExercises, s.replacedExercises))
+    if (s.skippedSets > 0 || s.addedExercises > 0 || s.replacedExercises > 0 || s.skippedExercises > 0) {
+        val skipped = s.skippedExercises.takeIf { it > 0 }?.let(t.training.skippedExercises)
+        val other = h.deviations(s.skippedSets, s.addedExercises, s.replacedExercises).ifEmpty { null }
+        Hint(listOfNotNull(skipped, other).joinToString(" · "))
     }
 }
 

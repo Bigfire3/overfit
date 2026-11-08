@@ -559,7 +559,7 @@ private fun ViewerInfo(
     val h = t.history
     val white = Color.White
     val dim = white.copy(alpha = 0.6f)
-    // Photos belong to their day (v13): the training is the old link, else the day's last training.
+    // Photos belong to their day (v14): the training is the old link, else the day's last training.
     val sessionId = item.photo.sessionId
         ?: history?.filter { dateOf(it.startedAt) == item.photo.date }?.maxByOrNull { it.startedAt }?.id
     val row = history?.firstOrNull { it.id == sessionId }

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 13,
-    "identityHash": "740f2ad4a5de36a04b698b8034518bea",
+    "identityHash": "a7ff915ed8e549f62aeebafb8d19f372",
     "entities": [
       {
         "tableName": "exercise",
@@ -426,7 +426,7 @@
       },
       {
         "tableName": "session_exercise",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `exerciseId` TEXT NOT NULL, `position` INTEGER NOT NULL, `restSec` INTEGER, `note` TEXT, `origin` TEXT NOT NULL, `replacedExerciseId` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`sessionId`) REFERENCES `workout_session`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`exerciseId`) REFERENCES `exercise`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `exerciseId` TEXT NOT NULL, `position` INTEGER NOT NULL, `restSec` INTEGER, `note` TEXT, `origin` TEXT NOT NULL, `replacedExerciseId` TEXT, `skipped` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`), FOREIGN KEY(`sessionId`) REFERENCES `workout_session`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`exerciseId`) REFERENCES `exercise`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
@@ -472,6 +472,13 @@
             "fieldPath": "replacedExerciseId",
             "columnName": "replacedExerciseId",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "skipped",
+            "columnName": "skipped",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -627,7 +634,7 @@
       },
       {
         "tableName": "workout_photo",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT, `fileName` TEXT NOT NULL, `takenAt` INTEGER NOT NULL, `position` INTEGER NOT NULL, `day` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`id`), FOREIGN KEY(`sessionId`) REFERENCES `workout_session`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT, `fileName` TEXT NOT NULL, `takenAt` INTEGER NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`sessionId`) REFERENCES `workout_session`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -657,13 +664,6 @@
             "columnName": "position",
             "affinity": "INTEGER",
             "notNull": true
-          },
-          {
-            "fieldPath": "day",
-            "columnName": "day",
-            "affinity": "TEXT",
-            "notNull": true,
-            "defaultValue": "''"
           }
         ],
         "primaryKey": {
@@ -690,15 +690,6 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_workout_photo_takenAt` ON `${TABLE_NAME}` (`takenAt`)"
-          },
-          {
-            "name": "index_workout_photo_day",
-            "unique": false,
-            "columnNames": [
-              "day"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_workout_photo_day` ON `${TABLE_NAME}` (`day`)"
           }
         ],
         "foreignKeys": [
@@ -1265,7 +1256,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '740f2ad4a5de36a04b698b8034518bea')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a7ff915ed8e549f62aeebafb8d19f372')"
     ]
   }
 }

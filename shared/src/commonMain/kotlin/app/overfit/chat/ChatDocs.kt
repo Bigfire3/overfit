@@ -93,6 +93,7 @@ object ChatDocs {
             ExerciseOrigin.REPLACED -> "replaced"
         })
         e.replacedExerciseId?.let { put("replacedExerciseId", it) }
+        if (e.skipped) put("skipped", true)
         e.note.takeIf { it.isNotBlank() }?.let { put("note", it) }
         e.restSec?.let { put("restSec", it) }
         put("sets", buildJsonArray { e.sets.forEach { add(workoutSet(it)) } })

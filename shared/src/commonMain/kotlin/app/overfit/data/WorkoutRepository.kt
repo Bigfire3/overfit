@@ -126,7 +126,7 @@ class WorkoutRepository(
 
     /**
      * Stores an already prepared JPEG as a photo of [day] in the private photo folder. Photos belong to the day
-     * (v13), never to a training: the training detail shows the photos of its day.
+     * (v14), never to a training: the training detail shows the photos of its day.
      */
     suspend fun addPhoto(day: LocalDate, jpeg: ByteArray, takenAt: Long = clock()): WorkoutPhoto {
         val id = Workout.newId()
@@ -225,6 +225,7 @@ class WorkoutRepository(
                     note = e.note.trim().ifEmpty { null },
                     origin = e.origin,
                     replacedExerciseId = e.replacedExerciseId,
+                    skipped = e.skipped,
                 )
             },
         )
@@ -321,7 +322,7 @@ data class FinishedWorkout(
 /** Photo of a workout; [path] is the absolute file path for the image loader. */
 data class WorkoutPhoto(
     val id: String,
-    /** Legacy: training the photo was added to before v13; null for newer photos and photos of a day. */
+    /** Legacy: training the photo was added to before v14; null for newer photos and photos of a day. */
     val sessionId: String?,
     val fileName: String,
     val takenAt: Long,
@@ -366,6 +367,7 @@ internal fun SessionWithExercises.toDomain(): Workout {
                 note = e.entry.note.orEmpty(),
                 origin = e.entry.origin,
                 replacedExerciseId = e.entry.replacedExerciseId,
+                skipped = e.entry.skipped,
                 sets = e.sets.sortedBy { it.position }.map { s ->
                     WorkoutSet(
                         id = s.id,

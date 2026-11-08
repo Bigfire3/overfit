@@ -13,9 +13,12 @@ object WorkoutPlan {
     fun adopt(template: Template, workout: Workout): Template {
         if (workout.exercises.isEmpty()) return template
         val unmatched = template.exercises.toMutableList()
-        val exercises = workout.exercises.map { we ->
+        val exercises = workout.exercises.mapNotNull { we ->
             val index = unmatched.indexOfFirst { it.exercise.id == we.exercise.id }
             val match = if (index >= 0) unmatched.removeAt(index) else null
+            // Skipped today: the plan keeps the exercise exactly as it was (its sets were not trained).
+            // An exercise added (or swapped in) during the training and then skipped does not join the plan.
+            if (we.skipped) return@mapNotNull match
             TemplateExercise(
                 exercise = we.exercise,
                 restSec = we.restSec ?: match?.restSec,

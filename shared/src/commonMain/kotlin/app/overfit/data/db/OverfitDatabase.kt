@@ -32,7 +32,7 @@ import androidx.room.useWriterConnection
         BodyWeightEntity::class,
         AiRequestEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
     // v1 → v2 adds the workout tables, v2 → v3 the photo table, v3 → v4 the coach tables (nothing is dropped or rewritten).
     // v4 → v5 is manual ([MIGRATION_4_5]): free-exercise-db removed, exercise.note added.
@@ -45,12 +45,14 @@ import androidx.room.useWriterConnection
     // v10 → v11 adds the AI request log `ai_request` (pure addition).
     // v11 → v12 adds coach_chat.profileOff (NOT NULL, default 0) and coach_chat_message.attachments / providerId / model
     // (nullable) for the chat redesign (pure addition).
-    // v12 → v13 is manual ([MIGRATION_12_13]): workout_photo.day – photos belong to a calendar day, not a training.
+    // v12 → v13 adds session_exercise.skipped (NOT NULL, default 0 = not skipped; "skip today", pure addition).
+    // v13 → v14 is manual ([MIGRATION_13_14]): workout_photo.day – photos belong to a calendar day, not a training.
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
         AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7),
         AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11), AutoMigration(from = 11, to = 12),
+        AutoMigration(from = 12, to = 13),
     ],
 )
 @TypeConverters(Converters::class)
@@ -71,7 +73,7 @@ abstract class OverfitDatabase : RoomDatabase() {
          * Manual migrations. Rule (SPEC): never migrate destructively – every schema change gets a
          * migration (here or as an [AutoMigration] for pure additions) and a migration test.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_4_5, MIGRATION_12_13)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_4_5, MIGRATION_13_14)
     }
 }
 
@@ -98,17 +100,17 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
 }
 
 /**
- * v12 → v13: photos belong to a calendar day (`workout_photo.day`, ISO date), not to a training.
+ * v13 → v14: photos belong to a calendar day (`workout_photo.day`, ISO date), not to a training.
  * Nothing is dropped: `sessionId` stays as it was. Every existing photo gets its day:
  * - a photo of a training → the day the training started (where the training detail showed it, also when it was
  *   taken after midnight or added days later),
  * - a photo without a training → the day it was taken (where the calendar showed it).
  * Days are computed in the device time zone, like the calendar did until now.
  */
-val MIGRATION_12_13: Migration = photoDayMigration(TimeZone.currentSystemDefault())
+val MIGRATION_13_14: Migration = photoDayMigration(TimeZone.currentSystemDefault())
 
-/** [MIGRATION_12_13] for a given [zone] (tests). */
-fun photoDayMigration(zone: TimeZone): Migration = object : Migration(12, 13) {
+/** [MIGRATION_13_14] for a given [zone] (tests). */
+fun photoDayMigration(zone: TimeZone): Migration = object : Migration(13, 14) {
     override fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE workout_photo ADD COLUMN day TEXT NOT NULL DEFAULT ''")
         connection.execSQL("CREATE INDEX IF NOT EXISTS `index_workout_photo_day` ON `workout_photo` (`day`)")

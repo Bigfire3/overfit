@@ -49,7 +49,7 @@ const val PHOTO_ADD_LIBRARY_TAG = "photo-add-library"
 
 /**
  * The photos of one calendar day as a grid of three equal tiles per row, followed by the add tiles (camera, library).
- * The same grid sits in the day view, the training detail and the finish screen: photos belong to the day (v13), so
+ * The same grid sits in the day view, the training detail and the finish screen: photos belong to the day (v14), so
  * wherever one is added, it lands on that day. A photo opens on tap ([onOpen], null = not tappable) and is removed with
  * the two-tap "x" ([onRemove], null = no "x").
  */
