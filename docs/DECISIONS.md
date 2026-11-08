@@ -1592,3 +1592,28 @@ Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Konto
   Tag, das bleibt unverändert (keine neue Anfrage, `OwnKeyPrivacyTest` unberührt). `HistoryRow.photoCount` zählt nur noch Altfotos mit
   Training und wird nirgends mehr angezeigt (bleibt, weil das Entfernen viele Tests ohne Nutzen ändert). Vollbild und Vergleich zeigen
   das Datum des Foto-Tages; „Training ansehen“ im Vollbild führt bei neuen Fotos zum letzten Training ihres Tages.
+
+## Kalender einheitlich, Tag auf einer Seite (8.11., Session BJ, Teil 2)
+- **Auftrag (Fabian, 8.11.):** „dass alle Symbole, zum Beispiel im Kalender, die Kreise gleich groß sind und alles ein bisschen einheitlich
+  ist, die Menüs nicht so überladen sind“ und „dass man möglichst wenig tippen muss“.
+- **Markierungen im Monatsraster:** vorher Trainingspunkt 18 dp bzw. 10 dp auf Fotos, Sauna-Ring 14/10 dp, Legende 8 dp, Gewichtsstrich
+  12×2 dp über der Kachel, Zähler-Badge 20 dp, Heute = graue Zellfläche. Jetzt hat jede Zelle drei feste Zeilen: Tageszahl in einem
+  22-dp-Kreis (Heute = Kreis gefüllt), eine **quadratische** Kachel (Foto, sonst bei Training leere Fläche) und eine reservierte
+  Markierungszeile. Alle Markierungen (Training ●, Sauna ○, Gewicht ▬) sitzen in gleich großen 8-dp-Boxen mit 3 dp Abstand, zentriert,
+  in derselben Reihenfolge; dieselben Composables (`DayMarkers`/`Marker`) zeichnen die Legende. Nichts liegt mehr auf dem Foto (vorher
+  mussten Punkt und Ring mit Seitenfarbe gefüllt werden, um lesbar zu bleiben). Das Zähler-Badge entfällt: Die Anzahl steht weiter in der
+  Screenreader-Beschreibung, der Tag zeigt alle Fotos. Die Wochenzeile gibt die Höhe vor (Quadrat aus der Zellbreite + feste Zeilen),
+  damit alle Zellen einer Woche pixelgenau fluchten (`CalendarUniformTest` misst Bounds, Mitten und Reihenfolge nach).
+- **Kopfzeile:** vorher bis zu vier Icons (Heute, Vergleichen, Muskeln, Liste/Raster) plus Sonderregel „Vergleichen wartet, solange Heute
+  sichtbar ist“. Jetzt [Heute (nur abseits des aktuellen Monats)] [Muskeln] [⋮]. Das ⋮ (`MoreMenu`, schon im Workout-Editor und im
+  Training) enthält „Als Liste/Kalender anzeigen“ und „Fotos vergleichen“ (nur im Raster ab 2 Fotos). Beides braucht man selten; die
+  Sonderregel entfällt. Alle Kopfzeilen-Icons 48 × 48 dp, gleiche Mitte (Test). Das Menü ist ein kleines Aufklappmenü, kein Bestätigungs-
+  Popup; die Regel „keine Popups“ in CLAUDE.md betrifft Bestätigungen und bleibt unberührt.
+- **Tipp auf einen Tag mit genau einem Training → trotzdem der Tag** (geprüft, verworfen: direkt ins Training). Gründe: Fotos, Gewicht
+  und Sauna liegen am Tag; ein Tipp, der je nach Inhalt woanders landet, ist schwer vorherzusagen; und der Tag zeigt das Training jetzt
+  **aufgeklappt** (Karte mit Uhrzeit, Dauer · Sätze · Volumen · Sauna und je Übung „3 Sätze · 80 kg × 8“, bester Satz), sodass meist kein
+  zweiter Tipp nötig ist. Alle Sätze, Bearbeiten, Teilen und Löschen bleiben im Trainingsdetail (Tipp auf die Karte). Bearbeiten
+  vergangener Trainings bleibt wie mit Session BI abgestimmt getrennt (Stift im Detail).
+- **Tag-Screen:** Gewicht, Trainings-Karten, Fotos (Raster aus Teil 1 mit Hinzufügen-Kacheln statt zweier Knöpfe) auf einer Seite.
+  Session BH setzt ein Coach-Symbol in die Kopfzeile (`BackHeader`-Aktionen), abgestimmt.
+- Belege: `docs/screenshots/kalender-einheitlich/vorher|nachher` (`raster.png`, `liste.png`, `tag.png`; 360 dp, dunkel).
