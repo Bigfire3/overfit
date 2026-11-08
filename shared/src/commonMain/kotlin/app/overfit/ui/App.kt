@@ -588,7 +588,8 @@ fun OverfitApp(deps: AppDependencies) {
                             lastDone = lastDoneText(LocalStrings.current, lastDone[id], deps.today()),
                             workoutRunning = workoutState.workout != null,
                             onClose = nav::popBackStack,
-                            onAddExercises = { nav.navigate(ExercisePickerRoute(single = false)) },
+                            // A replace whose picker was left with back must not turn the next add into a replace.
+                            onAddExercises = { editor.pendingReplaceKey = null; nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
                             onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it)) },
                             onStart = { template ->
@@ -793,7 +794,8 @@ fun OverfitApp(deps: AppDependencies) {
                             // A new workout opens right after "Save", ready to start (one tap less than via the list).
                             onSaved = { id -> nav.navigate(WorkoutPlanRoute(id)) { popUpTo<TemplateEditorRoute> { inclusive = true } } },
                             loadLast = { deps.data.workouts.lastPerformance(it, null) },
-                            onAddExercises = { nav.navigate(ExercisePickerRoute(single = false)) },
+                            // A replace whose picker was left with back must not turn the next add into a replace.
+                            onAddExercises = { editor.pendingReplaceKey = null; nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
                             onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it)) },
                         )

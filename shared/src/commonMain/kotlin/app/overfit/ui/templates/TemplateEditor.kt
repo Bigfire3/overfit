@@ -117,6 +117,8 @@ class TemplateEditorViewModel(
         val savedId: Long? = null,
         /** The workout was deleted (closing must not save it again). */
         val deleted: Boolean = false,
+        /** Counts attempts to leave/start/share that an invalid draft blocked (the screen then explains and arms back). */
+        val blocked: Int = 0,
     )
 
     private val pendingExercises: Map<String, CustomExerciseInput> = seed?.let { ShareMapper.pendingInputs(it.preview) }.orEmpty()
@@ -173,7 +175,11 @@ class TemplateEditorViewModel(
      * and shows why. Returns the stored workout, or null if the draft cannot be stored.
      */
     private suspend fun persist(): app.overfit.domain.Template? = saveLock.withLock {
+        // Deleted meanwhile: never store it again.
+        if (_state.value.deleted) return@withLock null
         val draft = _state.value.draft
+        // Unchanged: nothing to store, and nothing to validate (a stored workout is left/started as it is).
+        if (draft == original) return@withLock draft.toTemplate(unit)
         val problem = draft.validate(unit)
         if (problem != null) {
             _state.update { if (it.draft == draft) it.copy(problem = problem) else it }
@@ -185,8 +191,8 @@ class TemplateEditorViewModel(
                 templates.save(template)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                // Deleted meanwhile (e.g. on another screen): nothing to store any more.
+            } catch (_: IllegalArgumentException) {
+                // Deleted meanwhile (e.g. on another screen; save requires the row): nothing to store any more.
                 _state.update { it.copy(closed = true, deleted = true) }
                 return@withLock null
             }
@@ -202,7 +208,11 @@ class TemplateEditorViewModel(
      */
     fun flush(then: (app.overfit.domain.Template?) -> Unit = {}) {
         saveJob?.cancel()
-        viewModelScope.launch { then(persist()) }
+        viewModelScope.launch {
+            val saved = persist()
+            if (saved == null) _state.update { it.copy(blocked = it.blocked + 1) }
+            then(saved)
+        }
     }
 
     /** Back in autosave mode: store and close; an invalid draft first shows why (a second back discards it). */
@@ -210,7 +220,8 @@ class TemplateEditorViewModel(
         saveJob?.cancel()
         viewModelScope.launch {
             val saved = persist()
-            if (saved != null || force) _state.update { it.copy(closed = true) }
+            // Invalid: the screen shows why and arms back (a second back discards).
+            if (saved != null || force) _state.update { it.copy(closed = true) } else _state.update { it.copy(blocked = it.blocked + 1) }
         }
     }
 
@@ -339,6 +350,7 @@ fun TemplateEditorScreen(
         if (saved != null && onSaved != null) onSaved(saved) else onClose()
     }
     LaunchedEffect(backArmed) { if (backArmed) { delay(4000); backArmed = false } }
+    LaunchedEffect(state.blocked) { if (state.blocked > 0) backArmed = true }
     LaunchedEffect(undo) { if (undo != null) { delay(5000); viewModel.dismissUndo() } }
     val showUndo = undo?.after == draft && undo != null
 
@@ -365,7 +377,8 @@ fun TemplateEditorScreen(
     // Otherwise no leaving while saving: the save must not be cancelled half-way (new exercises, workout, chat acknowledgement).
     val back = {
         when {
-            autosave -> if (state.problem != null && state.dirty && !backArmed) backArmed = true else viewModel.leave(force = backArmed)
+            state.loading -> onClose()
+            autosave -> viewModel.leave(force = backArmed)
             state.saving -> Unit
             state.dirty && !backArmed -> backArmed = true
             else -> onClose()
@@ -384,7 +397,10 @@ fun TemplateEditorScreen(
             }
         },
         footer = {
+            // Autosave: a problem is only shown once it blocks leaving/starting (not while typing "62," or a new name).
             val message = when {
+                autosave && backArmed -> listOfNotNull(state.problem?.describe(t), t.unsavedHint).joinToString(" ")
+                autosave -> null
                 backArmed -> t.unsavedHint
                 else -> state.problem?.describe(t)
             }
