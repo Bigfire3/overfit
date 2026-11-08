@@ -205,7 +205,8 @@ interface WorkoutDao {
         """SELECT se.exerciseId FROM session_exercise se
            JOIN workout_session ws ON ws.id = se.sessionId
            WHERE ws.templateId = :templateId AND ws.status = 'FINISHED' AND se.skipped = 0
-             AND se.exerciseId IN (:exerciseIds)
+             AND se.exerciseId IN (:exerciseIds) AND se.origin != 'ADDED'
+             AND EXISTS (SELECT 1 FROM set_entry s2 WHERE s2.sessionExerciseId = se.id AND s2.completed = 1)
            ORDER BY ws.startedAt DESC, se.position LIMIT 1""",
     )
     suspend fun lastVariant(templateId: Long, exerciseIds: List<String>): String?

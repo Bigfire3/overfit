@@ -97,7 +97,8 @@ class AlternativesRepositoryTest {
         assertNull(workouts.lastVariant(t.id, variantIds))
 
         // Oldest: dumbbell done.
-        val first = Workout.fromTemplate(t, 1_000, id = "w1", idGen = ids(), variants = mapOf(1 to 1))
+        var first = Workout.fromTemplate(t, 1_000, id = "w1", idGen = ids(), variants = mapOf(1 to 1))
+        first = first.completeSet(first.exercises[1].sets[0].id, 1_500)
         workouts.save(first)
         workouts.finish(first, 2_000)
         assertEquals(variantIds[1], workouts.lastVariant(t.id, variantIds))
@@ -109,8 +110,15 @@ class AlternativesRepositoryTest {
         workouts.finish(skipped, 4_000)
         assertEquals(variantIds[1], workouts.lastVariant(t.id, variantIds))
 
+        // Newer, fly planned but not a single set of it done (training cut short): does not count either.
+        val untouched = Workout.fromTemplate(t, 4_500, id = "w2b", idGen = ids(), variants = mapOf(1 to 2))
+        workouts.save(untouched)
+        workouts.finish(untouched, 4_600)
+        assertEquals(variantIds[1], workouts.lastVariant(t.id, variantIds))
+
         // Newest of another template with bench: ignored.
-        val other = Workout.fromTemplate(t.copy(id = t.id + 100), 5_000, id = "w3", idGen = ids())
+        var other = Workout.fromTemplate(t.copy(id = t.id + 100), 5_000, id = "w3", idGen = ids())
+        other = other.completeSet(other.exercises[1].sets[0].id, 5_500)
         workouts.save(other)
         workouts.finish(other, 6_000)
         assertEquals(variantIds[1], workouts.lastVariant(t.id, variantIds))

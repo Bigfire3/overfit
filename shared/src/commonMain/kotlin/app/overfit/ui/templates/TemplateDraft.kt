@@ -53,6 +53,9 @@ data class TemplateDraft(
 
     /** Adds [exercise] as an alternative of the exercise [key] (same default sets as a new exercise). */
     fun addAlternative(key: Long, exercise: Exercise): TemplateDraft {
+        // The same exercise twice is no alternative.
+        val target = exercises.firstOrNull { it.key == key } ?: return this
+        if (target.exercise.id == exercise.id || target.alternatives.any { it.exercise.id == exercise.id }) return this
         var k = nextKey
         val sets = List(DEFAULT_SETS) { DraftSet(k++) }
         val alt = DraftExercise(k++, exercise, rest = exercise.defaultRestSec?.toString().orEmpty(), note = "", sets = sets)

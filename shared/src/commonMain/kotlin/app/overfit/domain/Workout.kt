@@ -114,6 +114,8 @@ data class Workout(
             // Keep the very first original if replaced twice.
             replacedExerciseId = e.replacedExerciseId ?: e.exercise.id,
             restSec = null,
+            // Something else entirely: no longer one of the plan's variants (no chips).
+            variants = emptyList(),
             sets = e.sets.map { s -> s.copy(target = s.target.fitTo(type), actual = s.actual.fitTo(type)) },
         )
     }

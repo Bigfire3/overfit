@@ -69,7 +69,8 @@ data class TemplateExercise(
     val alternatives: List<TemplateExercise> = emptyList(),
 ) {
     /** This exercise first, then its alternatives (the order the training rotates through). */
-    val variants: List<TemplateExercise> get() = listOf(copy(alternatives = emptyList())) + alternatives
+    val variants: List<TemplateExercise> get() =
+        (listOf(copy(alternatives = emptyList())) + alternatives).distinctBy { it.exercise.id } // a duplicate is no variant
 }
 
 data class PlannedSet(

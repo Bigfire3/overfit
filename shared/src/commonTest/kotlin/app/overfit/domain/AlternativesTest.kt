@@ -185,3 +185,30 @@ class AlternativesTest {
         assertEquals(listOf(planned(50.0, 10), planned(50.0, 8)), slot.sets)
     }
 }
+
+class AlternativesGuardTest {
+    private val a = app.overfit.workout.exercise("a")
+    private val b = app.overfit.workout.exercise("b")
+
+    @Test
+    fun duplicateVariantsCollapse_andReplaceDropsTheChips() {
+        val slot = app.overfit.workout.entry(a, null, app.overfit.workout.planned(10.0, 5)).copy(
+            alternatives = listOf(app.overfit.workout.entry(a, null), app.overfit.workout.entry(b, null)),
+        )
+        kotlin.test.assertEquals(listOf("a", "b"), slot.variants.map { it.exercise.id })
+        val w = Workout.fromTemplate(app.overfit.workout.templateOf(slot), 0)
+        kotlin.test.assertEquals(2, w.exercises[0].variants.size)
+        val replaced = w.replaceExercise(w.exercises[0].id, app.overfit.workout.exercise("c"))
+        kotlin.test.assertTrue(replaced.exercises[0].variants.isEmpty())
+    }
+
+    @Test
+    fun draftIgnoresTheSameExerciseAsAlternative() {
+        val d = app.overfit.ui.templates.TemplateDraft().addExercises(listOf(a))
+        val key = d.exercises[0].key
+        kotlin.test.assertEquals(d, d.addAlternative(key, a))
+        val withB = d.addAlternative(key, b)
+        kotlin.test.assertEquals(withB, withB.addAlternative(key, b))
+        kotlin.test.assertEquals(1, withB.exercises[0].alternatives.size)
+    }
+}

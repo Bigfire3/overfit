@@ -486,8 +486,9 @@ fun TemplateEditorScreen(
                     onEdit = viewModel::edit,
                     onRemoveSet = { exerciseKey, setKey -> viewModel.removeSet(exerciseKey, setKey) },
                     onRemove = { viewModel.removeExercise(it) },
-                    onReplace = { viewModel.pendingReplaceKey = it; onReplaceExercise() },
-                    onAddAlternative = { viewModel.pendingAlternativeKey = entry.key; onReplaceExercise() },
+                    // Only one pending pick at a time: a picker left with back must not change what the next one does.
+                    onReplace = { viewModel.pendingAlternativeKey = null; viewModel.pendingReplaceKey = it; onReplaceExercise() },
+                    onAddAlternative = { viewModel.pendingReplaceKey = null; viewModel.pendingAlternativeKey = entry.key; onReplaceExercise() },
                     onDetails = { e -> if (!e.exercise.id.startsWith(ShareMapper.PENDING_PREFIX)) onExerciseDetails(e.exercise.id) },
                 )
             }
