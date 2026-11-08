@@ -131,6 +131,8 @@ class DayPathsTest {
             )
         }
         waitFor("FOTOS DES TAGES")
+        // The photos load in their own flow after the training: wait for the thumbnail, not only the section.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Foto 1")).fetchSemanticsNodes().isNotEmpty() }
         // The photo has no training link (added to the day) and still shows in the training's detail.
         compose.onNode(hasContentDescription("Foto 1")).performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag(PHOTO_ADD_LIBRARY_TAG).performScrollTo().assertIsDisplayed()
