@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -62,6 +64,8 @@ import app.overfit.share.PlatformShare
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.HeaderDeleteButton
 import app.overfit.ui.components.HeaderIconButton
+import app.overfit.ui.components.MenuItem
+import app.overfit.ui.components.MoreMenu
 import app.overfit.ui.components.Panel
 import app.overfit.ui.components.panelRow
 import androidx.compose.foundation.layout.heightIn
@@ -158,22 +162,22 @@ fun PhotosScreen(
             if (selecting) {
                 SmallButton(p.cancel, onClick = { selecting = false; selected = emptyList() })
             } else {
-                // Icons only (48 dp each), so the row fits at 360 dp: at most three of today / compare / muscles /
-                // toggle at once – while "today" shows, compare waits (one tap back, or start comparing first and then
-                // scroll: the selection stays).
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Icons only (48 dp each, same icon size): [today, only while away] [muscles] [⋮]. The rest (switch
+                // view, compare photos) lives in the ⋮ menu, so the header stays calm.
+                Row(Modifier.testTag(DIARY_HEADER_TAG), verticalAlignment = Alignment.CenterVertically) {
                     if (loaded && awayFromToday) Box(Modifier.testTag(TODAY_BUTTON_TAG)) {
                         HeaderIconButton(Icon.Today, t.bodyWeight.jumpTodayDescription, {
                             jumpScope.launch { if (asList) listState.animateScrollToItem(0) else gridState.animateScrollToItem(todayIndex) }
                         })
                     }
-                    if (!asList && photoList.size >= 2 && !(loaded && awayFromToday)) HeaderIconButton(Icon.Compare, p.compare, { selecting = true })
                     if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
-                    // The icon shows the other view: list while the calendar is up, calendar while the list is up.
-                    HeaderIconButton(
-                        if (asList) Icon.Calendar else Icon.List,
-                        if (asList) p.showCalendar else p.showList,
-                        { asList = !asList; onListViewChange(asList) },
+                    MoreMenu(
+                        p.moreOptions,
+                        buildList {
+                            // The entry names the other view: list while the calendar is up, calendar while the list is up.
+                            add(MenuItem(if (asList) p.showCalendar else p.showList) { asList = !asList; onListViewChange(asList) })
+                            if (!asList && photoList.size >= 2) add(MenuItem(p.comparePhotos) { selecting = true })
+                        },
                     )
                 }
             }
@@ -251,43 +255,74 @@ private fun DiaryStats(workouts: Int, photos: Int, streakWeeks: Int) {
 private fun DiaryLegend(sauna: Boolean, weight: Boolean) {
     val p = LocalStrings.current.photos
     Row(Modifier.fillMaxWidth().padding(bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(8.dp).background(Theme.colors.foreground, CircleShape))
-        Spacer(Modifier.width(Space.xs))
-        Text(p.legendWorkout, style = Theme.type.caption, tone = Tone.Muted)
+        LegendEntry(DayMarker.Workout, p.legendWorkout)
         if (sauna) {
             Spacer(Modifier.width(Space.m))
-            SaunaRing(8.dp, 1.5.dp)
-            Spacer(Modifier.width(Space.xs))
-            Text(p.legendSauna, style = Theme.type.caption, tone = Tone.Muted)
+            LegendEntry(DayMarker.Sauna, p.legendSauna)
         }
         if (weight) {
             Spacer(Modifier.width(Space.m))
-            WeightDash()
-            Spacer(Modifier.width(Space.xs))
-            Text(LocalStrings.current.bodyWeight.legend, style = Theme.type.caption, tone = Tone.Muted)
+            LegendEntry(DayMarker.Weight, LocalStrings.current.bodyWeight.legend)
         }
     }
 }
 
-/** Body-weight marker: a short muted dash under the day (no confusion with the workout dot or the sauna ring). */
 @Composable
-private fun WeightDash(modifier: Modifier = Modifier) {
-    Box(modifier.size(width = 12.dp, height = 2.dp).background(Theme.colors.muted, RoundedCornerShape(1.dp)))
+private fun LegendEntry(kind: DayMarker, label: String) {
+    Marker(kind)
+    Spacer(Modifier.width(Space.xs))
+    Text(label, style = Theme.type.caption, tone = Tone.Muted)
 }
 
-/** Test tags: weight dash in a calendar day, the month grid, the "Today" button. */
+/** Kinds of day markers, in the order they appear under a day. */
+internal enum class DayMarker { Workout, Sauna, Weight }
+
+/** Every day marker (calendar day and legend) sits in a box of this size, so all of them line up. */
+internal val MARKER_SIZE = 8.dp
+/** Gap between the markers of one day. */
+internal val MARKER_GAP = 3.dp
+private val MARKER_STROKE = 1.5.dp
+private val WEIGHT_DASH_HEIGHT = 2.dp
+/** Circle slot of the day number (filled on today). */
+internal val DAY_NUMBER_SIZE = 22.dp
+
+/**
+ * One marker in a [MARKER_SIZE] box: workout = filled dot, sauna = ring, body weight = short muted dash (vertically
+ * centred). Used by the calendar days and the legend, so sizes are the same everywhere.
+ */
+@Composable
+internal fun Marker(kind: DayMarker, modifier: Modifier = Modifier) {
+    val c = Theme.colors
+    when (kind) {
+        DayMarker.Workout -> Box(modifier.testTag(WORKOUT_MARKER_TAG).size(MARKER_SIZE).background(c.foreground, CircleShape))
+        // A ring glyph (a symbol, not a frame).
+        DayMarker.Sauna -> Box(modifier.testTag(SAUNA_MARKER_TAG).size(MARKER_SIZE).border(MARKER_STROKE, c.foreground, CircleShape))
+        DayMarker.Weight -> Box(modifier.testTag(WEIGHT_MARKER_TAG).size(MARKER_SIZE), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(width = MARKER_SIZE, height = WEIGHT_DASH_HEIGHT).background(c.muted, RoundedCornerShape(1.dp)))
+        }
+    }
+}
+
+/** The markers of one day, centred in a row of fixed height (reserved also when empty, so all days line up). */
+@Composable
+internal fun DayMarkers(kinds: List<DayMarker>, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().height(MARKER_SIZE),
+        horizontalArrangement = Arrangement.spacedBy(MARKER_GAP, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) { kinds.forEach { Marker(it) } }
+}
+
+/** Test tags: markers in a calendar day (and the legend), the month grid, the "Today" button, today's day circle, the header icons. */
+const val WORKOUT_MARKER_TAG = "diary-workout"
+const val SAUNA_MARKER_TAG = "diary-sauna"
 const val WEIGHT_MARKER_TAG = "diary-weight"
 const val DIARY_GRID_TAG = "diary-grid"
 const val TODAY_BUTTON_TAG = "diary-today"
-
-/** Sauna marker: a hollow ring (the workout is the filled dot). [fill] keeps it readable on a photo. */
-@Composable
-private fun SaunaRing(size: androidx.compose.ui.unit.Dp, stroke: androidx.compose.ui.unit.Dp, color: Color = Theme.colors.foreground, fill: Color = Color.Transparent) {
-    Box(Modifier.testTag(SAUNA_MARKER_TAG).size(size).background(fill, CircleShape).border(stroke, color, CircleShape))
-}
-
-/** Test tag of the sauna ring in a calendar day. */
-const val SAUNA_MARKER_TAG = "diary-sauna"
+const val TODAY_MARKER_TAG = "diary-today-circle"
+const val DIARY_HEADER_TAG = "diary-header"
+/** Test tag of the marker row of a calendar day. */
+const val DAY_MARKERS_TAG = "diary-day-markers"
 
 @Composable
 private fun WeekdayRow(weekStart: kotlinx.datetime.DayOfWeek) {
@@ -302,6 +337,8 @@ private fun WeekdayRow(weekStart: kotlinx.datetime.DayOfWeek) {
 }
 
 private val CELL_GAP = 4.dp
+/** Width : height of a calendar day. */
+private const val CELL_ASPECT = 0.62f
 
 @Composable
 private fun MonthBlock(
@@ -325,9 +362,19 @@ private fun MonthBlock(
             style = Theme.type.title,
         )
         cells.chunked(7).forEach { week ->
-            Row(Modifier.fillMaxWidth().padding(bottom = CELL_GAP), horizontalArrangement = Arrangement.spacedBy(CELL_GAP)) {
+            // One height for the whole week (from the cell width), so every cell – and its marker row – lines up to
+            // the pixel; an aspect ratio per cell would round differently for 43 vs 44 px wide cells.
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = CELL_GAP).layout { measurable, constraints ->
+                    val cellWidth = (constraints.maxWidth - 6 * CELL_GAP.roundToPx()) / 7f
+                    val h = (cellWidth / CELL_ASPECT).roundToInt()
+                    val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                },
+                horizontalArrangement = Arrangement.spacedBy(CELL_GAP),
+            ) {
                 week.forEach { date ->
-                    Box(Modifier.weight(1f)) {
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
                         if (date != null) DayCell(date, days[date], date == today, date <= today, selected, selecting, unit, language, onDay)
                     }
                 }
@@ -359,57 +406,52 @@ private fun DayCell(
         (weightKg?.let { w.dayDescription(app.overfit.domain.formatWeight(it, unit, language)) } ?: "")
     val shape = RoundedCornerShape(8.dp)
     val picked = photo != null && photo.photo.id in selected
+    val markers = buildList {
+        if (training) add(DayMarker.Workout)
+        if (sauna) add(DayMarker.Sauna)
+        if (weightKg != null) add(DayMarker.Weight)
+    }
     Column(
         Modifier
-            .fillMaxWidth()
-            .aspectRatio(0.62f)
+            .fillMaxSize()
             // Future days: greyed out and not tappable (nothing to log there yet).
             .then(if (!tappable) Modifier.alpha(0.5f) else Modifier)
-            .then(if (isToday) Modifier.background(Theme.colors.surfacePressed, shape) else Modifier)
-            .padding(2.dp)
+            .padding(vertical = 2.dp)
             .semantics { contentDescription = desc }
             .then(if (if (selecting) photo != null else tappable) Modifier.clickable { onDay(date, day) } else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            date.dayOfMonth.toString(),
-            style = Theme.type.caption,
-            tone = if (photo != null || training) Tone.Muted else Tone.Faint,
-        )
-        // Body weight: short dash right under the day number (belongs clearly to this day); the slot stays reserved
-        // so all cells line up.
-        Box(Modifier.fillMaxWidth().height(6.dp), contentAlignment = Alignment.Center) {
-            if (weightKg != null) WeightDash(Modifier.testTag(WEIGHT_MARKER_TAG))
+        // Day number in a fixed circle slot; today fills the circle (inverse number).
+        Box(
+            Modifier
+                .size(DAY_NUMBER_SIZE)
+                .then(if (isToday) Modifier.testTag(TODAY_MARKER_TAG).background(Theme.colors.foreground, CircleShape) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                date.dayOfMonth.toString(),
+                style = Theme.type.caption,
+                tone = when {
+                    isToday -> Tone.Inverse
+                    photo != null || training -> Tone.Muted
+                    else -> Tone.Faint
+                },
+                maxLines = 1,
+            )
         }
+        Spacer(Modifier.height(2.dp))
+        // Tile: the photo if there is one, else an empty surface on training days, else nothing.
         when {
             photo != null -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface)) {
                 AsyncImage(photo.photo.path, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                val n = day!!.photos.size
-                if (n > 1) Box(
-                    Modifier.align(Alignment.BottomEnd).padding(4.dp).size(20.dp).background(Theme.colors.inverseBackground, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) { Text(p.photoCount(n), style = Theme.type.caption, tone = Tone.Inverse) }
                 if (selecting && picked) Box(Modifier.fillMaxSize().background(Theme.colors.foreground.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) { LineIcon(Icon.Check, size = 24.dp) }
-                // Photo and workout on the same day: the photo wins, a small dot keeps the workout visible.
-                if (training) Row(Modifier.align(Alignment.TopStart).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Box(Modifier.size(10.dp).background(Theme.colors.inverseBackground, CircleShape))
-                    // Sauna: hollow ring next to the dot, filled with the page colour so it stays visible on the photo.
-                    if (sauna) SaunaRing(10.dp, 2.dp, Theme.colors.inverseBackground, Theme.colors.background)
-                }
             }
-            // Workout without a photo: a clearly filled dot in the middle of the tile.
-            // Sauna afterwards: a hollow ring below the dot.
-            training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(18.dp).background(Theme.colors.foreground, CircleShape))
-                    if (sauna) {
-                        Spacer(Modifier.height(4.dp))
-                        SaunaRing(14.dp, 2.dp)
-                    }
-                }
-            }
+            training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface))
             else -> Spacer(Modifier.weight(1f))
         }
+        Spacer(Modifier.height(MARKER_GAP))
+        // One marker row under every day (reserved also when empty, so all cells line up).
+        DayMarkers(markers, Modifier.testTag(DAY_MARKERS_TAG))
     }
 }
 

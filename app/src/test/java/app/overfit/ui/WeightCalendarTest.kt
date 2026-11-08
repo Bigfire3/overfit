@@ -187,16 +187,19 @@ class WeightCalendarTest {
         field.assertTextEquals("180,5")
     }
 
-    @Test fun headerKeepsTheToggleWhenTodayShowsWithManyPhotos() {
+    @Test fun headerShowsTodayMusclesAndMenuOnly() {
         fun photo(id: String, d: LocalDate) = app.overfit.data.DiaryPhoto(app.overfit.data.WorkoutPhoto(id, null, "$id.jpg", ms(d), "/nonexistent/$id.jpg"), null)
         val photos = listOf(photo("a", LocalDate(2026, 11, 2)), photo("b", LocalDate(2026, 10, 2)))
         show { PhotosScreen(photos, history, Language.DE, today, {}, { _, _ -> }, weights = weights, onMuscles = {}) }
-        compose.onNodeWithContentDescription("Vergleichen").assertIsDisplayed()
+        // No separate compare or view icon any more: both live in the ⋮ menu, also while "today" shows.
         compose.onNodeWithTag(DIARY_GRID_TAG).performScrollToIndex(0)
         compose.onNodeWithTag(TODAY_BUTTON_TAG).assertIsDisplayed()
-        compose.onNodeWithContentDescription("Als Liste anzeigen").assertIsDisplayed()
         compose.onNodeWithContentDescription(stringsFor(Language.DE).muscles.open).assertIsDisplayed()
         compose.onAllNodesWithContentDescription("Vergleichen").assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Als Liste anzeigen").assertCountEquals(0)
+        compose.onNodeWithContentDescription("Weitere Optionen").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Fotos vergleichen").assertIsDisplayed()
+        compose.onNodeWithText("Als Liste anzeigen").assertIsDisplayed()
     }
 }
 
