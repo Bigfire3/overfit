@@ -1572,6 +1572,27 @@ Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Konto
 - **Sonnet-Gegencheck:** behoben: KI-Chat-Kontext (`ChatContext.workoutBlock`) zeigt ausgelassene Übungen mit Marker statt sie wegzulassen; Übungen ohne Sätze lösen „Training beenden“ nicht aus; Benachrichtigung zeigt „Alle Sätze erledigt“ auch, wenn alles ausgelassen ist; eine im Training hinzugefügte und dann ausgelassene Übung kommt nicht ins Workout. Bewusst so: Ausgelassene Karte hat nur „Nicht auslassen“ (kein Verschieben/Menü), die Übungsanzahl zählt ausgelassene mit.
 - **KI (mit BH abgestimmt):** Coach-Prompt: `2. Kniebeuge [id] (skipped today by the user)` plus ggf. erledigte Sätze, kein „no sets done“. KI-Chat-JSON: `"skipped": true`. Backup: `skipped` je Übung (fehlt in alten Backups = false; ältere Apps ignorieren das Feld).
 
+## Wenig tippen: Workout-Ansicht = Editor, Start aus der Liste (Session BI, 8.11.)
+- **Auftrag (Fabian):** „logische Schlussfolgerungen ziehen … wenn man auf Workouts tippt, dass man dann möglichst Screens wiederverwendet und gleich in der Editieransicht ist oder nicht, wann das Sinn macht … dass man möglichst wenig tippen muss.“
+- **Tipp-Zählung vorher → nachher** (Tipps ohne Tippen von Zahlen, ab Workouts-Tab):
+
+  | Aufgabe | vorher | nachher |
+  |---|---|---|
+  | Training starten | 2 (Karte → Starten) | **1** (▶ auf der Karte); über die Ansicht weiter 2 |
+  | Gewicht im Plan ändern | 4 (Karte → Stift → Feld → Speichern) | **2** (Karte → Feld), Zurück speichert |
+  | Gewicht ändern und gleich trainieren | 5 (… Speichern → Starten) | **3** (Karte → Feld → Starten) |
+  | Übung hinzufügen | 6 (Karte → Stift → Übung hinzufügen → Übung → Fertig → Speichern) | **4** (ohne Stift und Speichern) |
+  | Neues Workout | „+“ → Erstellen → … → Speichern, danach Liste → Karte → Starten | gleich bis Speichern; danach öffnet sich das Workout direkt (Starten = 1 Tipp statt 2) |
+  | Vergangenes Training ändern | Tag → Training → Stift → … → Speichern | **unverändert** |
+- **Entscheidung Workouts (Pläne):** Ansicht und Editor sind ein Screen (`TemplateEditorScreen` für `WorkoutPlanRoute`, `WorkoutPlanScreen` entfällt). Häufigste Aktion „Starten“ bleibt der schwebende Hauptknopf unten, Teilen/Löschen oben; Stift und „Speichern“ entfallen. Jede gültige Änderung wird nach 600 ms gespeichert (`TemplateEditorViewModel.autosave`), Zurück und „Starten“ speichern Ausstehendes sofort (gestartet wird also immer mit dem, was zu sehen ist). Untertitel „zuletzt vor … · speichert automatisch“, damit klar ist, dass kein Speichern nötig ist.
+- **Schutz vor versehentlichen Änderungen:** Werte ändern sich nur durch Tippen in ein Feld (Tastatur geht auf, sichtbar), Satz löschen per Wischen, Übung entfernen/ersetzen über ⋮ – alle drei mit „Rückgängig“ unten (5 s). Ungültige Eingaben („9,,5“, leerer Name) werden nicht gespeichert, der Grund steht unten; ein zweites Zurück verwirft sie. Kein Doppel-Bestätigen für Werte: Das wäre genau das Tippen, das Fabian loswerden will, und eine falsche Zahl ist so leicht korrigiert wie eingegeben.
+- **„Letztes Mal“:** steht jetzt in jeder Übungskarte unter „3 Sätze · Pause“ („Letztes Mal: 60 × 8, 8“, zuerst aus diesem Workout, sonst überall), wie im laufenden Training. Das Aufklappen nur zum Anzeigen der letzten Werte entfällt, Karten sind wie im Training offen (Tipp auf den Kopf klappt zu).
+- **Start auf der Karte:** weißer runder ▶-Knopf (48 dp, Beschreibung „Push starten“) rechts auf jeder Workout-Karte mit Übungen statt des Pfeils; der Rest der Karte öffnet das Workout. Läuft schon ein Training, kein ▶ (ein Training gleichzeitig; oben steht dann „Läuft gerade“). Versehentliches Starten ist harmlos (Training abbrechen = Doppeltipp, nichts wird gespeichert).
+- **Vergangene Trainings bleiben Ansicht + Stift:** Die Trainingsansicht ist ein Protokoll mit Auswertung, Fotos, Muskelkarte, Teilen; Änderungen sind selten und verändern Statistik und Bestwerte. Ein ausdrückliches Bearbeiten mit Speichern/Verwerfen schützt die Historie besser als Autosave (mit BJ abgestimmt, die das Trainingsdetail für Fotos ändert).
+- **Neue Workouts und Importe** behalten „Speichern“: Es gibt noch nichts zu überschreiben, ein Import/Coach-Vorschlag soll bewusst übernommen werden, und Zurück verwirft ohne Spuren. Nach dem Speichern öffnet sich das neue Workout (bereit zum Starten).
+- CLAUDE.md angepasst (Stift-Regel gilt nur noch für vergangene Trainings).
+- **Sonnet-Gegencheck (behoben):** Ein mit Zurück abgebrochenes „Ersetzen“ machte das nächste „Übung hinzufügen“ zum Ersetzen (gilt jetzt wie im Training: Hinzufügen setzt den Ersetzen-Zustand zurück); ein unverändertes, aber formal ungültiges Workout (z. B. aus einem Import) ließ sich nicht verlassen/starten (unverändert = nichts zu prüfen); Zurück während des Ladens wurde verschluckt; Löschen + sofort Zurück konnte noch speichern; jeder Speicherfehler galt als „gelöscht“ (jetzt nur der fehlende Datensatz); Zurück nach ungültiger Eingabe brauchte drei statt zwei Tipps; Fehlermeldung blinkte beim Tippen auf (bei Autosave erscheint der Grund erst, wenn er Zurück/Starten blockiert). Tests: `FewerTapsTest.invalidValue_…`, `replaceLeftWithBack_…`.
+
 ## Fotos gehören zum Tag (8.11., Session BJ, Teil 1)
 - **Auftrag (Fabian, 8.11.):** „irgendwie kann man dem Workout ein Bild hinzufügen und irgendwie kann man dann auch dem Tag ein Bild
   hinzufügen. Das finde ich alles noch ein bisschen undurchsichtig.“ Entscheidung der Koordination: Fotos gehören zum Tag, nicht zum Training.
