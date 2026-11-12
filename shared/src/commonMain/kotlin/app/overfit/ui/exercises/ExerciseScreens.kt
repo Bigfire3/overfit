@@ -185,6 +185,8 @@ fun ExerciseDetailScreen(
     language: Language,
     /** Opened from a running workout: no editing (tracking, rest time, edit/delete), so nothing under the workout changes. */
     readOnly: Boolean = false,
+    /** Coach icon: opens the coach over this screen with this exercise attached (null = no icon). */
+    onCoach: ((exerciseId: String, name: String) -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val exercise by viewModel.exercise.collectAsStateWithLifecycle()
@@ -199,6 +201,7 @@ fun ExerciseDetailScreen(
         scroll = true,
         header = {
             BackHeader(t.back, onBack) {
+                if (onCoach != null && !readOnly) app.overfit.ui.components.CoachIconButton { onCoach(e.id, e.name) }
                 if (e.isCustom && !readOnly) {
                     HeaderIconButton(Icon.Edit, t.edit, { onEditCustom(e.id) })
                     HeaderDeleteButton(t.delete, onConfirm = { viewModel.delete { onBack() } })

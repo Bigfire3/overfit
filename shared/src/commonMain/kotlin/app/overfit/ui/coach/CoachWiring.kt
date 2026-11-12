@@ -90,6 +90,8 @@ internal fun createCoachChat(
     chat: app.overfit.chat.ChatFeature,
     today: () -> LocalDate,
     clock: () -> Long,
+    /** The workout running right now (for a "running" attachment), null = none. */
+    running: () -> app.overfit.domain.Workout? = { null },
 ): app.overfit.coach.CoachChatService = app.overfit.coach.CoachChatService(
     dao = data.database.coachChatDao(),
     access = coach::access,
@@ -112,7 +114,10 @@ internal fun createCoachChat(
             ),
             context = app.overfit.coach.ChatAttachmentText.build(
                 request.attachments,
-                app.overfit.coach.AttachmentSources(input.workouts, input.templates, s.profile.unit, s.language, clock()),
+                app.overfit.coach.AttachmentSources(
+                    input.workouts, input.templates, s.profile.unit, s.language, clock(),
+                    weights = s.weights, running = running(),
+                ),
                 chatStrings,
             ),
             exerciseList = coach.exerciseList(),

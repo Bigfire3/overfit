@@ -155,7 +155,6 @@ import app.overfit.ui.coach.chat.createCoachChatEnv
 import app.overfit.ui.coach.CoachMemoryScreen
 import app.overfit.ui.coach.CoachNav
 import app.overfit.ui.coach.CoachReviewScreen
-import app.overfit.ui.coach.CoachSessionScreen
 import app.overfit.ui.coach.CoachAccessScreen
 import app.overfit.ui.coach.CoachInstructionsScreen
 import app.overfit.ui.coach.CoachProfileScreen
@@ -214,9 +213,11 @@ class AppDependencies(
     /** KI-Chat-Verbindung (Claude, ChatGPT, Gemini): sync, inbox, notes. The coach memory goes along as memory/coach. */
     val chat: ChatFeature = ChatFeature(fuel, data, store, kv, data.scope, clock, memory = { coach.memoryText })
     /** Coach chat in the Coach tab (own key or Fuel, demo without access). */
-    val coachChat: app.overfit.coach.CoachChatService = app.overfit.ui.coach.createCoachChat(store, data, coach, chat, today, clock)
+    val coachChat: app.overfit.coach.CoachChatService = app.overfit.ui.coach.createCoachChat(store, data, coach, chat, today, clock, running = { workout.state.value.workout })
     /** Next chat the Coach tab opens (CoachChatRoute, automatic review after a training). */
     val coachChatRequests = CoachChatRequests()
+    /** The coach opened over a screen (coach icon in a header), see [app.overfit.ui.coach.chat.CoachOverlayRequest]. */
+    val coachOverlay = app.overfit.ui.coach.chat.CoachOverlay()
 
     /** Data of the Coach tab chat; built once (its model/cost flows live in the app scope). */
     val coachChatEnv: app.overfit.ui.coach.chat.CoachChatEnv by lazy { createCoachChatEnv(this) }
@@ -232,6 +233,59 @@ class AppDependencies(
             val training = app.overfit.coach.ChatAttachment.Training(sessionId, record?.workout?.name.orEmpty(), record?.workout?.startedAt)
             coachChatRequests.open(ChatOpenRequest(draft = s.reviewMyTraining, attachments = listOf(training)))
         }
+    }
+
+    // --- Coach icon in screen headers: the coach opens over the screen with its context (Fabian 8.11.) ---------------
+
+    private fun coachStrings() = coachChatStringsFor(store.state.value.language)
+
+    /** A finished training (calendar): the training as chip; a proposal applies to its saved workout, if it has one. */
+    fun openCoachForTraining(sessionId: String) {
+        data.scope.launch {
+            val record = data.workouts.record(sessionId) ?: return@launch
+            val template = record.workout.templateId?.let { data.templates.get(it) }
+            coachOverlay.open(
+                app.overfit.ui.coach.chat.CoachOverlayRequest(
+                    listOf(app.overfit.coach.ChatAttachment.Training(sessionId, record.workout.name, record.workout.startedAt)),
+                    template?.let { app.overfit.ui.coach.chat.ApplyTarget.Template(it.id, it.name) },
+                ),
+            )
+        }
+    }
+
+    /** A saved workout: the workout as chip; a proposal opens in its editor. */
+    fun openCoachForTemplate(templateId: Long) {
+        data.scope.launch {
+            val template = data.templates.get(templateId) ?: return@launch
+            coachOverlay.open(
+                app.overfit.ui.coach.chat.CoachOverlayRequest(
+                    listOf(app.overfit.coach.ChatAttachment.Plan(template.id, template.name)),
+                    app.overfit.ui.coach.chat.ApplyTarget.Template(template.id, template.name),
+                ),
+            )
+        }
+    }
+
+    /** The running workout: as chip with done and open sets; a proposal changes it directly (with undo). */
+    fun openCoachForRunning() {
+        val w = workout.state.value.workout ?: return
+        coachOverlay.open(
+            app.overfit.ui.coach.chat.CoachOverlayRequest(
+                listOf(app.overfit.coach.ChatAttachment.Running(w.id, coachStrings().runningLabel(w.name))),
+                app.overfit.ui.coach.chat.ApplyTarget.Running(w.id, w.name),
+            ),
+        )
+    }
+
+    /** A calendar day: the day (trainings, body weight) as chip. */
+    fun openCoachForDay(date: LocalDate) {
+        val label = coachStrings().dayLabel(app.overfit.i18n.stringsFor(store.state.value.language).date(date))
+        coachOverlay.open(app.overfit.ui.coach.chat.CoachOverlayRequest(listOf(app.overfit.coach.ChatAttachment.Day(date.toString(), label))))
+    }
+
+    /** An exercise: its best values and progress as chip. */
+    fun openCoachForExercise(exerciseId: String, name: String) {
+        coachOverlay.open(app.overfit.ui.coach.chat.CoachOverlayRequest(listOf(app.overfit.coach.ChatAttachment.Exercise(exerciseId, name))))
     }
 
     init {
@@ -328,7 +382,6 @@ class AppDependencies(
 @Serializable data object CoachProfileRoute
 @Serializable data object CoachInstructionsRoute
 @Serializable data object CoachPromptsRoute
-@Serializable data class CoachSessionRoute(val sessionId: String)
 @Serializable data class CoachReviewRoute(val reviewId: String)
 @Serializable data class CoachDemoRoute(val sessionId: String)
 @Serializable data object AboutRoute
@@ -427,12 +480,10 @@ fun OverfitApp(deps: AppDependencies) {
                     connect = { nav.navigate(ConnectRoute) },
                     fuel = { nav.navigate(FuelRoute) },
                     openReview = { nav.navigate(CoachReviewRoute(it)) },
-                    openSession = { nav.navigate(CoachSessionRoute(it)) },
                     demo = { nav.navigate(CoachDemoRoute(it)) },
                     memory = { nav.navigate(CoachMemoryRoute) },
                     settings = { nav.navigate(CoachInstructionsRoute) },
                     openTemplate = { nav.navigate(WorkoutPlanRoute(it)) },
-                    reviewInChat = { id -> deps.openTrainingReview(id); nav.selectTab(Tab.COACH) },
                 )
             }
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
@@ -580,6 +631,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onDelete = { deps.data.scope.launch { deps.data.templates.delete(id) } },
                             onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
                             loadLast = { deps.data.workouts.lastPerformance(it, id) },
+                            onCoach = { deps.openCoachForTemplate(id) },
                         )
                     }
                     composable<WorkoutRoute> {
@@ -606,6 +658,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onClosed = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                             onMinimize = { if (!nav.popBackStack()) nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                             onFinished = { id -> nav.navigate(FinishRoute(id)) { popUpTo(StartRoute) } },
+                            onCoach = deps::openCoachForRunning,
                         )
                     }
                     composable<FinishRoute> { entry ->
@@ -661,6 +714,7 @@ fun OverfitApp(deps: AppDependencies) {
                                 }
                             },
                             onRemovePhoto = { id -> deps.data.scope.launch { deps.data.workouts.deletePhoto(id) } },
+                            onCoach = { deps.openCoachForDay(date) },
                         )
                     }
                     composable<WorkoutDetailRoute> { entry ->
@@ -678,7 +732,7 @@ fun OverfitApp(deps: AppDependencies) {
                             onOpenPhoto = { nav.navigate(PhotoViewerRoute(it)) },
                             onTemplateCreated = { nav.navigate(WorkoutPlanRoute(it)) },
                             onShare = { nav.navigate(WorkoutShareRoute(id, withActual = true)) },
-                            onCoach = { nav.navigate(CoachSessionRoute(id)) },
+                            onCoach = { deps.openCoachForTraining(id) },
                             onEdit = { nav.navigate(WorkoutEditRoute(id)) },
                             onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
                         )
@@ -735,6 +789,7 @@ fun OverfitApp(deps: AppDependencies) {
                             language = state.language,
                             onBack = nav::popBackStack,
                             onEditCustom = { nav.navigate(CustomExerciseRoute(id = it)) },
+                            onCoach = deps::openCoachForExercise,
                         )
                     }
                     composable<CustomExerciseRoute> { entry ->
@@ -1044,9 +1099,6 @@ fun OverfitApp(deps: AppDependencies) {
                             onBack = nav::popBackStack,
                         )
                     }
-                    composable<CoachSessionRoute> { entry ->
-                        CoachSessionScreen(deps.coach, entry.toRoute<CoachSessionRoute>().sessionId, state.profile.unit, state.language, coachNav)
-                    }
                     composable<CoachReviewRoute> { entry ->
                         CoachReviewScreen(deps.coach, entry.toRoute<CoachReviewRoute>().reviewId, state.profile.unit, state.language, coachNav)
                     }
@@ -1080,6 +1132,8 @@ fun OverfitApp(deps: AppDependencies) {
                     composable<RecoveryRoute> { RecoveryScreen(deps.fuelSession, onBack = nav::popBackStack, onRestored = {}) }
                 }
             }
+            // The coach opened from a screen lies over everything (also over the running workout and the tab bar).
+            CoachOverlayHost(deps, state, nav, editorSeeds)
             }
         }
     }

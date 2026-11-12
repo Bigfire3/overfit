@@ -63,6 +63,7 @@ import app.overfit.coach.ChatCost
 import app.overfit.coach.ChatPricing
 import app.overfit.coach.TokenEstimate
 import app.overfit.i18n.LocalStrings
+import kotlinx.coroutines.launch
 import app.overfit.coach.key
 import app.overfit.data.DiaryPhoto
 import app.overfit.i18n.CoachChatStrings
@@ -124,13 +125,18 @@ fun CoachChatTabScreen(
      */
     openedChatId: String? = null,
     onBack: () -> Unit = {},
+    /** Opened from a screen (coach icon): its context as chips, a close button instead of the tab's header icons. */
+    overlay: CoachOverlayRequest? = null,
+    onClose: () -> Unit = {},
+    /** Proposal cards apply to the screen the coach was opened from (diff + apply); null = the normal import. */
+    proposals: ProposalHandler? = null,
 ) {
     val s = chatStrings()
     var chatId by rememberSaveable { mutableStateOf(openedChatId.orEmpty()) }
     var input by rememberSaveable { mutableStateOf("") }
-    var pending by rememberSaveable(stateSaver = AttachmentListSaver) { mutableStateOf(emptyList()) }
-    /** New chat: the user removed the automatic "last training" chip. */
-    var trainingRemoved by rememberSaveable { mutableStateOf(false) }
+    var pending by rememberSaveable(stateSaver = AttachmentListSaver) { mutableStateOf(overlay?.attachments ?: emptyList()) }
+    /** New chat: the user removed the automatic "last training" chip (an opened coach brings its own context). */
+    var trainingRemoved by rememberSaveable { mutableStateOf(overlay != null) }
     /** New chat: the user removed the profile chip. */
     var newProfileOff by rememberSaveable { mutableStateOf(false) }
     var sheet by rememberSaveable { mutableStateOf(false) }
@@ -213,13 +219,16 @@ fun CoachChatTabScreen(
                 .padding(horizontal = Gutter),
         ) {
             Spacer(Modifier.height(Space.m))
-            if (openedChatId != null) OpenedChatHeader(chatRow?.title.orEmpty(), onBack)
-            else ChatHeader(s, onStory, onHistory, ::newChat, creditChip)
+            when {
+                overlay != null -> OverlayHeader(s, creditChip, onClose)
+                openedChatId != null -> OpenedChatHeader(chatRow?.title.orEmpty(), onBack)
+                else -> ChatHeader(s, onStory, onHistory, ::newChat, creditChip)
+            }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (chatId.isEmpty() && messages.isEmpty()) {
                     Suggestions(s.suggestions) { input = it }
                 } else {
-                    Conversation(messages, photos, templateNames, s, onApplyWorkout) { env.chat.retry(it) }
+                    Conversation(messages, photos, templateNames, s, onApplyWorkout, proposals) { env.chat.retry(it) }
                 }
             }
             ContextChips(
@@ -323,6 +332,16 @@ private fun ChatHeader(s: CoachChatStrings, onStory: () -> Unit, onHistory: () -
     }
 }
 
+/** Header of the coach opened over a screen: "Coach", credit chip, close. */
+@Composable
+private fun OverlayHeader(s: CoachChatStrings, creditChip: @Composable () -> Unit, onClose: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+        Title(s.title, Modifier.weight(1f))
+        creditChip()
+        HeaderIcon(Icon.Close, s.close, "coach:close", onClose)
+    }
+}
+
 /** Header of an earlier chat opened from the list: back arrow and the chat's title. */
 @Composable
 private fun OpenedChatHeader(title: String, onBack: () -> Unit) {
@@ -387,6 +406,7 @@ private fun Conversation(
     templateNames: Set<String>,
     s: CoachChatStrings,
     onApply: (String) -> Unit,
+    proposals: ProposalHandler?,
     onRetry: (String) -> Unit,
 ) {
     val list = rememberLazyListState()
@@ -396,7 +416,7 @@ private fun Conversation(
     LazyColumn(Modifier.fillMaxSize(), state = list, verticalArrangement = Arrangement.spacedBy(Space.m)) {
         item { Spacer(Modifier.height(Space.xs)) }
         items(messages, key = { it.id }) { m ->
-            if (m.fromUser) UserMessage(m, photos) else CoachMessage(m, templateNames, s, onApply, onRetry)
+            if (m.fromUser) UserMessage(m, photos) else CoachMessage(m, templateNames, s, onApply, proposals, onRetry)
         }
         item { Spacer(Modifier.height(Space.s)) }
     }
@@ -465,10 +485,19 @@ internal fun ChatAttachment.icon(): Icon = when (this) {
     is ChatAttachment.History -> Icon.List
     is ChatAttachment.Exercise -> Icon.Exercises
     is ChatAttachment.Photo -> Icon.Photos
+    is ChatAttachment.Running -> Icon.Workouts
+    is ChatAttachment.Day -> Icon.Today
 }
 
 @Composable
-private fun CoachMessage(m: ChatMessage, templateNames: Set<String>, s: CoachChatStrings, onApply: (String) -> Unit, onRetry: (String) -> Unit) {
+private fun CoachMessage(
+    m: ChatMessage,
+    templateNames: Set<String>,
+    s: CoachChatStrings,
+    onApply: (String) -> Unit,
+    proposals: ProposalHandler?,
+    onRetry: (String) -> Unit,
+) {
     val language = LocalFuelStrings.current.language
     Column(Modifier.fillMaxWidth().testTag("chat:coach")) {
         when (m.status) {
@@ -484,7 +513,10 @@ private fun CoachMessage(m: ChatMessage, templateNames: Set<String>, s: CoachCha
             ChatMessageStatus.DONE -> {
                 if (m.text.isNotBlank()) NoteBody(m.text)
                 val w = m.workout
-                if (w != null && m.workoutJson != null) WorkoutCard(w, w.name in templateNames, s) { onApply(m.workoutJson) }
+                if (w != null && m.workoutJson != null) {
+                    if (proposals != null) ChangeCard(m.id, m.workoutJson, proposals, s)
+                    else WorkoutCard(w, w.name in templateNames, s) { onApply(m.workoutJson) }
+                }
                 if (m.demo) Text(s.demoHint, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
                 Spacer(Modifier.height(Space.xs))
                 when {
@@ -525,6 +557,57 @@ private fun WorkoutCard(w: SharedTraining, isChange: Boolean, s: CoachChatString
 
 private const val MAX_CARD_EXERCISES = 5
 
+/**
+ * Proposal in a coach opened from a screen: what changes for exactly that workout (diff lines), "Apply" changes it
+ * (running workout: right away, with "Undo"; saved workout: opens its editor with the proposal).
+ */
+@Composable
+private fun ChangeCard(messageId: String, json: String, proposals: ProposalHandler, s: CoachChatStrings) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val diff by androidx.compose.runtime.produceState<List<String>?>(null, json) {
+        value = try { proposals.diff(json) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { emptyList() }
+    }
+    // Applied in this chat (survives scrolling, not a restart: the workout itself keeps the change).
+    var applied by remember(messageId) { mutableStateOf<app.overfit.ui.coach.chat.AppliedChange?>(null) }
+    var busy by remember(messageId) { mutableStateOf(false) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = Space.m)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Theme.colors.surface)
+            .padding(Space.m)
+            .testTag("chat:change"),
+    ) {
+        Text(proposals.title, style = Theme.type.label)
+        Spacer(Modifier.height(Space.s))
+        val lines = diff
+        when {
+            lines == null -> Unit
+            lines.isEmpty() -> Text(s.changeNone, style = Theme.type.caption, tone = Tone.Muted)
+            else -> lines.forEach { Text(it, Modifier.padding(vertical = 2.dp).testTag("chat:diff"), style = Theme.type.caption, tone = Tone.Muted) }
+        }
+        Spacer(Modifier.height(Space.m))
+        val done = applied
+        if (done == null) {
+            PrimaryButton(s.apply, {
+                if (!busy) {
+                    busy = true
+                    scope.launch {
+                        try { applied = proposals.apply(json) } finally { busy = false }
+                    }
+                }
+            }, modifier = Modifier.testTag("chat:apply"), compact = true, loading = busy)
+        } else {
+            done.note?.let { Text(it, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(s.applied, Modifier.weight(1f).testTag("chat:applied"))
+                SmallButton(LocalStrings.current.undo, { done.undo(); applied = null }, modifier = Modifier.testTag("chat:undo"))
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Context chips
 
@@ -552,6 +635,8 @@ private fun ContextChips(
                 is ChatAttachment.History -> "chip:history"
                 is ChatAttachment.Exercise -> "chip:exercise"
                 is ChatAttachment.Photo -> "chip:photo"
+                is ChatAttachment.Running -> "chip:running"
+                is ChatAttachment.Day -> "chip:day"
             }
             val text = attachmentText(a)
             ContextChip(text, a.icon(), s.remove(text), tag, onClick = null, onRemove = { onRemove(a) })

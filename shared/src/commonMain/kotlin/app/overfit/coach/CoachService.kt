@@ -111,11 +111,6 @@ class CoachService(
     /** Runs [block] in the app scope (UI actions that must not be cancelled by leaving the screen). */
     fun launch(block: suspend () -> Unit): Job = scope.launch { block() }
 
-    /** Non-suspending entry for the UI: queue a session review and send it in the app scope. */
-    fun startSessionReview(sessionId: String): Job = scope.launch {
-        try { requestSessionReview(sessionId) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
-    }
-
     /** Non-suspending entry for the UI; the id is known right away so the screen can observe it. */
     fun startProgressReview(): String {
         val id = newId()

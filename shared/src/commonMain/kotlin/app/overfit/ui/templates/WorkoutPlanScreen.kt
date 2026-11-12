@@ -80,6 +80,8 @@ fun WorkoutPlanScreen(
     onExerciseDetails: (String) -> Unit = {},
     /** "Last time" of an exercise (preferably in this workout); null = never done. Shown when its card is opened. */
     loadLast: suspend (exerciseId: String) -> LastPerformance? = { null },
+    /** Coach icon: opens the coach over this screen with this workout attached (null = no icon). */
+    onCoach: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     var template by remember(templateId) { mutableStateOf<Template?>(null) }
@@ -107,6 +109,7 @@ fun WorkoutPlanScreen(
         header = {
             BackHeader(t.back, onBack) {
                 if (w != null) {
+                    if (onCoach != null) app.overfit.ui.components.CoachIconButton(onCoach)
                     HeaderIconButton(Icon.Edit, t.edit, onEdit)
                     HeaderIconButton(Icon.Share, t.share.shareTemplate, onShare)
                     HeaderDeleteButton(t.deleteTemplate, onDelete)

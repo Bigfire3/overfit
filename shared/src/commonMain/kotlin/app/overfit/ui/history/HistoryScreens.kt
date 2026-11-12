@@ -123,7 +123,7 @@ fun WorkoutDetailScreen(
     onShare: () -> Unit,
     /** Accepted notes from the AI chat that belong to this workout. */
     chatNotes: List<ChatNote> = emptyList(),
-    /** Coach review of this workout (phase 4). */
+    /** Coach icon: opens the coach over this screen with this training attached (null = no icon). */
     onCoach: (() -> Unit)? = null,
     /** Edit sets, feeling, sauna and note afterwards. */
     onEdit: (() -> Unit)? = null,
@@ -149,6 +149,7 @@ fun WorkoutDetailScreen(
     Screen(scroll = true, header = {
         BackHeader(t.back, onBack) {
             if (data != null) {
+                if (onCoach != null) app.overfit.ui.components.CoachIconButton(onCoach)
                 if (onEdit != null) HeaderIconButton(Icon.Edit, h.editWorkout, onEdit)
                 HeaderIconButton(Icon.Share, h.shareWorkout, onShare)
                 HeaderDeleteButton(t.delete, onConfirm = {
@@ -248,7 +249,6 @@ fun WorkoutDetailScreen(
                     withContext(Dispatchers.Main) { onTemplateCreated(id) }
                 }
             })
-            if (onCoach != null) ListRow(app.overfit.i18n.LocalCoachStrings.current.reviewTitle, onClick = onCoach)
         }
     }
 }
