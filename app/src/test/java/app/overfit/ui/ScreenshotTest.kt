@@ -90,7 +90,9 @@ open class ScreenshotTest {
         node.performClick()
     }
     private fun tab(name: String) {
-        val tabNode = hasText(name) and hasClickAction()
+        // Only the bottom-bar tab (role Tab): the Coach tab also has a "Profil" chip.
+        val tabNode = hasText(name) and hasClickAction() and
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Tab)
         repeat(4) {
             if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
             if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) {
