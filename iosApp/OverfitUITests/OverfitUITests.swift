@@ -194,6 +194,8 @@ final class ScreenshotTests: OverfitUITestCase {
         waitFor("Push").tap()
         waitFor("Starten")
         shot("03-workout-detail")
+        // Share sits in the ⋮ of the header since the UI audit (12.11.).
+        tap("Weitere Optionen")
         tap("Teilen")
         waitFor("Link kopieren")
         shot("04-teilen")
