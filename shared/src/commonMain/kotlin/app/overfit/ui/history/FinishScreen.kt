@@ -72,9 +72,12 @@ fun FinishScreen(
     unit: WeightUnit,
     language: Language,
     appScope: CoroutineScope,
-    coachSection: @Composable (String) -> Unit,
+    /** Coach card; its callback saves like "Save" and then calls [onReview] instead of [onClose]. */
+    coachSection: @Composable (workoutId: String, onReview: () -> Unit) -> Unit,
     onSaved: (String) -> Unit,
     onClose: () -> Unit,
+    /** "Get this training reviewed": after saving, open the coach chat with this training attached (nothing is sent). */
+    onReview: (String) -> Unit = { onClose() },
     /** Renames the finished workout and its saved workout (runs in [appScope]). */
     rename: suspend (workout: Workout, name: String) -> Unit = { _, _ -> },
 ) {
@@ -111,7 +114,7 @@ fun FinishScreen(
     }
     var saving by remember { mutableStateOf(false) }
 
-    val save = {
+    fun save(review: Boolean) {
         if (!saving) {
             saving = true
             val noteText = note
@@ -130,12 +133,12 @@ fun FinishScreen(
                 }
                 withContext(Dispatchers.Main) {
                     onSaved(workoutId)
-                    onClose()
+                    if (review) onReview(workoutId) else onClose()
                 }
             }
         }
-        Unit
     }
+    val save = { save(review = false) }
 
     // System back (Android gesture/button) saves note and feeling like the header back button does.
     androidx.compose.ui.backhandler.BackHandler(enabled = true, onBack = save)
@@ -182,7 +185,7 @@ fun FinishScreen(
         Hint(h.photosPrivate)
 
         Spacer(Modifier.height(Space.l))
-        coachSection(workoutId)
+        coachSection(workoutId) { save(review = true) }
     }
 }
 

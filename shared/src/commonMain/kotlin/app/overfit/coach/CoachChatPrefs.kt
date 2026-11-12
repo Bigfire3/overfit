@@ -58,14 +58,15 @@ data class AthleteProfile(
 /**
  * Settings of the coach chat, apart from [CoachSettings] (own key, so both can change independently):
  * - [profile]: the coach profile,
- * - [addition]: "Deine Ergänzung", appended to the system prompt of every request (every model, own key too),
- * - [autoReview]: after a finished training a new chat with the training attached asks "Review my training".
+ * - [addition]: "Deine Ergänzung", appended to the system prompt of every request (every model, own key too).
+ *
+ * Until 8.11. there was `autoReview` (a review chat sent by itself after every training). It is gone: no AI request
+ * leaves without a tap of the user. Stored prefs that still carry the key are rewritten without it on load.
  */
 @Serializable
 data class CoachChatPrefs(
     val profile: AthleteProfile = AthleteProfile(),
     val addition: String = "",
-    val autoReview: Boolean = true,
 ) {
     companion object {
         const val ADDITION_MAX = 2_000
@@ -77,8 +78,13 @@ class CoachChatPrefsStore(private val kv: KeyValueStore) {
     private val _state = MutableStateFlow(load())
     val state: StateFlow<CoachChatPrefs> = _state.asStateFlow()
 
-    private fun load(): CoachChatPrefs =
-        kv.get(KEY)?.let { runCatching { json.decodeFromString<CoachChatPrefs>(it) }.getOrNull() } ?: CoachChatPrefs()
+    private fun load(): CoachChatPrefs {
+        val raw = kv.get(KEY) ?: return CoachChatPrefs()
+        val prefs = runCatching { json.decodeFromString<CoachChatPrefs>(raw) }.getOrNull() ?: return CoachChatPrefs()
+        // Migration: drop the removed "automatic review" switch from the stored JSON (everything else stays).
+        if (raw.contains("\"$LEGACY_AUTO_REVIEW\"")) kv.put(KEY, json.encodeToString(CoachChatPrefs.serializer(), prefs))
+        return prefs
+    }
 
     private fun edit(block: (CoachChatPrefs) -> CoachChatPrefs) {
         _state.update(block)
@@ -97,7 +103,6 @@ class CoachChatPrefsStore(private val kv: KeyValueStore) {
     }
 
     fun setAddition(text: String) = edit { it.copy(addition = text.trim().take(CoachChatPrefs.ADDITION_MAX)) }
-    fun setAutoReview(on: Boolean) = edit { it.copy(autoReview = on) }
     fun replace(prefs: CoachChatPrefs) = edit { prefs }
     fun reset() { kv.remove(KEY); _state.value = CoachChatPrefs() }
 
@@ -117,7 +122,11 @@ class CoachChatPrefsStore(private val kv: KeyValueStore) {
         settings.setInstructions(null)
     }
 
-    companion object { const val KEY = "overfit.coachChat.v1" }
+    companion object {
+        const val KEY = "overfit.coachChat.v1"
+        /** Key of the removed automatic-review switch (older app versions and backups). */
+        const val LEGACY_AUTO_REVIEW = "autoReview"
+    }
 }
 
 /** System prompt instructions: the Overfit base text plus the user's addition (if any). */

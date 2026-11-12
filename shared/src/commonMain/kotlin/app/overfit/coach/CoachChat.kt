@@ -152,6 +152,8 @@ object CoachChatPrompt {
             appendLine()
             appendLine(CoachChatSchema.RULES)
             appendLine()
+            appendLine(WeightRules.TEXT)
+            appendLine()
             appendLine("Example of a workout in the share format v1 (as the string value of \"workout\"):")
             appendLine(app.overfit.share.AiPrompt.EXAMPLE)
             appendLine()
@@ -282,6 +284,23 @@ class CoachChatService(
     /** Old call shape (tests). */
     suspend fun sendNow(chatId: String, text: String, photoIds: List<String> = emptyList()) =
         sendNow(chatId, ChatSendRequest(text, photoIds.map { ChatAttachment.Photo(it) }))
+
+    /**
+     * Input tokens the next question of [chatId] (null = new chat) would send with [request]: built with the same
+     * system prompt, attachments of the chat so far, history and photos as [sendNow], without sending anything. The
+     * question text of [request] counts too; the UI adds what is typed later through [TokenEstimate.plusText].
+     */
+    suspend fun estimate(chatId: String?, request: ChatSendRequest): TokenEstimate {
+        val earlier = chatId?.takeIf { it.isNotEmpty() }?.let { dao.messages(it) }.orEmpty()
+        val attachments = request.attachments.distinctBy { it.key() }
+        val photos = attachments.count { it is ChatAttachment.Photo }
+        val virtual = CoachChatMessageEntity(
+            id = "estimate", chatId = chatId.orEmpty(), fromUser = true, text = request.text, status = ChatMessageStatus.DONE.name,
+            createdAt = 0, attachments = ChatAttachment.encode(attachments),
+        )
+        val prompt = CoachChatPrompt.build(parts(contextOf(earlier + virtual, request.includeProfile)), CoachChatPrompt.history(earlier), request.text)
+        return ChatTokens.estimate(prompt, photos)
+    }
 
     /** Profile chip of an existing chat. */
     fun setProfileIncluded(chatId: String, included: Boolean): Job = scope.launch {

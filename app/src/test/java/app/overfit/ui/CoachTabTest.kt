@@ -245,15 +245,26 @@ class CoachTabTest {
         waitForTag("chat:suggestion:0")
         assertTrue(compose.onAllNodes(hasTestTag("chat:user")).fetchSemanticsNodes().isEmpty())
 
-        // Earlier chats → open it again.
+        // Earlier chats → the chat opens completely in its own screen (Fabian 8.11.: "man kann da nicht rein").
         compose.onNodeWithTag("coach:history").performClick()
         waitForTag("history:item")
         compose.onNodeWithTag("history:item").performClick()
+        waitForTag("chat:back")
         waitForTag("chat:user")
         waitFor("Probier das hier.")
+        // Attachment card, the proposal and the model line are there too.
+        waitForTag("chat:workout")
+        waitFor("eigener Schlüssel", substring = true)
+        // Writing on continues this chat (history goes along).
+        ask("Und weiter?")
+        compose.waitUntilState(10_000) { chatPrompts().size == 2 }
+        assertEquals(2, chatPrompts().last().history.size)
+        assertEquals(1, runBlocking { database.coachChatDao().allChats() }.size)
+        // Back → the list again.
+        compose.onNodeWithTag("chat:back").performClick()
+        waitForTag("history:item")
 
         // Delete: first tap arms (still stored), second deletes.
-        compose.onNodeWithTag("coach:history").performClick()
         waitForTag("history:delete")
         compose.onNodeWithTag("history:delete").performClick()
         compose.onNodeWithTag("confirm:armed").assertExists()
@@ -262,6 +273,22 @@ class CoachTabTest {
         compose.waitUntilState(10_000) { runBlocking { database.coachChatDao().allChats() }.isEmpty() }
         waitFor("Noch keine Chats.")
         assertTrue(runBlocking { database.coachChatDao().allMessages() }.isEmpty())
+    }
+
+    // Fabian 8.11.: "Man sieht keinen Preis, man sieht nichts." The send button always says what it costs.
+    @Test
+    fun sendButtonShowsOwnKeyOrDemo() {
+        setUp(withKey = true)
+        // The price sits inside the send button (merged into its semantics).
+        waitFor("eigener Schlüssel")
+        compose.onNodeWithTag("coach:send").assertExists()
+        assertTrue(fake.prompts.isEmpty())
+    }
+
+    @Test
+    fun withoutAccessTheSendButtonSaysDemo() {
+        setUp(withKey = false)
+        waitFor("Demo · kostenlos")
     }
 
     @Test
@@ -274,19 +301,25 @@ class CoachTabTest {
         assertTrue(fake.prompts.isEmpty())
     }
 
+    // 8.11.: a request from elsewhere only fills the chat; the user sends it.
     @Test
-    fun openRequestSendsRightAwayWithItsAttachment() {
+    fun openRequestFillsTheChatButNeverSends() {
         setUp(withKey = true, openTab = false)
         deps.coachChatRequests.open(
-            ChatOpenRequest(draft = "Werte mein Training aus", attachments = listOf(ChatAttachment.Training("w1", "Push · heute")), send = true),
+            ChatOpenRequest(draft = "Werte mein Training aus", attachments = listOf(ChatAttachment.Training("w1", "Push · heute"))),
         )
         compose.onNodeWithTag("tab:COACH").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasSetTextAction() and hasText("Werte mein Training aus")).fetchSemanticsNodes().isNotEmpty() }
+        waitForTag("chip:training")
+        compose.waitUntilState(10_000) { deps.coachChatRequests.pending.value == null }
+        compose.waitForIdle()
+        assertTrue(fake.prompts.isEmpty())
+        compose.onNodeWithTag("coach:send").performClick()
         compose.waitUntilState(10_000) { chatPrompts().size == 1 }
         val prompt = chatPrompts().last()
         assertEquals("Werte mein Training aus", prompt.user)
         assertTrue(prompt.dynamicSystem, prompt.dynamicSystem.contains("## Attached training"))
         waitFor("Probier das hier.")
-        compose.waitUntilState(10_000) { deps.coachChatRequests.pending.value == null }
     }
 
     @Test

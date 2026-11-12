@@ -4,6 +4,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -204,13 +205,12 @@ class CoachSettingsTest {
         assertTrue(runBlocking { database.coachChatDao().allChats() }.isEmpty())
     }
 
+    // 8.11.: no automatic review any more, so no switch for it.
     @Test
-    fun autoReviewSwitchTogglesThePreference() {
+    fun automaticReviewSwitchIsGone() {
         setUp()
-        assertTrue(data.coachChatPrefs.state.value.autoReview)
-        compose.onNodeWithTag("coach:auto-review").performScrollTo().performClick()
-        compose.waitUntilState { !data.coachChatPrefs.state.value.autoReview }
-        compose.onNodeWithTag("coach:auto-review").performClick()
-        compose.waitUntilState { data.coachChatPrefs.state.value.autoReview }
+        compose.waitForIdle()
+        compose.onNodeWithTag("coach:auto-review").assertDoesNotExist()
+        compose.onAllNodes(hasText("Automatische Auswertung", substring = true)).assertCountEquals(0)
     }
 }

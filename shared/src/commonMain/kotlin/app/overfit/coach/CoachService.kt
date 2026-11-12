@@ -43,8 +43,8 @@ data class CoachProfile(val block: String, val language: Language)
 /**
  * The coach: builds requests, sends them through the current provider, parses and stores the answer, keeps the
  * queue. Every request is a row in `coach_review`; it stays QUEUED while there is no network (or a timeout / rate
- * limit / server error happened) and is sent again on [processQueue] (app start, app back in the foreground, new
- * request, "Try again"). Non-recoverable problems (no access, invalid key, no Fuel left, invalid answer twice) end in
+ * limit / server error happened) and is sent again on "Try again" (since 8.11. never by itself on app start or in the
+ * foreground: [parkQueue] turns old queued rows into FAILED). Non-recoverable problems (no access, invalid key, no Fuel left, invalid answer twice) end in
  * FAILED and wait for "Try again".
  *
  * All work runs in [scope] (the app scope), so leaving a screen never cancels a request.
@@ -117,16 +117,6 @@ class CoachService(
         try { requestSessionReview(sessionId) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
     }
 
-    /** Non-suspending entry for the UI; the id is known right away so the screen can observe it. */
-    fun startProgressReview(): String {
-        val id = newId()
-        scope.launch {
-            dao.upsert(newRow(id, null, ReviewKind.PROGRESS))
-            sendPending()
-        }
-        return id
-    }
-
     /** Name of the workout and its template (demo review). */
     suspend fun sessionAndTemplate(sessionId: String): Pair<String, Template?> {
         val s = dao.session(sessionId)?.session ?: return "" to null
@@ -172,6 +162,16 @@ class CoachService(
     }
 
     suspend fun delete(id: String) = dao.delete(id)
+
+    /**
+     * Requests still queued from older app versions (offline queue) are not sent by themselves any more: no AI request
+     * leaves without a tap (Fabian, 8.11.). They fail with "Try again", which the user can tap in the review.
+     */
+    fun parkQueue(): Job = scope.launch {
+        try {
+            mutex.withLock { dao.pending().forEach { fail(it, CoachErrorKind.NETWORK, null) } }
+        } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+    }
 
     /** Sends everything that is queued; returns immediately, the work runs in the app scope. */
     fun processQueue(): Job = scope.launch {

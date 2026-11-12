@@ -66,7 +66,6 @@ internal fun CoachSettingsSection(
     val c = LocalCoachStrings.current
     val t = LocalStrings.current
     val settings by coach.settings.state.collectAsState()
-    val chatPrefs by prefs.state.collectAsState()
     val reviews by coach.reviews.collectAsState(initial = emptyList())
     val fuel = state.providerId == ProviderId.FUEL
     val ownKey = !fuel && state.hasApiKey
@@ -85,11 +84,6 @@ internal fun CoachSettingsSection(
         Hint(c.hub.accessOwnKeyPrivacy(providers.get(state.providerId).label), Modifier.testTag("coach:access-privacy"))
     }
 
-    Spacer(Modifier.height(Space.m))
-    Panel {
-        SwitchRow(s.autoReview, chatPrefs.autoReview, Modifier.testTag("coach:auto-review"), onCheckedChange = prefs::setAutoReview)
-    }
-    Hint(s.autoReviewHint)
 
     Spacer(Modifier.height(Space.m))
     Panel {
