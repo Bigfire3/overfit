@@ -39,7 +39,6 @@ data class PhotoStrings(
     val dayTrainings: String,
     val dayNoTraining: String,
     val dayPhotos: String,
-    val dayNoPhotos: String,
 
     val backupSection: String,
     val backupExport: String,
@@ -107,7 +106,6 @@ val PhotoGerman = PhotoStrings(
     dayTrainings = "Trainings",
     dayNoTraining = "An diesem Tag kein Training.",
     dayPhotos = "Fotos",
-    dayNoPhotos = "Noch keine Fotos an diesem Tag.",
 
     backupSection = "Backup",
     backupExport = "Backup exportieren",
@@ -170,7 +168,6 @@ val PhotoEnglish = PhotoStrings(
     dayTrainings = "Workouts",
     dayNoTraining = "No workout on this day.",
     dayPhotos = "Photos",
-    dayNoPhotos = "No photos on this day yet.",
 
     backupSection = "Backup",
     backupExport = "Export backup",

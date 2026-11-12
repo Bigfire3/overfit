@@ -119,13 +119,12 @@ internal fun createCoachChat(
         )
     },
     photos = { ids ->
-        val zone = kotlinx.datetime.TimeZone.currentSystemDefault()
         val all = data.workouts.allPhotos().associateBy { it.id }
         ids.mapNotNull { id ->
             val photo = all[id] ?: return@mapNotNull null
             val jpeg = data.workouts.readPhoto(photo)?.let { prepareJpeg(it, maxEdge = 1500) } ?: return@mapNotNull null
-            val date = kotlin.time.Instant.fromEpochMilliseconds(photo.takenAt).toLocalDateTime(zone).date.toString()
-            app.overfit.coach.CoachImage(date, jpeg)
+            // Label = the photo's calendar day (v14), the same day the calendar shows it on.
+            app.overfit.coach.CoachImage(photo.date.toString(), jpeg)
         }
     },
     demo = {

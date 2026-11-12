@@ -1592,3 +1592,32 @@ Fabian: drei Opus-Chat-Anfragen (Guthaben) mit „Error: No connection“, Konto
 - **Neue Workouts und Importe** behalten „Speichern“: Es gibt noch nichts zu überschreiben, ein Import/Coach-Vorschlag soll bewusst übernommen werden, und Zurück verwirft ohne Spuren. Nach dem Speichern öffnet sich das neue Workout (bereit zum Starten).
 - CLAUDE.md angepasst (Stift-Regel gilt nur noch für vergangene Trainings).
 - **Sonnet-Gegencheck (behoben):** Ein mit Zurück abgebrochenes „Ersetzen“ machte das nächste „Übung hinzufügen“ zum Ersetzen (gilt jetzt wie im Training: Hinzufügen setzt den Ersetzen-Zustand zurück); ein unverändertes, aber formal ungültiges Workout (z. B. aus einem Import) ließ sich nicht verlassen/starten (unverändert = nichts zu prüfen); Zurück während des Ladens wurde verschluckt; Löschen + sofort Zurück konnte noch speichern; jeder Speicherfehler galt als „gelöscht“ (jetzt nur der fehlende Datensatz); Zurück nach ungültiger Eingabe brauchte drei statt zwei Tipps; Fehlermeldung blinkte beim Tippen auf (bei Autosave erscheint der Grund erst, wenn er Zurück/Starten blockiert). Tests: `FewerTapsTest.invalidValue_…`, `replaceLeftWithBack_…`.
+
+## Fotos gehören zum Tag (8.11., Session BJ, Teil 1)
+- **Auftrag (Fabian, 8.11.):** „irgendwie kann man dem Workout ein Bild hinzufügen und irgendwie kann man dann auch dem Tag ein Bild
+  hinzufügen. Das finde ich alles noch ein bisschen undurchsichtig.“ Entscheidung der Koordination: Fotos gehören zum Tag, nicht zum Training.
+- **Datenmodell (DB v14, manuelle Migration `MIGRATION_13_14`; v13 hatte Session BI zuerst gemergt, nicht destruktiv):** `workout_photo.day` (ISO-Datum, Index). Der Tag wird beim
+  Speichern festgelegt und wandert nicht mehr mit der Zeitzone. `sessionId` bleibt als Altbestand stehen (Fremdschlüssel unverändert,
+  „Training löschen behält die Fotos“ wie seit v9); neue Fotos bekommen nie mehr ein Training.
+- **Welcher Tag für alte Fotos?** Ein Trainingsfoto kommt auf den **Starttag seines Trainings**, ein Foto ohne Training auf den Tag der
+  Aufnahme. Grund: Bisher zeigte das Trainingsdetail das Foto beim Training, auch wenn es nach Mitternacht aufgenommen oder Tage später
+  hinzugefügt wurde. Der Nutzer hat es bewusst diesem Training gegeben; so bleibt es dort sichtbar (das Detail zeigt jetzt die Fotos seines
+  Tages). Einziger sichtbarer Unterschied: Solche Randfälle stehen im Kalender jetzt am Trainingstag statt am Aufnahmetag. Kein Foto und
+  keine Datei geht verloren (Migrationstest mit Foto nach Mitternacht, Tage später hinzugefügtem Foto und Foto ohne Training, feste Zeitzone).
+- **Ein Ort zum Hinzufügen, überall gleich:** Tag, Trainingsdetail und Abschluss-Screen zeigen dasselbe Raster `DayPhotoGrid` (drei gleich
+  große Kacheln pro Zeile, dahinter die Kacheln „Foto aufnehmen“ / „Aus Fotos wählen“, Entfernen mit dem Doppeltipp-„×“). Was dort
+  hinzukommt, gehört dem Tag. Trainingsdetail und Abschluss-Screen heißen den Abschnitt „Fotos des Tages“, darunter der Hinweis „Fotos
+  gehören zum Tag. Du findest sie auch im Kalender.“ Das Trainingsdetail konnte bisher keine Fotos hinzufügen, der Abschluss-Screen hängte
+  sie ans Training. Zeitstempel: heute = jetzt, frühere Tage = 12:00 (ordnet nur innerhalb des Tages).
+- **Trainingsliste des Tages:** „n Fotos“ steht nicht mehr in der Zeile eines Trainings (die Fotos stehen direkt darunter beim Tag).
+- **Backup:** `BPhoto.day` (optional). Alte Backups ohne Tag: Trainingsfoto → Starttag des Trainings, sonst Aufnahmetag. Neu: Ein Foto, dessen
+  Training im Backup fehlt, wird nicht mehr verworfen, sondern als Foto seines Tages übernommen. Versionsregel unverändert (v2, sobald ein
+  Foto ohne Training dabei ist; das ist jetzt jedes neue Foto. Apps ab DB v9 lesen v2).
+- **Coach:** Auswertung mit Körperfotos nimmt das erste Foto vom Tag des Trainings bzw. das neueste Foto bis heute, Vergleichsfoto = neuestes
+  Foto mindestens 28 Tage davor, jeweils auch Fotos ohne Training (vorher nur Trainingsfotos). Bild-Beschriftung = Tag des Fotos, auch bei
+  Chat-Anhängen. `ChatAttachment.Photo` (per Foto-ID) unverändert. Mit Session BH abgestimmt (per Nachricht).
+- **Bewusst so (Sonnet-Gegencheck):** Der Tag eines Fotos ist fest. Ändert man später die Startzeit eines Trainings über Mitternacht,
+  bleibt das Foto am alten Tag. Der KI-Chat-Sync (`ChatSync`) schickt weiter `takenAt` und die Alt-`sessionId`; das Backend kennt keinen
+  Tag, das bleibt unverändert (keine neue Anfrage, `OwnKeyPrivacyTest` unberührt). `HistoryRow.photoCount` zählt nur noch Altfotos mit
+  Training und wird nirgends mehr angezeigt (bleibt, weil das Entfernen viele Tests ohne Nutzen ändert). Vollbild und Vergleich zeigen
+  das Datum des Foto-Tages; „Training ansehen“ im Vollbild führt bei neuen Fotos zum letzten Training ihres Tages.

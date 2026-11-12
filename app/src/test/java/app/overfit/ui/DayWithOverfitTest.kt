@@ -293,7 +293,7 @@ class DayWithOverfitTest {
         compose.onNodeWithContentDescription("Gefühl 4 von 5").assertIsSelected()
         // The name field is the first text field, the note field the second.
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
-        runBlocking { data.workouts.addPhoto(workoutId, byteArrayOf(1, 2, 3, 4)) }
+        runBlocking { data.workouts.addPhoto(kotlinx.datetime.LocalDate.parse(app.overfit.data.db.photoDay(data.workouts.getFinished(workoutId)!!.workout.startedAt)), byteArrayOf(1, 2, 3, 4)) }
         click("Speichern")
         compose.waitForTrainingTab() // back on the Training tab
         compose.waitUntilState(10_000) { runBlocking { data.workouts.getFinished(workoutId)?.note } == "Stark heute" }

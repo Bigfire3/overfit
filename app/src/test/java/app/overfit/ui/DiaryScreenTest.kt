@@ -206,7 +206,7 @@ class DiaryScreenTest {
             )
         }
         compose.onNodeWithText("An diesem Tag kein Training.").assertIsDisplayed()
-        compose.onNodeWithText("Noch keine Fotos an diesem Tag.").assertIsDisplayed()
+        compose.onNodeWithTag(app.overfit.ui.photos.PHOTO_ADD_LIBRARY_TAG).assertIsDisplayed()
         compose.onNodeWithText("Aus Fotos wählen").assertIsDisplayed()
     }
 
