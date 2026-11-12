@@ -80,9 +80,10 @@
     },
     "impeccable": {
       "source": "pbakaus/impeccable",
+      "ref": "main",
       "sourceType": "github",
-      "skillPath": ".agents/skills/impeccable/SKILL.md",
-      "computedHash": "86e265bf3df79c65215f7244d71892ca278370d56dec47a8cc15e8373db3f714",
+      "skillPath": ".claude/skills/impeccable/SKILL.md",
+      "computedHash": "23cbb66b64c5ba0e06b11769f2a9b4b7f2a3e8bc7e1ad85b71d662ec5867973b",
       "installMode": "copy"
     },
     "interface-review": {
