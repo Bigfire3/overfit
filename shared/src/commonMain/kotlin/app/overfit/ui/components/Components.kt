@@ -209,6 +209,16 @@ fun HeaderIconButton(icon: Icon, label: String, onClick: () -> Unit, color: Colo
 }
 
 /**
+ * The one way into the AI from a screen (Fabian 8.11.: no scattered "Fill in with AI" buttons): the coach icon top
+ * right, the same everywhere. It opens the coach over the screen with the screen's context attached.
+ */
+@Composable
+fun CoachIconButton(onClick: () -> Unit) {
+    val label = app.overfit.i18n.coachChatStringsFor(app.overfit.i18n.LocalFuelStrings.current.language).openCoach
+    Box(Modifier.testTag("coach:open")) { HeaderIconButton(Icon.Coach, label, onClick) }
+}
+
+/**
  * Delete in a [BackHeader], two-tap pattern: the first tap turns the bin red (armed, screen readers hear
  * "Löschen – zum Bestätigen erneut tippen"), a second tap within 3 s runs [onConfirm]. A tap elsewhere,
  * scrolling or the timeout disarm it ([ConfirmArea]). No popup, no extra text.

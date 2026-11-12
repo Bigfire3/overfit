@@ -112,11 +112,6 @@ class CoachService(
     /** Runs [block] in the app scope (UI actions that must not be cancelled by leaving the screen). */
     fun launch(block: suspend () -> Unit): Job = scope.launch { block() }
 
-    /** Non-suspending entry for the UI: queue a session review and send it in the app scope. */
-    fun startSessionReview(sessionId: String): Job = scope.launch {
-        try { requestSessionReview(sessionId) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
-    }
-
     /** Name of the workout and its template (demo review). */
     suspend fun sessionAndTemplate(sessionId: String): Pair<String, Template?> {
         val s = dao.session(sessionId)?.session ?: return "" to null

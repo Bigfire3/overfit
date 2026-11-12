@@ -34,6 +34,27 @@ Katalog-Filter, leerer Training-Tab). Screenshots: `docs/screenshots/ui-polish/v
 6. Alle Workouts löschen: Training-Tab zeigt unten „Neues Workout“.
 7. Profil → Backup exportieren: klappt wie bisher (bei einem Fehler stünde jetzt ein Hinweis unter dem Panel).
 
+## Coach/KI Teil 2: ein Coach-Symbol überall (Session BH)
+**Erledigt:**
+- Überall dasselbe Coach-Symbol oben rechts: laufendes Training, Workout, Training, Tag, Übung, eigene Übung. Es öffnet den
+  Coach-Chat als Ebene über dem Screen, mit dem Screen als Chip.
+- Vorschläge zeigen die Unterschiede. „Übernehmen“ ändert genau dieses Workout (Editor) bzw. das laufende Training (sofort,
+  mit Rückgängig).
+- „Mit KI ausfüllen“, „Coach-Auswertung“ und „An Coach senden“ sind weg.
+- Details in DECISIONS.md. Tests: `CoachOverlayTest`, `RunningMergeTest`, `CustomExerciseFlowTest`.
+- Screenshots: `docs/screenshots/coach-ki/bh2-*`.
+
+### Bitte auf dem Handy testen (Coach/KI Teil 2)
+1. Workout öffnen → Sprechblase oben rechts: Der Coach fährt von unten hoch, Chip „Push“. Erst Senden schickt ab (mit Preis).
+   „Mehr Volumen bitte“ → Karte „Änderung für „Push““ mit Unterschieden → „Übernehmen“ → Editor mit dem Vorschlag →
+   „Speichern“ ändert genau dieses Workout.
+2. Laufendes Training, ein Satz abgehakt → Sprechblase → „Pass den Rest an“ → „Übernehmen“: Der abgehakte Satz bleibt, die
+   offenen ändern sich. „Rückgängig“ stellt alles wieder her. ✕ bringt dich zurück ins Training.
+3. Kalender → Tag → Sprechblase: Chip „Tag · …“. Training öffnen → Sprechblase: Chip mit dem Training.
+4. Übungen → Übung → Sprechblase: Chip mit der Übung.
+5. Eigene Übung anlegen → Sprechblase: Sheet „Vom Coach ausfüllen lassen“ mit Preis. Erst „Ausfüllen · …“ füllt die Felder.
+6. Der Chat aus der Ebene steht danach unter Coach → „Frühere Chats“.
+
 ## Alternativen (A/B) im Workout (Session BI, 8.11.)
 **Erledigt:** Im Workout ⋮ einer Übung → „Alternative hinzufügen“; die Alternative hat eigene Sätze. Im Training zeigt die Karte Chips
 mit den Varianten; voreingestellt ist die, die beim letzten Training dieses Workouts nicht dran war (A/B-Wechsel, reihum bei mehr).

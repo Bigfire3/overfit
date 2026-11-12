@@ -85,13 +85,10 @@ class CoachNav(
     val connect: () -> Unit,
     val fuel: () -> Unit,
     val openReview: (String) -> Unit,
-    val openSession: (String) -> Unit,
     val demo: (String) -> Unit,
     val memory: () -> Unit,
     val settings: () -> Unit,
     val openTemplate: (Long) -> Unit,
-    /** "Send to coach" on a training: a new chat with the training attached ("Review my training"). */
-    val reviewInChat: ((String) -> Unit)? = null,
 )
 
 // ---------------------------------------------------------------------------------------------
@@ -148,37 +145,6 @@ private fun dateText(ms: Long): String =
 // ---------------------------------------------------------------------------------------------
 // Review of a workout: send, wait, result, plan
 
-/** Coach review of a finished workout; offers sending if there is none yet. */
-@Composable
-fun CoachSessionScreen(coach: CoachService, sessionId: String, unit: WeightUnit, language: Language, nav: CoachNav) {
-    val item by remember(sessionId) { coach.reviewForSession(sessionId) }.collectAsState(initial = null)
-    var requested by rememberSaveable(sessionId) { mutableStateOf(false) }
-    val current = item
-    if (current == null && !requested) {
-        val c = LocalCoachStrings.current
-        var comparisons by remember(sessionId) { mutableStateOf<List<ExerciseComparison>>(emptyList()) }
-        LaunchedEffect(sessionId) { comparisons = coach.comparisons(sessionId) }
-        val access = coach.access()
-        Screen(
-            header = { BackHeader(LocalStrings.current.back, nav.back) },
-            footer = if (access is CoachAccess.Ready) {
-                {
-                    PrimaryButton(c.sendToCoach, onClick = {
-                        val chat = nav.reviewInChat
-                        if (chat != null) chat(sessionId) else { requested = true; coach.startSessionReview(sessionId) }
-                    })
-                }
-            } else null,
-        ) {
-            Title(c.reviewTitle)
-            Spacer(Modifier.height(Space.l))
-            if (access !is CoachAccess.Ready) NoAccess(nav, onDemo = { nav.demo(sessionId) })
-            LocalNumbers(comparisons, unit, language)
-        }
-        return
-    }
-    ReviewScreen(coach, current, unit, language, nav, onDemo = { nav.demo(sessionId) })
-}
 
 @Composable
 fun CoachReviewScreen(coach: CoachService, reviewId: String, unit: WeightUnit, language: Language, nav: CoachNav) {
