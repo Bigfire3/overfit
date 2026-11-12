@@ -26,30 +26,24 @@ internal data class DiaryDay(
     val sauna get() = workouts.any { it.sauna }
 }
 
-/** Days with a photo, a workout or a body weight. A photo belongs to the day it was taken. */
+/** Days with a photo, a workout or a body weight. A photo belongs to its day ([app.overfit.data.WorkoutPhoto.date], v14). */
 internal fun buildDiaryDays(
     photos: List<DiaryPhoto>,
     history: List<HistoryRow>,
     weights: List<app.overfit.domain.WeightEntry> = emptyList(),
 ): Map<LocalDate, DiaryDay> {
-    val p = photos.sortedBy { it.photo.takenAt }.groupBy { dateOf(it.photo.takenAt) }
+    val p = photos.sortedBy { it.photo.takenAt }.groupBy { it.photo.date }
     val w = history.groupBy { dateOf(it.startedAt) }
     val kg = weights.mapNotNull { e -> runCatching { LocalDate.parse(e.date) }.getOrNull()?.let { it to e.kg } }.toMap()
     return (p.keys + w.keys + kg.keys).associateWith { DiaryDay(it, p[it].orEmpty(), w[it].orEmpty(), kg[it]) }
 }
 
 /**
- * Where a photo added in the day view goes: the day's last training (so the coach and the training
- * detail see it), or no training at all. [takenAt] is now for today, noon of the day for earlier days,
- * so the photo always lands on the tapped day.
+ * Time stamp of a photo added to [date] (day view, training detail, finish screen): now for today, noon of the day for
+ * earlier days. The photo belongs to [date] anyway (stored day, v14); the time only orders the day's photos.
  */
-internal data class DayPhotoTarget(val sessionId: String?, val takenAt: Long)
-
-internal fun dayPhotoTarget(date: LocalDate, today: LocalDate, workouts: List<HistoryRow>, now: Long): DayPhotoTarget {
-    val session = workouts.filter { dateOf(it.startedAt) == date }.maxByOrNull { it.startedAt }?.id
-    val takenAt = if (date == today) now else LocalDateTime(date, LocalTime(12, 0)).toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
-    return DayPhotoTarget(session, takenAt)
-}
+internal fun dayPhotoTakenAt(date: LocalDate, today: LocalDate, now: Long): Long =
+    if (date == today) now else LocalDateTime(date, LocalTime(12, 0)).toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
 
 /** Remembers whether the calendar tab shows the list (true) or the month grid (false). */
 class DiaryViewPref(private val kv: app.overfit.data.KeyValueStore) {

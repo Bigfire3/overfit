@@ -17,6 +17,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
+import kotlinx.datetime.toInstant
 import java.io.File
 
 /**
@@ -155,8 +156,9 @@ class MigrationTest {
             assertEquals("gut", finished.note)
             assertEquals(4, finished.feeling)
             assertEquals(62.5, finished.workout.exercises.single().sets.single().actual.weightKg)
-            repo.addPhoto("w1", byteArrayOf(1, 2, 3), takenAt = 6000)
-            assertEquals(1, repo.photosOf("w1").size)
+            val day = kotlinx.datetime.LocalDate.parse(photoDay(1000))
+            repo.addPhoto(day, byteArrayOf(1, 2, 3), takenAt = 6000)
+            assertEquals(1, repo.photosOfDay(day).size)
         } finally {
             db.close()
         }
@@ -327,7 +329,7 @@ class MigrationTest {
             assertEquals(2, old.position)
 
             // A photo without training is now allowed.
-            dao.insertPhoto(WorkoutPhotoEntity("p2", null, "p2.jpg", 9000, dao.nextPhotoPosition(null)))
+            dao.insertPhoto(WorkoutPhotoEntity("p2", null, "p2.jpg", 9000, 0, photoDay(9000)))
             val free = dao.getPhoto("p2")!!
             assertNull(free.sessionId)
             assertEquals(2, dao.allPhotos().size)
@@ -520,6 +522,64 @@ class MigrationTest {
             assertEquals(true, e.sets.single().completed)
             dao.insertExercises(listOf(SessionExerciseEntity("se2", "w1", "ex1", 1, null, null, app.overfit.domain.ExerciseOrigin.PLANNED, null, skipped = true)))
             assertEquals(listOf(false, true), dao.get("w1")!!.exercises.sortedBy { it.entry.position }.map { it.entry.skipped })
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
+     * v13 → v14: photos belong to a calendar day. Every photo keeps its row and file and gets its day:
+     * a training photo the training's start day (also when taken after midnight or added days later),
+     * a photo without training the day it was taken. The test runs in a fixed zone so "after midnight" is exact.
+     */
+    @Test
+    fun migration13to14GivesEveryPhotoItsDayWithoutLosingOne() = runBlocking<Unit> {
+        val zone = kotlinx.datetime.TimeZone.of("Europe/Berlin")
+        fun at(iso: String) = kotlinx.datetime.LocalDateTime.parse(iso).toInstant(zone).toEpochMilliseconds()
+        val migration = photoDayMigration(zone)
+        val migrations = OverfitDatabase.MIGRATIONS.map { if (it.startVersion == 13) migration else it }
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            dbFile,
+            driver,
+            OverfitDatabase::class,
+            { OverfitDatabaseConstructor.initialize() },
+        )
+        val start = at("2026-11-07T23:30:00")
+        val v13 = helper.createDatabase(13)
+        v13.execSQL(
+            "INSERT INTO workout_session (id, name, templateId, status, startedAt, endedAt, note, feeling, photoPath, aiStatus, restStartedAt, restEndsAt, restAfterSetId, updatedAt, sauna) " +
+                "VALUES ('w1', 'Push', NULL, 'FINISHED', $start, ${start + 4_000_000}, NULL, NULL, NULL, 'NONE', NULL, NULL, NULL, 1, 0)",
+        )
+        // Taken after midnight right after the training, added three days later in the old training detail,
+        // and a photo of a day without a training.
+        v13.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p1', 'w1', 'p1.jpg', ${at("2026-11-08T00:45:00")}, 0)")
+        v13.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p2', 'w1', 'p2.jpg', ${at("2026-11-10T09:00:00")}, 1)")
+        v13.execSQL("INSERT INTO workout_photo (id, sessionId, fileName, takenAt, position) VALUES ('p3', NULL, 'p3.jpg', ${at("2026-11-09T23:59:00")}, 0)")
+        v13.close()
+
+        // Validates the migrated schema against schemas/.../14.json.
+        helper.runMigrationsAndValidate(14, migrations).close()
+
+        val db = Room.databaseBuilder<OverfitDatabase>(context, dbFile.absolutePath)
+            .setDriver(driver)
+            .addMigrations(*migrations.toTypedArray())
+            .build()
+        try {
+            val dao = db.workoutDao()
+            assertEquals(3, dao.allPhotos().size)
+            val p1 = dao.getPhoto("p1")!!
+            assertEquals("2026-11-07", p1.day)
+            assertEquals("w1", p1.sessionId)
+            assertEquals("p1.jpg", p1.fileName)
+            assertEquals(at("2026-11-08T00:45:00"), p1.takenAt)
+            assertEquals("2026-11-07", dao.getPhoto("p2")!!.day)
+            assertEquals("2026-11-09", dao.getPhoto("p3")!!.day)
+            assertEquals(listOf("p1", "p2"), dao.photosOfDay("2026-11-07").map { it.id })
+            // The training detail of w1 still shows both of its photos (its day), the diary groups by day.
+            val repo = app.overfit.data.WorkoutRepository(db)
+            val days = repo.photos.first().associate { it.photo.id to it.photo.date.toString() }
+            assertEquals(mapOf("p1" to "2026-11-07", "p2" to "2026-11-07", "p3" to "2026-11-09"), days)
         } finally {
             db.close()
         }

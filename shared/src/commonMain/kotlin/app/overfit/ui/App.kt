@@ -107,7 +107,7 @@ import app.overfit.ui.history.FinishScreen
 import app.overfit.ui.history.WorkoutDetailScreen
 import app.overfit.ui.history.WorkoutEditScreen
 import app.overfit.ui.photos.DayScreen
-import app.overfit.ui.photos.dayPhotoTarget
+import app.overfit.ui.photos.dayPhotoTakenAt
 import app.overfit.platform.prepareJpeg
 import app.overfit.share.ShareMapper
 import app.overfit.ui.components.Chip
@@ -667,10 +667,7 @@ fun OverfitApp(deps: AppDependencies) {
                                 // App scope: leaving the day must not drop a photo that is still being prepared.
                                 deps.data.scope.launch {
                                     val jpeg = withContext(Dispatchers.Default) { prepareJpeg(bytes) } ?: return@launch
-                                    // Read the trainings now (not the screen's state, which may still be loading).
-                                    val workoutsNow = deps.data.workouts.history.first()
-                                    val target = dayPhotoTarget(date, deps.today(), workoutsNow, deps.clock())
-                                    deps.data.workouts.addPhoto(target.sessionId, jpeg, target.takenAt)
+                                    deps.data.workouts.addPhoto(date, jpeg, dayPhotoTakenAt(date, deps.today(), deps.clock()))
                                 }
                             },
                             onRemovePhoto = { id -> deps.data.scope.launch { deps.data.workouts.deletePhoto(id) } },

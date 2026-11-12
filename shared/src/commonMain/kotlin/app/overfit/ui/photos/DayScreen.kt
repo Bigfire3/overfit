@@ -99,9 +99,8 @@ fun DayScreen(
     val t = LocalStrings.current
     val p = t.photos
     val h = t.history
-    val dayPhotos = remember(photos, date) { photos.orEmpty().filter { dateOf(it.photo.takenAt) == date }.sortedBy { it.photo.takenAt } }
+    val dayPhotos = remember(photos, date) { photos.orEmpty().filter { it.photo.date == date }.sortedBy { it.photo.takenAt } }
     val trainings = remember(history, date) { history.orEmpty().filter { dateOf(it.startedAt) == date }.sortedBy { it.startedAt } }
-    val picker = rememberPhotoPicker(onAddPhoto)
 
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         Title(t.date(date))
@@ -115,56 +114,8 @@ fun DayScreen(
         }
 
         SectionTitle(p.dayPhotos)
-        if (photos != null && dayPhotos.isEmpty()) {
-            Text(p.dayNoPhotos, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.s))
-        }
-        if (dayPhotos.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
-                dayPhotos.forEachIndexed { i, item ->
-                    DayPhoto(item, h.photoDescription(i + 1), onOpen = { onOpenPhoto(item.photo.id) }, onRemove = { onRemovePhoto(item.photo.id) })
-                }
-            }
-            Spacer(Modifier.height(Space.m))
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-            if (picker.canTakePhoto) SmallButton(h.takePhoto, picker.takePhoto, tone = Tone.Default)
-            SmallButton(h.pickPhoto, picker.pickFromLibrary, tone = Tone.Default)
-        }
+        DayPhotoGrid(dayPhotos.map { it.photo }, onAdd = onAddPhoto, onOpen = onOpenPhoto, onRemove = onRemovePhoto)
         Hint(h.photosPrivate)
-    }
-}
-
-/** Thumbnail with an "x" in the corner, two-tap pattern: the first tap turns the "x" red, the second removes. */
-@Composable
-private fun DayPhoto(item: DiaryPhoto, description: String, onOpen: () -> Unit, onRemove: () -> Unit) {
-    val t = LocalStrings.current
-    val arm = rememberConfirmArm()
-    val armed = arm.armed
-    val c = Theme.colors
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    Box {
-        PhotoThumb(item.photo, description, size = 104.dp, onClick = onOpen)
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                .then(arm.modifier)
-                .size(36.dp)
-                .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
-                .semantics {
-                    contentDescription = if (armed) "${t.history.removePhoto} – ${t.tapAgainToConfirm}" else t.history.removePhoto
-                    if (armed) stateDescription = t.tapAgainToConfirm
-                }
-                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) {
-                    if (armed) { arm.disarm(); onRemove() }
-                    else { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); arm.arm() }
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(Modifier.size(24.dp).background(c.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
-                LineIcon(Icon.Close, size = 16.dp, color = if (armed) c.armed else c.foreground)
-            }
-        }
     }
 }
 
