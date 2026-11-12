@@ -1735,4 +1735,4 @@ Fabians Feedback vom 8.11. (Zitate in PROGRESS.md), Vorgaben der Koordination. T
   (vorher `LICENSE`, `NOTICE.md`, `VENDORED.md` im Skill-Ordner). Lizenzen (Apache-2.0, MIT) und Herkunft liegen deshalb in
   `.claude/skills/_licenses/` (kein `SKILL.md`, wird nicht als Skill geladen); die Skill-Ordner bleiben unverändert.
 - Alle Skills sind Anregungen; das Overfit-Designsystem (CLAUDE.md) hat Vorrang. Die Krehel-Skills zielen auf Web
-  (temporäre Seiten, CSS, ARIA) und gelten für Compose sinngemäß. `agents/openai.yaml`/`*.toml` in den Ordnern sind für Codex.
+  (temporäre Seiten, CSS, ARIA) und gelten für Compose sinngemäß. `agents/openai.yaml` in den Krehel-Ordnern ist für Codex.

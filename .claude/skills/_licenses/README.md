@@ -23,5 +23,5 @@ Lizenztexte liegen deshalb hier und nicht in den Skill-Ordnern.
 Aktualisieren: `npx skills update -p -y` (oder die beiden `add`-Befehle oben erneut), danach die
 Agenten aus `.claude/agents` des impeccable-Repos nach `.claude/agents/` kopieren und die Tabelle anpassen.
 
-`agents/openai.yaml` bzw. `*.toml` in den Skill-Ordnern sind Konfigurationen für andere Agenten (Codex)
-und werden von Claude Code ignoriert.
+`agents/openai.yaml` in den Krehel-Skill-Ordnern ist eine Konfiguration für Codex und wird von
+Claude Code ignoriert.
