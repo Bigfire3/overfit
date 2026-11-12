@@ -47,6 +47,17 @@ sealed interface ChatAttachment {
     @Serializable @SerialName("photo")
     data class Photo(val photoId: String, override val label: String = "") : ChatAttachment
 
+    /**
+     * The workout that is running right now (coach opened from the running workout): done and open sets. Its text is
+     * built from the live workout when the question is sent; afterwards (finished) it reads like a training.
+     */
+    @Serializable @SerialName("running")
+    data class Running(val sessionId: String, override val label: String = "") : ChatAttachment
+
+    /** A calendar day ([date] ISO, e.g. "2026-11-08"): its trainings and body weight. */
+    @Serializable @SerialName("day")
+    data class Day(val date: String, override val label: String = "") : ChatAttachment
+
     companion object {
         private val json = Json { ignoreUnknownKeys = true; classDiscriminator = "type" }
 
@@ -69,6 +80,10 @@ data class AttachmentSources(
     val language: Language,
     val now: Long,
     val zone: TimeZone = TimeZone.currentSystemDefault(),
+    /** Body weight entries (for a day attachment). */
+    val weights: List<app.overfit.domain.WeightEntry> = emptyList(),
+    /** The workout running right now (in memory, newer than the database), null = none. */
+    val running: app.overfit.domain.Workout? = null,
 )
 
 /**
@@ -89,6 +104,44 @@ object ChatAttachmentText {
         is ChatAttachment.History -> history(a, src, t)
         is ChatAttachment.Exercise -> exercise(a, src)
         is ChatAttachment.Photo -> null
+        is ChatAttachment.Running -> running(a, src, t)
+        is ChatAttachment.Day -> day(a, src, t)
+    }
+
+    private fun running(a: ChatAttachment.Running, src: AttachmentSources, t: ChatStrings): String {
+        val live = src.running?.takeIf { it.id == a.sessionId }
+        if (live == null) {
+            // Finished (or discarded) since: what is stored.
+            val r = src.workouts.firstOrNull { it.workout.id == a.sessionId }
+                ?: return "## Attached workout that was running\n(${a.label.ifBlank { a.sessionId }}: no longer there)"
+            return "## Attached training (was running when the chat started)\n" + ChatContext.workoutBlock(r, t, src.unit, src.language, src.zone).trimEnd()
+        }
+        val sb = StringBuilder("## Running workout (in progress right now, not finished): ${live.name}\n")
+        sb.append("Started ${date(live.startedAt, src.zone)}. Done sets are what the user logged; open sets are the plan for the rest of today.\n")
+        live.exercises.forEach { e ->
+            val type = e.exercise.trackingType
+            val done = e.sets.filter { it.completed }.joinToString(", ") { ChatContext.setText(it, type, src.unit, src.language) }
+            val open = e.sets.filter { !it.completed }.joinToString(", ") { s ->
+                ChatContext.setText(s.copy(actual = s.target), type, src.unit, src.language)
+            }
+            sb.append("- ${WeightRules.name(e.exercise.name, e.exercise.equipment)} [${e.exercise.id}]")
+            if (e.skipped) sb.append(" (skipped today by the user)")
+            sb.append(": done ").append(done.ifEmpty { "none" })
+            if (!e.skipped && open.isNotEmpty()) sb.append("; open (planned) ").append(open)
+            e.restSec?.let { sb.append(", rest $it s") }
+            sb.append('\n')
+        }
+        if (live.exercises.isEmpty()) sb.append("No exercises yet.\n")
+        return sb.toString().trimEnd()
+    }
+
+    private fun day(a: ChatAttachment.Day, src: AttachmentSources, t: ChatStrings): String {
+        val sb = StringBuilder("## Attached day: ${a.date}\n")
+        src.weights.firstOrNull { it.date == a.date }?.let { sb.append("Body weight: ${Numbers.formatWeight(it.kg, src.unit, src.language)} ${src.unit.symbol}\n") }
+        val trainings = finished(src).filter { date(it.workout.startedAt, src.zone) == a.date }.sortedBy { it.workout.startedAt }
+        if (trainings.isEmpty()) sb.append("No training on this day.\n")
+        trainings.forEach { sb.append(ChatContext.workoutBlock(it, t, src.unit, src.language, src.zone)) }
+        return sb.toString().trimEnd()
     }
 
     private fun finished(src: AttachmentSources) =

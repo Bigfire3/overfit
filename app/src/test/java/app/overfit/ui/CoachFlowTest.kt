@@ -132,18 +132,16 @@ class CoachFlowTest {
     }
 
     @Test
-    fun sendToCoachOnATrainingOpensTheChatWithoutSending() {
+    fun trainingCoachIconOpensTheChatWithoutSending() {
         setUp(withKey = true)
         compose.waitForTrainingTab()
-        // Calendar → today → training → "Coach-Auswertung" → "An Coach senden" = the chat with the training, not sent.
+        // Calendar → today → training → coach icon = the coach over the training, with it as chip, nothing sent.
         openToday()
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
-        waitFor("Coach-Auswertung")
-        compose.onNodeWithText("Coach-Auswertung").performScrollTo().performClick()
-        waitFor("An Coach senden")
-        compose.onNodeWithText("An Coach senden").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodes(hasSetTextAction() and hasText("Werte mein Training aus")).fetchSemanticsNodes().isNotEmpty() }
+        waitForTag("coach:open")
+        compose.onNodeWithTag("coach:open").performClick()
+        waitForTag("chip:training")
         compose.waitForIdle()
         assertTrue(fake.prompts.isEmpty())
     }
@@ -173,19 +171,20 @@ class CoachFlowTest {
     }
 
     @Test
-    fun withoutAccessTheDemoReviewIsOffered() {
+    fun withoutAccessTheCoachOverATrainingAnswersWithADemo() {
         setUp(withKey = false)
         compose.waitForTrainingTab()
-        // Calendar → today → training → "Coach-Auswertung".
         openToday()
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
-        waitFor("Coach-Auswertung")
-        compose.onNodeWithText("Coach-Auswertung").performScrollTo().performClick()
-        waitFor("Kein KI-Zugang")
-        compose.onNodeWithText("Demo-Auswertung ansehen").performClick()
-        waitFor("Demo · Beispielinhalt, nicht vom Coach")
-        waitFor("8/10")
+        waitForTag("coach:open")
+        compose.onNodeWithTag("coach:open").performClick()
+        waitForTag("chip:training")
+        waitFor("Demo · kostenlos")
+        compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:input"))).performTextInput("Wie war das?")
+        compose.onNodeWithTag("coach:send").performClick()
+        waitFor("Demo-Antwort", substring = true)
+        assertTrue(fake.prompts.isEmpty())
     }
 
     @Test

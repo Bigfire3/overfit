@@ -11,6 +11,8 @@ import app.overfit.domain.Language
 class ExerciseFormStrings(
     val language: Language,
     val aiFill: String,
+    /** Button in the coach sheet of the form, with the estimated price: "Ausfüllen · ≈ 0,1 ct". */
+    val aiFillConfirm: (price: String) -> String,
     val aiFilling: String,
     val aiFillHint: String,
     val aiFilled: String,
@@ -30,7 +32,8 @@ class ExerciseFormStrings(
 
 val GermanExerciseForm = ExerciseFormStrings(
     language = Language.DE,
-    aiFill = "Mit KI ausfüllen",
+    aiFill = "Vom Coach ausfüllen lassen",
+    aiFillConfirm = { "Ausfüllen · $it" },
     aiFilling = "KI füllt aus …",
     aiFillHint = "Aus dem Namen: Erfassungsart, Muskeln, Equipment, Pause, Ausführung",
     aiFilled = "Von der KI ausgefüllt. Prüfe die Felder und ändere, was nicht passt.",
@@ -61,7 +64,8 @@ val GermanExerciseForm = ExerciseFormStrings(
 
 val EnglishExerciseForm = ExerciseFormStrings(
     language = Language.EN,
-    aiFill = "Fill in with AI",
+    aiFill = "Let the coach fill it in",
+    aiFillConfirm = { "Fill in · $it" },
     aiFilling = "AI is filling in …",
     aiFillHint = "From the name: tracking, muscles, equipment, rest, how to do it",
     aiFilled = "Filled in by the AI. Check the fields and change what does not fit.",

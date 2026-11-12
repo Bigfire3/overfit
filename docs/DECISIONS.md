@@ -1723,6 +1723,76 @@ Fabians Feedback vom 8.11. (Zitate in PROGRESS.md), Vorgaben der Koordination. T
   Session BH setzt ein Coach-Symbol in die Kopfzeile (`BackHeader`-Aktionen), abgestimmt.
 - Belege: `docs/screenshots/kalender-einheitlich/vorher|nachher` (`raster.png`, `liste.png`, `tag.png`; 360 dp, dunkel).
 
+## Coach/KI Teil 2: ein Coach-Symbol überall statt KI-Knöpfen (Session BH)
+Fabian: „Das dürfen nicht so Buttons mit so einem kurzen Stichpunkt sein … wie ein Overlay, dass man dann einfach sagen kann,
+jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
+- **Ein Einstieg:** dasselbe Coach-Symbol (`CoachIconButton`, Sprechblase, Tag `coach:open`) oben rechts in der Kopfzeile von
+  laufendem Training, Workout-Ansicht (= Editor seit #102), Training (Kalender), Tag, Übungsdetail und Formular für eigene Übungen.
+  Kein Coach-Symbol im Übungsdetail, das aus dem laufenden Training geöffnet wurde (nur lesen). Ebenso keins im Kalender, dort
+  liegt der Coach-Tab direkt daneben.
+- **Overlay = derselbe Chat:** Das Symbol öffnet den Coach-Chat als Ebene über dem Screen (von unten, über Tab-Leiste und
+  laufendem Training), schließen mit ✕ oder Zurück. Jeder Aufruf startet einen neuen Chat. Er landet wie jeder Chat in
+  „Frühere Chats“, der Coach-Tab bleibt der zentrale Ort.
+  - Der Kontext des Screens hängt als abwählbarer Chip an: Workout (`Plan`), laufendes Training (neu `Running`: erledigte und
+    offene Sätze aus dem Speicher, nicht aus der DB), Training, Tag (neu `Day`: Trainings und Körpergewicht des Tages), Übung.
+    „Letztes Training“ kommt im Overlay nicht automatisch dazu.
+  - Gesendet wird wie überall erst mit dem Senden-Knopf samt Preis.
+  - Neue Anhang-Typen sind reine JSON-Erweiterungen von `coach_chat_message.attachments` (keine Migration). Unbekannte Typen
+    verwirft `decode` schon heute.
+- **Änderungen übernehmen:**
+  - Die Grundregel des Chats verlangt bei einem angehängten Workout bzw. Training immer das *vollständige* geänderte Workout.
+  - Im Overlay zeigt die Vorschlagskarte „Änderung für „Push““ bzw. „Änderung am laufenden Training“ mit den Unterschieden
+    (`TemplateDiff`, wie beim Chat-Eingang).
+  - **Gespeichertes Workout** (auch vom Training aus, wenn es zu einem Workout gehört): „Übernehmen“ öffnet den normalen Editor mit
+    dem Vorschlag (Seed-Weg #88, Unterschiede als Hinweis). „Speichern“ überschreibt genau dieses Workout, Zurück verwirft.
+    Verworfen: direkt speichern mit Rückgängig. Ein Workout ist langlebig, der Editor zeigt alles vor dem Überschreiben.
+  - **Laufendes Training:** „Übernehmen“ ändert es sofort (`RunningMerge`):
+    - Erledigte Sätze bleiben unverändert. Offene Sätze bekommen die Werte des Vorschlags, ihre IDs bleiben (Abhaken und
+      Pausentimer zeigen weiter auf echte Sätze).
+    - Neue Übungen kommen dazu. Übungen ohne erledigten Satz, die fehlen, fliegen raus. Solche mit erledigten Sätzen bleiben
+      (vorne).
+    - Unbekannte Übungen werden ausgelassen und genannt.
+    - „Rückgängig“ in der Karte stellt den Stand davor wieder her, solange seitdem nichts geändert wurde.
+  - Ohne Ziel (Tag, Übung, Coach-Tab) bleibt „Übernehmen“ wie bisher (neues Workout über den Import-Editor).
+- **Weggefallen:**
+  - „Coach-Auswertung“-Zeile im Training (jetzt das Symbol) und der alte Screen `CoachSessionScreen` mit „An Coach senden“
+    (nicht mehr erreichbar). Alte strukturierte Auswertungen bleiben unter Einstellungen → Coach → Auswertungen lesbar.
+  - „Mit KI ausfüllen“ im Formular für eigene Übungen. Dort öffnet das Coach-Symbol ein Sheet: was der Coach ausfüllt, Preis
+    (günstige Stufe mit Guthaben, „eigener Schlüssel“, sonst „Preis unbekannt“) und ein ausdrückliches „Ausfüllen · ≈ x ct“.
+    Bewusst kein ganzer Chat: Es geht nur um Felder des Formulars, ein Gespräch brächte keinen Mehrwert, kostete aber mehr
+    Token und bräuchte ein eigenes Antwortformat.
+  - Bleibt: „KI-Prompt kopieren“ (Import) und „Im Chat verwenden“ (Prompts). Das sind Texte für externe Chats bzw. setzen nur Text
+    ins Feld, keine KI-Anfrage.
+- **Hinweis von BI (Alternativen A/B):** `coach/PlanDiff.kt` (nur noch für alte strukturierte Auswertungen, „Alle annehmen“)
+  kennt keine Alternativen. Der neue Übernehmen-Weg geht über Share-Format und Editor, dort trägt BIs Format `alt` mit.
+- **Sonnet-Gegencheck (Befunde und Umgang):**
+  - Behoben (hoch): Nach „Übernehmen“ → „Speichern“ lag die alte Workout-Ansicht noch darunter. Zurück zeigte den alten Stand,
+    Autosave hätte ihn zurückgeschrieben. Jetzt schließt „Übernehmen“ die alte Ansicht, Zurück führt zur Liste (Test).
+  - Behoben: „Übernehmen“ ohne Ziel (Tag, Übung) öffnete den Import-Editor unter dem Coach. Der Coach schließt jetzt.
+  - Behoben: „Rückgängig“ tat nach einer späteren Änderung still nichts. Jetzt steht dort „Rückgängig geht nicht mehr …“.
+  - Behoben: Der Übernommen-Zustand der Karte ging beim Scrollen und Drehen verloren (doppeltes Übernehmen möglich). Er liegt
+    jetzt prozessweit je Nachricht.
+  - Behoben: Das Zusammenführen geschieht jetzt im selben Schritt am aktuellen Training. Ein dazwischen abgehakter Satz geht
+    nicht mehr verloren.
+  - Behoben: Eine Übung, die die App nur über den Namen kennt (z. B. eine eigene Übung), wurde gelöscht und als „ausgelassen“
+    gemeldet. Jetzt bleibt sie unverändert.
+  - Behoben: Fehlschlag beim Übernehmen ohne Rückmeldung (jetzt ein Hinweis mit erneutem Versuch).
+  - Behoben: System-Zurück schließt den Coach auch über Screens mit eigenem Zurück-Handler (Test über dem Editor). Ein
+    Textfeld darunter verliert beim Öffnen den Fokus.
+  - Behoben: Der Knopf „Ausfüllen“ im Übungsformular war tippbar, bevor der Preis da war.
+  - Bewusst so: Bei der Übernahme stehen erledigte Sätze vor den offenen, und Übungen mit erledigten Sätzen, die im Vorschlag
+    fehlen, rücken nach vorn (selten, nichts geht verloren).
+  - Bewusst so: In offene, noch nicht abgehakte Sätze getippte Werte überschreibt der Vorschlag. Das ist der Sinn von
+    „Übernehmen“, und „Rückgängig“ holt sie zurück.
+  - Bewusst so: TalkBack kann den Screen unter dem Coach noch erreichen. Das gilt für alle Ebenen der App gleich und gehört
+    ins UI-Audit.
+- **Alternativen (#105) bleiben:**
+  - Ein Vorschlag für ein gespeichertes Workout nennt deren Alternativen meist nicht. Vor dem Überschreiben bekommt jede
+    vorgeschlagene Übung ohne eigene Alternativen die der gleichen Übung im alten Workout (`KeepAlternatives`).
+  - Nennt der Vorschlag selbst Alternativen, gelten diese.
+  - Schlägt der Coach statt der Hauptübung deren Alternative vor, bleibt das wie im Editor eine neue Übung. Der Editor zeigt
+    das vor dem Speichern.
+
 ## Design-Skills per `skills`-CLI (12.11.)
 - Owner-Wunsch: impeccable (`pbakaus/impeccable`) und die Skills von Jakub Krehel (`jakubkrehel/skills`) für Claude Code auf
   Projektebene in `.claude/skills/` installieren. Installiert mit `npx skills add <repo> --agent claude-code --skill '*' --copy -y`

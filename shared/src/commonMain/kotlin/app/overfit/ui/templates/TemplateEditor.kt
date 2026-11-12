@@ -399,7 +399,7 @@ fun TemplateEditorScreen(
         header = {
             BackHeader(t.back, back) {
                 if (autosave && !state.loading) {
-                    onCoach?.let { HeaderIconButton(Icon.Coach, t.navCoach, it) }
+                    onCoach?.let { app.overfit.ui.components.CoachIconButton(it) }
                     HeaderIconButton(Icon.Share, t.share.shareTemplate, { viewModel.flush { if (it != null) onShare() } })
                     HeaderDeleteButton(t.deleteTemplate, viewModel::delete)
                 }

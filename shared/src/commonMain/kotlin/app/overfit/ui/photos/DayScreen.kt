@@ -97,6 +97,8 @@ fun DayScreen(
     focusWeight: Boolean = false,
     /** Full trainings of the day by id (exercises and sets for the opened cards); missing ones show only the head. */
     workouts: Map<String, app.overfit.domain.Workout> = emptyMap(),
+    /** Coach icon: opens the coach over this screen with this day attached (null = no icon). */
+    onCoach: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val p = t.photos
@@ -104,7 +106,7 @@ fun DayScreen(
     val dayPhotos = remember(photos, date) { photos.orEmpty().filter { it.photo.date == date }.sortedBy { it.photo.takenAt } }
     val trainings = remember(history, date) { history.orEmpty().filter { dateOf(it.startedAt) == date }.sortedBy { it.startedAt } }
 
-    Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
+    Screen(scroll = true, header = { BackHeader(t.back, onBack) { if (onCoach != null) app.overfit.ui.components.CoachIconButton(onCoach) } }) {
         Title(t.date(date))
 
         if (weights != null) DayWeight(date, weights, unit, language, focusWeight, onSetWeight, onDeleteWeight)

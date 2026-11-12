@@ -63,7 +63,7 @@ private fun Scrim(onDismiss: () -> Unit, closeLabel: String) {
 }
 
 /** Swallows taps on the sheet itself, so they do not reach the scrim underneath. */
-private fun Modifier.absorbTaps(): Modifier = pointerInput(Unit) { detectTapGestures { } }
+internal fun Modifier.absorbTaps(): Modifier = pointerInput(Unit) { detectTapGestures { } }
 
 /**
  * Bottom sheet as an overlay inside the layout (no window, no dialog): black scrim (~60 %), a [Colors.surface] area

@@ -15,6 +15,27 @@
 | 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Coach/KI Teil 2: ein Coach-Symbol überall (Session BH)
+**Erledigt:**
+- Überall dasselbe Coach-Symbol oben rechts: laufendes Training, Workout, Training, Tag, Übung, eigene Übung. Es öffnet den
+  Coach-Chat als Ebene über dem Screen, mit dem Screen als Chip.
+- Vorschläge zeigen die Unterschiede. „Übernehmen“ ändert genau dieses Workout (Editor) bzw. das laufende Training (sofort,
+  mit Rückgängig).
+- „Mit KI ausfüllen“, „Coach-Auswertung“ und „An Coach senden“ sind weg.
+- Details in DECISIONS.md. Tests: `CoachOverlayTest`, `RunningMergeTest`, `CustomExerciseFlowTest`.
+- Screenshots: `docs/screenshots/coach-ki/bh2-*`.
+
+### Bitte auf dem Handy testen (Coach/KI Teil 2)
+1. Workout öffnen → Sprechblase oben rechts: Der Coach fährt von unten hoch, Chip „Push“. Erst Senden schickt ab (mit Preis).
+   „Mehr Volumen bitte“ → Karte „Änderung für „Push““ mit Unterschieden → „Übernehmen“ → Editor mit dem Vorschlag →
+   „Speichern“ ändert genau dieses Workout.
+2. Laufendes Training, ein Satz abgehakt → Sprechblase → „Pass den Rest an“ → „Übernehmen“: Der abgehakte Satz bleibt, die
+   offenen ändern sich. „Rückgängig“ stellt alles wieder her. ✕ bringt dich zurück ins Training.
+3. Kalender → Tag → Sprechblase: Chip „Tag · …“. Training öffnen → Sprechblase: Chip mit dem Training.
+4. Übungen → Übung → Sprechblase: Chip mit der Übung.
+5. Eigene Übung anlegen → Sprechblase: Sheet „Vom Coach ausfüllen lassen“ mit Preis. Erst „Ausfüllen · …“ füllt die Felder.
+6. Der Chat aus der Ebene steht danach unter Coach → „Frühere Chats“.
+
 ## Alternativen (A/B) im Workout (Session BI, 8.11.)
 **Erledigt:** Im Workout ⋮ einer Übung → „Alternative hinzufügen“; die Alternative hat eigene Sätze. Im Training zeigt die Karte Chips
 mit den Varianten; voreingestellt ist die, die beim letzten Training dieses Workouts nicht dran war (A/B-Wechsel, reihum bei mehr).
