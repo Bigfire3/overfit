@@ -294,9 +294,14 @@ class DayWithOverfitTest {
         // The name field is the first text field, the note field the second.
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
         runBlocking { data.workouts.addPhoto(kotlinx.datetime.LocalDate.parse(app.overfit.data.db.photoDay(data.workouts.getFinished(workoutId)!!.workout.startedAt)), byteArrayOf(1, 2, 3, 4)) }
+        // The finish flow offers the review as a card with its price; nothing is sent by itself (8.11.).
+        compose.onNodeWithTag("finish:review").performScrollTo()
+        waitFor("Training auswerten lassen")
+        waitFor("eigener Schlüssel")
         click("Speichern")
         compose.waitForTrainingTab() // back on the Training tab
         compose.waitUntilState(10_000) { runBlocking { data.workouts.getFinished(workoutId)?.note } == "Stark heute" }
+        assertTrue(coachTransport.prompts.isEmpty())
         val finished = runBlocking { data.workouts.getFinished(workoutId) }!!
         assertEquals(4, finished.feeling)
         assertEquals(1, finished.photos.size)
@@ -318,10 +323,12 @@ class DayWithOverfitTest {
             compose.onAllNodes(hasContentDescription("Tag ${realToday().dayOfMonth}, 1 Foto", substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
 
-        // --- Coach: "Save" started the automatic review as a new chat (training attached, "Werte mein Training aus").
+        // --- Coach: the last training is attached automatically; the user asks for the review themselves.
         // Offline the answer fails; "Erneut versuchen" sends it once the network is back.
         tab("Coach")
-        waitFor("Werte mein Training aus")
+        waitFor("Push · heute")
+        compose.onNode(hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("coach:input"))).performTextInput("Werte mein Training aus")
+        compose.onNodeWithTag("coach:send").performClick()
         waitFor("Erneut versuchen")
         online = true
         click("Erneut versuchen")

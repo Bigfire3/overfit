@@ -92,6 +92,7 @@ object CoachPromptBuilder {
             appendLine(ctx.instructions.trim())
             appendLine()
             appendLine(OUTPUT_RULES)
+            appendLine(WeightRules.TEXT)
             appendLine(SAUNA_NOTE)
             appendLine("Example of the shape: ${CoachSchema.example}")
             appendLine()
@@ -187,16 +188,16 @@ object CoachPromptBuilder {
             // A skipped exercise: only what was done before skipping counts; its open sets are not "not done".
             if (e.skipped) {
                 val done = e.sets.filter { it.completed }.joinToString(", ") { formatSet(it.actual, e.exercise.trackingType) }
-                appendLine("${i + 1}. ${e.exercise.name} [${e.exercise.id}]$origin${if (done.isEmpty()) "" else ": $done"}")
+                appendLine("${i + 1}. ${WeightRules.name(e.exercise.name, e.exercise.equipment)} [${e.exercise.id}]$origin${if (done.isEmpty()) "" else ": $done"}")
                 return@forEachIndexed
             }
             val type = e.exercise.trackingType
             if (!detailed) {
                 val done = e.sets.filter { it.completed }.joinToString(", ") { formatSet(it.actual, type) }
-                appendLine("${i + 1}. ${e.exercise.name} [${e.exercise.id}]$origin: ${done.ifEmpty { "no sets done" }}")
+                appendLine("${i + 1}. ${WeightRules.name(e.exercise.name, e.exercise.equipment)} [${e.exercise.id}]$origin: ${done.ifEmpty { "no sets done" }}")
                 return@forEachIndexed
             }
-            appendLine("${i + 1}. ${e.exercise.name} [${e.exercise.id}]$origin${e.restSec?.let { ", planned rest ${it}s" } ?: ""}")
+            appendLine("${i + 1}. ${WeightRules.name(e.exercise.name, e.exercise.equipment)} [${e.exercise.id}]$origin${e.restSec?.let { ", planned rest ${it}s" } ?: ""}")
             e.sets.forEachIndexed { si, set ->
                 val planned = formatSet(set.target, type)
                 val line = if (set.completed) {
@@ -215,12 +216,13 @@ object CoachPromptBuilder {
     fun formatTemplate(t: Template): String = t.exercises.mapIndexed { i, e ->
         val type = e.exercise.trackingType
         val sets = e.sets.joinToString(", ") { formatSet(it, type) }
-        "${i + 1}. ${e.exercise.name} [${e.exercise.id}]${e.restSec?.let { " rest ${it}s" } ?: ""}: $sets"
+        "${i + 1}. ${WeightRules.name(e.exercise.name, e.exercise.equipment)} [${e.exercise.id}]${e.restSec?.let { " rest ${it}s" } ?: ""}: $sets"
     }.joinToString("\n")
 
     /** "80kg×8", "12 reps", "45s", "-20kg×8" (assisted), "20kg×45s". */
     fun formatSet(v: SetValues, type: TrackingType): String {
-        val w = v.weightKg?.let { "${formatNumber(it, Language.EN)}kg" }
+        // 0 kg = bodyweight / no added weight (a valid entry, see WeightRules).
+        val w = v.weightKg?.takeIf { it != 0.0 }?.let { "${formatNumber(it, Language.EN)}kg" }
         return when (type) {
             TrackingType.WEIGHT_REPS -> "${w ?: "BW"}×${v.reps ?: "?"}"
             TrackingType.REPS -> "${v.reps ?: "?"} reps"
@@ -254,7 +256,7 @@ object CoachPromptBuilder {
                     val e1rm = if (type == TrackingType.WEIGHT_REPS && (p.set.weightKg ?: 0.0) > 0) " (e1RM ${p.score.roundToInt()})" else ""
                     "${p.date} ${formatSet(p.set, type)}$e1rm"
                 }
-                "${e.exercise.name} [${e.exercise.id}]: $list"
+                "${WeightRules.name(e.exercise.name, e.exercise.equipment)} [${e.exercise.id}]: $list"
             }
     }
 

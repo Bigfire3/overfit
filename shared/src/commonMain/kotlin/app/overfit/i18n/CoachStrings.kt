@@ -12,19 +12,11 @@ class CoachStrings(
     val coachTitle: String,
     val reviewTitle: String,
     val progressTitle: String,
-    val reviewLast: String,
-    val reviewLastHint: String,
-    val assessProgress: String,
-    val assessProgressHint: String,
     val reviews: String,
     val reviewsEmpty: String,
     val settingsTitle: String,
     val sendToCoach: String,
     val viewReview: String,
-    val finishSend: String,
-    val finishLater: String,
-    val finishHint: String,
-    val finishNoAccess: String,
     // Status
     val thinking: String,
     val waitingForNetwork: String,
@@ -149,22 +141,14 @@ val GermanCoach = CoachStrings(
     coachTitle = "Coach",
     reviewTitle = "Coach-Auswertung",
     progressTitle = "Fortschritt",
-    reviewLast = "Letztes Training auswerten",
-    reviewLastHint = "Bewertung, Tipps und Plan für das nächste Mal",
-    assessProgress = "Fortschritt bewerten",
-    assessProgressHint = "Einschätzung der letzten Wochen auf Knopfdruck",
     reviews = "Auswertungen",
     reviewsEmpty = "Noch keine Auswertungen.",
     settingsTitle = "Coach-Einstellungen",
     sendToCoach = "An Coach senden",
     viewReview = "Coach-Auswertung ansehen",
-    finishSend = "Senden",
-    finishLater = "Später",
-    finishHint = "Der Coach wertet dein Training in einem neuen Chat im Coach-Tab aus. Ausschalten: Einstellungen → Coach.",
-    finishNoAccess = "Für eine Auswertung im Chat: Einstellungen → Coach → KI-Zugang (eigener Schlüssel oder Guthaben).",
     thinking = "Der Coach sieht sich dein Training an …",
     waitingForNetwork = "Wartet auf Verbindung",
-    queuedHint = "Die Anfrage ist gespeichert und wird automatisch gesendet, sobald Overfit wieder online ist (beim Öffnen der App).",
+    queuedHint = "Die Anfrage ist gespeichert. Gesendet wird sie nur, wenn du auf „Erneut versuchen“ tippst.",
     retry = "Erneut versuchen",
     errNoAccess = "Kein KI-Zugang eingerichtet.",
     errAuth = "Der API-Key wurde abgelehnt. Prüfe ihn unter KI-Zugang.",
@@ -257,7 +241,8 @@ val GermanCoach = CoachStrings(
 - Sei konkret, knapp und ehrlich. Nenne Zahlen (Gewicht, Wiederholungen, Sätze, Pausen, Häufigkeit), wo möglich, und begründe kurz.
 - Nutze nur die mitgeschickten Daten (Profil, Trainings, Workouts, Verlauf, Fotos). Erfinde nichts; frage gezielt nach, wenn Wichtiges fehlt.
 - Orientiere dich an Ziel, Niveau, Einschränkungen und Ausrüstung.
-- Progressive Überlastung mit Augenmaß: meist +2,5 kg (Oberkörper) bzw. +2,5–5 kg (Beine) oder +1–2 Wiederholungen, wenn alle Sätze sauber geschafft wurden. Nicht geschaffte Sätze: Gewicht halten oder leicht senken. Technik vor Gewicht, Erholung einplanen.
+- Gewichte sind genau das, was die Person am Gerät oder an der Hantel einstellt (bei Maschinen und Kabelzügen der Wert am Steckgewicht, nicht umgerechnet). Nie als falsch, vergessen oder unrealistisch bezeichnen und keine eigenen Zahlen erfinden; 0 kg ist gültig (Körpergewicht, unterstützt oder ohne Zusatzgewicht). Fortschritt nur innerhalb derselben Übung bewerten.
+- Progressive Überlastung mit Augenmaß, in den Schritten, die die Person bei der Übung selbst nutzt (sonst meist +2,5 kg Oberkörper bzw. +2,5–5 kg Beine) oder +1–2 Wiederholungen, wenn alle Sätze sauber geschafft wurden. Nicht geschaffte Sätze: Gewicht halten oder leicht senken. Technik vor Gewicht, Erholung einplanen.
 - Erkenne Stagnation (3+ Einheiten ohne Fortschritt) und steuere gegen: Deload, andere Wiederholungsbereiche, Variation.
 - Berücksichtige Calisthenics-Progressionen (z. B. Band-Unterstützung reduzieren, schwierigere Variante); negative Gewichte bedeuten Unterstützung.
 - Bei Technik-Fotos konkret benennen, was gut ist und was zu korrigieren ist.
@@ -286,22 +271,14 @@ val EnglishCoach = CoachStrings(
     coachTitle = "Coach",
     reviewTitle = "Coach review",
     progressTitle = "Progress",
-    reviewLast = "Review last workout",
-    reviewLastHint = "Rating, tips and the plan for next time",
-    assessProgress = "Assess progress",
-    assessProgressHint = "An assessment of the last weeks at the push of a button",
     reviews = "Reviews",
     reviewsEmpty = "No reviews yet.",
     settingsTitle = "Coach settings",
     sendToCoach = "Send to coach",
     viewReview = "View coach review",
-    finishSend = "Send",
-    finishLater = "Later",
-    finishHint = "The coach reviews your training in a new chat in the Coach tab. Switch off: Settings → Coach.",
-    finishNoAccess = "For a review in the chat: Settings → Coach → AI access (own key or credit).",
     thinking = "The coach is looking at your workout …",
     waitingForNetwork = "Waiting for connection",
-    queuedHint = "The request is saved and will be sent automatically as soon as Overfit is online again (when you open the app).",
+    queuedHint = "The request is saved. It is only sent when you tap “Try again”.",
     retry = "Try again",
     errNoAccess = "No AI access set up.",
     errAuth = "The API key was rejected. Check it under AI access.",
@@ -394,7 +371,8 @@ val EnglishCoach = CoachStrings(
 - Be concrete, brief and honest. Give numbers (weight, reps, sets, rest, frequency) where possible, with a short reason.
 - Only use the data sent along (profile, trainings, workouts, history, photos). Do not invent anything; ask specifically when something important is missing.
 - Take goal, level, limitations and equipment into account.
-- Progressive overload with judgement: usually +2.5 kg (upper body) or +2.5–5 kg (legs), or +1–2 reps, when all sets were completed cleanly. Missed sets: keep the weight or lower it slightly. Technique before weight; plan recovery.
+- Weights are exactly what the person sets on the machine or bar (for machines and cables the value on the weight stack, not converted). Never call them wrong, forgotten or unrealistic and never invent numbers of your own; 0 kg is valid (bodyweight, assisted or without added weight). Judge progress only within the same exercise.
+- Progressive overload with judgement, in the steps the person uses for that exercise (otherwise usually +2.5 kg upper body or +2.5–5 kg legs), or +1–2 reps, when all sets were completed cleanly. Missed sets: keep the weight or lower it slightly. Technique before weight; plan recovery.
 - Recognise stagnation (3+ sessions without progress) and counter it: deload, other rep ranges, variation.
 - Take calisthenics progressions into account (e.g. less band assistance, harder variation); negative weights mean assistance.
 - For technique photos, name concretely what is good and what to correct.

@@ -118,16 +118,6 @@ fun modelChipLabel(state: AppState, settings: CoachSettings, fuelAvailable: Bool
     else -> strings.accessNone
 }
 
-/**
- * Estimated price of one chat message ("≈ 2,6 ct"), only with credit and a known price table; own key and no access
- * → null (the provider bills the user directly, Overfit does not know the price).
- */
-fun chatCostEstimate(state: AppState, settings: CoachSettings, config: FuelConfig?, language: Language): String? {
-    if (state.providerId != ProviderId.FUEL || config == null) return null
-    val info = config.tiers[settings.model(ProviderId.FUEL)]?.takeIf { it.available } ?: return null
-    return "≈ " + formatCents(CostEstimate.micro(info, config.markupBp, FuelTask.CHAT, config.usageProfiles), language)
-}
-
 /** Settings → "AI access" / "Default model": the [ModelPicker] as a page. */
 @Composable
 fun CoachAccessScreen(state: AppState, store: AppStore, providers: Providers, coach: CoachService, onBack: () -> Unit) {

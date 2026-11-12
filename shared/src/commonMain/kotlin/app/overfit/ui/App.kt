@@ -142,7 +142,6 @@ import app.overfit.i18n.LocalCoachStrings
 import app.overfit.i18n.coachStringsFor
 import app.overfit.ui.coach.CoachDemoScreen
 import app.overfit.ui.coach.CoachBackup
-import app.overfit.ui.coach.CoachFinishChoice
 import app.overfit.ui.coach.CoachFinishSection
 import app.overfit.i18n.coachChatStringsFor
 import app.overfit.ui.coach.CoachHomeScreen
@@ -223,18 +222,15 @@ class AppDependencies(
     val coachChatEnv: app.overfit.ui.coach.chat.CoachChatEnv by lazy { createCoachChatEnv(this) }
 
     /**
-     * The review after a training (automatic, or "Send to coach" on a training): a new chat with the training attached
-     * and the question "Review my training", sent right away; the Coach tab opens it next.
+     * "Get this training reviewed" (finish flow, a training's review page): the Coach tab opens a new chat with the
+     * training attached and "Review my training" in the input. Nothing is sent: the user taps send (Fabian, 8.11.).
      */
-    fun startTrainingReviewChat(sessionId: String) {
+    fun openTrainingReview(sessionId: String) {
         data.scope.launch {
-            val record = data.workouts.record(sessionId) ?: return@launch
+            val record = data.workouts.record(sessionId)
             val s = coachChatStringsFor(store.state.value.language)
-            val (chatId, _) = coachChat.send(
-                null,
-                app.overfit.coach.ChatSendRequest(s.reviewMyTraining, listOf(app.overfit.coach.ChatAttachment.Training(sessionId, record.workout.name, record.workout.startedAt))),
-            )
-            coachChatRequests.open(ChatOpenRequest(chatId = chatId))
+            val training = app.overfit.coach.ChatAttachment.Training(sessionId, record?.workout?.name.orEmpty(), record?.workout?.startedAt)
+            coachChatRequests.open(ChatOpenRequest(draft = s.reviewMyTraining, attachments = listOf(training)))
         }
     }
 
@@ -266,7 +262,7 @@ class AppDependencies(
      * Phase 4 (coach): content at the end of the finish flow, below note/feeling/photos and
      * above "Save" – e.g. "Send to coach" / "Later". Empty until the coach is wired in.
      */
-    var finishCoachSection: @Composable (workoutId: String) -> Unit = {}
+    var finishCoachSection: @Composable (workoutId: String, onReview: () -> Unit) -> Unit = { _, _ -> }
 
     /**
      * Called (on the main thread) when the finish flow is saved: note, feeling and photos are
@@ -275,17 +271,13 @@ class AppDependencies(
     val workoutSavedListeners = mutableListOf<(workoutId: String) -> Unit>()
 
     init {
-        // Coach (phase 4): choice at the end of the finish flow, review queued on "Save", memory/reviews in the backup.
-        val coachChoice = CoachFinishChoice()
-        finishCoachSection = { id -> CoachFinishSection(coach, data.coachChatPrefs, coachChoice, id) }
-        workoutSavedListeners += { id ->
-            if (coachChoice.send && data.coachChatPrefs.state.value.autoReview && coach.access() is app.overfit.coach.CoachAccess.Ready) {
-                startTrainingReviewChat(id)
-            }
-        }
+        // Coach: one card at the end of the finish flow; it only opens the chat (no automatic review any more).
+        finishCoachSection = { id, onReview -> CoachFinishSection(coachChatEnv, id, onReview) }
         backupContributors += CoachBackup(coach, data.coachChatPrefs)
         backupContributors += app.overfit.ui.coach.CoachChatBackup(coachChat)
         coachChat.recover()
+        // Old offline queue: never sent by itself any more, it waits for "Try again".
+        coach.parkQueue()
     }
     val backup = BackupService(data, store, versionName, clock) { backupContributors.toList() }
     /** The running workout; created once per process, loads the stored workout right away. */
@@ -328,6 +320,8 @@ class AppDependencies(
 @Serializable data class CoachChatRoute(val chatId: String = "", val draft: String = "")
 /** Earlier coach chats (from the Coach tab header). */
 @Serializable data object CoachHistoryRoute
+/** An earlier coach chat in its own screen (tap in "Earlier chats"). */
+@Serializable data class CoachOpenChatRoute(val chatId: String)
 @Serializable data object CoachReviewsRoute
 /** Settings → Coach → AI access / default model (model picker as a page). */
 @Serializable data object CoachAccessRoute
@@ -397,7 +391,6 @@ fun OverfitApp(deps: AppDependencies) {
     val editorSeeds = remember { EditorSeedHolder() }
 
     /** "Apply" on a coach proposal: same path as an imported workout (the import screen picks it up from the inbox). */
-    val applyCoachWorkout: (String) -> Unit = { json -> deps.inbox.offer(json) }
     val workoutState by deps.workout.state.collectAsStateWithLifecycle()
     val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox, deps.data.scope) {
         val s = deps.store.state.value
@@ -412,10 +405,9 @@ fun OverfitApp(deps: AppDependencies) {
     // Body weight: take over the profile list once, then mirror the table into the profile (AI context reads it there).
     LaunchedEffect(deps) { app.overfit.data.syncProfileWeights(deps.data, deps.store, deps.kv) }
     // KI-Chat: back in the foreground → send what is left and fetch the inbox; to the background → send a running workout now.
-    // Queued coach requests go out on app start and whenever the app comes back to the foreground.
+    // Coach requests are never sent by themselves (no queue processing here): every AI request needs a tap.
     LifecycleResumeEffect(deps) {
         deps.chat.onForeground()
-        deps.coach.processQueue()
         onPauseOrDispose { deps.chat.onBackground() }
     }
     val chatInbox by deps.chat.inbox.state.collectAsStateWithLifecycle()
@@ -439,7 +431,7 @@ fun OverfitApp(deps: AppDependencies) {
                     memory = { nav.navigate(CoachMemoryRoute) },
                     settings = { nav.navigate(CoachInstructionsRoute) },
                     openTemplate = { nav.navigate(WorkoutPlanRoute(it)) },
-                    reviewInChat = { id -> deps.startTrainingReviewChat(id); nav.selectTab(Tab.COACH) },
+                    reviewInChat = { id -> deps.openTrainingReview(id); nav.selectTab(Tab.COACH) },
                 )
             }
             val start = remember { if (state.onboardingDone) StartRoute else NameRoute }
@@ -641,6 +633,11 @@ fun OverfitApp(deps: AppDependencies) {
                             coachSection = deps.finishCoachSection,
                             onSaved = { id -> deps.workoutSavedListeners.toList().forEach { it(id) } },
                             onClose = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
+                            onReview = { id ->
+                                deps.openTrainingReview(id)
+                                nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } }
+                                nav.selectTab(Tab.COACH)
+                            },
                             rename = { w, name ->
                                 deps.data.workouts.rename(w.id, name)
                                 w.templateId?.let { deps.data.templates.rename(it, name) }
@@ -1033,45 +1030,16 @@ fun OverfitApp(deps: AppDependencies) {
                                 nav.navigate(CoachStoryRoute)
                             }
                         }
-                        val coachEnv = deps.coachChatEnv
-                        val openRequest by deps.coachChatRequests.pending.collectAsStateWithLifecycle()
-                        var modelSheet by rememberSaveable { mutableStateOf(false) }
-                        var creditPopup by rememberSaveable { mutableStateOf(false) }
-                        val fuelActive = state.providerId == ProviderId.FUEL
-                        Box(Modifier.fillMaxSize()) {
-                            CoachChatTabScreen(
-                                env = coachEnv,
-                                openRequest = openRequest,
-                                onOpenRequestConsumed = deps.coachChatRequests::consumed,
-                                onHistory = { nav.navigate(CoachHistoryRoute) },
-                                onStory = { nav.navigate(CoachStoryRoute) },
-                                onModelChip = { modelSheet = true },
-                                onApplyWorkout = { applyCoachWorkout(it) },
-                                creditChip = { app.overfit.ui.coach.CreditChip(deps.fuelSession, fuelActive, onClick = { creditPopup = true }) },
-                            )
-                            val close = LocalStrings.current.back
-                            app.overfit.ui.components.BottomSheet(modelSheet, onDismiss = { modelSheet = false }, closeLabel = close) {
-                                app.overfit.ui.coach.ModelPicker(state, deps.store, deps.providers, deps.coach, onApplied = { modelSheet = false }, onSurface = true)
-                            }
-                            app.overfit.ui.components.CenterPopup(creditPopup, onDismiss = { creditPopup = false }, closeLabel = close) {
-                                app.overfit.ui.coach.CreditPopupContent(
-                                    session = deps.fuelSession,
-                                    dao = deps.data.database.aiRequestDao(),
-                                    onOpenFuel = { creditPopup = false; nav.navigate(FuelRoute) },
-                                    onAllRequests = { creditPopup = false; nav.navigate(RequestLogRoute) },
-                                    onClose = { creditPopup = false },
-                                    distribution = deps.distribution,
-                                )
-                            }
-                        }
+                        CoachChatHost(deps, state, nav, openedChatId = null)
+                    }
+                    composable<CoachOpenChatRoute> { entry ->
+                        // An earlier chat, opened from the list: the same chat screen with a back arrow.
+                        CoachChatHost(deps, state, nav, openedChatId = entry.toRoute<CoachOpenChatRoute>().chatId)
                     }
                     composable<CoachHistoryRoute> {
                         CoachHistoryScreen(
                             chat = deps.coachChat,
-                            onOpen = { id ->
-                                deps.coachChatRequests.open(ChatOpenRequest(chatId = id))
-                                nav.popBackStack()
-                            },
+                            onOpen = { id -> nav.navigate(CoachOpenChatRoute(id)) },
                             onBack = nav::popBackStack,
                         )
                     }

@@ -59,6 +59,10 @@ import app.overfit.coach.ChatAttachment
 import app.overfit.coach.ChatMessage
 import app.overfit.coach.ChatMessageStatus
 import app.overfit.coach.ChatSendRequest
+import app.overfit.coach.ChatCost
+import app.overfit.coach.ChatPricing
+import app.overfit.coach.TokenEstimate
+import app.overfit.i18n.LocalStrings
 import app.overfit.coach.key
 import app.overfit.data.DiaryPhoto
 import app.overfit.i18n.CoachChatStrings
@@ -114,9 +118,15 @@ fun CoachChatTabScreen(
     onApplyWorkout: (String) -> Unit,
     creditChip: @Composable () -> Unit = {},
     onCamera: (() -> Unit)? = null,
+    /**
+     * Opens exactly this earlier chat in its own screen ("Earlier chats" → tap): back arrow instead of story, list and
+     * new chat; the user can keep writing in it.
+     */
+    openedChatId: String? = null,
+    onBack: () -> Unit = {},
 ) {
     val s = chatStrings()
-    var chatId by rememberSaveable { mutableStateOf("") }
+    var chatId by rememberSaveable { mutableStateOf(openedChatId.orEmpty()) }
     var input by rememberSaveable { mutableStateOf("") }
     var pending by rememberSaveable(stateSaver = AttachmentListSaver) { mutableStateOf(emptyList()) }
     /** New chat: the user removed the automatic "last training" chip. */
@@ -134,12 +144,26 @@ fun CoachChatTabScreen(
     val photos by env.photos.collectAsState(initial = emptyList())
     val templateNames by env.templateNames.collectAsState(initial = emptySet())
     val modelLabel by env.modelLabel.collectAsState()
-    val cost by env.costEstimate.collectAsState()
+    val pricing by env.pricing.collectAsState()
 
     // Until the chat row of a just sent first question exists, the local choice holds (no chip flashing back).
     val profileIncluded = if (chatId.isEmpty()) !newProfileOff else chatRow?.let { !it.profileOff } ?: !newProfileOff
     val autoTraining = last?.takeIf { t -> chatId.isEmpty() && !trainingRemoved && pending.none { it.key() == t.key() } }
     val chips = listOfNotNull(autoTraining) + pending
+    // Live estimate of what the next question sends: rebuilt from the real prompt when the chat, its attachments or the
+    // profile chip change; what is typed is added on the fly.
+    var baseTokens by remember { mutableStateOf<TokenEstimate?>(null) }
+    LaunchedEffect(chatId, chips, profileIncluded, messages.size) {
+        // Small pause: quick changes in a row build the prompt once. The last estimate stays until the new one is there.
+        kotlinx.coroutines.delay(150)
+        try {
+            baseTokens = env.chat.estimate(chatId.ifEmpty { null }, ChatSendRequest("", chips, profileIncluded))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) { }
+    }
+    val language = LocalFuelStrings.current.language
+    val price = sendPriceLabel(pricing, baseTokens?.plusText(input), s, language)
 
     fun newChat() {
         chatId = ""; input = ""; pending = emptyList(); trainingRemoved = false; newProfileOff = false
@@ -173,16 +197,10 @@ fun CoachChatTabScreen(
         if (r.draft.isNotEmpty() && input.isBlank()) input = r.draft
         pending = r.attachments
         // Exactly what was asked for: no automatic training on top of an explicit request.
-        trainingRemoved = r.attachments.isNotEmpty() || r.send
+        trainingRemoved = r.attachments.isNotEmpty()
         newProfileOff = false
         sheet = false
         profilePopup = false
-        // A new chat from a request always starts with the profile (the state above is only read on the next composition).
-        if (r.send && r.draft.isNotBlank()) {
-            val typed = input.takeIf { it != r.draft }
-            send(r.draft, r.attachments, includeProfile = r.chatId.isEmpty() || profileIncluded)
-            if (typed != null) input = typed
-        }
         onOpenRequestConsumed(r)
     }
 
@@ -195,7 +213,8 @@ fun CoachChatTabScreen(
                 .padding(horizontal = Gutter),
         ) {
             Spacer(Modifier.height(Space.m))
-            ChatHeader(s, onStory, onHistory, ::newChat, creditChip)
+            if (openedChatId != null) OpenedChatHeader(chatRow?.title.orEmpty(), onBack)
+            else ChatHeader(s, onStory, onHistory, ::newChat, creditChip)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (chatId.isEmpty() && messages.isEmpty()) {
                     Suggestions(s.suggestions) { input = it }
@@ -218,7 +237,7 @@ fun CoachChatTabScreen(
                 onValueChange = { input = it },
                 s = s,
                 modelLabel = modelLabel,
-                cost = cost,
+                price = price,
                 onPlus = { sheet = true },
                 onModelChip = onModelChip,
                 onSend = { send(input, chips) },
@@ -301,6 +320,16 @@ private fun ChatHeader(s: CoachChatStrings, onStory: () -> Unit, onHistory: () -
         creditChip()
         HeaderIcon(Icon.List, s.history, "coach:history", onHistory)
         HeaderIcon(Icon.Edit, s.newChat, "coach:new", onNew)
+    }
+}
+
+/** Header of an earlier chat opened from the list: back arrow and the chat's title. */
+@Composable
+private fun OpenedChatHeader(title: String, onBack: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+        HeaderIcon(Icon.Back, LocalStrings.current.back, "chat:back", onBack)
+        Spacer(Modifier.width(Space.xs))
+        Text(title, Modifier.weight(1f), style = Theme.type.label, maxLines = 1)
     }
 }
 
@@ -576,7 +605,8 @@ private fun Composer(
     onValueChange: (String) -> Unit,
     s: CoachChatStrings,
     modelLabel: String,
-    cost: String?,
+    /** Estimated price shown on the send button ("≈ 2,6 ct", "own key", "Demo · free"); null = not known yet. */
+    price: String?,
     onPlus: () -> Unit,
     onModelChip: () -> Unit,
     onSend: () -> Unit,
@@ -606,14 +636,7 @@ private fun Composer(
             Spacer(Modifier.width(Space.xs))
             // The chip takes what it needs (long names are cut off), the rest stays free before cost and send.
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) { ModelChip(modelLabel, s, onModelChip, Modifier) }
-            if (cost != null) {
-                Text(cost, Modifier.padding(horizontal = Space.s), style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
-            }
-            val enabled = value.isNotBlank()
-            RoundIcon(
-                Icon.ArrowUp, s.send, "coach:send", fill = c.foreground, tint = c.background,
-                enabled = enabled, onClick = onSend,
-            )
+            SendButton(price, s, enabled = value.isNotBlank(), onClick = onSend)
         }
     }
 }
@@ -637,6 +660,62 @@ private fun ModelChip(label: String, s: CoachChatStrings, onClick: () -> Unit, m
         )
         Spacer(Modifier.width(2.dp))
         LineIcon(Icon.ChevronDown, size = 16.dp, color = Theme.colors.muted)
+    }
+}
+
+/**
+ * Send: a white pill with the estimated price and an arrow ("≈ 2,6 ct ↑"), so nothing goes out without the user
+ * seeing what it costs; only the arrow while the price is not known yet.
+ */
+@Composable
+private fun SendButton(price: String?, s: CoachChatStrings, enabled: Boolean, onClick: () -> Unit) {
+    val c = Theme.colors
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .heightIn(min = 48.dp)
+            .pressScale(interaction, PressScale.icon)
+            .clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = if (price != null) s.sendWithPrice(price) else s.send }
+            .testTag("coach:send"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier
+                .heightIn(min = 40.dp)
+                .alpha(if (enabled) 1f else 0.3f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(c.foreground)
+                .padding(start = if (price != null) 14.dp else 9.dp, end = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (price != null) {
+                BasicText(
+                    price, Modifier.widthIn(max = 150.dp).testTag("coach:price"),
+                    style = Theme.type.caption.copy(color = c.background, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(6.dp))
+            }
+            LineIcon(Icon.ArrowUp, size = 22.dp, color = c.background)
+        }
+    }
+}
+
+/**
+ * Text on the send button: credit → "≈ 2,6 ct" (price of the tier + markup), own key → "own key · ≈ 2,1 ct" (list price
+ * if Overfit knows the model) or "own key", no access → "Demo · free"; null while the price table is unknown.
+ */
+internal fun sendPriceLabel(pricing: ChatPricing, tokens: TokenEstimate?, s: CoachChatStrings, language: app.overfit.domain.Language): String? {
+    fun cents(micro: Long) = "≈ " + app.overfit.fuel.formatCents(micro, language)
+    return when (pricing) {
+        ChatPricing.Demo -> s.priceDemo
+        ChatPricing.Unknown -> s.priceUnknown
+        is ChatPricing.Credit -> tokens?.let { cents(ChatCost.micro(it, pricing.outputTokens, pricing.price, pricing.markupBp)) }
+        is ChatPricing.OwnKey -> {
+            val micro = tokens?.let { t -> pricing.price?.let { ChatCost.micro(t, pricing.outputTokens, it) } }
+            if (micro != null) s.priceOwnKeyCost(cents(micro)) else s.priceOwnKey
+        }
     }
 }
 

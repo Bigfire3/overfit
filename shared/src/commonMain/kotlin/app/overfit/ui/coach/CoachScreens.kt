@@ -101,15 +101,10 @@ fun CoachHomeScreen(coach: CoachService, nav: CoachNav) {
     val c = LocalCoachStrings.current
     val t = LocalStrings.current
     val reviews by coach.reviews.collectAsState(initial = emptyList())
-    val latest by coach.latestFinished.collectAsState(initial = null)
     Screen(scroll = true, header = { BackHeader(t.back, nav.back) }) {
         Title(c.coachTitle)
         Spacer(Modifier.height(Space.l))
-        Panel {
-            latest?.let { s -> RowWithHint(c.reviewLast, c.reviewLastHint) { nav.openSession(s.id) } }
-            RowWithHint(c.assessProgress, c.assessProgressHint) { nav.openReview(coach.startProgressReview()) }
-        }
-
+        // Archive of the reviews before the coach chat (8.11.: no AI buttons here any more, new reviews go through the chat).
         if (reviews.isEmpty()) {
             SectionTitle(c.reviews)
             Text(c.reviewsEmpty, tone = Tone.Muted)
