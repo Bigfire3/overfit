@@ -154,7 +154,13 @@ fun CoachChatTabScreen(
     // profile chip change; what is typed is added on the fly.
     var baseTokens by remember { mutableStateOf<TokenEstimate?>(null) }
     LaunchedEffect(chatId, chips, profileIncluded, messages.size) {
-        baseTokens = runCatching { env.chat.estimate(chatId.ifEmpty { null }, ChatSendRequest("", chips, profileIncluded)) }.getOrNull()
+        // Small pause: quick changes in a row build the prompt once. The last estimate stays until the new one is there.
+        kotlinx.coroutines.delay(150)
+        try {
+            baseTokens = env.chat.estimate(chatId.ifEmpty { null }, ChatSendRequest("", chips, profileIncluded))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) { }
     }
     val language = LocalFuelStrings.current.language
     val price = sendPriceLabel(pricing, baseTokens?.plusText(input), s, language)
@@ -191,16 +197,10 @@ fun CoachChatTabScreen(
         if (r.draft.isNotEmpty() && input.isBlank()) input = r.draft
         pending = r.attachments
         // Exactly what was asked for: no automatic training on top of an explicit request.
-        trainingRemoved = r.attachments.isNotEmpty() || r.send
+        trainingRemoved = r.attachments.isNotEmpty()
         newProfileOff = false
         sheet = false
         profilePopup = false
-        // A new chat from a request always starts with the profile (the state above is only read on the next composition).
-        if (r.send && r.draft.isNotBlank()) {
-            val typed = input.takeIf { it != r.draft }
-            send(r.draft, r.attachments, includeProfile = r.chatId.isEmpty() || profileIncluded)
-            if (typed != null) input = typed
-        }
         onOpenRequestConsumed(r)
     }
 
@@ -691,7 +691,7 @@ private fun SendButton(price: String?, s: CoachChatStrings, enabled: Boolean, on
         ) {
             if (price != null) {
                 BasicText(
-                    price, Modifier.widthIn(max = 180.dp).testTag("coach:price"),
+                    price, Modifier.widthIn(max = 150.dp).testTag("coach:price"),
                     style = Theme.type.caption.copy(color = c.background, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
@@ -710,7 +710,7 @@ internal fun sendPriceLabel(pricing: ChatPricing, tokens: TokenEstimate?, s: Coa
     fun cents(micro: Long) = "≈ " + app.overfit.fuel.formatCents(micro, language)
     return when (pricing) {
         ChatPricing.Demo -> s.priceDemo
-        ChatPricing.Unknown -> null
+        ChatPricing.Unknown -> s.priceUnknown
         is ChatPricing.Credit -> tokens?.let { cents(ChatCost.micro(it, pricing.outputTokens, pricing.price, pricing.markupBp)) }
         is ChatPricing.OwnKey -> {
             val micro = tokens?.let { t -> pricing.price?.let { ChatCost.micro(t, pricing.outputTokens, it) } }

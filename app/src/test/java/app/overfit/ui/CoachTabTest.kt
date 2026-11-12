@@ -301,19 +301,25 @@ class CoachTabTest {
         assertTrue(fake.prompts.isEmpty())
     }
 
+    // 8.11.: a request from elsewhere only fills the chat; the user sends it.
     @Test
-    fun openRequestSendsRightAwayWithItsAttachment() {
+    fun openRequestFillsTheChatButNeverSends() {
         setUp(withKey = true, openTab = false)
         deps.coachChatRequests.open(
-            ChatOpenRequest(draft = "Werte mein Training aus", attachments = listOf(ChatAttachment.Training("w1", "Push · heute")), send = true),
+            ChatOpenRequest(draft = "Werte mein Training aus", attachments = listOf(ChatAttachment.Training("w1", "Push · heute"))),
         )
         compose.onNodeWithTag("tab:COACH").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasSetTextAction() and hasText("Werte mein Training aus")).fetchSemanticsNodes().isNotEmpty() }
+        waitForTag("chip:training")
+        compose.waitUntilState(10_000) { deps.coachChatRequests.pending.value == null }
+        compose.waitForIdle()
+        assertTrue(fake.prompts.isEmpty())
+        compose.onNodeWithTag("coach:send").performClick()
         compose.waitUntilState(10_000) { chatPrompts().size == 1 }
         val prompt = chatPrompts().last()
         assertEquals("Werte mein Training aus", prompt.user)
         assertTrue(prompt.dynamicSystem, prompt.dynamicSystem.contains("## Attached training"))
         waitFor("Probier das hier.")
-        compose.waitUntilState(10_000) { deps.coachChatRequests.pending.value == null }
     }
 
     @Test

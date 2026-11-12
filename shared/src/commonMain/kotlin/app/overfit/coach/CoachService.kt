@@ -116,16 +116,6 @@ class CoachService(
         try { requestSessionReview(sessionId) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
     }
 
-    /** Non-suspending entry for the UI; the id is known right away so the screen can observe it. */
-    fun startProgressReview(): String {
-        val id = newId()
-        scope.launch {
-            dao.upsert(newRow(id, null, ReviewKind.PROGRESS))
-            sendPending()
-        }
-        return id
-    }
-
     /** Name of the workout and its template (demo review). */
     suspend fun sessionAndTemplate(sessionId: String): Pair<String, Template?> {
         val s = dao.session(sessionId)?.session ?: return "" to null

@@ -391,7 +391,6 @@ fun OverfitApp(deps: AppDependencies) {
     val editorSeeds = remember { EditorSeedHolder() }
 
     /** "Apply" on a coach proposal: same path as an imported workout (the import screen picks it up from the inbox). */
-    val applyCoachWorkout: (String) -> Unit = { json -> deps.inbox.offer(json) }
     val workoutState by deps.workout.state.collectAsStateWithLifecycle()
     val share = remember(deps) { ShareDependencies(deps.share, deps.data.importer, deps.data.templates, deps.inbox, deps.data.scope) {
         val s = deps.store.state.value

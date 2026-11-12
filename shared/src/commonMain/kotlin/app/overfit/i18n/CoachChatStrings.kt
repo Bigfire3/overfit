@@ -21,8 +21,10 @@ class CoachChatStrings(
     val sendWithPrice: (price: String) -> String,
     /** Send button with the user's own key, price unknown. */
     val priceOwnKey: String,
-    /** Send button with the user's own key and a known list price: "eigener Schlüssel · ≈ 2,1 ct". */
+    /** Send button with the user's own key and a known list price: "Key ≈ 2,1 ct" (short, the model chip must stay readable). */
     val priceOwnKeyCost: (cost: String) -> String,
+    /** Send button with credit while the price table could not be loaded yet. */
+    val priceUnknown: String,
     /** Send button without AI access (the demo answers). */
     val priceDemo: String,
     /** Finish flow: card that opens the chat with this training attached (nothing is sent before the user taps send). */
@@ -113,7 +115,8 @@ val GermanCoachChat = CoachChatStrings(
     send = "Senden",
     sendWithPrice = { "Senden, $it" },
     priceOwnKey = "eigener Schlüssel",
-    priceOwnKeyCost = { "eigener Schlüssel · $it" },
+    priceOwnKeyCost = { "Schlüssel $it" },
+    priceUnknown = "Preis unbekannt",
     priceDemo = "Demo · kostenlos",
     reviewCard = "Training auswerten lassen",
     reviewCardHint = "Öffnet den Coach-Chat mit diesem Training. Gesendet wird erst, wenn du selbst auf Senden tippst.",
@@ -204,7 +207,8 @@ val EnglishCoachChat = CoachChatStrings(
     send = "Send",
     sendWithPrice = { "Send, $it" },
     priceOwnKey = "own key",
-    priceOwnKeyCost = { "own key · $it" },
+    priceOwnKeyCost = { "Key $it" },
+    priceUnknown = "Price unknown",
     priceDemo = "Demo · free",
     reviewCard = "Get this training reviewed",
     reviewCardHint = "Opens the coach chat with this training attached. Nothing is sent until you tap send yourself.",
