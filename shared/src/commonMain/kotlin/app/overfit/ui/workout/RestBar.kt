@@ -64,7 +64,9 @@ fun RestBar(
     @Composable
     fun Actions(modifier: Modifier = Modifier) {
         // Tight spacing, "skip" takes the rest of the row: on a 360 dp phone it stays readable next to the countdown.
-        Row(modifier, horizontalArrangement = Arrangement.spacedBy(Space.s), verticalAlignment = Alignment.CenterVertically) {
+        // 6 dp gaps (and 4 dp after the countdown): the tabular countdown is ~4 dp wider than before and "Überspringen"
+        // must still fit next to it on a 360 dp phone (screenshot ui-polish/nachher/06-training-pause).
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             SmallButton(t.restMinus, { onAdjust(-15) })
             SmallButton(t.restPlus, { onAdjust(15) })
             SmallButton(t.restSkip, onSkip, Modifier.weight(1f, fill = false), tone = Tone.Default)
@@ -100,7 +102,7 @@ fun RestBar(
                     // Tabular digits: the countdown keeps its width every second.
                     style = Theme.type.tabular(Theme.type.label),
                 )
-                Spacer(Modifier.width(Space.s))
+                Spacer(Modifier.width(Space.xs))
                 Actions(Modifier.weight(1f, fill = false))
             }
             NextLine(Theme.type.caption, Modifier.fillMaxWidth().padding(vertical = Space.xs))
