@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasContentDescription
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -191,10 +193,12 @@ class UiFeedbackTest {
     @Test
     fun screenChange_isShort_andSwallowsADoubleTapOnBack() {
         launchApp()
+        // From the workout screen into the exercise details (a screen on top of the workout), then back.
         compose.onNodeWithText("Push").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Bearbeiten").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeitungsmodus").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Details zu", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(hasContentDescription("Details zu", substring = true))[0].performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("FORTSCHRITT").fetchSemanticsNodes().isNotEmpty() }
 
         compose.mainClock.autoAdvance = false
         compose.onNodeWithContentDescription("Zurück").performClick()
@@ -208,17 +212,16 @@ class UiFeedbackTest {
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
         compose.onAllNodesWithTag("nav-transition").assertCountEquals(0)
-        // The workout page reloads its plan from Room (background thread, not covered by waitForIdle): wait for its
-        // content instead of asserting at once, which failed now and then under load in the full suite.
+        // Still on the workout screen (its header has share and delete), not on the Training tab.
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Bearbeiten").assertExists()
+        compose.onNodeWithContentDescription("Workout löschen").assertExists()
     }
 
     @Test
     fun deletingAWorkout_landsInTheWorkoutList_notOnABlackScreen() {
         launchApp()
         compose.onNodeWithText("Push").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Workout löschen").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Workout löschen").performClick()
         compose.onNodeWithContentDescription("Workout löschen – zum Bestätigen erneut tippen").assertExists()
         compose.onNodeWithTag("confirm:armed").performClick()
@@ -242,25 +245,41 @@ class UiFeedbackTest {
     }
 
     @Test
-    fun editor_swipeDeletesSet_undoBringsItBack_noShareOrDeleteInEditMode() {
-        launchApp()
+    fun workoutScreen_swipeDeletesSet_undoBringsItBack_shareAndDeleteInHeader() {
+        val deps = launchApp()
         compose.onNodeWithText("Push").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
-        // Workout screen: share and delete as icons top right.
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
+        // Workout screen = editor: share and delete as icons top right, no pencil.
         compose.onNodeWithContentDescription("Teilen").assertExists()
         compose.onNodeWithContentDescription("Workout löschen").assertExists()
-        compose.onNodeWithContentDescription("Bearbeiten").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Bearbeitungsmodus").fetchSemanticsNodes().isNotEmpty() }
-        // Edit mode: neither share nor delete.
-        compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Teilen")).assertCountEquals(0)
-        compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Workout löschen")).assertCountEquals(0)
+        compose.onAllNodes(hasContentDescription("Bearbeiten")).assertCountEquals(0)
 
+        val pushId = runBlocking { deps.data.templates.templates.first().first { it.name == "Push" }.id }
+        fun storedSets() = runBlocking { deps.data.templates.get(pushId) }!!.exercises[0].sets.size
+        assertEquals(4, storedSets())
         compose.onAllNodesWithText("4 Sätze", substring = true)[0].assertExists()
         compose.onAllNodesWithTag("set-row:4")[0].performTouchInput { swipeLeft() }
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Satz gelöscht").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("3 Sätze", substring = true)[0].assertExists()
+        // Stored right away (autosave), undo brings it back and stores that as well.
+        compose.waitUntilState(10_000) { storedSets() == 3 }
         compose.onNodeWithText("Rückgängig").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Satz gelöscht").fetchSemanticsNodes().isEmpty() }
         compose.onAllNodesWithText("4 Sätze", substring = true)[0].assertExists()
+        compose.waitUntilState(10_000) { storedSets() == 4 }
+    }
+
+    @Test
+    fun newWorkoutEditor_hasNoShareOrDelete() {
+        launchApp()
+        compose.onNodeWithContentDescription("Neues Workout").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Workout erstellen").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Workout erstellen").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Name des Workouts").fetchSemanticsNodes().isNotEmpty() }
+        // A new workout is not stored yet: nothing to share or delete, "Speichern" instead of "Starten".
+        compose.onNodeWithText("Speichern").assertExists()
+        compose.onAllNodesWithText("Starten").assertCountEquals(0)
+        compose.onAllNodes(hasContentDescription("Teilen")).assertCountEquals(0)
+        compose.onAllNodes(hasContentDescription("Workout löschen")).assertCountEquals(0)
     }
 }

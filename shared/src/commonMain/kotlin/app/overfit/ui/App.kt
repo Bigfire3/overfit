@@ -98,7 +98,6 @@ import app.overfit.ui.templates.EditorSeed
 import app.overfit.ui.templates.EditorSeedHolder
 import app.overfit.ui.templates.TemplateEditorScreen
 import app.overfit.ui.workout.NewWorkoutScreen
-import app.overfit.ui.templates.WorkoutPlanScreen
 import app.overfit.ui.main.lastDoneText
 import app.overfit.ui.workout.MiniWorkoutBar
 import app.overfit.domain.Workout
@@ -526,6 +525,7 @@ fun OverfitApp(deps: AppDependencies) {
                     }
 
                     composable<StartRoute> {
+                        val startScope = rememberCoroutineScope()
                         val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = emptyMap())
                         StartScreen(
                             templates = templates,
@@ -541,6 +541,13 @@ fun OverfitApp(deps: AppDependencies) {
                             onNew = { nav.navigate(StartWorkoutRoute) },
                             onExercises = { nav.navigate(ExercisesRoute) },
                             onOpenWorkout = { nav.navigate(WorkoutPlanRoute(it)) },
+                            onStartWorkout = { id ->
+                                // Start right from the list (one tap). Main thread: the controller and navigation live there.
+                                startScope.launch {
+                                    val template = deps.data.templates.get(id) ?: return@launch
+                                    if (deps.workout.startFromTemplate(template)) nav.navigate(WorkoutRoute)
+                                }
+                            },
                             share = share,
                             chatInboxCount = chatInbox.items.size,
                             chatInboxFull = chatInbox.full,
@@ -563,17 +570,28 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
                     composable<WorkoutPlanRoute> { entry ->
+                        // A saved workout: shown and edited in one screen (autosave), "Start" at the bottom.
                         val id = entry.toRoute<WorkoutPlanRoute>().templateId
                         val scope = rememberCoroutineScope()
                         val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = emptyMap())
-                        WorkoutPlanScreen(
-                            templateId = id,
-                            templates = deps.data.templates,
-                            lastDone = lastDoneText(LocalStrings.current, lastDone[id], deps.today()),
+                        val editor = viewModel(key = "plan-$id") {
+                            TemplateEditorViewModel(id, deps.data.templates, deps.data.exercises, state.profile.unit, state.language)
+                        }
+                        val result by picked.result.collectAsStateWithLifecycle()
+                        LaunchedEffect(result) {
+                            result?.let { editor.onExercisesPicked(it); picked.result.value = null }
+                        }
+                        TemplateEditorScreen(
+                            viewModel = editor,
                             unit = state.profile.unit,
                             language = state.language,
+                            lastDone = lastDoneText(LocalStrings.current, lastDone[id], deps.today()),
                             workoutRunning = workoutState.workout != null,
-                            onBack = nav::popBackStack,
+                            onClose = nav::popBackStack,
+                            // A replace whose picker was left with back must not turn the next add into a replace.
+                            onAddExercises = { editor.pendingReplaceKey = null; nav.navigate(ExercisePickerRoute(single = false)) },
+                            onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
+                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it)) },
                             onStart = { template ->
                                 scope.launch {
                                     if (deps.workout.startFromTemplate(template)) nav.navigate(WorkoutRoute) { popUpTo(StartRoute) }
@@ -581,11 +599,7 @@ fun OverfitApp(deps: AppDependencies) {
                             },
                             onToRunning = { nav.openWorkout() },
                             onEndRunning = { deps.data.scope.launch { deps.workout.finish() }; nav.openWorkout() },
-                            onEdit = { nav.navigate(TemplateEditorRoute(id)) },
                             onShare = { nav.navigate(ShareRoute(id)) },
-                            // App scope: the screen closes itself as soon as the workout is gone.
-                            onDelete = { deps.data.scope.launch { deps.data.templates.delete(id) } },
-                            onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it, readOnly = true)) },
                             loadLast = { deps.data.workouts.lastPerformance(it, id) },
                         )
                     }
@@ -772,8 +786,13 @@ fun OverfitApp(deps: AppDependencies) {
                         TemplateEditorScreen(
                             viewModel = editor,
                             unit = state.profile.unit,
+                            language = state.language,
                             onClose = nav::popBackStack,
-                            onAddExercises = { nav.navigate(ExercisePickerRoute(single = false)) },
+                            // A new workout opens right after "Save", ready to start (one tap less than via the list).
+                            onSaved = { id -> nav.navigate(WorkoutPlanRoute(id)) { popUpTo<TemplateEditorRoute> { inclusive = true } } },
+                            loadLast = { deps.data.workouts.lastPerformance(it, null) },
+                            // A replace whose picker was left with back must not turn the next add into a replace.
+                            onAddExercises = { editor.pendingReplaceKey = null; nav.navigate(ExercisePickerRoute(single = false)) },
                             onReplaceExercise = { nav.navigate(ExercisePickerRoute(single = true)) },
                             onExerciseDetails = { nav.navigate(ExerciseDetailRoute(it)) },
                         )

@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.overfit.ai.Providers
@@ -82,16 +83,16 @@ class ExerciseImageTapTest {
     }
 
     @Test
-    fun workoutDetail_exerciseCardImageOpensReadOnlyDetails() {
+    fun workoutScreen_exerciseCardImageOpensDetails_backReturns() {
         launch()
         compose.onNodeWithText("Push").performClick()
         waitFor("Starten")
         // The exercise is a card with its image, as in the running workout.
-        waitFor("2 Sätze · 60 kg × 8")
+        waitFor("2 Sätze · Pause 1:30")
         compose.onNodeWithContentDescription("Details zu Bench Press").performClick()
         waitFor("FORTSCHRITT")
-        assertEquals(false, shown("Speichern"))
-        assertEquals(false, shown("ERFASSUNG"))
+        // The workout screen is editable, so are the exercise details opened from it (not read-only any more).
+        assertEquals(true, shown("ERFASSUNG"))
         compose.onNodeWithContentDescription("Zurück").performClick()
         waitFor("Starten")
     }
@@ -150,26 +151,28 @@ class ExerciseImageTapTest {
     }
 
     @Test
-    fun editor_iconOpensDetails_backReturnsToEditor() {
+    fun workoutScreen_editSurvivesDetails_backReturnsToWorkout() {
         launch()
         compose.onNodeWithText("Push").performClick()
-        waitForDescription("Bearbeiten")
-        compose.onNodeWithContentDescription("Bearbeiten").performClick()
-        waitFor("Bearbeitungsmodus")
+        waitFor("Starten")
+        // Edited in place (no pencil); the change must survive a trip to the exercise details.
+        compose.onNodeWithContentDescription("Gewicht Satz 1").performTextReplacement("62,5")
         compose.onNodeWithContentDescription("Details zu Bench Press").performClick()
         waitFor("FORTSCHRITT")
         compose.onNodeWithContentDescription("Zurück").performClick()
-        waitFor("Bearbeitungsmodus")
+        waitFor("Starten")
+        waitFor("62,5")
+        val id = requireNotNull(pushTemplate).id
+        compose.waitUntilState(10_000) { runBlocking { data.templates.get(id) }?.exercises?.single()?.sets?.first()?.weightKg == 62.5 }
     }
 
     @Test
     fun picker_imageOpensDetails_rowStillSelects() {
         launch()
         compose.onNodeWithText("Push").performClick()
-        waitForDescription("Bearbeiten")
-        compose.onNodeWithContentDescription("Bearbeiten").performClick()
-        waitFor("Bearbeitungsmodus")
-        compose.onNodeWithText("Übung hinzufügen").performClick()
+        waitFor("Starten")
+        waitFor("Übung hinzufügen")
+        compose.onNodeWithText("Übung hinzufügen").performScrollTo().performClick()
         waitFor("Übungen hinzufügen")
         // Only the rows at the top of the list are composed; the first row's image opens its details.
         val image = hasContentDescription("Details zu", substring = true)

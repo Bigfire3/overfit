@@ -2,7 +2,11 @@ package app.overfit.ui
 
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnySibling
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -45,8 +49,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Fabian's two wishes in the real app: in a saved workout a tap on an exercise shows the sets from last time
- * (or "not trained yet"), and a past training can be renamed from its detail page (only the training, not the
+ * Fabian's two wishes in the real app: in a saved workout each exercise card shows the sets from last time
+ * ("Letztes Mal: …", nothing if never trained), and a past training can be renamed from its detail page (only the training, not the
  * saved workout). With `SCREENSHOT_DIR` set it also writes the screenshots for the PR (dark, 360 dp).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -114,20 +118,18 @@ class LastTimeAndRenameTest {
         compose.waitForTrainingTab()
         waitFor("Push")
 
-        // 1. Saved workout: a tap on an exercise opens its card with the sets from last time.
+        // 1. Saved workout: each exercise card says what was done last time, right under its name.
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
         waitFor("Starten")
         waitFor(first)
-        compose.onNodeWithText(first).performClick()
-        waitFor("Letztes Mal · ", substring = true)
-        waitFor("62,5 kg × 8")
-        waitFor("65 kg × 6")
-        compose.onNodeWithText(second).performScrollTo().performClick()
-        waitFor("Noch nicht trainiert")
+        val firstCaption = hasText("Letztes Mal: 62,5 kg × 8, 65 × 6") and hasAnySibling(hasText(first))
+        compose.waitUntil(20_000) { compose.onAllNodes(firstCaption, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         shot("workout-letzte-werte")
-        // A second tap closes the card again.
-        compose.onNodeWithText(first).performScrollTo().performClick()
-        compose.waitUntil(10_000) { !shown("62,5 kg × 8") }
+        // The second exercise was not trained yet: no "last time" line on its card.
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(second, substring = true))
+        compose.waitUntil(20_000) { compose.onAllNodes(hasText(second), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(hasText("Letztes Mal", substring = true) and hasAnySibling(hasText(second)), useUnmergedTree = true)
+            .assertCountEquals(0)
         back()
         compose.waitForTrainingTab()
 
