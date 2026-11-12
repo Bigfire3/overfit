@@ -4,6 +4,7 @@ import app.overfit.data.db.ExerciseSetRow
 import app.overfit.data.db.HistoryRow
 import app.overfit.data.db.OverfitDatabase
 import app.overfit.data.db.WorkoutPhotoEntity
+import kotlinx.datetime.LocalDate
 import app.overfit.domain.LoggedSet
 import app.overfit.domain.WorkoutStats
 import app.overfit.domain.WorkoutSummary
@@ -52,7 +53,7 @@ class WorkoutRepository(
             endedAt = row.session.endedAt ?: row.session.updatedAt,
             note = row.session.note,
             feeling = row.session.feeling,
-            photos = photosOf(id),
+            photos = photosOfDay(LocalDate.parse(app.overfit.data.db.photoDay(row.session.startedAt))),
             sauna = row.session.sauna,
         )
     }
@@ -112,22 +113,26 @@ class WorkoutRepository(
 
     // --- Photos ------------------------------------------------------------------------------
 
-    /** Photos of one workout in order (AI chat sync, coach). */
-    suspend fun photosOf(sessionId: String): List<WorkoutPhoto> = dao.photosOf(sessionId).map { it.toPhoto() }
+    /** Photos of one calendar day in order (training detail, finish screen, coach). */
+    suspend fun photosOfDay(day: LocalDate): List<WorkoutPhoto> = dao.photosOfDay(day.toString()).map { it.toPhoto() }
 
-    fun observePhotosOf(sessionId: String): Flow<List<WorkoutPhoto>> = dao.observePhotosOf(sessionId).map { l -> l.map { it.toPhoto() } }
+    fun observePhotosOfDay(day: LocalDate): Flow<List<WorkoutPhoto>> =
+        dao.observePhotosOfDay(day.toString()).map { l -> l.map { it.toPhoto() } }
 
     /** All photos for the diary, newest first. */
     val photos: Flow<List<DiaryPhoto>> = dao.observePhotos().map { rows ->
-        rows.map { DiaryPhoto(WorkoutPhoto(it.id, it.sessionId, it.fileName, it.takenAt, photoFiles.path(it.fileName)), it.sessionName) }
+        rows.map { DiaryPhoto(WorkoutPhoto(it.id, it.sessionId, it.fileName, it.takenAt, photoFiles.path(it.fileName), it.day.ifEmpty { null }), it.sessionName) }
     }
 
-    /** Stores an already prepared JPEG for [sessionId] (null = no training, just the day) in the private photo folder. */
-    suspend fun addPhoto(sessionId: String?, jpeg: ByteArray, takenAt: Long = clock()): WorkoutPhoto {
+    /**
+     * Stores an already prepared JPEG as a photo of [day] in the private photo folder. Photos belong to the day
+     * (v14), never to a training: the training detail shows the photos of its day.
+     */
+    suspend fun addPhoto(day: LocalDate, jpeg: ByteArray, takenAt: Long = clock()): WorkoutPhoto {
         val id = Workout.newId()
         val name = "$id.jpg"
         photoFiles.write(name, jpeg)
-        val entity = WorkoutPhotoEntity(id, sessionId, name, takenAt, dao.nextPhotoPosition(sessionId))
+        val entity = WorkoutPhotoEntity(id, null, name, takenAt, dao.nextPhotoPosition(day.toString()), day.toString())
         try {
             dao.insertPhoto(entity)
         } catch (e: Exception) {
@@ -151,7 +156,7 @@ class WorkoutRepository(
     /** JPEG of a photo by id, null if it is gone. */
     suspend fun photoJpeg(id: String): ByteArray? = dao.getPhoto(id)?.let { photoFiles.read(it.fileName) }
 
-    private fun WorkoutPhotoEntity.toPhoto() = WorkoutPhoto(id, sessionId, fileName, takenAt, photoFiles.path(fileName))
+    private fun WorkoutPhotoEntity.toPhoto() = WorkoutPhoto(id, sessionId, fileName, takenAt, photoFiles.path(fileName), day.ifEmpty { null })
     /** Called after a workout was saved, finished or deleted (KI-Chat sync); `finished` = ended or discarded. */
     var onChanged: ((id: String, finished: Boolean) -> Unit)? = null
 
@@ -334,14 +339,18 @@ data class FinishedWorkout(
 /** Photo of a workout; [path] is the absolute file path for the image loader. */
 data class WorkoutPhoto(
     val id: String,
-    /** null = photo of a calendar day without a training. */
+    /** Legacy: training the photo was added to before v14; null for newer photos and photos of a day. */
     val sessionId: String?,
     val fileName: String,
     val takenAt: Long,
     val path: String,
-)
+    /** Calendar day the photo belongs to (ISO date); null only for in-memory test data → the day it was taken. */
+    val day: String? = null,
+) {
+    /** The calendar day this photo belongs to. */
+    val date: LocalDate get() = day?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.parse(app.overfit.data.db.photoDay(takenAt))
+}
 
-/** [workoutName] is null for a photo without a training. */
 data class DiaryPhoto(val photo: WorkoutPhoto, val workoutName: String?)
 
 internal fun ExerciseSetRow.toLogged() = LoggedSet(exerciseId, SetValues(weightKg, reps, durationSec))

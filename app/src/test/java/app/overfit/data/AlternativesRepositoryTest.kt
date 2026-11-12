@@ -21,7 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** Exercise alternatives (A/B, DB v14) in the repositories. */
+/** Exercise alternatives (A/B, DB v15) in the repositories. */
 @RunWith(RobolectricTestRunner::class)
 class AlternativesRepositoryTest {
     private lateinit var db: OverfitDatabase

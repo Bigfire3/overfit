@@ -18,7 +18,7 @@
 ## Alternativen (A/B) im Workout (Session BI, 8.11.)
 **Erledigt:** Im Workout ⋮ einer Übung → „Alternative hinzufügen“; die Alternative hat eigene Sätze. Im Training zeigt die Karte Chips
 mit den Varianten; voreingestellt ist die, die beim letzten Training dieses Workouts nicht dran war (A/B-Wechsel, reihum bei mehr).
-DB v14 (`template_exercise.variant`), Teilen/Export (`alt`), Backup und Coach/KI tragen Alternativen; alte Dateien bleiben lesbar.
+DB v15 (`template_exercise.variant`), Teilen/Export (`alt`), Backup und Coach/KI tragen Alternativen; alte Dateien bleiben lesbar.
 Screenshots: `docs/screenshots/workout-alternativen/`.
 
 ### Bitte auf dem Handy testen (Alternativen)

@@ -71,7 +71,7 @@ class BackupTest {
         data.workouts.finish(done, 20_000)
         data.workouts.updateDetails("w1", "Stark", 4)
         data.workouts.setSauna("w1", true)
-        data.workouts.addPhoto("w1", byteArrayOf(9, 8, 7), takenAt = 21_000)
+        data.workouts.addPhoto(kotlinx.datetime.LocalDate.parse(app.overfit.data.db.photoDay(10_000)), byteArrayOf(9, 8, 7), takenAt = 21_000)
         store.setName("Fabian")
         store.completeOnboarding()
         store.connectAi(app.overfit.ai.ProviderId.ANTHROPIC, "sk-secret")
@@ -123,7 +123,7 @@ class BackupTest {
 
     @Test
     fun photoWithoutWorkoutSurvivesExportAndImport() = runTest {
-        val photo = data.workouts.addPhoto(null, byteArrayOf(5, 4, 3), takenAt = 33_000)
+        val photo = data.workouts.addPhoto(kotlinx.datetime.LocalDate(2026, 11, 3), byteArrayOf(5, 4, 3), takenAt = 33_000)
         val file = backup.export()
 
         data.resetAll()
@@ -138,6 +138,7 @@ class BackupTest {
         assertEquals(photo.id, restored.id)
         assertEquals(null, restored.sessionId)
         assertEquals(33_000L, restored.takenAt)
+        assertEquals(kotlinx.datetime.LocalDate(2026, 11, 3), restored.date)
         assertEquals(listOf<Byte>(5, 4, 3), photos.read(restored.fileName)?.toList())
         val diary = data.workouts.photos.first().single()
         assertEquals(null, diary.workoutName)
@@ -150,11 +151,51 @@ class BackupTest {
             return Regex("\"v\":(\\d+)").find(json)!!.groupValues[1].toInt()
         }
         fill()
-        // Only photos of trainings: still v1, so an older app keeps reading the backup.
+        data.workouts.allPhotos().forEach { data.workouts.deletePhoto(it.id) }
+        // Only legacy photos of trainings (before DB v14): still v1, so an older app keeps reading the backup.
+        db.workoutDao().insertPhoto(app.overfit.data.db.WorkoutPhotoEntity("legacy", "w1", "legacy.jpg", 21_000, 0, app.overfit.data.db.photoDay(10_000)))
+        photos.write("legacy.jpg", byteArrayOf(1))
         assertEquals(1, version(backup.export()))
-        data.workouts.addPhoto(null, byteArrayOf(1), takenAt = 7_000)
-        // A photo without training: v2, an older app says "update the app" instead of failing to read it.
+        // A photo of a day (every new photo since v14): v2, an older app says "update the app" instead of failing.
+        data.workouts.addPhoto(kotlinx.datetime.LocalDate(2026, 11, 3), byteArrayOf(1), takenAt = 7_000)
         assertEquals(2, version(backup.export()))
+    }
+
+    /**
+     * Backup of an older app (no `day`): a training photo lands on the training's day, even when it was taken days
+     * later; a photo without training on the day it was taken; a photo whose training is missing is kept on its day.
+     */
+    @Test
+    fun oldBackupWithoutDaysPutsTrainingPhotosOnTheTrainingDay() = runTest {
+        fill()
+        val later = 10_000L + 3 * 86_400_000L
+        val noTraining = 10_000L + 5 * 86_400_000L
+        val file = backup.export()
+        val entries = Zip.read(file)
+        var json = entries.getValue(BackupService.JSON_NAME).decodeToString()
+        val original = json
+        val photo = Regex("\\{\"id\":\"[^\"]+\",\"file\":\"([^\"]+)\"[^}]*\\}").find(json)!!
+        val fileName = photo.groupValues[1]
+        // As an app before v14 wrote it: linked to the training, no day, taken three days after the training.
+        json = json.replace(photo.value, "{\"id\":\"old1\",\"workoutId\":\"w1\",\"file\":\"$fileName\",\"takenAt\":$later,\"position\":0}," +
+            "{\"id\":\"old2\",\"file\":\"$fileName\",\"takenAt\":$noTraining,\"position\":0}," +
+            "{\"id\":\"old3\",\"workoutId\":\"gone\",\"file\":\"$fileName\",\"takenAt\":$later,\"position\":1}")
+        assertTrue("the backup was rewritten", json != original && !json.contains("\"day\""))
+        val old = Zip.write(entries.map { (name, bytes) -> Zip.Entry(name, if (name == BackupService.JSON_NAME) json.encodeToByteArray() else bytes) })
+
+        data.resetAll()
+        store.resetAll()
+        backup.restore(backup.preview(old).getOrThrow())
+
+        val byId = data.workouts.allPhotos().associateBy { it.id }
+        assertEquals(setOf("old1", "old2", "old3"), byId.keys)
+        val trainingDay = kotlinx.datetime.LocalDate.parse(app.overfit.data.db.photoDay(10_000))
+        assertEquals(trainingDay, byId.getValue("old1").date)
+        assertEquals(kotlinx.datetime.LocalDate.parse(app.overfit.data.db.photoDay(noTraining)), byId.getValue("old2").date)
+        assertEquals(kotlinx.datetime.LocalDate.parse(app.overfit.data.db.photoDay(later)), byId.getValue("old3").date)
+        assertEquals(null, byId.getValue("old3").sessionId)
+        // The training detail shows the photo on its day.
+        assertEquals(listOf("old1"), data.workouts.getFinished("w1")!!.photos.map { it.id })
     }
 
     private suspend fun snapshot(): List<Any?> {
