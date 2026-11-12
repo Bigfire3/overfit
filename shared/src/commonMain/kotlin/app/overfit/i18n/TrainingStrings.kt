@@ -21,6 +21,10 @@ data class TrainingStrings(
     val exerciseReplaced: String,
     /** Play button on a workout card in the list. */
     val startNamed: (workout: String) -> String,
+    /** Editor ⋮: add an alternative (A/B) to this exercise. */
+    val addAlternative: String,
+    /** Label above an alternative in the editor. */
+    val alternative: String,
 )
 
 val TrainingGerman = TrainingStrings(
@@ -34,6 +38,8 @@ val TrainingGerman = TrainingStrings(
     exerciseRemoved = "Übung entfernt",
     exerciseReplaced = "Übung ersetzt",
     startNamed = { "$it starten" },
+    addAlternative = "Alternative hinzufügen",
+    alternative = "Alternative",
 )
 
 val TrainingEnglish = TrainingStrings(
@@ -47,4 +53,6 @@ val TrainingEnglish = TrainingStrings(
     exerciseRemoved = "Exercise removed",
     exerciseReplaced = "Exercise replaced",
     startNamed = { "Start $it" },
+    addAlternative = "Add alternative",
+    alternative = "Alternative",
 )

@@ -222,6 +222,48 @@ class BackupTest {
     }
 
     @Test
+    fun templateAlternativesSurviveExportAndRestore() = runTest {
+        data.seedCatalog().getOrThrow()
+        val bench = data.exercises.get("wg:bench-press")!!
+        val own = data.exercises.get(data.exercises.createCustom(CustomExerciseInput("Landmine Press", TrackingType.WEIGHT_REPS, 60)))!!
+        val squat = data.exercises.get(data.exercises.createCustom(CustomExerciseInput("Squat eigen", TrackingType.WEIGHT_REPS, null)))!!
+        val template = Template(
+            0, "AB", null,
+            listOf(
+                TemplateExercise(
+                    bench, 120, "A", listOf(PlannedSet(60.0, 8)),
+                    alternatives = listOf(TemplateExercise(own, 90, "B", listOf(PlannedSet(30.0, 12), PlannedSet(30.0, 10)))),
+                ),
+                TemplateExercise(squat, null, null, listOf(PlannedSet(80.0, 5))),
+            ),
+        )
+        val id = data.templates.save(template)
+        val before = data.templates.get(id)!!
+        val file = backup.export()
+        assertTrue(Zip.read(file).getValue(BackupService.JSON_NAME).decodeToString().contains("\"alternatives\""))
+
+        data.resetAll()
+        backup.restore(backup.preview(file).getOrThrow())
+        val after = data.templates.get(data.templates.templates.first().single().id)!!
+        assertEquals(before.copy(id = after.id), after)
+        assertEquals(listOf("Landmine Press"), after.exercises[0].alternatives.map { it.exercise.name })
+        assertEquals(2, data.templates.templates.first().single().exerciseNames.size)
+    }
+
+    @Test
+    fun oldBackupWithoutAlternativesStillReads() = runTest {
+        data.seedCatalog().getOrThrow()
+        val json = """{"format":"overfit-backup","v":1,"createdAt":5,
+            "templates":[{"id":3,"name":"Alt","exercises":[{"exerciseId":"wg:bench-press","restSec":90,"sets":[{"tKg":50,"tReps":10}]},
+                                                        {"exerciseId":"wg:squat","sets":[{"tKg":80,"tReps":5}]}]}]}"""
+        backup.restore(backup.preview(Zip.write(listOf(Zip.Entry("backup.json", json.encodeToByteArray())))).getOrThrow())
+        val t = data.templates.get(3)!!
+        assertEquals(listOf("wg:bench-press", "wg:squat"), t.exercises.map { it.exercise.id })
+        assertTrue(t.exercises.all { it.alternatives.isEmpty() })
+        assertEquals(listOf(PlannedSet(50.0, 10)), t.exercises[0].sets)
+    }
+
+    @Test
     fun oldMinimalBackupImports() = runTest {
         data.seedCatalog().getOrThrow()
         val minimal = Zip.write(

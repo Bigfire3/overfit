@@ -64,6 +64,19 @@ object ChatDocs {
                         te.restSec?.let { put("restSec", it) }
                         te.note?.let { put("note", it) }
                         put("sets", buildJsonArray { te.sets.forEach { add(plannedSet(it)) } })
+                        // Alternatives (A/B): done instead of this exercise in some trainings (alternating).
+                        if (te.alternatives.isNotEmpty()) put("alternatives", buildJsonArray {
+                            te.alternatives.forEach { a ->
+                                add(buildJsonObject {
+                                    put("exerciseId", a.exercise.id)
+                                    put("name", a.exercise.name)
+                                    put("trackingType", a.exercise.trackingType.name)
+                                    a.restSec?.let { put("restSec", it) }
+                                    a.note?.let { put("note", it) }
+                                    put("sets", buildJsonArray { a.sets.forEach { add(plannedSet(it)) } })
+                                })
+                            }
+                        })
                     })
                 }
             })

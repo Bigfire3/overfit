@@ -96,6 +96,8 @@ data class BTemplateExercise(
     val restSec: Int? = null,
     val note: String? = null,
     val sets: List<BSet> = emptyList(),
+    /** Alternatives (A/B, DB v15), nested so older apps simply ignore them; missing in older backups = none. */
+    val alternatives: List<BTemplateExercise> = emptyList(),
 )
 
 @Serializable
@@ -220,11 +222,15 @@ class BackupService(
                 BTemplate(
                     id = t.template.id, name = t.template.name, note = t.template.note, position = t.template.position,
                     createdAt = t.template.createdAt, updatedAt = t.template.updatedAt,
-                    exercises = t.exercises.sortedBy { it.entry.position }.map { e ->
-                        BTemplateExercise(
-                            exerciseId = e.entry.exerciseId, restSec = e.entry.restSec, note = e.entry.note,
-                            sets = e.sets.sortedBy { it.position }.map { BSet(tKg = it.targetWeightKg, tReps = it.targetReps, tSec = it.targetDurationSec) },
-                        )
+                    // Rows of one position: variant 0 is the exercise, the others its alternatives.
+                    exercises = t.exercises.groupBy { it.entry.position }.entries.sortedBy { it.key }.map { (_, rows) ->
+                        val sorted = rows.sortedBy { it.entry.variant }.map { e ->
+                            BTemplateExercise(
+                                exerciseId = e.entry.exerciseId, restSec = e.entry.restSec, note = e.entry.note,
+                                sets = e.sets.sortedBy { it.position }.map { BSet(tKg = it.targetWeightKg, tReps = it.targetReps, tSec = it.targetDurationSec) },
+                            )
+                        }
+                        sorted.first().copy(alternatives = sorted.drop(1))
                     },
                 )
             },
@@ -293,7 +299,7 @@ class BackupService(
         val now = clock()
         val exerciseDao = db.exerciseDao()
         db.transaction {
-            val referencedIds = (json.templates.flatMap { t -> t.exercises.map { it.exerciseId } } +
+            val referencedIds = (json.templates.flatMap { t -> t.exercises.flatMap { e -> listOf(e.exerciseId) + e.alternatives.map { it.exerciseId } } } +
                 json.workouts.flatMap { w -> w.exercises.flatMap { listOfNotNull(it.exerciseId, it.replacedExerciseId) } }).toSet()
             json.exercises.forEach { e ->
                 // free-exercise-db is gone (database v5): only exercises the backup uses come back, as custom ones.
@@ -308,7 +314,7 @@ class BackupService(
                 }
             }
             // Anything referenced but missing (e.g. a catalogue exercise that no longer exists).
-            val referenced = (json.templates.flatMap { t -> t.exercises.map { it.exerciseId } } +
+            val referenced = (json.templates.flatMap { t -> t.exercises.flatMap { e -> listOf(e.exerciseId) + e.alternatives.map { it.exerciseId } } } +
                 json.workouts.flatMap { w -> w.exercises.map { it.exerciseId } }).distinct()
             val missing = referenced - exerciseDao.getAll(referenced).map { it.id }.toSet()
             missing.forEach { id ->
@@ -323,9 +329,11 @@ class BackupService(
             val tDao = db.templateDao()
             json.templates.forEach { t ->
                 val id = tDao.insertTemplate(WorkoutTemplateEntity(t.id, t.name, t.note, t.position, t.createdAt, t.updatedAt))
-                t.exercises.forEachIndexed { i, e ->
-                    val eid = tDao.insertExercise(TemplateExerciseEntity(templateId = id, exerciseId = e.exerciseId, position = i, restSec = e.restSec, note = e.note))
-                    tDao.insertSets(e.sets.mapIndexed { si, s -> TemplateSetEntity(templateExerciseId = eid, position = si, targetWeightKg = s.tKg, targetReps = s.tReps, targetDurationSec = s.tSec) })
+                t.exercises.forEachIndexed { i, slot ->
+                    (listOf(slot) + slot.alternatives).forEachIndexed { variant, e ->
+                        val eid = tDao.insertExercise(TemplateExerciseEntity(templateId = id, exerciseId = e.exerciseId, position = i, restSec = e.restSec, note = e.note, variant = variant))
+                        tDao.insertSets(e.sets.mapIndexed { si, s -> TemplateSetEntity(templateExerciseId = eid, position = si, targetWeightKg = s.tKg, targetReps = s.tReps, targetDurationSec = s.tSec) })
+                    }
                 }
             }
             val wDao = db.workoutDao()

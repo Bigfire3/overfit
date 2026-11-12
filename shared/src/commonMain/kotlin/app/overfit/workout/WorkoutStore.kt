@@ -19,6 +19,12 @@ interface WorkoutStore {
 
     /** Completed sets of the exercise from the last finished workout with it ("last time"). */
     suspend fun lastSets(exerciseId: String): List<SetValues>
+
+    /**
+     * Which of [exerciseIds] (the variants of one exercise) the last finished training of saved workout [templateId]
+     * did (not skipped); null if none of them was done yet. Drives the A/B rotation.
+     */
+    suspend fun lastVariant(templateId: Long, exerciseIds: List<String>): String? = null
 }
 
 /** Simple in-memory store (tests, previews). */
@@ -27,10 +33,14 @@ class InMemoryWorkoutStore : WorkoutStore {
     val finished = mutableListOf<Pair<Workout, Long>>()
     var saves = 0
     val last = mutableMapOf<String, List<SetValues>>()
+    /** Exercise done last per template (A/B rotation in tests). */
+    val lastVariants = mutableMapOf<Long, List<String>>()
 
     override suspend fun loadActive() = active
     override suspend fun save(workout: Workout) { saves++; active = workout }
     override suspend fun finish(workout: Workout, endedAt: Long) { active = null; finished += workout to endedAt }
     override suspend fun delete(id: String) { if (active?.id == id) active = null }
     override suspend fun lastSets(exerciseId: String) = last[exerciseId].orEmpty()
+    override suspend fun lastVariant(templateId: Long, exerciseIds: List<String>) =
+        lastVariants[templateId].orEmpty().firstOrNull { it in exerciseIds }
 }

@@ -25,6 +25,8 @@ data class TemplateDraft(
         val rest: String,
         val note: String,
         val sets: List<DraftSet>,
+        /** Alternatives (A/B): edited like the exercise itself, keys are unique across the whole draft. */
+        val alternatives: List<DraftExercise> = emptyList(),
     )
 
     data class DraftSet(val key: Long, val weight: String = "", val reps: String = "", val duration: String = "")
@@ -42,7 +44,27 @@ data class TemplateDraft(
         return copy(exercises = exercises + added, nextKey = k)
     }
 
-    fun removeExercise(key: Long) = copy(exercises = exercises.filterNot { it.key == key })
+    /** Removes an exercise (with its alternatives) or a single alternative. */
+    fun removeExercise(key: Long) = copy(
+        exercises = exercises.filterNot { it.key == key }.map { e ->
+            if (e.alternatives.any { it.key == key }) e.copy(alternatives = e.alternatives.filterNot { it.key == key }) else e
+        },
+    )
+
+    /** Adds [exercise] as an alternative of the exercise [key] (same default sets as a new exercise). */
+    fun addAlternative(key: Long, exercise: Exercise): TemplateDraft {
+        // The same exercise twice is no alternative.
+        val target = exercises.firstOrNull { it.key == key } ?: return this
+        if (target.exercise.id == exercise.id || target.alternatives.any { it.exercise.id == exercise.id }) return this
+        var k = nextKey
+        val sets = List(DEFAULT_SETS) { DraftSet(k++) }
+        val alt = DraftExercise(k++, exercise, rest = exercise.defaultRestSec?.toString().orEmpty(), note = "", sets = sets)
+        val updated = copy(exercises = exercises.map { if (it.key == key) it.copy(alternatives = it.alternatives + alt) else it })
+        return updated.copy(nextKey = k)
+    }
+
+    /** All exercises and alternatives (validation, lookups). */
+    val allExercises: List<DraftExercise> get() = exercises.flatMap { listOf(it) + it.alternatives }
 
     /** Moves an exercise by [delta] positions (−1 = up). */
     fun moveExercise(key: Long, delta: Int): TemplateDraft {
@@ -78,8 +100,16 @@ data class TemplateDraft(
     fun updateSet(exerciseKey: Long, setKey: Long, transform: (DraftSet) -> DraftSet) =
         updateExercise(exerciseKey) { e -> e.copy(sets = e.sets.map { if (it.key == setKey) transform(it) else it }) }
 
-    private fun updateExercise(key: Long, transform: (DraftExercise) -> DraftExercise) =
-        copy(exercises = exercises.map { if (it.key == key) transform(it) else it })
+    /** Changes the exercise or alternative with [key]. */
+    private fun updateExercise(key: Long, transform: (DraftExercise) -> DraftExercise) = copy(
+        exercises = exercises.map { e ->
+            when {
+                e.key == key -> transform(e)
+                e.alternatives.any { it.key == key } -> e.copy(alternatives = e.alternatives.map { if (it.key == key) transform(it) else it })
+                else -> e
+            }
+        },
+    )
 
     /** Why the draft cannot be saved, or null. */
     sealed interface Problem {
@@ -90,7 +120,7 @@ data class TemplateDraft(
 
     fun validate(unit: WeightUnit): Problem? {
         if (name.isBlank()) return Problem.MissingName
-        exercises.forEach { e ->
+        allExercises.forEach { e ->
             e.sets.forEachIndexed { i, s ->
                 val bad = (s.weight.isNotBlank() && Numbers.parseWeight(s.weight, unit) == null) ||
                     (s.reps.isNotBlank() && Numbers.parseCount(s.reps) == null) ||
@@ -106,29 +136,31 @@ data class TemplateDraft(
         id = id,
         name = name.trim(),
         note = note.trim().ifEmpty { null },
-        exercises = exercises.map { e ->
-            val type = e.exercise.trackingType
-            TemplateExercise(
-                exercise = e.exercise,
-                restSec = e.rest.toIntOrNull(),
-                note = e.note.trim().ifEmpty { null },
-                sets = e.sets.map { s ->
-                    PlannedSet(
-                        weightKg = if (type.usesWeight) Numbers.parseWeight(s.weight, unit) else null,
-                        reps = if (type.usesReps) Numbers.parseCount(s.reps) else null,
-                        durationSec = if (type.usesTime) Numbers.parseDuration(s.duration) else null,
-                    )
-                },
-            )
-        },
+        exercises = exercises.map { e -> e.toPlanned(unit).copy(alternatives = e.alternatives.map { it.toPlanned(unit) }) },
     )
+
+    private fun DraftExercise.toPlanned(unit: WeightUnit): TemplateExercise {
+        val type = exercise.trackingType
+        return TemplateExercise(
+            exercise = exercise,
+            restSec = rest.toIntOrNull(),
+            note = note.trim().ifEmpty { null },
+            sets = sets.map { s ->
+                PlannedSet(
+                    weightKg = if (type.usesWeight) Numbers.parseWeight(s.weight, unit) else null,
+                    reps = if (type.usesReps) Numbers.parseCount(s.reps) else null,
+                    durationSec = if (type.usesTime) Numbers.parseDuration(s.duration) else null,
+                )
+            },
+        )
+    }
 
     companion object {
         const val DEFAULT_SETS = 3
 
         fun from(template: Template, unit: WeightUnit = WeightUnit.KG, language: Language = Language.DE): TemplateDraft {
             var k = 1L
-            val exercises = template.exercises.map { te ->
+            fun draft(te: TemplateExercise): DraftExercise {
                 val sets = te.sets.map { s ->
                     DraftSet(
                         key = k++,
@@ -137,8 +169,9 @@ data class TemplateDraft(
                         duration = s.durationSec?.toString().orEmpty(),
                     )
                 }
-                DraftExercise(k++, te.exercise, te.restSec?.toString().orEmpty(), te.note.orEmpty(), sets)
+                return DraftExercise(k++, te.exercise, te.restSec?.toString().orEmpty(), te.note.orEmpty(), sets)
             }
+            val exercises = template.exercises.map { te -> draft(te).copy(alternatives = te.alternatives.map(::draft)) }
             return TemplateDraft(template.id, template.name, template.note.orEmpty(), exercises, k)
         }
     }

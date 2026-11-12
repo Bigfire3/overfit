@@ -71,19 +71,7 @@ class TemplateRepository(
 
     suspend fun get(id: Long): Template? {
         val full = dao.getWithExercises(id) ?: return null
-        return Template(
-            id = full.template.id,
-            name = full.template.name,
-            note = full.template.note,
-            exercises = full.exercises.sortedBy { it.entry.position }.map { e ->
-                TemplateExercise(
-                    exercise = e.exercise.toDomain(),
-                    restSec = e.entry.restSec,
-                    note = e.entry.note,
-                    sets = e.sets.sortedBy { it.position }.map { PlannedSet(it.targetWeightKg, it.targetReps, it.targetDurationSec) },
-                )
-            },
-        )
+        return full.toDomain()
     }
 
     /**
@@ -113,27 +101,31 @@ class TemplateRepository(
             dao.deleteExercisesOf(template.id)
             template.id
         }
-        template.exercises.forEachIndexed { index, te ->
-            val entryId = dao.insertExercise(
-                TemplateExerciseEntity(
-                    templateId = id,
-                    exerciseId = te.exercise.id,
-                    position = index,
-                    restSec = te.restSec,
-                    note = te.note?.takeIf { it.isNotBlank() },
-                ),
-            )
-            dao.insertSets(
-                te.sets.mapIndexed { setIndex, s ->
-                    TemplateSetEntity(
-                        templateExerciseId = entryId,
-                        position = setIndex,
-                        targetWeightKg = s.weightKg,
-                        targetReps = s.reps,
-                        targetDurationSec = s.durationSec,
-                    )
-                },
-            )
+        template.exercises.forEachIndexed { index, slot ->
+            // The exercise as variant 0, its alternatives as 1, 2 … at the same position.
+            slot.variants.forEachIndexed { variant, te ->
+                val entryId = dao.insertExercise(
+                    TemplateExerciseEntity(
+                        templateId = id,
+                        exerciseId = te.exercise.id,
+                        position = index,
+                        restSec = te.restSec,
+                        note = te.note?.takeIf { it.isNotBlank() },
+                        variant = variant,
+                    ),
+                )
+                dao.insertSets(
+                    te.sets.mapIndexed { setIndex, s ->
+                        TemplateSetEntity(
+                            templateExerciseId = entryId,
+                            position = setIndex,
+                            targetWeightKg = s.weightKg,
+                            targetReps = s.reps,
+                            targetDurationSec = s.durationSec,
+                        )
+                    },
+                )
+            }
         }
         id
     }
@@ -143,3 +135,24 @@ class TemplateRepository(
         onChanged?.invoke()
     }
 }
+
+/**
+ * A stored template as domain model: rows with the same position form one exercise, variant 0 is the exercise,
+ * higher variants are its alternatives in order.
+ */
+internal fun app.overfit.data.db.TemplateWithExercises.toDomain(): Template = Template(
+    id = template.id,
+    name = template.name,
+    note = template.note,
+    exercises = exercises.groupBy { it.entry.position }.entries.sortedBy { it.key }.map { (_, rows) ->
+        val sorted = rows.sortedBy { it.entry.variant }
+        sorted.first().toDomainExercise().copy(alternatives = sorted.drop(1).map { it.toDomainExercise() })
+    },
+)
+
+private fun app.overfit.data.db.TemplateExerciseWithDetails.toDomainExercise() = TemplateExercise(
+    exercise = exercise.toDomain(),
+    restSec = entry.restSec,
+    note = entry.note,
+    sets = sets.sortedBy { it.position }.map { PlannedSet(it.targetWeightKg, it.targetReps, it.targetDurationSec) },
+)
