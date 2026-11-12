@@ -259,7 +259,7 @@ private fun SheetRow(
         }
         when {
             checked != null -> CheckCircle(checked)
-            chevron -> LineIcon(Icon.ChevronRight, size = 20.dp, color = c.muted)
+            chevron -> LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = c.muted)
         }
     }
 }
@@ -272,7 +272,7 @@ private fun SheetRow(
 private fun CheckCircle(checked: Boolean) {
     val c = Theme.colors
     Box(Modifier.size(24.dp).clip(CircleShape).background(if (checked) c.foreground else c.background), contentAlignment = Alignment.Center) {
-        if (checked) LineIcon(Icon.Check, size = 16.dp, color = c.background)
+        if (checked) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = c.background)
     }
 }
 
@@ -298,7 +298,7 @@ private fun CameraTile(label: String, onClick: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        LineIcon(Icon.Photos, size = 22.dp)
+        LineIcon(Icon.Photos, size = app.overfit.ui.theme.IconSize.inline)
         Spacer(Modifier.height(Space.xs))
         Text(label, style = Theme.type.caption, tone = Tone.Muted)
     }

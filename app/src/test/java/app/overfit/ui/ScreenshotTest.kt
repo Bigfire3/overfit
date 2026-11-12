@@ -3,6 +3,7 @@ package app.overfit.ui
 import kotlinx.coroutines.runBlocking
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -90,7 +91,10 @@ open class ScreenshotTest {
         node.performClick()
     }
     private fun tab(name: String) {
-        val tabNode = hasText(name) and hasClickAction()
+        // The tab bar entry (the coach tab also has a chip "Profil").
+        val tabNode = hasText(name) and hasClickAction() and androidx.compose.ui.test.SemanticsMatcher("tab") { n ->
+            n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag)?.startsWith("tab:") == true
+        }
         repeat(4) {
             if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
             if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) {
@@ -129,7 +133,7 @@ open class ScreenshotTest {
         waitFor("Starten")
         shot("workout-detail")
         // Share (icon top right)
-        compose.onNodeWithContentDescription("Teilen").performClick()
+        compose.openMenuEntry("Teilen")
         waitFor("Link kopieren")
         shot("teilen")
         back()
@@ -158,7 +162,7 @@ open class ScreenshotTest {
         waitFor("Push")
         shot("kalender-tag")
         compose.onAllNodes(hasText("Push"))[0].performClick()
-        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Teilen").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Training bearbeiten").fetchSemanticsNodes().isNotEmpty() }
         shot("training-detail")
         compose.onNodeWithContentDescription("Training bearbeiten").performClick()
         waitFor("Satz hinzufügen")

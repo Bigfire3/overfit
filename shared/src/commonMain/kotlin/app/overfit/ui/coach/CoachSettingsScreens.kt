@@ -222,8 +222,9 @@ private fun SelectChip(label: String, selected: Boolean, tag: String, modifier: 
             .clickable(interaction, indication = null, role = Role.RadioButton, onClick = onClick)
             .semantics { this.selected = selected }
             .testTag(tag)
-            .heightIn(min = 40.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .padding(vertical = (app.overfit.ui.theme.TouchTarget.min - app.overfit.ui.theme.Sizes.chip) / 2)
+            .heightIn(min = app.overfit.ui.theme.Sizes.chip)
+            .clip(app.overfit.ui.components.ChipShape)
             .background(if (selected) c.foreground else c.surfacePressed)
             .padding(horizontal = if (compact) 0.dp else 14.dp, vertical = Space.s),
         contentAlignment = Alignment.Center,

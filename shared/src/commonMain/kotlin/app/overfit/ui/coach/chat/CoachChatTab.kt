@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
@@ -324,11 +325,13 @@ private fun ChatHeader(s: CoachChatStrings, onStory: () -> Unit, onHistory: () -
         ) {
             Title(s.title)
             Spacer(Modifier.width(Space.s))
-            LineIcon(Icon.Info, size = 20.dp, color = Theme.colors.muted)
+            LineIcon(Icon.Info, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
         }
-        creditChip()
-        HeaderIcon(Icon.List, s.history, "coach:history", onHistory)
-        HeaderIcon(Icon.Edit, s.newChat, "coach:new", onNew)
+        app.overfit.ui.components.HeaderActions {
+            creditChip()
+            HeaderIcon(Icon.List, s.history, "coach:history", onHistory)
+            HeaderIcon(Icon.Edit, s.newChat, "coach:new", onNew)
+        }
     }
 }
 
@@ -337,8 +340,10 @@ private fun ChatHeader(s: CoachChatStrings, onStory: () -> Unit, onHistory: () -
 private fun OverlayHeader(s: CoachChatStrings, creditChip: @Composable () -> Unit, onClose: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         Title(s.title, Modifier.weight(1f))
-        creditChip()
-        HeaderIcon(Icon.Close, s.close, "coach:close", onClose)
+        app.overfit.ui.components.HeaderActions {
+            creditChip()
+            HeaderIcon(Icon.Close, s.close, "coach:close", onClose)
+        }
     }
 }
 
@@ -363,7 +368,7 @@ private fun HeaderIcon(icon: Icon, label: String, tag: String, onClick: () -> Un
             .semantics { contentDescription = label }
             .testTag(tag),
         contentAlignment = Alignment.Center,
-    ) { LineIcon(icon) }
+    ) { LineIcon(icon, size = app.overfit.ui.theme.IconSize.action) }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -473,7 +478,7 @@ private fun AttachmentCard(a: ChatAttachment) {
         Modifier.clip(RoundedCornerShape(12.dp)).background(Theme.colors.surface).padding(horizontal = 12.dp, vertical = Space.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LineIcon(a.icon(), size = 18.dp, color = Theme.colors.muted)
+        LineIcon(a.icon(), size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.muted)
         Spacer(Modifier.width(Space.s))
         Text(attachmentText(a), style = Theme.type.caption, maxLines = 1)
     }
@@ -655,11 +660,16 @@ private fun ContextChips(
 @Composable
 private fun ContextChip(label: String, icon: Icon, removeLabel: String, tag: String, onClick: (() -> Unit)?, onRemove: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
+    // A 40 dp pill like every chip, drawn inside a 48 dp row so the chip and its ✕ are full touch targets.
+    val fill = Theme.colors.surface
     Row(
         Modifier
-            .heightIn(min = 40.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Theme.colors.surface)
+            .heightIn(min = app.overfit.ui.theme.TouchTarget.min)
+            .drawBehind {
+                val inset = (app.overfit.ui.theme.TouchTarget.min - app.overfit.ui.theme.Sizes.chip).toPx() / 2
+                val h = size.height - 2 * inset
+                drawRoundRect(fill, topLeft = androidx.compose.ui.geometry.Offset(0f, inset), size = androidx.compose.ui.geometry.Size(size.width, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2))
+            }
             .widthIn(max = 240.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -671,20 +681,20 @@ private fun ContextChip(label: String, icon: Icon, removeLabel: String, tag: Str
                 .weight(1f, fill = false),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LineIcon(icon, size = 16.dp, color = Theme.colors.muted)
+            LineIcon(icon, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.muted)
             Spacer(Modifier.width(6.dp))
             Text(label, style = Theme.type.caption, maxLines = 1)
         }
         val removeInteraction = remember { MutableInteractionSource() }
         Box(
             Modifier
-                .size(36.dp)
+                .size(app.overfit.ui.theme.TouchTarget.min)
                 .pressScale(removeInteraction, PressScale.icon)
                 .clickable(removeInteraction, indication = null, role = Role.Button, onClick = onRemove)
                 .semantics { contentDescription = removeLabel }
                 .testTag("$tag:remove"),
             contentAlignment = Alignment.Center,
-        ) { LineIcon(Icon.Close, size = 14.dp, color = Theme.colors.muted) }
+        ) { LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.muted) }
     }
 }
 
@@ -751,7 +761,7 @@ private fun ModelChip(label: String, s: CoachChatStrings, onClick: () -> Unit, m
             style = Theme.type.caption.copy(color = Theme.colors.muted), maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(2.dp))
-        LineIcon(Icon.ChevronDown, size = 16.dp, color = Theme.colors.muted)
+        LineIcon(Icon.ChevronDown, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.muted)
     }
 }
 
@@ -789,7 +799,7 @@ private fun SendButton(price: String?, s: CoachChatStrings, enabled: Boolean, on
                 )
                 Spacer(Modifier.width(6.dp))
             }
-            LineIcon(Icon.ArrowUp, size = 22.dp, color = c.background)
+            LineIcon(Icon.ArrowUp, size = app.overfit.ui.theme.IconSize.inline, color = c.background)
         }
     }
 }
@@ -820,7 +830,7 @@ private fun RoundIcon(
     fill: androidx.compose.ui.graphics.Color,
     tint: androidx.compose.ui.graphics.Color,
     enabled: Boolean = true,
-    size: Dp = 40.dp,
+    size: Dp = app.overfit.ui.theme.Sizes.roundButton,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -836,6 +846,6 @@ private fun RoundIcon(
         Box(
             Modifier.size(size).alpha(if (enabled) 1f else 0.3f).clip(CircleShape).background(fill),
             contentAlignment = Alignment.Center,
-        ) { LineIcon(icon, size = 22.dp, color = tint) }
+        ) { LineIcon(icon, size = app.overfit.ui.theme.IconSize.inline, color = tint) }
     }
 }

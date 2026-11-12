@@ -49,3 +49,11 @@ fun ComposeTestRule.openCalendarDay(dayOfMonth: Int, dayWord: String = "Tag", se
     onAllNodes(matcher).onFirst().performScrollTo().performClick()
     waitUntil(20_000) { onAllNodes(hasText(sectionTitle, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty() }
 }
+
+/** Opens the ⋮ of the screen header ("Weitere Optionen") and taps the entry [label] (share, delete … since the UI audit 12.11.). */
+fun ComposeTestRule.openMenuEntry(label: String) {
+    waitUntil(20_000) { onAllNodes(androidx.compose.ui.test.hasContentDescription("Weitere Optionen")).fetchSemanticsNodes().isNotEmpty() }
+    onNode(androidx.compose.ui.test.hasContentDescription("Weitere Optionen")).performClick()
+    waitUntil(5_000) { onAllNodes(hasText(label)).fetchSemanticsNodes().isNotEmpty() }
+    onNode(hasText(label)).performClick()
+}

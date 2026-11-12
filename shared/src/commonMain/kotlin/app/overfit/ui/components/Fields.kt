@@ -36,6 +36,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
+import app.overfit.ui.theme.TouchTarget
+import app.overfit.ui.theme.Sizes
+import app.overfit.ui.theme.IconSize
+
+/** Shape of every chip (filter, choice, context, credit): a pill (UI audit 12.11.). */
+val ChipShape = RoundedCornerShape(50)
 
 /** Pill-shaped toggle for filters and single choices. Selected = inverted. */
 @Composable
@@ -46,9 +52,9 @@ fun Chip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifi
             .pressScale(interaction)
             // 48 dp touch area around the 40 dp chip.
             .clickable(interaction, indication = null, role = Role.Checkbox, onClick = onClick)
-            .padding(vertical = 4.dp)
-            .heightIn(min = 40.dp)
-            .background(if (selected) Theme.colors.inverseBackground else if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface, RoundedCornerShape(50))
+            .padding(vertical = (TouchTarget.min - Sizes.chip) / 2)
+            .heightIn(min = Sizes.chip)
+            .background(if (selected) Theme.colors.inverseBackground else if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface, ChipShape)
             .semantics { this.selected = selected }
             .padding(horizontal = Space.m, vertical = 8.dp),
         contentAlignment = Alignment.Center,
@@ -64,7 +70,7 @@ fun SearchInput(value: String, onValueChange: (String) -> Unit, placeholder: Str
     val style = Theme.type.body.copy(color = Theme.colors.foreground)
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LineIcon(Icon.Search, size = 20.dp, color = Theme.colors.muted)
+            LineIcon(Icon.Search, size = IconSize.inline, color = Theme.colors.muted)
             Spacer(Modifier.width(Space.s))
             BasicTextField(
                 value = value,
@@ -89,7 +95,7 @@ fun SearchInput(value: String, onValueChange: (String) -> Unit, placeholder: Str
                         .semantics { contentDescription = clearLabel }
                         .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onValueChange("") },
                     contentAlignment = Alignment.Center,
-                ) { LineIcon(Icon.Close, size = 18.dp, color = Theme.colors.muted) }
+                ) { LineIcon(Icon.Close, size = IconSize.small, color = Theme.colors.muted) }
             }
         }
         Hairline()
@@ -128,7 +134,8 @@ fun SmallInput(
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier.textInputArea()
                     .weight(1f)
-                    .padding(vertical = 10.dp)
+                    // The field itself is the 48 dp touch target (was 10 dp padding around the text line, UI audit 12.11.).
+                    .heightIn(min = TouchTarget.min)
                     .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
                 decorationBox = { inner ->
                     Box(contentAlignment = if (align == TextAlign.Center) Alignment.Center else Alignment.CenterStart) {

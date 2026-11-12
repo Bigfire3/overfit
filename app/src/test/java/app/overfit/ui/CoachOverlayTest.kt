@@ -224,7 +224,7 @@ class CoachOverlayTest {
 
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
-        compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Teilen")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { compose.onAllNodes(hasContentDescription("Training bearbeiten")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("coach:open").performClick()
         waitForTag("chip:training")
         input().performTextInput("Wie war das?")

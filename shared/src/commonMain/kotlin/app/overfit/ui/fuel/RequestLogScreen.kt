@@ -122,7 +122,7 @@ private fun RequestCard(e: AiRequestEntity, r: RequestLogStrings, language: Lang
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(purposeLabel(e.purpose, r), Modifier.weight(1f), style = Theme.type.label)
                 Spacer(Modifier.width(Space.m))
-                LineIcon(if (open) Icon.ChevronUp else Icon.ChevronDown, size = 16.dp, color = Theme.colors.muted)
+                LineIcon(if (open) Icon.ChevronUp else Icon.ChevronDown, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.muted)
             }
             // Date and time on their own line, so a long purpose never gets cut at 360 dp.
             Text(formatMillis(e.startedAt, s), Modifier.padding(top = 2.dp), style = Theme.type.caption, tone = Tone.Muted)

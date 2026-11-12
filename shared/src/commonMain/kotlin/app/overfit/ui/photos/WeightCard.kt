@@ -66,7 +66,7 @@ fun WeightCard(entries: List<WeightEntry>, today: LocalDate, unit: WeightUnit, l
                     Text(w.logToday, style = Theme.type.label)
                     Text(w.logTodayHint, style = Theme.type.caption, tone = Tone.Muted)
                 }
-                LineIcon(Icon.Plus, size = 20.dp)
+                LineIcon(Icon.Plus, size = app.overfit.ui.theme.IconSize.inline)
             }
         }
         return

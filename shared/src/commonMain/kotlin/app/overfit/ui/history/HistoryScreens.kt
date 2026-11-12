@@ -2,6 +2,7 @@ package app.overfit.ui.history
 
 import app.overfit.ui.photos.DayPhotoGrid
 import app.overfit.ui.components.Hint
+import app.overfit.ui.components.MenuItem
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -100,7 +101,7 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
                 Spacer(Modifier.width(Space.m))
                 Text(clockTime(row.startedAt), style = Theme.type.caption, tone = Tone.Muted)
                 Spacer(Modifier.width(Space.s))
-                LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+                LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
             }
             Spacer(Modifier.height(2.dp))
             Text(meta, style = Theme.type.caption, tone = Tone.Muted)
@@ -179,16 +180,20 @@ fun WorkoutDetailScreen(
         .collectAsStateWithLifecycle(emptyList())
 
     Screen(scroll = true, header = {
-        BackHeader(t.back, onBack) {
-            if (data != null) {
-                if (onCoach != null) app.overfit.ui.components.CoachIconButton(onCoach)
-                if (onEdit != null) HeaderIconButton(Icon.Edit, h.editWorkout, onEdit)
-                HeaderIconButton(Icon.Share, h.shareWorkout, onShare)
-                HeaderDeleteButton(t.delete, onConfirm = {
+        // [edit] [⋮ share, delete] [coach] (UI audit 12.11.: four icons were too many; delete keeps its two taps).
+        val loaded = data != null
+        BackHeader(
+            t.back, onBack,
+            coach = if (loaded) onCoach else null,
+            menu = if (loaded) listOf(
+                MenuItem(h.shareWorkout, onClick = onShare),
+                MenuItem(t.delete, destructive = true, confirm = true) {
                     appScope.launch { workouts.deleteWorkout(workoutId) }
                     onBack()
-                })
-            }
+                },
+            ) else emptyList(),
+        ) {
+            if (loaded && onEdit != null) HeaderIconButton(Icon.Edit, h.editWorkout, onEdit)
         }
     }) {
         val d = data ?: return@Screen
@@ -206,7 +211,7 @@ fun WorkoutDetailScreen(
         SummaryRows(d.summary, unit, language, t) {
             d.finished.feeling?.let { ListRow(h.feeling, "$it / 5") }
             // Changed afterwards via "Edit" (pencil top right).
-            if (d.finished.sauna) ListRow(h.sauna) { LineIcon(Icon.Check, size = 20.dp) }
+            if (d.finished.sauna) ListRow(h.sauna) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline) }
         }
         d.finished.note?.let {
             PanelSection(h.note) { PanelItem { Text(it) } }
@@ -270,7 +275,7 @@ fun WorkoutDetailScreen(
                         ) {
                             Text("${i + 1}", Modifier.width(32.dp), tone = Tone.Muted)
                             Text(text, Modifier.weight(1f), tone = tone)
-                            if (s.completed) LineIcon(Icon.Check, size = 18.dp) else Text(h.notDone, style = Theme.type.caption, tone = Tone.Muted)
+                            if (s.completed) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small) else Text(h.notDone, style = Theme.type.caption, tone = Tone.Muted)
                         }
                     }
                 }

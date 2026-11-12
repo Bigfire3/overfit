@@ -62,6 +62,7 @@ import app.overfit.ui.fuel.rememberLoaded
 import app.overfit.ui.fuel.reservedNote
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
+import app.overfit.ui.components.ChipShape
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -96,11 +97,13 @@ fun CreditChip(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit, m
         modifier
             .pressScale(interaction)
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
-            .heightIn(min = 36.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Theme.colors.surface)
             .semantics { contentDescription = s.creditChip(text) + (reserved?.let { " $it" } ?: "") }
             .testTag("coach:credit")
+            // 48 dp to tap around the 40 dp pill, like every chip (UI audit 12.11.).
+            .padding(vertical = (app.overfit.ui.theme.TouchTarget.min - app.overfit.ui.theme.Sizes.chip) / 2)
+            .heightIn(min = app.overfit.ui.theme.Sizes.chip)
+            .clip(ChipShape)
+            .background(Theme.colors.surface)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -148,7 +151,7 @@ fun CreditPopupContent(
                     .clickable(closeInteraction, indication = null, role = Role.Button, onClick = onClose)
                     .testTag("credit:close"),
                 contentAlignment = Alignment.Center,
-            ) { LineIcon(Icon.Close, size = 20.dp, color = Theme.colors.muted) }
+            ) { LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted) }
         }
         when (val a = account) {
             is Loaded.Ready -> {
@@ -183,7 +186,7 @@ fun CreditPopupContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(s.allRequests, Modifier.weight(1f), style = Theme.type.label)
-            LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+            LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
         }
     }
 }

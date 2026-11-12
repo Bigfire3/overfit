@@ -212,18 +212,18 @@ class UiFeedbackTest {
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
         compose.onAllNodesWithTag("nav-transition").assertCountEquals(0)
-        // Still on the workout screen (its header has share and delete), not on the Training tab.
+        // Still on the workout screen (its header has the ⋮ with share and delete), not on the Training tab.
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Workout löschen").assertExists()
+        compose.onNodeWithContentDescription("Weitere Optionen").assertExists()
     }
 
     @Test
     fun deletingAWorkout_landsInTheWorkoutList_notOnABlackScreen() {
         launchApp()
         compose.onNodeWithText("Push").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Workout löschen").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Workout löschen").performClick()
-        compose.onNodeWithContentDescription("Workout löschen – zum Bestätigen erneut tippen").assertExists()
+        // Delete sits in the ⋮ and keeps its two taps: first tap arms the entry, the second deletes.
+        compose.openMenuEntry("Workout löschen")
+        compose.onNodeWithText("Workout löschen – zum Bestätigen erneut tippen").assertExists()
         compose.onNodeWithTag("confirm:armed").performClick()
         // Back on the training tab (list with Pull and Legs), not on an empty screen.
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Pull").fetchSemanticsNodes().isNotEmpty() }
@@ -249,9 +249,14 @@ class UiFeedbackTest {
         val deps = launchApp()
         compose.onNodeWithText("Push").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
-        // Workout screen = editor: share and delete as icons top right, no pencil.
-        compose.onNodeWithContentDescription("Teilen").assertExists()
-        compose.onNodeWithContentDescription("Workout löschen").assertExists()
+        // Workout screen = editor: share and delete in the ⋮ top right (UI audit 12.11.), no pencil.
+        compose.onNodeWithContentDescription("Weitere Optionen").performClick()
+        compose.onNodeWithText("Teilen").assertExists()
+        compose.onNodeWithText("Workout löschen").assertExists()
+        compose.onNodeWithText("Teilen").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Link kopieren").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(hasContentDescription("Bearbeiten")).assertCountEquals(0)
 
         val pushId = runBlocking { deps.data.templates.templates.first().first { it.name == "Push" }.id }
@@ -280,6 +285,6 @@ class UiFeedbackTest {
         compose.onNodeWithText("Speichern").assertExists()
         compose.onAllNodesWithText("Starten").assertCountEquals(0)
         compose.onAllNodes(hasContentDescription("Teilen")).assertCountEquals(0)
-        compose.onAllNodes(hasContentDescription("Workout löschen")).assertCountEquals(0)
+        compose.onAllNodes(hasContentDescription("Weitere Optionen")).assertCountEquals(0)
     }
 }

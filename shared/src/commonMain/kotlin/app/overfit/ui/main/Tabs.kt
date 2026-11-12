@@ -43,7 +43,6 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.Strings
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.Icon
-import app.overfit.ui.components.IconButton
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.Panel
@@ -100,9 +99,10 @@ fun StartScreen(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { Title(t.navStart) }
             // The exercise catalogue is not a tab: it sits here (and in every exercise picker).
-            IconButton(Icon.Exercises, t.navExercises, onExercises)
-            Spacer(Modifier.width(Space.s))
-            IconButton(Icon.Plus, t.newWorkout, onNew)
+            app.overfit.ui.components.HeaderActions {
+                app.overfit.ui.components.HeaderIconButton(Icon.Exercises, t.navExercises, onExercises)
+                app.overfit.ui.components.HeaderIconButton(Icon.Plus, t.newWorkout, onNew)
+            }
         }
         Spacer(Modifier.height(Space.l))
 
@@ -147,7 +147,7 @@ fun WorkoutRow(workout: TemplateSummary, lastDone: String, onStart: (() -> Unit)
             }
             Spacer(Modifier.width(Space.m))
             if (onStart != null && workout.exerciseNames.isNotEmpty()) StartCircle(t.training.startNamed(workout.name), onStart)
-            else LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+            else LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
         }
     }
 }
@@ -160,11 +160,17 @@ fun WorkoutRow(workout: TemplateSummary, lastDone: String, onStart: (() -> Unit)
 private fun StartCircle(description: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Box(
-        Modifier.size(48.dp).pressScale(interaction).clip(CircleShape).background(Theme.colors.inverseBackground)
+        // 48 dp to tap, the same 40 dp white circle as every round button (UI audit 12.11.).
+        Modifier.size(app.overfit.ui.theme.TouchTarget.min).pressScale(interaction)
             .clickable(interaction, indication = null, role = Role.Button, onClickLabel = description) { onClick() }
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
-    ) { LineIcon(Icon.Play, size = 22.dp, color = Theme.colors.inverseForeground) }
+    ) {
+        Box(
+            Modifier.size(app.overfit.ui.theme.Sizes.roundButton).clip(CircleShape).background(Theme.colors.inverseBackground),
+            contentAlignment = Alignment.Center,
+        ) { LineIcon(Icon.Play, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.inverseForeground) }
+    }
 }
 
 /** "last done 3 days ago" / "not done yet" from the start of the last session (epoch ms). */

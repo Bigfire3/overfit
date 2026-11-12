@@ -135,7 +135,7 @@ private fun GridPhoto(photo: WorkoutPhoto, description: String, size: Dp, onOpen
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.size(24.dp).background(c.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
-                LineIcon(Icon.Close, size = 16.dp, color = if (armed) c.armed else c.foreground)
+                LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small, color = if (armed) c.armed else c.foreground)
             }
         }
     }

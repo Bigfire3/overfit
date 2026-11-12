@@ -182,9 +182,8 @@ class DayWithOverfitTest {
             waitFor(name)
             compose.onAllNodes(hasText(name))[0].performScrollTo().performClick()
             waitFor("Starten") // the workout plan screen
-            // Share is an icon top right (content description, no text).
-            compose.waitUntil(20_000) { compose.onAllNodes(hasContentDescription("Teilen")).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithContentDescription("Teilen").performClick()
+            // Share is in the ⋮ top right.
+            compose.openMenuEntry("Teilen")
             waitFor("Das wird geteilt") // preview of what the recipient gets, above the compact QR code
             waitFor("Link kopieren")
             click("Link kopieren")
@@ -311,7 +310,7 @@ class DayWithOverfitTest {
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
         waitFor("Stark heute")
-        compose.onNodeWithContentDescription("Teilen").performClick()
+        compose.openMenuEntry("Teilen")
         waitFor("Link kopieren")
         click("Link kopieren")
         val workoutLink = share.clipboard.orEmpty()

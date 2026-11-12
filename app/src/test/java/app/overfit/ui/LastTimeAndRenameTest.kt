@@ -138,7 +138,7 @@ class LastTimeAndRenameTest {
         compose.openCalendarDay(realToday().dayOfMonth)
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
-        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Teilen").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Training bearbeiten").fetchSemanticsNodes().isNotEmpty() }
         shot("training-detail")
         compose.onNode(hasText("Push") and hasClickAction()).performClick()
         waitFor("Statistiken und Bestwerte", substring = true)
@@ -146,7 +146,7 @@ class LastTimeAndRenameTest {
         shot("training-umbenennen")
         compose.onNodeWithText("Speichern").performClick()
         waitFor("Brust Montag")
-        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Teilen").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Training bearbeiten").fetchSemanticsNodes().isNotEmpty() }
         shot("training-umbenannt")
         back()
         waitFor("Brust Montag")

@@ -94,7 +94,7 @@ internal fun PhotoThumb(
                 contentAlignment = Alignment.Center,
             ) {
                 Box(Modifier.size(24.dp).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
-                    LineIcon(Icon.Close, size = 16.dp)
+                    LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small)
                 }
             }
         }

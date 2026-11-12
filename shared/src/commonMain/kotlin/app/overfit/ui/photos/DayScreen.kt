@@ -106,7 +106,7 @@ fun DayScreen(
     val dayPhotos = remember(photos, date) { photos.orEmpty().filter { it.photo.date == date }.sortedBy { it.photo.takenAt } }
     val trainings = remember(history, date) { history.orEmpty().filter { dateOf(it.startedAt) == date }.sortedBy { it.startedAt } }
 
-    Screen(scroll = true, header = { BackHeader(t.back, onBack) { if (onCoach != null) app.overfit.ui.components.CoachIconButton(onCoach) } }) {
+    Screen(scroll = true, header = { BackHeader(t.back, onBack, coach = onCoach) }) {
         Title(t.date(date))
 
         if (weights != null) DayWeight(date, weights, unit, language, focusWeight, onSetWeight, onDeleteWeight)
