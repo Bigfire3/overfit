@@ -83,11 +83,13 @@ fun SearchInput(value: String, onValueChange: (String) -> Unit, placeholder: Str
                 },
             )
             if (value.isNotEmpty()) {
+                val clearInteraction = remember { MutableInteractionSource() }
                 Box(
                     Modifier
                         .size(48.dp)
                         .semantics { contentDescription = clearLabel }
-                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onValueChange("") },
+                        .pressScale(clearInteraction, PressScale.icon)
+                        .clickable(clearInteraction, indication = null, role = Role.Button) { onValueChange("") },
                     contentAlignment = Alignment.Center,
                 ) { LineIcon(Icon.Close, size = 18.dp, color = Theme.colors.muted) }
             }
@@ -171,7 +173,8 @@ fun MultilineInput(
             .padding(Space.m),
         decorationBox = { inner ->
             Box {
-                if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = c.muted))
+                // Same placeholder grey as every other input (faint), so a hint never reads as an entered value.
+                if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = c.faint))
                 inner()
             }
         },

@@ -1,5 +1,6 @@
 package app.overfit.ui.history
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -88,12 +89,13 @@ internal fun PhotoThumb(
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .size(32.dp)
+                    // 44 dp target around the 24 dp badge (the badge stays in the corner).
+                    .size(44.dp)
                     .semantics { contentDescription = removeLabel }
                     .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onRemove),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.size(24.dp).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
+                Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(24.dp).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
                     LineIcon(Icon.Close, size = 16.dp)
                 }
             }

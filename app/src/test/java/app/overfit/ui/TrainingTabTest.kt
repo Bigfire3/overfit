@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performClick
@@ -78,6 +79,8 @@ class TrainingTabTest {
     fun startEmpty_addExercise_finish_isSavedWorkout_startsAgain() {
         val deps = launch()
         waitFor("Noch keine Workouts", substring = true)
+        // The empty state leads on: a main button "Neues Workout" next to the "+" icon (same chooser).
+        compose.onNodeWithText("Neues Workout").assertIsDisplayed()
 
         // "+" → start empty → the workout runs without exercises
         compose.onNodeWithContentDescription("Neues Workout").performClick()

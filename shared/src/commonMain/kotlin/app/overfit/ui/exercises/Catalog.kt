@@ -1,5 +1,6 @@
 package app.overfit.ui.exercises
 
+import app.overfit.ui.components.SmallButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,6 +89,8 @@ class CatalogViewModel(repository: ExerciseRepository) : ViewModel() {
     fun toggleEquipment(equipment: Equipment) =
         _filter.update { it.copy(equipment = if (it.equipment == equipment) null else equipment) }
     fun toggleOnlyCustom() = _filter.update { it.copy(onlyCustom = !it.onlyCustom) }
+    /** Removes muscle, equipment and "custom only" (keeps the search text). */
+    fun clearFilters() = _filter.update { it.copy(muscle = null, equipment = null, onlyCustom = false) }
 }
 
 /** Tab "Exercises": catalogue (search, filters, custom exercises). */
@@ -144,11 +147,18 @@ fun ColumnScope.CatalogList(
         when {
             list == null -> item(key = "loading") { Text(t.catalogLoading, Modifier.padding(top = Space.l), tone = Tone.Muted) }
             list.isEmpty() -> item(key = "empty") {
-                Text(
-                    if (filter.onlyCustom && filter.query.isBlank()) t.noCustomExercises else t.noResults,
-                    Modifier.padding(top = Space.l),
-                    tone = Tone.Muted,
-                )
+                Column {
+                    Text(
+                        if (filter.onlyCustom && filter.query.isBlank()) t.noCustomExercises else t.noResults,
+                        Modifier.padding(top = Space.l),
+                        tone = Tone.Muted,
+                    )
+                    // With a filter active the way out is one tap away, not three chip toggles.
+                    if (filter.muscle != null || filter.equipment != null || (filter.onlyCustom && filter.query.isNotBlank())) {
+                        Spacer(Modifier.height(Space.m))
+                        SmallButton(t.clearFilters, catalog::clearFilters)
+                    }
+                }
             }
             else -> {
                 item(key = "count") {

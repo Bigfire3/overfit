@@ -91,10 +91,11 @@ fun StartScreen(
     val t = LocalStrings.current
     Screen(
         scroll = true,
-        footer = if (running != null) {
-            { RunningWorkoutChoice(onOpenRunning, onEndRunning) }
-        } else {
-            null
+        footer = when {
+            running != null -> { { RunningWorkoutChoice(onOpenRunning, onEndRunning) } }
+            // Empty state leads to the next step: the same chooser as "+" (create a workout or start empty).
+            templates != null && templates.isEmpty() -> { { PrimaryButton(t.newWorkout, onNew, icon = Icon.Plus) } }
+            else -> null
         },
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

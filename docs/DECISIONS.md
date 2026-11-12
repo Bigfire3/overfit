@@ -1723,6 +1723,32 @@ Fabians Feedback vom 8.11. (Zitate in PROGRESS.md), Vorgaben der Koordination. T
   Session BH setzt ein Coach-Symbol in die Kopfzeile (`BackHeader`-Aktionen), abgestimmt.
 - Belege: `docs/screenshots/kalender-einheitlich/vorher|nachher` (`raster.png`, `liste.png`, `tag.png`; 360 dp, dunkel).
 
+## UI/UX-Feinschliff mit impeccable + Jakub-Krehel-Skills (12.11.2026)
+- **Auftrag (Fabian):** Bestandsaufnahme und Audit mit den Design-Skills, wichtigste Mängel direkt beheben. Bericht mit P0–P2:
+  `docs/UI-AUDIT.md`; Produkt- und Designkontext neu in `PRODUCT.md` und `DESIGN.md` (aus SPEC/DECISIONS abgeleitet, ohne
+  Interview, Annahmen markiert). Die Jakub-Krehel-Skills liegen nur auf dem offenen Branch `claude/install-impeccable-jakub-skills-8tqz25`
+  und wurden von dort gelesen, nicht übernommen (fremde Session).
+- **Kontrast-Untergrenze statt Augenmaß:** `muted` #8E8E93 → #98989D (4,4 → 4,9 : 1 auf `surfacePressed`), `faint` #48484A → #757579
+  (2,3 → 4,6 : 1 auf Schwarz; Platzhalter auf `surface` 3,7 : 1), `negative` #FF453A → #FF6961 (Text auf allen Flächen ≥ 4,5 : 1;
+  `armed` bleibt #FF453A für das Mülleimer-Icon). Hierarchie bleibt sichtbar (muted 7,3 vs. faint 4,6 auf Schwarz, Test). Abgesichert
+  in `ContrastTest`. Zahlen auf der grünen Satzzeile erreichen 4,1 : 1 – als großer Text (20 sp halbfett) über der 3 : 1-Grenze, bewusst
+  so gelassen, weil die grüne Zeile (`confirmFill`) aus „Grüne Satzzeile“ (7.11.) stammt.
+- **Tabellenziffern, wo Ziffern laufen:** vorher nur `number`; der kleine Countdown im Pausentimer und die Trainingsdauer wackelten
+  jede Sekunde. Jetzt `hero`, `title`, `number` mit `tnum`, laufende Werte in Body/Label/Caption über `Theme.type.tabular(…)`.
+  Verworfen: `tnum` für alle Stile – tabellarische „1“ machen „−15 s“/„+15 s“ breiter und schnitten „Überspringen“ auf 360 dp ab
+  (Sonnet-Gegencheck, Screenshot `ui-polish/nachher/06-training-pause`).
+- **Konzentrische Radien:** `Block` 16 → 20 dp (Satzzeile 12 dp + 8 dp Innenabstand), `SetField` 10 → 8 dp (12 − 4). Karten 24 dp und
+  Panels 16 dp bleiben.
+- **Tippflächen ≥ 44–48 dp:** Tab-Leiste (Padding in die Klickfläche), Countdown im Pausentimer, Segmente, Foto-×, Kontext-Chip-×,
+  Guthaben-Schließen. Sichtbare Größe unverändert.
+- **Bewegung:** ⋮-Menü wächst aus seiner Ecke (150 ms, 0,96 → 1, Fade, kein Nachfedern), Pausentimer klappt weich auf/zu
+  (`animateContentSize`, ohne Feder-Überschwingen). Bewusst **nicht** geändert: Icon-Druck 0,88, Karten 0,98 und das Nachfedern von
+  `pressScale` (Entscheidung „Knöpfe“, 6.11.), obwohl better-ui 0,96 und bounce 0 empfiehlt.
+- **Zustände:** Fehler werden gezeigt statt verschluckt (Backup-Export, Abschluss speichern, Plan übernehmen/ablehnen, Guthaben mit
+  „Erneut versuchen“, QR-Kurzcode offline als eigener Fehler `ShareFailure.NETWORK`), Laden ist nicht mehr „leer“ (Posteingang,
+  Coach-Archiv), fehlende Auswertung bekommt einen eigenen Text, Leerzustände führen weiter (Training-Tab: „Neues Workout“,
+  Katalog: „Filter zurücksetzen“). Offene Punkte stehen in `docs/UI-AUDIT.md`.
+
 ## Coach/KI Teil 2: ein Coach-Symbol überall statt KI-Knöpfen (Session BH)
 Fabian: „Das dürfen nicht so Buttons mit so einem kurzen Stichpunkt sein … wie ein Overlay, dass man dann einfach sagen kann,
 jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
