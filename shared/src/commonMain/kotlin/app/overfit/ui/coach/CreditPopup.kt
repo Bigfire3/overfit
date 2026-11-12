@@ -146,7 +146,7 @@ fun CreditPopupContent(
             Text(s.creditTitle, Modifier.weight(1f), style = Theme.type.label, tone = Tone.Muted)
             val closeInteraction = remember { MutableInteractionSource() }
             Box(
-                Modifier.size(40.dp).semantics { contentDescription = s.close }
+                Modifier.size(app.overfit.ui.theme.TouchTarget.min).semantics { contentDescription = s.close }
                     .pressScale(closeInteraction, app.overfit.ui.components.PressScale.icon)
                     .clickable(closeInteraction, indication = null, role = Role.Button, onClick = onClose)
                     .testTag("credit:close"),

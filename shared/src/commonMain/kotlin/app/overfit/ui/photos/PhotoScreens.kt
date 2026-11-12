@@ -488,9 +488,9 @@ fun PhotoViewerScreen(
         // Header like every detail screen: back left, share and delete as icons top right (for the photo shown).
         var shown by remember { mutableStateOf<String?>(null) }
         val scope = rememberCoroutineScope()
-        Row(Modifier.padding(horizontal = Space.l, vertical = Space.m).height(44.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = Space.l, vertical = Space.m).height(app.overfit.ui.theme.TouchTarget.min).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(44.dp).semantics { contentDescription = t.back }.clickable(onClick = onBack),
+                Modifier.size(app.overfit.ui.theme.TouchTarget.min).semantics { contentDescription = t.back }.clickable(onClick = onBack),
                 contentAlignment = Alignment.CenterStart,
             ) { LineIcon(Icon.Back, color = white) }
             Spacer(Modifier.weight(1f))

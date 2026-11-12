@@ -559,9 +559,11 @@ fun BigInput(
             cursorBrush = SolidColor(Theme.colors.foreground),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); onDone() }),
-            modifier = (if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth()).textInputArea(),
+            modifier = (if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth()).textInputArea()
+                .heightIn(min = TouchTarget.min)
+                .semantics { contentDescription = placeholder },
             decorationBox = { inner ->
-                Box {
+                Box(contentAlignment = Alignment.CenterStart) {
                     if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
                     inner()
                 }

@@ -141,7 +141,7 @@ fun CoachStoryScreen(
             }
             Row(Modifier.fillMaxWidth().padding(top = Space.s), horizontalArrangement = Arrangement.End) {
                 Box(
-                    Modifier.size(44.dp).testTag("story:close")
+                    Modifier.size(app.overfit.ui.theme.TouchTarget.min).testTag("story:close")
                         .semantics { contentDescription = s.close }
                         .clickable(role = Role.Button) { onClose() },
                     contentAlignment = Alignment.Center,

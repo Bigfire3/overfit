@@ -136,7 +136,8 @@ fun SmallInput(
                     .weight(1f)
                     // The field itself is the 48 dp touch target (was 10 dp padding around the text line, UI audit 12.11.).
                     .heightIn(min = TouchTarget.min)
-                    .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
+                    // Screen readers name the field even when it is empty (the grey placeholder is only drawn).
+                    .semantics { contentDescription = description ?: placeholder },
                 decorationBox = { inner ->
                     Box(contentAlignment = if (align == TextAlign.Center) Alignment.Center else Alignment.CenterStart) {
                         if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
@@ -174,6 +175,7 @@ fun MultilineInput(
             .textInputArea()
             .fillMaxWidth()
             .heightIn(min = minHeight)
+            .semantics { contentDescription = placeholder }
             .then(if (inPanel) Modifier.background(c.surface) else Modifier.clip(shape).background(c.surface))
             .padding(Space.m),
         decorationBox = { inner ->

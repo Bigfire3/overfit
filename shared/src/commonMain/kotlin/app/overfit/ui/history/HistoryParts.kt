@@ -88,12 +88,12 @@ internal fun PhotoThumb(
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .size(32.dp)
+                    .size(app.overfit.ui.theme.TouchTarget.min)
                     .semantics { contentDescription = removeLabel }
                     .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onRemove),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.size(24.dp).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
                     LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small)
                 }
             }

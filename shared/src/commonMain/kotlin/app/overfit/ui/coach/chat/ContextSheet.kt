@@ -271,7 +271,7 @@ private fun SheetRow(
 @Composable
 private fun CheckCircle(checked: Boolean) {
     val c = Theme.colors
-    Box(Modifier.size(24.dp).clip(CircleShape).background(if (checked) c.foreground else c.background), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(if (checked) c.foreground else c.background), contentAlignment = Alignment.Center) {
         if (checked) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = c.background)
     }
 }
@@ -279,7 +279,7 @@ private fun CheckCircle(checked: Boolean) {
 @Composable
 private fun CountBadge(n: Int) {
     val c = Theme.colors
-    Box(Modifier.size(24.dp).clip(CircleShape).background(c.foreground), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(c.foreground), contentAlignment = Alignment.Center) {
         BasicText(n.toString(), style = Theme.type.caption.copy(color = c.background, fontWeight = FontWeight.SemiBold, fontSize = 12.sp))
     }
 }
@@ -318,7 +318,7 @@ private fun PhotoTile(p: DiaryPhoto, number: Int?, enabled: Boolean, s: CoachCha
         PhotoThumb(p.photo, p.workoutName ?: s.photos, size = TILE, onClick = if (enabled) onClick else null)
         if (number != null) {
             Box(
-                Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).clip(CircleShape).background(c.foreground),
+                Modifier.align(Alignment.TopEnd).padding(6.dp).size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(c.foreground),
                 contentAlignment = Alignment.Center,
             ) {
                 BasicText(number.toString(), style = Theme.type.caption.copy(color = c.background, fontWeight = FontWeight.SemiBold, fontSize = 12.sp))

@@ -136,6 +136,10 @@ class UiUniformTest {
 
     /** Every tappable thing without text but with a description (icon button, check circle, ▶) is ≥ 48 dp to tap. */
     private fun checkIconButtons(screen: String) {
+        // Nothing tappable is mute for screen readers: no text and no description = an unlabeled icon button.
+        val mute = compose.onAllNodes(hasClickAction(), useUnmergedTree = false).fetchSemanticsNodes()
+            .filter { it.config.getOrNull(SemanticsProperties.Text) == null && it.config.getOrNull(SemanticsProperties.ContentDescription) == null }
+        assertTrue("$screen: tappable without label ${mute.map { "%.1f × %.1f dp ".format(it.size.width.toFloat().dp(), it.size.height.toFloat().dp()) + it.config.toString().take(300) }}", mute.isEmpty())
         val small = compose.onAllNodes(hasClickAction(), useUnmergedTree = false).fetchSemanticsNodes()
             .filter { it.config.getOrNull(SemanticsProperties.Text) == null && it.config.getOrNull(SemanticsProperties.ContentDescription) != null }
             // Layout size, not the visible bounds: a target cut off at the edge of a scrolled list is not too small.

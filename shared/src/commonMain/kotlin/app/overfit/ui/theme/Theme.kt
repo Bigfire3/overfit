@@ -137,6 +137,8 @@ object Sizes {
     val roundButton = 40.dp
     /** Round check button of a set row (running workout). */
     val checkCircle = 36.dp
+    /** Small round badge on a photo or a choice (✕ to remove, tick, count). */
+    val badge = 24.dp
     /** Day number circle in the calendar. */
     val dayCircle = 22.dp
     /** Box of every calendar marker (dot, ring, dash) and of the legend. */

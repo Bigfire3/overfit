@@ -1836,3 +1836,9 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
   Aktionsgruppe, ≤ 3 Aktionen, alle ≥ 48 dp auf einer Linie, Icons genau 48 × 48, Coach ganz rechts, jeder Icon-Knopf ohne Text ≥ 48 dp,
   Löschen im ⋮ wird erst scharf geschaltet, Coach-Ebene verdeckt das Training für Screenreader.
 - Belege: `docs/screenshots/einheitlich/vorher|nachher` (360 dp, dunkel).
+- **Sonnet-Gegencheck:** keine Verhaltensfehler. Behoben: Touch-Ziele unter 48 dp außerhalb der Hauptscreens (✕ der Coach-Story 44,
+  ✕ im Guthaben-Popup 40, Foto-Vollbild Zurück/Kopfzeile 44, ✕ „Foto entfernen“ 40 bzw. 32 dp); die runden Badges darauf und im
+  Kontext-Sheet nutzen `Sizes.badge` (24 dp). Der Test prüft jetzt auch, dass nichts Tippbares ohne Beschriftung ist; dabei fielen
+  Textfelder ohne Namen für Screenreader auf (Notiz, Workout-Name: leer hörte man nur „Eingabefeld“). Sie tragen jetzt ihren
+  Platzhalter als Beschreibung, und der Workout-Name ist 48 dp hoch. Bewusst so: Übungsdetail, Foto-Vollbild, Profil/Einstellungen
+  laufen nicht im Test (keine oder ≤ 3 Kopfzeilen-Aktionen, im Code geprüft); die Checkbox (22 dp in 56-dp-Zeile) bleibt.
