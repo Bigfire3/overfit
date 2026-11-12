@@ -224,9 +224,17 @@ class AppSmokeTest {
         waitFor("4 Sätze", substring = true)
         compose.onNodeWithText("Speichern").performClick()
 
-        // Saving closes the editor; the Training tab lists the workout with its exercise
-        compose.waitForTrainingTab()
+        // Saving a new workout opens it, ready to start (no "Speichern" there: a saved workout is edited in place)
+        waitFor("Starten")
         compose.waitUntilState(5_000) { kotlinx.coroutines.runBlocking { data.templates.templates.first() }.size == 1 }
+        compose.onAllNodes(hasTextExactly("Speichern")).assertCountEquals(0)
+        val saved = kotlinx.coroutines.runBlocking { data.templates.get(data.templates.templates.first().single().id) }!!
+        assertEquals("Push", saved.name)
+        assertEquals(4, saved.exercises.single().sets.size)
+
+        // Back from the workout lands on the Training tab, which lists the workout with its exercise
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        compose.waitForTrainingTab()
         compose.onNodeWithText("Push", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Bench Press", substring = true).assertIsDisplayed()
     }

@@ -133,12 +133,7 @@ open class ScreenshotTest {
         waitFor("Link kopieren")
         shot("teilen")
         back()
-        // Edit mode: blocks per exercise, set rows (wait until the workout page is back after the share screen)
-        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Bearbeiten").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Bearbeiten").performClick()
-        waitFor("Bearbeitungsmodus")
-        shot("workout-bearbeiten")
-        back()
+        // The workout page is also its editor (no separate edit mode): wait until it is back after the share screen.
         waitFor("Starten")
         // Run it
         click("Starten")

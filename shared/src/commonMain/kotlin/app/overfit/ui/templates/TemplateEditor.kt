@@ -37,6 +37,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.overfit.data.CustomExerciseInput
+import app.overfit.data.LastPerformance
+import app.overfit.domain.Template
+import app.overfit.ui.components.HeaderDeleteButton
+import app.overfit.ui.components.HeaderIconButton
+import app.overfit.ui.main.RunningWorkoutChoice
+import app.overfit.workout.WorkoutFormat
 import app.overfit.data.ExerciseRepository
 import app.overfit.share.ShareMapper
 import app.overfit.data.TemplateRepository
@@ -82,6 +88,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 
 class TemplateEditorViewModel(
     private val templateId: Long,
@@ -92,6 +99,11 @@ class TemplateEditorViewModel(
     /** A workout from outside: opens pre-filled, counts as unsaved and creates its new exercises only on "Save". */
     val seed: EditorSeed? = null,
 ) : ViewModel() {
+    /**
+     * A saved workout opened from the list is edited in place: every valid change is stored after a short pause
+     * ([AUTOSAVE_DELAY_MS]), leaving or "Start" stores what is still pending. New workouts and imports keep "Save".
+     */
+    val autosave: Boolean = templateId != 0L && seed == null
 
     data class State(
         val loading: Boolean = true,
@@ -101,6 +113,12 @@ class TemplateEditorViewModel(
         val problem: TemplateDraft.Problem? = null,
         /** Set once the editor should close (saved, deleted or template missing). */
         val closed: Boolean = false,
+        /** ID of a new workout stored with "Save" (the app then opens it, ready to start). */
+        val savedId: Long? = null,
+        /** The workout was deleted (closing must not save it again). */
+        val deleted: Boolean = false,
+        /** Counts attempts to leave/start/share that an invalid draft blocked (the screen then explains and arms back). */
+        val blocked: Int = 0,
     )
 
     private val pendingExercises: Map<String, CustomExerciseInput> = seed?.let { ShareMapper.pendingInputs(it.preview) }.orEmpty()
@@ -136,9 +154,75 @@ class TemplateEditorViewModel(
         }
     }
 
-    fun edit(transform: (TemplateDraft) -> TemplateDraft) = _state.update { s ->
-        val draft = transform(s.draft)
-        s.copy(draft = draft, dirty = draft != original, problem = null)
+    fun edit(transform: (TemplateDraft) -> TemplateDraft) {
+        _state.update { s ->
+            val draft = transform(s.draft)
+            s.copy(draft = draft, dirty = draft != original, problem = null)
+        }
+        if (autosave) scheduleSave()
+    }
+
+    private var saveJob: kotlinx.coroutines.Job? = null
+    private val saveLock = kotlinx.coroutines.sync.Mutex()
+
+    private fun scheduleSave() {
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch { delay(AUTOSAVE_DELAY_MS); persist() }
+    }
+
+    /**
+     * Autosave: stores the current draft if it changed and is valid; an invalid draft (no name, "9,,5") stays unsaved
+     * and shows why. Returns the stored workout, or null if the draft cannot be stored.
+     */
+    private suspend fun persist(): app.overfit.domain.Template? = saveLock.withLock {
+        // Deleted meanwhile: never store it again.
+        if (_state.value.deleted) return@withLock null
+        val draft = _state.value.draft
+        // Unchanged: nothing to store, and nothing to validate (a stored workout is left/started as it is).
+        if (draft == original) return@withLock draft.toTemplate(unit)
+        val problem = draft.validate(unit)
+        if (problem != null) {
+            _state.update { if (it.draft == draft) it.copy(problem = problem) else it }
+            return@withLock null
+        }
+        val template = draft.toTemplate(unit)
+        if (draft != original) {
+            try {
+                templates.save(template)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: IllegalArgumentException) {
+                // Deleted meanwhile (e.g. on another screen; save requires the row): nothing to store any more.
+                _state.update { it.copy(closed = true, deleted = true) }
+                return@withLock null
+            }
+            original = draft
+            _state.update { it.copy(dirty = it.draft != original) }
+        }
+        template
+    }
+
+    /**
+     * Autosave mode: stores what is pending and then calls [then] with the stored workout (null if the draft is
+     * invalid). Runs in the view model scope, which outlives a tap that navigates away right after.
+     */
+    fun flush(then: (app.overfit.domain.Template?) -> Unit = {}) {
+        saveJob?.cancel()
+        viewModelScope.launch {
+            val saved = persist()
+            if (saved == null) _state.update { it.copy(blocked = it.blocked + 1) }
+            then(saved)
+        }
+    }
+
+    /** Back in autosave mode: store and close; an invalid draft first shows why (a second back discards it). */
+    fun leave(force: Boolean) {
+        saveJob?.cancel()
+        viewModelScope.launch {
+            val saved = persist()
+            // Invalid: the screen shows why and arms back (a second back discards).
+            if (saved != null || force) _state.update { it.copy(closed = true) } else _state.update { it.copy(blocked = it.blocked + 1) }
+        }
     }
 
     /** Picker result: add the exercises, or replace one if [pendingReplaceKey] is set. */
@@ -148,21 +232,29 @@ class TemplateEditorViewModel(
         pendingReplaceKey = null
         viewModelScope.launch {
             val picked = exercises.getAll(ids)
-            if (replaceKey != null) picked.firstOrNull()?.let { ex -> edit { it.replaceExercise(replaceKey, ex) } }
+            if (replaceKey != null) picked.firstOrNull()?.let { ex -> undoable(UndoKind.Replaced) { it.replaceExercise(replaceKey, ex) } }
             else edit { it.addExercises(picked) }
         }
     }
 
-    /** Last swiped-away set: [before] comes back on "Undo" as long as nothing else was changed ([after]). */
-    data class Undo(val before: TemplateDraft, val after: TemplateDraft)
+    /** What the last undoable change was (the footer says it next to "Undo"). */
+    enum class UndoKind { SetRemoved, ExerciseRemoved, Replaced }
+
+    /** Last removal/replacement: [before] comes back on "Undo" as long as nothing else was changed ([after]). */
+    data class Undo(val before: TemplateDraft, val after: TemplateDraft, val kind: UndoKind = UndoKind.SetRemoved)
     private val _undo = MutableStateFlow<Undo?>(null)
     val undo: StateFlow<Undo?> = _undo.asStateFlow()
 
-    fun removeSet(exerciseKey: Long, setKey: Long) {
+    /** A change that "Undo" can take back (removing a set or an exercise, replacing an exercise). */
+    fun undoable(kind: UndoKind, transform: (TemplateDraft) -> TemplateDraft) {
         val before = _state.value.draft
-        edit { it.removeSet(exerciseKey, setKey) }
-        _undo.value = Undo(before, _state.value.draft)
+        edit(transform)
+        _undo.value = Undo(before, _state.value.draft, kind)
     }
+
+    fun removeSet(exerciseKey: Long, setKey: Long) = undoable(UndoKind.SetRemoved) { it.removeSet(exerciseKey, setKey) }
+
+    fun removeExercise(key: Long) = undoable(UndoKind.ExerciseRemoved) { it.removeExercise(key) }
 
     fun undoRemoveSet() {
         val u = _undo.value ?: return
@@ -187,9 +279,9 @@ class TemplateEditorViewModel(
                     te.copy(exercise = te.exercise.copy(id = created.getOrPut(te.exercise.id) { exercises.createCustom(input) }))
                 })
             }
-            templates.save(template)
+            val id = templates.save(template)
             seed?.onSaved?.invoke()
-            _state.update { it.copy(saving = false, dirty = false, closed = true) }
+            _state.update { it.copy(saving = false, dirty = false, closed = true, savedId = id) }
         }
     }
 
@@ -200,18 +292,24 @@ class TemplateEditorViewModel(
     }
 
     fun delete() {
+        saveJob?.cancel()
         viewModelScope.launch {
-            if (templateId != 0L) templates.delete(templateId)
-            _state.update { it.copy(closed = true) }
+            saveLock.withLock { if (templateId != 0L) templates.delete(templateId) }
+            _state.update { it.copy(closed = true, deleted = true) }
         }
+    }
+
+    companion object {
+        const val AUTOSAVE_DELAY_MS = 600L
     }
 }
 
 /**
- * Create/edit a saved workout ("Bearbeitungsmodus"): name in the header (pencil = rename), one grey [Block] per
- * exercise (collapsible; image opens details; ⋮ for replace/move/remove), one [SetRowSurface] per set
- * (swipe left = delete, with "Undo"), "+ Add set", "+ Add exercise" and "Save" pinned at the bottom.
- * No share or delete here: those live on the workout screen. Leaving with unsaved changes needs a second back press.
+ * A saved workout and its editor in one screen. Opened from the list it is edited in place ([TemplateEditorViewModel.autosave]):
+ * name, one grey [Block] per exercise (tap = collapse; image opens details; ⋮ for replace/move/remove), one
+ * [SetRowSurface] per set (swipe left = delete), "Undo" for removals, share and delete top right and "Start" floating
+ * at the bottom. A new workout or an import ("Neues Workout") keeps "Save" at the bottom and needs a second back
+ * press to leave with unsaved changes.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -222,17 +320,49 @@ fun TemplateEditorScreen(
     onAddExercises: () -> Unit,
     onReplaceExercise: () -> Unit,
     onExerciseDetails: (String) -> Unit,
+    language: Language = Language.DE,
+    /** "last done 3 days ago" under the name (saved workouts only). */
+    lastDone: String? = null,
+    /** Another workout is running: "Start" becomes the choice "to the running one / end it". */
+    workoutRunning: Boolean = false,
+    /** Starts the stored workout (pending changes are saved first). */
+    onStart: (Template) -> Unit = {},
+    onToRunning: () -> Unit = {},
+    onEndRunning: () -> Unit = {},
+    onShare: () -> Unit = {},
+    /** "Last time" of an exercise (preferably in this workout); null = never done. */
+    loadLast: suspend (exerciseId: String) -> LastPerformance? = { null },
+    /** A new workout was stored with "Save": the app opens it (ready to start) instead of just closing. */
+    onSaved: ((Long) -> Unit)? = null,
+    /** Coach icon in the header of a saved workout (wired by the coach feature); null = none. */
+    onCoach: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val undo by viewModel.undo.collectAsStateWithLifecycle()
     val draft = state.draft
+    val autosave = viewModel.autosave
     var collapsed by rememberSaveable { mutableStateOf(listOf<Long>()) }
     var backArmed by remember { mutableStateOf(false) }
-    LaunchedEffect(state.closed) { if (state.closed) onClose() }
+    LaunchedEffect(state.closed) {
+        if (!state.closed) return@LaunchedEffect
+        val saved = state.savedId
+        if (saved != null && onSaved != null) onSaved(saved) else onClose()
+    }
     LaunchedEffect(backArmed) { if (backArmed) { delay(4000); backArmed = false } }
+    LaunchedEffect(state.blocked) { if (state.blocked > 0) backArmed = true }
     LaunchedEffect(undo) { if (undo != null) { delay(5000); viewModel.dismissUndo() } }
     val showUndo = undo?.after == draft && undo != null
+
+    // "Last time" per exercise, loaded once per set of exercises (not on every typed value).
+    val exerciseIds = if (state.loading) null else draft.exercises.map { it.exercise.id }.distinct()
+    var last by remember { mutableStateOf<Map<String, LastPerformance?>>(emptyMap()) }
+    LaunchedEffect(exerciseIds) {
+        val missing = exerciseIds.orEmpty().filter { it !in last && !it.startsWith(ShareMapper.PENDING_PREFIX) }
+        if (missing.isNotEmpty()) last = last + missing.associateWith {
+            try { loadLast(it) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { null }
+        }
+    }
 
     val listState = rememberLazyListState()
     val reorder = rememberReorderState(listState, canMove = { it is Long }) { from, to ->
@@ -243,25 +373,57 @@ fun TemplateEditorScreen(
         }
     }
 
-    // No leaving while saving: the save must not be cancelled half-way (new exercises, workout, chat acknowledgement).
-    val back = { if (state.saving) Unit else if (state.dirty && !backArmed) backArmed = true else onClose() }
-    BackHandler(enabled = state.dirty, onBack = back)
+    // Autosave: back stores and closes; only an invalid draft needs a second back (it cannot be stored).
+    // Otherwise no leaving while saving: the save must not be cancelled half-way (new exercises, workout, chat acknowledgement).
+    val back = {
+        when {
+            state.loading -> onClose()
+            autosave -> viewModel.leave(force = backArmed)
+            state.saving -> Unit
+            state.dirty && !backArmed -> backArmed = true
+            else -> onClose()
+        }
+    }
+    BackHandler(enabled = state.dirty || autosave, onBack = back)
 
     Screen(
-        header = { BackHeader(t.back, back) },
+        header = {
+            BackHeader(t.back, back) {
+                if (autosave && !state.loading) {
+                    onCoach?.let { app.overfit.ui.components.CoachIconButton(it) }
+                    HeaderIconButton(Icon.Share, t.share.shareTemplate, { viewModel.flush { if (it != null) onShare() } })
+                    HeaderDeleteButton(t.deleteTemplate, viewModel::delete)
+                }
+            }
+        },
         footer = {
+            // Autosave: a problem is only shown once it blocks leaving/starting (not while typing "62," or a new name).
             val message = when {
+                autosave && backArmed -> listOfNotNull(state.problem?.describe(t), t.unsavedHint).joinToString(" ")
+                autosave -> null
                 backArmed -> t.unsavedHint
                 else -> state.problem?.describe(t)
             }
-            if (showUndo) {
+            val u = undo
+            if (showUndo && u != null) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(t.setDeleted, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
+                    val label = when (u.kind) {
+                        TemplateEditorViewModel.UndoKind.SetRemoved -> t.setDeleted
+                        TemplateEditorViewModel.UndoKind.ExerciseRemoved -> t.training.exerciseRemoved
+                        TemplateEditorViewModel.UndoKind.Replaced -> t.training.exerciseReplaced
+                    }
+                    Text(label, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
                     SmallButton(t.undo, viewModel::undoRemoveSet)
                 }
             }
             if (message != null) Text(message, style = Theme.type.caption, tone = Tone.Muted)
-            PrimaryButton(t.save, viewModel::save, enabled = !state.loading, loading = state.saving)
+            when {
+                !autosave -> PrimaryButton(t.save, viewModel::save, enabled = !state.loading, loading = state.saving)
+                state.loading -> Unit
+                workoutRunning -> RunningWorkoutChoice(onToRunning, onEndRunning)
+                // Pending changes are stored first, so the training starts from what is on screen.
+                else -> PrimaryButton(t.startThisWorkout, { viewModel.flush { saved -> saved?.let(onStart) } })
+            }
         },
     ) {
         if (state.loading) return@Screen
@@ -280,7 +442,12 @@ fun TemplateEditorScreen(
                         Modifier.weight(1f),
                     )
                 }
-                Text(if (draft.isNew) t.newTemplate else t.editMode, style = Theme.type.caption, tone = Tone.Muted)
+                val caption = when {
+                    autosave -> listOfNotNull(lastDone, t.training.autosaved).joinToString(" · ")
+                    draft.isNew -> t.newTemplate
+                    else -> t.editMode
+                }
+                Text(caption, style = Theme.type.caption, tone = Tone.Muted)
                 // Notes of an import (new exercises, chat message, diff): short, only when they apply.
                 val newNames = draft.exercises.filter { it.exercise.id.startsWith(ShareMapper.PENDING_PREFIX) }
                     .map { it.exercise.name }.distinctBy { it.lowercase() }
@@ -292,18 +459,24 @@ fun TemplateEditorScreen(
                 }
                 Spacer(Modifier.height(Space.m))
             }
+            if (draft.exercises.isEmpty() && autosave) {
+                item(key = "empty") { Text(t.workoutPlanEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted) }
+            }
             itemsIndexed(draft.exercises, key = { _, e -> e.key }) { index, entry ->
                 ExerciseBlock(
                     modifier = Modifier.then(reorderableItem(reorder, entry.key)),
                     reorder = reorder,
                     entry = entry,
                     unit = unit,
+                    language = language,
+                    last = last[entry.exercise.id],
                     expanded = entry.key !in collapsed,
                     isFirst = index == 0,
                     isLast = index == draft.exercises.lastIndex,
                     onToggle = { collapsed = if (entry.key in collapsed) collapsed - entry.key else collapsed + entry.key },
                     onEdit = viewModel::edit,
                     onRemoveSet = { setKey -> viewModel.removeSet(entry.key, setKey) },
+                    onRemove = { viewModel.removeExercise(entry.key) },
                     onReplace = { viewModel.pendingReplaceKey = entry.key; onReplaceExercise() },
                     onDetails = { if (!entry.exercise.id.startsWith(ShareMapper.PENDING_PREFIX)) onExerciseDetails(entry.exercise.id) },
                 )
@@ -327,12 +500,15 @@ private fun ExerciseBlock(
     reorder: ReorderState,
     entry: DraftExercise,
     unit: WeightUnit,
+    language: Language,
+    last: LastPerformance?,
     expanded: Boolean,
     isFirst: Boolean,
     isLast: Boolean,
     onToggle: () -> Unit,
     onEdit: ((TemplateDraft) -> TemplateDraft) -> Unit,
     onRemoveSet: (setKey: Long) -> Unit,
+    onRemove: () -> Unit,
     onReplace: () -> Unit,
     onDetails: () -> Unit,
 ) {
@@ -353,6 +529,10 @@ private fun ExerciseBlock(
                 Text(entry.exercise.name, style = Theme.type.label, maxLines = 2)
                 val rest = entry.rest.toIntOrNull()?.let { t.restSummary(Numbers.formatDuration(it)) }
                 Text(listOfNotNull(t.setCount(entry.sets.size), rest).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
+                // What was done last time (as in the running training), so a target can be set right here.
+                last?.sets?.takeIf { it.isNotEmpty() }?.let { sets ->
+                    Text(t.lastTime(WorkoutFormat.lastTime(sets, type, unit, language, t)), style = Theme.type.caption, tone = Tone.Muted, maxLines = 2)
+                }
             }
             MoreMenu(
                 t.moreActions(entry.exercise.name),
@@ -360,7 +540,7 @@ private fun ExerciseBlock(
                     add(MenuItem(t.replace, onClick = onReplace))
                     if (!isFirst) add(MenuItem(t.moveUp) { onEdit { it.moveExercise(key, -1) } })
                     if (!isLast) add(MenuItem(t.moveDown) { onEdit { it.moveExercise(key, 1) } })
-                    add(MenuItem(t.remove, destructive = true) { onEdit { it.removeExercise(key) } })
+                    add(MenuItem(t.remove, destructive = true, onClick = onRemove))
                 },
             )
         }

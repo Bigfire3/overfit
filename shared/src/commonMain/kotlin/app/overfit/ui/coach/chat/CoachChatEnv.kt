@@ -32,13 +32,12 @@ class CoachChatEnv(
 
 /**
  * What the Coach tab should open next: [chatId] empty = new chat, [draft] goes into the input, [attachments] become
- * chips, [send] sends right away (automatic review after a training).
+ * chips. Nothing is ever sent from here: the user taps send (Fabian 8.11.).
  */
 data class ChatOpenRequest(
     val chatId: String = "",
     val draft: String = "",
     val attachments: List<ChatAttachment> = emptyList(),
-    val send: Boolean = false,
 )
 
 /** App-wide holder of the next [ChatOpenRequest] (set from anywhere, consumed by the Coach tab). */

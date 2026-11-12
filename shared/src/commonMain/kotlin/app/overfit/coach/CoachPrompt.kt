@@ -188,7 +188,7 @@ object CoachPromptBuilder {
             // A skipped exercise: only what was done before skipping counts; its open sets are not "not done".
             if (e.skipped) {
                 val done = e.sets.filter { it.completed }.joinToString(", ") { formatSet(it.actual, e.exercise.trackingType) }
-                appendLine("${i + 1}. ${e.exercise.name} [${e.exercise.id}]$origin${if (done.isEmpty()) "" else ": $done"}")
+                appendLine("${i + 1}. ${WeightRules.name(e.exercise.name, e.exercise.equipment)} [${e.exercise.id}]$origin${if (done.isEmpty()) "" else ": $done"}")
                 return@forEachIndexed
             }
             val type = e.exercise.trackingType

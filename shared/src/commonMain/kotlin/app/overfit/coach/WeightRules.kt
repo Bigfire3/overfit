@@ -13,7 +13,7 @@ object WeightRules {
 - Never call a logged weight wrong, forgotten, a typo or unrealistic, and never replace it with numbers of your own. It is the user's benchmark: calculate from it (e.g. 70 kg × 10 today → 75 kg next time).
 - 0 kg ("BW" in the data) is a valid entry: bodyweight, assisted or without added weight. It is not a missing entry. Negative weights mean assistance.
 - Judge progress only relative to earlier sets of the same exercise (same machine). Never compare weights across different exercises or machines, or with free-weight norms.
-- Suggest increases in the steps the user already uses for that exercise (look at the jumps in their history); if unknown, the smallest usual step (about 2.5 kg, on a machine the next plate of the stack).
+- Suggest increases in the steps the user already uses for that exercise (look at the jumps in their history); if unknown, the smallest usual step in the user's unit (about 2.5 kg or 5 lb, on a machine the next plate of the stack).
 - The data names each exercise's equipment in parentheses: (machine), (cable), (free weight), (bodyweight), (band)."""
 
     /** Short equipment tag for the AI data ("machine", "cable", "free weight", "bodyweight", "band"); null = unknown/other. */

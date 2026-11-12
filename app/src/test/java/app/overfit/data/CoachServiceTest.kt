@@ -305,14 +305,6 @@ class CoachServiceTest {
     }
 
     @Test
-    fun startProgressReviewReturnsIdAndCompletes() = runBlocking {
-        seedFinishedWorkout()
-        val id = coach.startProgressReview()
-        awaitStatus(id, ReviewStatus.DONE)
-        assertEquals(ReviewKind.PROGRESS, dao.get(id)!!.kind)
-    }
-
-    @Test
     fun memoryVersionsFlow() = runBlocking {
         assertNull(dao.currentMemory())
         coach.saveMemory("  Erste Version  ")

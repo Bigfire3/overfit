@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -274,6 +275,8 @@ class CoachChatShotTest {
         render { CoachChatTabScreen(e, null, {}, onHistory = {}, onStory = {}, onModelChip = {}, onApplyWorkout = {}, openedChatId = "c1") }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("chat:workout").fetchSemanticsNodes().isNotEmpty() }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("coach:price", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        // From the start: the question with its attachment cards.
+        compose.onAllNodes(androidx.compose.ui.test.hasScrollToIndexAction())[0].performScrollToIndex(0)
         save("bh-01-frueherer-chat")
     }
 

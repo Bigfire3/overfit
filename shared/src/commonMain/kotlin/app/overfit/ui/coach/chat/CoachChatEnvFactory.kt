@@ -12,6 +12,7 @@ import app.overfit.i18n.stringsFor
 import app.overfit.ui.AppDependencies
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
@@ -33,8 +34,10 @@ fun createCoachChatEnv(deps: AppDependencies): CoachChatEnv {
     val access = kotlinx.coroutines.flow.combine(store.state, deps.coach.settings.state) { s, settings -> s to settings }
     // Credit: the model name comes from the backend's /v1/config (tiers can point to any vendor); the built-in name of
     // the tier is only the fallback while the config is unknown.
+    // mapLatest: a slow config request never holds back a later change (e.g. switching to the own key).
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val chip = access
-        .map { (s, settings) ->
+        .mapLatest { (s, settings) ->
             val fuel = s.providerId == app.overfit.ai.ProviderId.FUEL
             val config = if (fuel) deps.providers.fuel.config() else null
             val fallback = app.overfit.ui.coach.modelChipLabel(s, settings, deps.providers.fuel.available, app.overfit.i18n.coachSettingsStringsFor(s.language))
