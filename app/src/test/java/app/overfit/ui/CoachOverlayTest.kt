@@ -6,6 +6,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -34,6 +35,9 @@ import app.overfit.share.NoopPlatformShare
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.captureToImage
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -52,7 +56,8 @@ import java.io.File
  * exactly that workout (saved workout: its editor; running workout: right away, with undo).
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w411dp-h891dp")
+@org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w360dp-h780dp-xxhdpi")
 class CoachOverlayTest {
     @get:Rule(order = 0)
     val teardown = AppTeardown({ data }, { database })
@@ -115,6 +120,7 @@ class CoachOverlayTest {
         compose.onNodeWithTag("coach:open").performClick()
         waitForTag("coach:close")
         waitForTag("chip:plan")
+        shot("bh2-01-coach-ueber-workout")
         compose.waitForIdle()
         assertTrue("nothing is sent by opening", fake.prompts.isEmpty())
 
@@ -127,16 +133,18 @@ class CoachOverlayTest {
         waitForTag("chat:change")
         waitFor("Änderung für „Push“")
         waitFor("Plank", substring = true)
+        shot("bh2-02-aenderung-fuer-workout")
         compose.onNodeWithTag("chat:apply").performClick()
         // The normal editor, pre-filled; "Speichern" overwrites exactly this workout.
         waitFor("Speichern")
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("coach:close")).fetchSemanticsNodes().isEmpty() }
+        shot("bh2-03-editor-mit-vorschlag")
         compose.onNodeWithText("Speichern").performClick()
         compose.waitUntilState(10_000) { runBlocking { data.templates.get(templateId) }?.exercises?.size == 2 }
         val saved = runBlocking { data.templates.get(templateId) }!!
         assertEquals("Push", saved.name)
         assertEquals(3, saved.exercises[0].sets.size)
-        assertEquals(1, runBlocking { data.templates.templates.let { f -> kotlinx.coroutines.flow.first(f) } }.count { it.name == "Push" })
+        assertEquals(1, runBlocking { data.templates.templates.first() }.count { it.name == "Push" })
     }
 
     @Test
@@ -162,6 +170,7 @@ class CoachOverlayTest {
         waitFor("Änderung am laufenden Training")
         compose.onNodeWithTag("chat:apply").performClick()
         waitForTag("chat:undo")
+        shot("bh2-04-laufendes-training-uebernommen")
         compose.waitUntilState(10_000) { deps.workout.state.value.workout?.exercises?.size == 2 }
         val after = deps.workout.state.value.workout!!
         // The done set is untouched, the open ones follow the proposal, the plank was added.
@@ -191,6 +200,7 @@ class CoachOverlayTest {
         compose.openCalendarDay(realToday().dayOfMonth)
         compose.onNodeWithTag("coach:open").performClick()
         waitForTag("chip:day")
+        shot("bh2-05-coach-ueber-tag")
         compose.onNodeWithTag("coach:close").performClick()
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("coach:close")).fetchSemanticsNodes().isEmpty() }
 
@@ -205,6 +215,17 @@ class CoachOverlayTest {
         assertTrue(chatPrompts().single().dynamicSystem.contains("## Attached training"))
         // Its saved workout is the target of a proposal.
         waitFor("Änderung für „Push“")
+    }
+
+    /** Evidence screenshot into `$SCREENSHOT_DIR` (only when set). */
+    private fun shot(name: String) {
+        val dir = System.getenv("SCREENSHOT_DIR") ?: return
+        compose.waitForIdle()
+        val out = File(dir).also { it.mkdirs() }
+        File(out, "$name.png").outputStream().use {
+            compose.onAllNodes(androidx.compose.ui.test.isRoot()).let { roots -> roots[roots.fetchSemanticsNodes().size - 1] }
+                .captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
     }
 
     private fun waitForTag(tag: String) = compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }

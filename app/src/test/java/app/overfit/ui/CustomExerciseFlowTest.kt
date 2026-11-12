@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -110,9 +111,14 @@ class CustomExerciseFlowTest {
         waitFor("„Turkish Get-up Neu“ als neue Übung anlegen")
         compose.onNodeWithText("„Turkish Get-up Neu“ als neue Übung anlegen").performScrollTo().performClick()
 
-        // Form: name prefilled, AI fills the rest
-        waitFor("Mit KI ausfüllen")
-        compose.onNodeWithText("Mit KI ausfüllen").performClick()
+        // Form: name prefilled; the coach icon opens a sheet with price, the AI fills in only after "Ausfüllen" (8.11.)
+        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasTestTag("coach:open")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("coach:open").performClick()
+        waitFor("Vom Coach ausfüllen lassen")
+        waitFor("Ausfüllen · ", substring = true) // with the price (here credit without a price table: "Preis unbekannt")
+        compose.waitForIdle()
+        assertTrue(fake.prompts.isEmpty())
+        compose.onNodeWithTag("exercise:coach-fill").performClick()
         waitFor("Von der KI ausgefüllt", substring = true)
         assertEquals(ExerciseAutofillSchema.schema, fake.prompts.single().schema)
         assertTrue(fake.prompts.single().user.contains("Turkish Get-up Neu"))

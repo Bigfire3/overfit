@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -322,9 +323,15 @@ fun CustomExerciseScreen(
     onBack: () -> Unit,
     onSaved: (String) -> Unit,
     onPickExisting: ((Exercise) -> Unit)? = null,
+    /**
+     * Estimated price of one "fill in" ("≈ 0,1 ct", "eigener Schlüssel"); asked only when the user opens the coach
+     * sheet. Null = no price (no access).
+     */
+    autofillPrice: suspend () -> String? = { null },
 ) {
     val t = LocalStrings.current
     val f = LocalExerciseFormStrings.current
+    var coachSheet by rememberSaveable { mutableStateOf(false) }
     val existing by viewModel.exercise.collectAsStateWithLifecycle()
     val loaded by viewModel.loaded.collectAsStateWithLifecycle()
     if (!loaded) return
@@ -356,7 +363,8 @@ fun CustomExerciseScreen(
 
     Screen(
         scroll = true,
-        header = { BackHeader(t.back, onBack) },
+        // The one way into the AI here too: the coach icon (no "Fill in with AI" row any more, Fabian 8.11.).
+        header = { BackHeader(t.back, onBack) { app.overfit.ui.components.CoachIconButton { coachSheet = true } } },
         footer = {
             PrimaryButton(t.save, {
                 val input = CustomExerciseInput(
@@ -377,23 +385,12 @@ fun CustomExerciseScreen(
         BigInput(name, { name = it.take(60) }, t.exerciseNamePlaceholder, Modifier.fillMaxWidth())
 
         Spacer(Modifier.height(Space.m))
-        if (viewModel.aiAvailable) {
-            val loading = autofillState == ExerciseViewModel.AutofillState.Loading
-            Panel {
-                ListRow(
-                    if (loading) f.aiFilling else f.aiFill,
-                    tone = if (name.isBlank() || loading) Tone.Muted else Tone.Default,
-                    onClick = { if (!loading && name.isNotBlank()) viewModel.autofill(name, language) },
-                )
-            }
-            val hint = when (val st = autofillState) {
-                ExerciseViewModel.AutofillState.Done -> f.aiFilled
-                is ExerciseViewModel.AutofillState.Failed -> f.aiError(st.kind)
-                else -> if (name.isBlank()) f.aiNeedName else f.aiFillHint
-            }
-            Hint(hint)
-        } else {
-            Text(f.aiNoAccess, style = Theme.type.caption, tone = Tone.Muted)
+        // What the coach did (filling, done, failed); nothing until the user asked for it.
+        when (val st = autofillState) {
+            ExerciseViewModel.AutofillState.Loading -> Hint(f.aiFilling)
+            ExerciseViewModel.AutofillState.Done -> Hint(f.aiFilled)
+            is ExerciseViewModel.AutofillState.Failed -> Hint(f.aiError(st.kind))
+            else -> Unit
         }
 
         if (similar.isNotEmpty() && onPickExisting != null) {
@@ -438,6 +435,56 @@ fun CustomExerciseScreen(
 
         SectionTitle(f.note)
         MultilineInput(note, { note = it.take(500) }, f.notePlaceholder, minHeight = 64.dp)
+    }
+    CoachFillSheet(
+        visible = coachSheet,
+        name = name,
+        available = viewModel.aiAvailable,
+        loading = autofillState == ExerciseViewModel.AutofillState.Loading,
+        price = autofillPrice,
+        onFill = { coachSheet = false; viewModel.autofill(name, language) },
+        onDismiss = { coachSheet = false },
+    )
+}
+
+/**
+ * The coach for a new exercise: what it fills in, the estimated price, and one explicit "Fill in · ≈ x ct". Nothing is
+ * sent before that tap. Without AI access it says how to get one.
+ */
+@Composable
+private fun CoachFillSheet(
+    visible: Boolean,
+    name: String,
+    available: Boolean,
+    loading: Boolean,
+    price: suspend () -> String?,
+    onFill: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val f = LocalExerciseFormStrings.current
+    val t = LocalStrings.current
+    var priceText by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(visible) { if (visible && available) priceText = price() }
+    app.overfit.ui.components.BottomSheet(
+        visible = visible,
+        onDismiss = onDismiss,
+        closeLabel = t.back,
+        footer = if (available) ({
+            PrimaryButton(
+                priceText?.let(f.aiFillConfirm) ?: f.aiFill,
+                onFill,
+                enabled = name.isNotBlank() && !loading,
+                modifier = Modifier.fillMaxWidth().testTag("exercise:coach-fill"),
+            )
+        }) else null,
+    ) {
+        Title(f.aiFill)
+        Spacer(Modifier.height(Space.s))
+        Text(if (available) f.aiFillHint else f.aiNoAccess, tone = Tone.Muted)
+        if (available && name.isBlank()) {
+            Spacer(Modifier.height(Space.s))
+            Text(f.aiNeedName, style = Theme.type.caption, tone = Tone.Muted)
+        }
     }
 }
 

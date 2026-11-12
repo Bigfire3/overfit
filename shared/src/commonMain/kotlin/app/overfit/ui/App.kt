@@ -276,6 +276,28 @@ class AppDependencies(
         )
     }
 
+    /**
+     * Price of one "fill in" of a new exercise (cheap tier with credit): "≈ 0,1 ct"; own key: "eigener Schlüssel"; no
+     * access: null. With the own key nothing is asked from the backend.
+     */
+    suspend fun autofillPrice(): String? {
+        val s = store.state.value
+        val strings = coachStrings()
+        return when {
+            s.providerId == ProviderId.FUEL && providers.fuel.available -> {
+                val config = providers.fuel.config()
+                val tier = config?.tiers?.get(app.overfit.ai.TIER_LITE)?.takeIf { it.available }
+                if (config == null || tier == null) strings.priceUnknown
+                else "≈ " + app.overfit.fuel.formatCents(
+                    app.overfit.fuel.CostEstimate.micro(tier, config.markupBp, app.overfit.fuel.FuelTask.AUTOFILL, config.usageProfiles), s.language,
+                )
+            }
+            s.hasApiKey -> strings.priceOwnKey
+            coach.access() is app.overfit.coach.CoachAccess.Ready -> strings.priceUnknown
+            else -> null
+        }
+    }
+
     /** A calendar day: the day (trainings, body weight) as chip. */
     fun openCoachForDay(date: LocalDate) {
         val label = coachStrings().dayLabel(app.overfit.i18n.stringsFor(store.state.value.language).date(date))
@@ -824,6 +846,7 @@ fun OverfitApp(deps: AppDependencies) {
                                     nav.navigate(ExerciseDetailRoute(existing.id)) { popUpTo<CustomExerciseRoute> { inclusive = true } }
                                 }
                             },
+                            autofillPrice = { deps.autofillPrice() },
                         )
                     }
                     composable<TemplateEditorRoute> { entry ->
