@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -724,7 +725,13 @@ fun OverfitApp(deps: AppDependencies) {
                         val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
                         val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
                         val weights by deps.data.bodyWeights.entries.collectAsStateWithLifecycle(initialValue = null)
+                        // The day's trainings in full (exercises, sets) for the opened cards; reloads after an edit.
+                        val dayWorkouts by produceState(emptyMap<String, app.overfit.domain.Workout>(), history, date) {
+                            val ids = history.orEmpty().filter { app.overfit.ui.history.localDateTime(it.startedAt).date == date }.map { it.id }
+                            value = ids.mapNotNull { id -> deps.data.workouts.getFinished(id)?.workout?.let { id to it } }.toMap()
+                        }
                         DayScreen(
+                            workouts = dayWorkouts,
                             weights = weights,
                             focusWeight = route.focusWeight,
                             // App scope: leaving the day right after typing must not drop the value.
