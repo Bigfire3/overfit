@@ -66,6 +66,7 @@ fun ChatInboxScreen(
     val c = LocalChatStrings.current
     val inbox by chat.inbox.state.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf<InboxTemplate?>(null) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { chat.inbox.refresh() }
 
     val current = open
@@ -77,7 +78,16 @@ fun ChatInboxScreen(
         Title(c.inboxTitle)
         Spacer(Modifier.height(Space.m))
         if (inbox.full) Text(c.inboxFull, Modifier.padding(bottom = Space.m), style = Theme.type.caption)
-        if (inbox.items.isEmpty()) Text(c.inboxEmpty, tone = Tone.Muted)
+        // Loading and failure are their own states: "Nothing new" only once the server really said so.
+        if (inbox.items.isEmpty()) when {
+            inbox.loading -> Text(c.inboxLoading, tone = Tone.Muted)
+            inbox.failed -> {
+                Text(c.inboxFailed, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.m))
+                SmallButton(c.inboxRetry, { scope.launch { chat.inbox.refresh() } })
+            }
+            else -> Text(c.inboxEmpty, tone = Tone.Muted)
+        }
         if (inbox.items.isNotEmpty()) Panel {
             inbox.items.forEach { item ->
                 when (item) {

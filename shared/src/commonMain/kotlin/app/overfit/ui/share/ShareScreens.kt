@@ -98,6 +98,7 @@ fun ShareFailure.message(t: ShareStrings): String = when (this) {
     ShareFailure.UNSUPPORTED_KIND -> t.importUnsupportedKind
     ShareFailure.INVALID -> t.importInvalid
     ShareFailure.TOO_LARGE -> t.importTooLarge
+    ShareFailure.NETWORK -> t.importNetwork
 }
 
 /** Copies the AI prompt (in the app language) for ChatGPT, Claude or Gemini. */
@@ -127,8 +128,14 @@ class ImportViewModel(private val importer: TemplateImporter, private val shortC
     fun handle(text: String?) {
         QrPayload.shortId(text.orEmpty())?.let { id ->
             viewModelScope.launch {
-                val training = runCatching { shortCodes.fetch(id) }.getOrNull()
-                if (training == null) _state.value = State(error = ShareFailure.NOT_OVERFIT) else openEditor(ShareParse.Ok(training))
+                // A thrown fetch is a connection problem (retry helps), null is an unknown code.
+                val result = runCatching { shortCodes.fetch(id) }
+                val training = result.getOrNull()
+                when {
+                    training != null -> openEditor(ShareParse.Ok(training))
+                    result.isFailure -> _state.value = State(error = ShareFailure.NETWORK)
+                    else -> _state.value = State(error = ShareFailure.NOT_OVERFIT)
+                }
             }
             return
         }

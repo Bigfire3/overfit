@@ -71,6 +71,8 @@ fun SettingsScreen(
     onReset: () -> Unit,
     exportingBackup: Boolean,
     onExportBackup: () -> Unit,
+    /** The last export failed: the hint under the panel says so and how to retry. */
+    backupExportFailed: Boolean = false,
     onImportBackup: () -> Unit,
 ) {
     val t = LocalStrings.current
@@ -153,7 +155,7 @@ fun SettingsScreen(
             ListRow(if (exportingBackup) t.photos.backupExporting else t.photos.backupExport, onClick = { if (!exportingBackup) onExportBackup() })
             ListRow(t.photos.backupImport, onClick = onImportBackup)
         }
-        Hint(t.photos.backupExportHint)
+        Hint(if (backupExportFailed) t.photos.backupExportFailed else t.photos.backupExportHint)
 
         SectionTitle(t.data)
         Spacer(Modifier.height(Space.s))

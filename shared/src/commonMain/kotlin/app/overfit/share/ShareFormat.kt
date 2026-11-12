@@ -261,7 +261,8 @@ data class SharedTraining(
     val custom: List<SharedCustom> = emptyList(),
 )
 
-enum class ShareFailure { EMPTY, NOT_OVERFIT, TOO_NEW, UNSUPPORTED_KIND, INVALID, TOO_LARGE }
+/** Why an import failed. [NETWORK]: a short code could not be fetched (offline), not a bad code. */
+enum class ShareFailure { EMPTY, NOT_OVERFIT, TOO_NEW, UNSUPPORTED_KIND, INVALID, TOO_LARGE, NETWORK }
 
 sealed interface ShareParse {
     data class Ok(val training: SharedTraining) : ShareParse

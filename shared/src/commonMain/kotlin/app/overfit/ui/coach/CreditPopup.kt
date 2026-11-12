@@ -143,7 +143,7 @@ fun CreditPopupContent(
             Text(s.creditTitle, Modifier.weight(1f), style = Theme.type.label, tone = Tone.Muted)
             val closeInteraction = remember { MutableInteractionSource() }
             Box(
-                Modifier.size(40.dp).semantics { contentDescription = s.close }
+                Modifier.size(48.dp).semantics { contentDescription = s.close }
                     .pressScale(closeInteraction, app.overfit.ui.components.PressScale.icon)
                     .clickable(closeInteraction, indication = null, role = Role.Button, onClick = onClose)
                     .testTag("credit:close"),
@@ -157,7 +157,11 @@ fun CreditPopupContent(
                     Text(it, Modifier.testTag("credit:reserved"), style = Theme.type.caption, tone = Tone.Muted)
                 }
             }
-            is Loaded.Failed -> Text(f.unreachable, tone = Tone.Muted)
+            is Loaded.Failed -> {
+                Text(f.unreachable, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.s))
+                app.overfit.ui.components.SmallButton(f.retry, { reload() })
+            }
             Loaded.Loading -> Text("…", style = Theme.type.title, tone = Tone.Muted)
         }
         Text(if (demo) "${s.neverExpires} · ${f.fuelRowDemo}" else s.neverExpires, style = Theme.type.caption, tone = Tone.Muted)

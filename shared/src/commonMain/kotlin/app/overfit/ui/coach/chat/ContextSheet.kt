@@ -125,7 +125,7 @@ internal fun ColumnScope.ContextSheet(
                 }
                 val shown = list?.filter { query.isBlank() || it.first.label.contains(query.trim(), ignoreCase = true) }
                 val subs = list.orEmpty().associate { it.first.key() to it.second }
-                ItemList(shown?.map { it.first }, s.emptyExercises, state) { it.label to subs[it.key()] }
+                ItemList(shown?.map { it.first }, if (query.isBlank()) s.emptyExercises else s.noExerciseMatch, state) { it.label to subs[it.key()] }
             }
         }
     }

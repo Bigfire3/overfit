@@ -890,6 +890,7 @@ fun OverfitApp(deps: AppDependencies) {
                     }
                     composable<SettingsRoute> {
                         var exportingBackup by remember { mutableStateOf(false) }
+                        var backupExportFailed by remember { mutableStateOf(false) }
                         val pickBackup = rememberFilePicker { bytes ->
                             deps.pendingBackup.value = bytes
                             nav.navigate(BackupImportRoute)
@@ -920,12 +921,15 @@ fun OverfitApp(deps: AppDependencies) {
                             restAlerts = deps.restAlerts,
                             share = share,
                             exportingBackup = exportingBackup,
+                            backupExportFailed = backupExportFailed,
                             onExportBackup = {
                                 exportingBackup = true
+                                backupExportFailed = false
                                 deps.data.scope.launch {
                                     val bytes = try { deps.backup.export() } catch (e: Exception) { null }
                                     withContext(Dispatchers.Main) {
                                         exportingBackup = false
+                                        backupExportFailed = bytes == null
                                         if (bytes != null) deps.share.shareBytes(BackupService.fileName(deps.today().toString()), bytes, BackupService.MIME_TYPE)
                                     }
                                 }
@@ -1184,7 +1188,7 @@ private fun TabBar(current: Tab, onSelect: (Tab) -> Unit) {
     val strings = LocalStrings.current
     Column(Modifier.fillMaxWidth().background(Theme.colors.background).windowInsetsPadding(WindowInsets.navigationBars)) {
         Hairline()
-        Row(Modifier.fillMaxWidth().padding(vertical = Space.s), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             Tab.entries.forEach { tab ->
                 val active = tab == current
                 val color = if (active) Theme.colors.foreground else Theme.colors.muted
@@ -1193,7 +1197,9 @@ private fun TabBar(current: Tab, onSelect: (Tab) -> Unit) {
                         .weight(1f)
                         .semantics { selected = active }
                         .testTag("tab:${tab.name}")
-                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { onSelect(tab) },
+                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { onSelect(tab) }
+                        // Padding inside the clickable: the whole 60 dp column is the target, not just icon + label (44 dp).
+                        .padding(vertical = Space.s),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     LineIcon(tab.icon, color = color)
