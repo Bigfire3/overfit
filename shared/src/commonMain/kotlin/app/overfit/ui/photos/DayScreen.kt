@@ -95,6 +95,8 @@ fun DayScreen(
     onDeleteWeight: () -> Unit = {},
     /** Opened from the weight card: the field gets the focus right away. */
     focusWeight: Boolean = false,
+    /** Full trainings of the day by id (exercises and sets for the opened cards); missing ones show only the head. */
+    workouts: Map<String, app.overfit.domain.Workout> = emptyMap(),
 ) {
     val t = LocalStrings.current
     val p = t.photos
@@ -110,7 +112,7 @@ fun DayScreen(
         SectionTitle(p.dayTrainings)
         if (history != null && trainings.isEmpty()) Text(p.dayNoTraining, tone = Tone.Muted)
         if (trainings.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
-            trainings.forEach { TrainingRow(it, unit, language, onOpenWorkout) }
+            trainings.forEach { TrainingRow(it, unit, language, onOpenWorkout, workouts[it.id]) }
         }
 
         SectionTitle(p.dayPhotos)

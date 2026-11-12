@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.assertIsDisplayed
@@ -107,20 +108,26 @@ class DiaryScreenTest {
         )
     }
 
-    @Test fun iconSwitchesBetweenCalendarAndListAndBack() {
+    /** Opens the ⋮ menu in the calendar header and taps [entry]. */
+    private fun menu(entry: String) {
+        compose.onNodeWithContentDescription("Weitere Optionen").performClick()
+        compose.onNodeWithText(entry).performClick()
+    }
+
+    @Test fun menuSwitchesBetweenCalendarAndListAndBack() {
         showWithPref(InMemoryKeyValueStore())
-        // Calendar first; the icon offers the list.
+        // Calendar first; the menu offers the list.
         compose.onNodeWithText("Mo").assertIsDisplayed()
         compose.onAllNodesWithTag("diary-list").assertCountEquals(0)
-        compose.onNodeWithContentDescription("Als Liste anzeigen").performClick()
+        menu("Als Liste anzeigen")
         compose.onNodeWithTag("diary-list").assertIsDisplayed()
         compose.onAllNodesWithTag("diary-list-row").assertCountEquals(3)
         // Newest first, grouped by month, with workout name and short numbers.
         compose.onNodeWithText("November 2026").assertIsDisplayed()
         compose.onNodeWithText("Push").assertIsDisplayed()
         compose.onAllNodesWithText("1:00:00 · 9 Sätze · 4.200 kg", substring = true).assertCountEquals(3)
-        // The icon now offers the calendar.
-        compose.onNodeWithContentDescription("Als Kalender anzeigen").performClick()
+        // The menu now offers the calendar.
+        menu("Als Kalender anzeigen")
         compose.onNodeWithText("Mo").assertIsDisplayed()
         compose.onAllNodesWithTag("diary-list").assertCountEquals(0)
     }
@@ -128,12 +135,12 @@ class DiaryScreenTest {
     @Test fun chosenViewIsRemembered() {
         val kv = InMemoryKeyValueStore()
         showWithPref(kv)
-        compose.onNodeWithContentDescription("Als Liste anzeigen").performClick()
+        menu("Als Liste anzeigen")
         assertEquals(true, DiaryViewPref(kv).list)
         // A fresh screen (new start) comes up in the list.
         val kv2 = InMemoryKeyValueStore().apply { put("diary.view", "list") }
         assertEquals(true, DiaryViewPref(kv2).list)
-        compose.onNodeWithContentDescription("Als Kalender anzeigen").performClick()
+        menu("Als Kalender anzeigen")
         assertEquals(false, DiaryViewPref(kv).list)
     }
 
@@ -229,7 +236,9 @@ class DiaryScreenTest {
         // Photo day: ring next to the workout dot; training-only day: ring below the dot; no sauna: no ring.
         compose.onNode(hasContentDescription("Tag 2, 2 Fotos, Sauna") and ring, useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasContentDescription("Tag 1, Training") and !ring, useUnmergedTree = true).assertIsDisplayed()
-        compose.onNode(hasContentDescription("Tag 30, Training, Sauna") and ring, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        // October is the next month in the list (square tiles: it is below the screen until scrolled to).
+        compose.onNodeWithTag(app.overfit.ui.photos.DIARY_GRID_TAG).performScrollToIndex(app.overfit.domain.DiaryCalendar.MONTHS_AHEAD + 1)
+        compose.onNode(hasContentDescription("Tag 30, Training, Sauna") and ring, useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun noLegendWithoutSauna() {

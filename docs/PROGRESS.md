@@ -40,6 +40,39 @@ Screenshots: `docs/screenshots/coach-ki/`.
 5. Ein Training mit 0 kg (z. B. Dips) und eine Maschinen-Übung auswerten lassen: Der Coach nennt die Werte nicht „vergessen“ oder
    „unrealistisch“ und rechnet von deinen Zahlen aus weiter.
 
+## Kalender, Tag und Fotos (Session BJ, 8.11.)
+**Erledigt:** Fabians Feedback vom 8.11. („Kreise gleich groß“, „Menüs nicht so überladen“, „möglichst wenig tippen“, Bild am Workout
+oder am Tag „undurchsichtig“):
+- **Fotos gehören zum Tag** (PR #100, DB v14, Migration mit Test, auch für alte Backups). Tag, Trainingsdetail und Abschluss-Screen
+  zeigen dasselbe Foto-Raster mit Kacheln „Foto aufnehmen“ und „Aus Fotos wählen“. Alles landet am Tag. Alte Trainingsfotos stehen am
+  Starttag ihres Trainings.
+- **Kalender einheitlich** (Teil 2): Tageszahl im festen Kreis (Heute = gefüllt), quadratische Kachel, darunter eine Markierungszeile.
+  Training ●, Sauna ○ und Gewicht ▬ sind alle 8 dp groß und zentriert, die Legende ist identisch. Kopfzeile: Heute, Muskeln und ⋮
+  (Liste/Kalender, Fotos vergleichen).
+- **Tag auf einer Seite:** Trainings als aufgeklappte Karten (Dauer, Sätze, Volumen, Sauna, je Übung Sätze und bester Satz). Ein Tipp
+  auf die Karte öffnet das Detail. Darunter Fotos und Gewicht.
+- Tests: Migration, altes Backup, Coach-Fotos des Tages, `CalendarUniformTest` (misst die Größen und Lage der Markierungen nach),
+  `DayPathsTest`. Screenshots: `docs/screenshots/kalender-einheitlich/`.
+
+**Offen:**
+- Das Zähler-Badge „3“ auf Foto-Tagen im Raster ist bewusst weg. Falls Fabian es vermisst, käme es als Zahl in die Markierungszeile.
+- Der KI-Chat-Sync schickt weiter das Aufnahmedatum und nicht den Tag.
+
+### Bitte auf dem Handy testen (Kalender, Tag, Fotos)
+1. Kalender: Alle Punkte, Ringe und Striche unter den Tagen sind gleich groß und stehen auf einer Linie. Heute ist ein weißer Kreis um die
+   Zahl. Fotos liegen als quadratische Vorschau, ohne Punkte darauf.
+2. Kopfzeile: nur Muskel-Icon und ⋮ (dazu „Heute“, wenn du weggescrollt hast). ⋮ → „Als Liste anzeigen“ wechselt zur Liste. ⋮ →
+   „Fotos vergleichen“ startet den Vergleich (ab 2 Fotos).
+3. Tag mit Training antippen: Das Training steht aufgeklappt da (Übungen mit Sätzen und bestem Satz, Sauna). Ein Tipp auf die Karte öffnet
+   das Training.
+4. Im Tag „Aus Fotos wählen“ bzw. „Foto aufnehmen“: Das Foto erscheint im Tag und im Trainingsdetail unter „Fotos des Tages“. Fügst du es im
+   Trainingsdetail hinzu, erscheint es ebenso im Tag und im Kalender.
+5. Alte Fotos (vor dem Update) sind alle noch da, Trainingsfotos am Tag ihres Trainings. Foto entfernen: × antippen (wird rot), nochmal
+   tippen.
+6. Training beenden → im Abschluss-Screen ein Foto hinzufügen: Es steht danach am Tag des Trainings.
+7. Backup exportieren und wieder einspielen: Fotos bleiben an ihren Tagen.
+8. App auf Englisch: „Photos of the day“, „More options“, „Compare photos“.
+
 ## Wenig tippen: Workout direkt bearbeiten, Start aus der Liste (Session BI, 8.11.)
 **Erledigt:** Workout-Ansicht und Editor sind ein Screen: Sätze, Name, Übungen direkt änderbar, wird automatisch gespeichert
 (kein Stift, kein Speichern), „Rückgängig“ nach Entfernen/Ersetzen, unten „Starten“. ▶ auf jeder Workout-Karte startet direkt.
