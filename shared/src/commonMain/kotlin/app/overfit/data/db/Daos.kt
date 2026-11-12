@@ -290,18 +290,19 @@ interface WorkoutDao {
     @Query("DELETE FROM workout_photo WHERE id = :id")
     suspend fun deletePhoto(id: String)
 
-    @Query("SELECT * FROM workout_photo WHERE sessionId = :sessionId ORDER BY position, takenAt")
-    suspend fun photosOf(sessionId: String): List<WorkoutPhotoEntity>
+    /** Photos of one calendar day (ISO date), in the order they were added. */
+    @Query("SELECT * FROM workout_photo WHERE day = :day ORDER BY takenAt, position")
+    suspend fun photosOfDay(day: String): List<WorkoutPhotoEntity>
 
-    @Query("SELECT * FROM workout_photo WHERE sessionId = :sessionId ORDER BY position, takenAt")
-    fun observePhotosOf(sessionId: String): Flow<List<WorkoutPhotoEntity>>
+    @Query("SELECT * FROM workout_photo WHERE day = :day ORDER BY takenAt, position")
+    fun observePhotosOfDay(day: String): Flow<List<WorkoutPhotoEntity>>
 
-    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM workout_photo WHERE sessionId IS :sessionId")
-    suspend fun nextPhotoPosition(sessionId: String?): Int
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM workout_photo WHERE day = :day")
+    suspend fun nextPhotoPosition(day: String): Int
 
     @Query(
         """SELECT p.id AS id, p.sessionId AS sessionId, p.fileName AS fileName, p.takenAt AS takenAt, p.position AS position,
-             ws.name AS sessionName
+             ws.name AS sessionName, p.day AS day
            FROM workout_photo p LEFT JOIN workout_session ws ON ws.id = p.sessionId
            ORDER BY p.takenAt DESC, p.position DESC""",
     )

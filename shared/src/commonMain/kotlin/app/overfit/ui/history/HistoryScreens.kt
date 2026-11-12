@@ -1,5 +1,8 @@
 package app.overfit.ui.history
 
+import app.overfit.ui.photos.DayPhotoGrid
+import app.overfit.ui.components.Hint
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import app.overfit.ui.components.pressScale
@@ -74,7 +77,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** One finished training in a list (calendar day): name, time, sets, volume, photos. */
+/** One finished training in a list (calendar day): name, time, sets, volume (photos belong to the day, v14). */
 @Composable
 internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, onOpen: (String) -> Unit) {
     val h = LocalStrings.current.history
@@ -82,7 +85,6 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
         row.endedAt?.let { WorkoutFormat.elapsed(it - row.startedAt) },
         h.setCount(row.completedSets),
         formatVolume(row.volumeKg, unit, language).takeIf { row.volumeKg > 0 },
-        h.photoCount(row.photoCount).takeIf { row.photoCount > 0 },
         h.sauna.takeIf { row.sauna },
     ).joinToString(" · ")
     // Each training is its own floating card (Fabian: lists of standalone things as cards).
@@ -144,7 +146,10 @@ fun WorkoutDetailScreen(
             }
         }
     }
-    val photos by remember(workoutId) { workouts.observePhotosOf(workoutId) }.collectAsStateWithLifecycle(emptyList())
+    // Photos belong to the training's day (v14): the detail shows them all and adds new ones to that day.
+    val day = data?.finished?.workout?.startedAt?.let { localDateTime(it).date }
+    val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
+        .collectAsStateWithLifecycle(emptyList())
 
     Screen(scroll = true, header = {
         BackHeader(t.back, onBack) {
@@ -191,11 +196,15 @@ fun WorkoutDetailScreen(
             }
         }
 
-        if (photos.isNotEmpty()) {
-            SectionTitle(h.photos)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-                photos.forEachIndexed { i, p -> PhotoThumb(p, h.photoDescription(i + 1), onClick = { onOpenPhoto(p.id) }) }
-            }
+        if (day != null) {
+            SectionTitle(h.dayPhotos)
+            DayPhotoGrid(
+                photos,
+                onAdd = { bytes -> addDayPhoto(workouts, appScope, day, bytes) },
+                onOpen = onOpenPhoto,
+                onRemove = { id -> appScope.launch { workouts.deletePhoto(id) } },
+            )
+            Hint(h.dayPhotosHint)
         }
 
         // Muscles of exactly this training (completed sets), small version of the calendar's body map.
@@ -270,3 +279,12 @@ private fun Workout.toTemplate() = Template(
         )
     },
 )
+
+/** Prepares a picked image and stores it as a photo of [day] (in [appScope]: leaving the screen must not drop it). */
+internal fun addDayPhoto(workouts: WorkoutRepository, appScope: CoroutineScope, day: kotlinx.datetime.LocalDate, bytes: ByteArray) {
+    appScope.launch {
+        val jpeg = withContext(Dispatchers.Default) { app.overfit.platform.prepareJpeg(bytes) } ?: return@launch
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        workouts.addPhoto(day, jpeg, app.overfit.ui.photos.dayPhotoTakenAt(day, localDateTime(now).date, now))
+    }
+}

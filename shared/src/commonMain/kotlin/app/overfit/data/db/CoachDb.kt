@@ -68,7 +68,7 @@ data class CoachMemoryEntity(
 )
 
 /** A body photo (file in the app-private photo directory) and when its workout started. */
-data class CoachPhotoRow(val fileName: String, val startedAt: Long)
+data class CoachPhotoRow(val fileName: String, val day: String)
 
 @Dao
 interface CoachDao {
@@ -152,21 +152,16 @@ interface CoachDao {
     @Query("SELECT * FROM workout_session WHERE status = 'FINISHED' ORDER BY startedAt DESC LIMIT 1")
     fun observeLatestFinished(): Flow<WorkoutSessionEntity?>
 
-    /** Newest photo of a finished workout started before [before] (comparison photo). */
+    /** Newest photo of a calendar day up to [day] (ISO date; comparison photo), with or without a training. */
     @Query(
-        """SELECT p.fileName AS fileName, s.startedAt AS startedAt FROM workout_photo p
-           JOIN workout_session s ON s.id = p.sessionId
-           WHERE s.status = 'FINISHED' AND s.startedAt <= :before
-           ORDER BY s.startedAt DESC, p.position LIMIT 1""",
+        """SELECT fileName, day FROM workout_photo WHERE day != '' AND day <= :day
+           ORDER BY day DESC, takenAt DESC, position DESC LIMIT 1""",
     )
-    suspend fun latestPhotoBefore(before: Long): CoachPhotoRow?
+    suspend fun latestPhotoOnOrBefore(day: String): CoachPhotoRow?
 
-    @Query(
-        """SELECT p.fileName AS fileName, s.startedAt AS startedAt FROM workout_photo p
-           JOIN workout_session s ON s.id = p.sessionId
-           WHERE p.sessionId = :sessionId ORDER BY p.position LIMIT 1""",
-    )
-    suspend fun firstPhotoOf(sessionId: String): CoachPhotoRow?
+    /** First photo of a calendar day (the day of the reviewed training). */
+    @Query("SELECT fileName, day FROM workout_photo WHERE day = :day ORDER BY takenAt, position LIMIT 1")
+    suspend fun firstPhotoOfDay(day: String): CoachPhotoRow?
 
     @Query("UPDATE workout_session SET aiStatus = :status WHERE id = :sessionId")
     suspend fun setAiStatus(sessionId: String, status: AiStatus)
