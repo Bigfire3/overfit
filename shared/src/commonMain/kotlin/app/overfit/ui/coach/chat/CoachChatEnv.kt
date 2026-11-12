@@ -66,7 +66,13 @@ sealed interface ApplyTarget {
 }
 
 /** Result of "Apply" that stays in the chat: [undo] restores the old state, [note] says what was left out. */
-class AppliedChange(val undo: () -> Unit, val note: String? = null)
+/**
+ * Result of "Apply" that stays in the chat. [undo] restores the old state and returns false when that is no longer
+ * possible (changed since); null = nothing to undo (failed: [note] says why).
+ */
+class AppliedChange(val undo: (() -> Boolean)?, val note: String? = null) {
+    val failed: Boolean get() = undo == null
+}
 
 /**
  * How proposal cards of an opened coach show and apply a change: [title] ("Änderung für „Push“"), [diff] (lines what
@@ -76,11 +82,15 @@ class ProposalHandler(
     val title: String,
     val diff: suspend (workoutJson: String) -> List<String>,
     val apply: suspend (workoutJson: String) -> AppliedChange?,
+    /** Where applied cards remember their state (see [CoachOverlay.applied]). */
+    val applied: MutableMap<String, AppliedChange> = mutableMapOf(),
 )
 
 /** App-wide holder of the opened coach (null = closed). */
 class CoachOverlay {
     val request = MutableStateFlow<CoachOverlayRequest?>(null)
+    /** Applied proposals by message id: survive scrolling and rotation (the card keeps "Undo"). Process-wide only. */
+    val applied = androidx.compose.runtime.mutableStateMapOf<String, AppliedChange>()
     fun open(r: CoachOverlayRequest) { request.value = r }
     fun close() { request.value = null }
 }

@@ -26,7 +26,12 @@ object RunningMerge {
         val unknown = mutableListOf<String>()
         val merged = mutableListOf<WorkoutExercise>()
         for (te in proposal.exercises) {
-            if (te.exercise.id.startsWith(ShareMapper.PENDING_PREFIX)) { unknown += te.exercise.name; continue }
+            if (te.exercise.id.startsWith(ShareMapper.PENDING_PREFIX)) {
+                // Not resolved by id, but the workout has it by name (e.g. a custom exercise): keep that one as it is.
+                val sameName = remaining.indexOfFirst { it.exercise.name.equals(te.exercise.name, ignoreCase = true) }
+                if (sameName >= 0) merged += remaining.removeAt(sameName) else unknown += te.exercise.name
+                continue
+            }
             val type = te.exercise.trackingType
             val index = remaining.indexOfFirst { it.exercise.id == te.exercise.id }
             if (index >= 0) {

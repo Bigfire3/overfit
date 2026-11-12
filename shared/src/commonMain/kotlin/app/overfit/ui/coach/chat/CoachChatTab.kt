@@ -567,8 +567,9 @@ private fun ChangeCard(messageId: String, json: String, proposals: ProposalHandl
     val diff by androidx.compose.runtime.produceState<List<String>?>(null, json) {
         value = try { proposals.diff(json) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { emptyList() }
     }
-    // Applied in this chat (survives scrolling, not a restart: the workout itself keeps the change).
-    var applied by remember(messageId) { mutableStateOf<app.overfit.ui.coach.chat.AppliedChange?>(null) }
+    // Applied in this chat: kept in the handler's map (survives scrolling and rotation, not a restart).
+    val applied = proposals.applied[messageId]
+    var undoFailed by remember(messageId) { mutableStateOf(false) }
     var busy by remember(messageId) { mutableStateOf(false) }
     Column(
         Modifier
@@ -594,15 +595,21 @@ private fun ChangeCard(messageId: String, json: String, proposals: ProposalHandl
                 if (!busy) {
                     busy = true
                     scope.launch {
-                        try { applied = proposals.apply(json) } finally { busy = false }
+                        try { proposals.apply(json)?.let { proposals.applied[messageId] = it } } finally { busy = false }
                     }
                 }
             }, modifier = Modifier.testTag("chat:apply"), compact = true, loading = busy)
         } else {
             done.note?.let { Text(it, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(s.applied, Modifier.weight(1f).testTag("chat:applied"))
-                SmallButton(LocalStrings.current.undo, { done.undo(); applied = null }, modifier = Modifier.testTag("chat:undo"))
+            if (done.failed) {
+                SmallButton(s.apply, { proposals.applied.remove(messageId) }, modifier = Modifier.testTag("chat:retry-apply"))
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (undoFailed) s.undoTooLate else s.applied, Modifier.weight(1f).testTag("chat:applied"))
+                    if (!undoFailed) SmallButton(LocalStrings.current.undo, {
+                        if (done.undo?.invoke() == true) proposals.applied.remove(messageId) else undoFailed = true
+                    }, modifier = Modifier.testTag("chat:undo"))
+                }
             }
         }
     }

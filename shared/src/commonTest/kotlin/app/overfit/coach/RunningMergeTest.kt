@@ -101,6 +101,15 @@ class RunningMergeTest {
     }
 
     @Test
+    fun unresolvedNameThatIsInTheWorkoutStaysUnchanged() {
+        val byName = ex(ShareMapper.PENDING_PREFIX + "biceps curl machine", "Biceps Curl Machine")
+        val before = running()
+        val r = RunningMerge.apply(before, proposal(TemplateExercise(bench, 120, null, List(3) { PlannedSet(60.0, 8) }), TemplateExercise(byName, null, null, listOf(PlannedSet(50.0, 5)))))
+        assertTrue(r.unknown.isEmpty())
+        assertEquals(before.exercises[1], r.workout.exercises.first { it.exercise.id == "wg:curl" })
+    }
+
+    @Test
     fun asTemplateUsesLoggedValuesForDoneSets() {
         var w = running()
         w = w.setValues(w.exercises[0].sets[0].id, PlannedSet(65.0, 8))

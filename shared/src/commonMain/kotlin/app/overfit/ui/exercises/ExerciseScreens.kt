@@ -464,7 +464,15 @@ private fun CoachFillSheet(
     val f = LocalExerciseFormStrings.current
     val t = LocalStrings.current
     var priceText by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(visible) { if (visible && available) priceText = price() }
+    // The button waits for the price: nothing is sent before the user could see what it costs.
+    var priceLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(visible) {
+        if (visible && available) {
+            priceLoaded = false
+            priceText = try { price() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { null }
+            priceLoaded = true
+        }
+    }
     app.overfit.ui.components.BottomSheet(
         visible = visible,
         onDismiss = onDismiss,
@@ -473,7 +481,7 @@ private fun CoachFillSheet(
             PrimaryButton(
                 priceText?.let(f.aiFillConfirm) ?: f.aiFill,
                 onFill,
-                enabled = name.isNotBlank() && !loading,
+                enabled = name.isNotBlank() && !loading && priceLoaded,
                 modifier = Modifier.fillMaxWidth().testTag("exercise:coach-fill"),
             )
         }) else null,

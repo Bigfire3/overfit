@@ -101,9 +101,17 @@ class CoachOverlayTest {
             store, Providers(HttpClient(MockEngine { respond("{}") })), data, versionName = "0.1.test", share = NoopPlatformShare(),
             today = { realToday() }, coachTransport = { fake },
         )
-        compose.setContent { OverfitApp(deps) }
+        compose.setContent {
+            backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+            OverfitApp(deps)
+        }
         compose.waitForTrainingTab()
     }
+
+    private var backDispatcher: androidx.activity.OnBackPressedDispatcher? = null
+
+    /** System back (gesture/button). */
+    private fun back() { compose.runOnIdle { backDispatcher!!.onBackPressed() } }
 
     private fun openPush() {
         waitFor("Push", substring = true)
@@ -121,6 +129,12 @@ class CoachOverlayTest {
         waitForTag("coach:close")
         waitForTag("chip:plan")
         shot("bh2-01-coach-ueber-workout")
+        // System back closes the coach (wins over the editor's own back handler) and returns to the workout.
+        back()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("coach:close")).fetchSemanticsNodes().isEmpty() }
+        waitFor("Starten")
+        compose.onNodeWithTag("coach:open").performClick()
+        waitForTag("chip:plan")
         compose.waitForIdle()
         assertTrue("nothing is sent by opening", fake.prompts.isEmpty())
 
@@ -145,6 +159,10 @@ class CoachOverlayTest {
         assertEquals("Push", saved.name)
         assertEquals(3, saved.exercises[0].sets.size)
         assertEquals(1, runBlocking { data.templates.templates.first() }.count { it.name == "Push" })
+        // Back from the fresh workout screen: not a stale copy of the old version underneath, but the list.
+        waitFor("Starten")
+        back()
+        compose.waitForTrainingTab()
     }
 
     @Test

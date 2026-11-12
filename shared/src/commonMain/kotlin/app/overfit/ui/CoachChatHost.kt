@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import app.overfit.ui.components.absorbTaps
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,7 +45,8 @@ internal fun CoachChatHost(
             onHistory = { nav.navigate(CoachHistoryRoute) },
             onStory = { nav.navigate(CoachStoryRoute) },
             onModelChip = { modelSheet = true },
-            onApplyWorkout = { json -> deps.inbox.offer(json) },
+            // Plain proposal (no target): the import editor opens; an opened coach closes so it is not hidden underneath.
+            onApplyWorkout = { json -> if (overlay != null) onClose(); deps.inbox.offer(json) },
             creditChip = { app.overfit.ui.coach.CreditChip(deps.fuelSession, fuelActive, onClick = { creditPopup = true }) },
             openedChatId = openedChatId,
             onBack = { nav.popBackStack() },
@@ -82,7 +84,13 @@ internal fun CoachOverlayHost(
     editorSeeds: app.overfit.ui.templates.EditorSeedHolder,
 ) {
     val request by deps.coachOverlay.request.collectAsStateWithLifecycle()
-    androidx.compose.ui.backhandler.BackHandler(enabled = request != null) { deps.coachOverlay.close() }
+    // Registered anew whenever it opens, so it wins over back handlers of the screen underneath (last one wins).
+    androidx.compose.runtime.key(request) {
+        androidx.compose.ui.backhandler.BackHandler(enabled = request != null) { deps.coachOverlay.close() }
+    }
+    // A text field underneath (e.g. the workout name) loses focus and keyboard.
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    LaunchedEffect(request) { if (request != null) focus.clearFocus(force = true) }
     // Keeps the last request while the layer slides out.
     var shown by androidx.compose.runtime.remember { mutableStateOf<app.overfit.ui.coach.chat.CoachOverlayRequest?>(null) }
     request?.let { shown = it }
@@ -148,11 +156,17 @@ internal fun proposalHandler(
                     )
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         deps.coachOverlay.close()
+                        // The workout's own screen (if it is open) goes: after "Save" the editor opens a fresh one, a
+                        // stale one underneath would show (and autosave) the old version.
+                        nav.popBackStack(WorkoutPlanRoute(target.templateId), inclusive = true)
                         nav.navigate(TemplateEditorRoute(seeded = true))
                     }
+                    null
+                } else {
+                    app.overfit.ui.coach.chat.AppliedChange(undo = null, note = s.applyFailed)
                 }
-                null
             },
+            applied = deps.coachOverlay.applied,
         )
         is app.overfit.ui.coach.chat.ApplyTarget.Running -> app.overfit.ui.coach.chat.ProposalHandler(
             title = s.changeRunning,
@@ -163,18 +177,29 @@ internal fun proposalHandler(
                 else app.overfit.chat.TemplateDiff.lines(app.overfit.coach.RunningMerge.asTemplate(w), p.copy(name = w.name), c, unit, language)
             },
             apply = apply@{ json ->
-                val before = deps.workout.state.value.workout?.takeIf { it.id == target.sessionId } ?: return@apply null
-                val p = preview(json) ?: return@apply null
-                val result = app.overfit.coach.RunningMerge.apply(before, app.overfit.share.ShareMapper.toDraftTemplate(p))
-                val after = result.workout
+                val failed = app.overfit.ui.coach.chat.AppliedChange(undo = null, note = s.applyFailed)
+                val proposal = preview(json)?.let(app.overfit.share.ShareMapper::toDraftTemplate) ?: return@apply failed
+                // Merged from the workout as it is in this moment (a set ticked meanwhile is not lost).
+                var before: app.overfit.domain.Workout? = null
+                var result: app.overfit.coach.RunningMerge.Result? = null
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    deps.workout.edit { w -> if (w.id == before.id) after else w }
+                    deps.workout.edit { w ->
+                        if (w.id != target.sessionId) w
+                        else { before = w; app.overfit.coach.RunningMerge.apply(w, proposal).also { result = it }.workout }
+                    }
                 }
+                val old = before ?: return@apply failed
+                val merged = result ?: return@apply failed
                 app.overfit.ui.coach.chat.AppliedChange(
-                    undo = { deps.workout.edit { w -> if (w == after) before else w } },
-                    note = result.unknown.takeIf { it.isNotEmpty() }?.let { s.leftOut(it.joinToString(", ")) },
+                    undo = {
+                        var undone = false
+                        deps.workout.edit { w -> if (w == merged.workout) { undone = true; old } else w }
+                        undone
+                    },
+                    note = merged.unknown.takeIf { it.isNotEmpty() }?.let { s.leftOut(it.joinToString(", ")) },
                 )
             },
+            applied = deps.coachOverlay.applied,
         )
     }
 }

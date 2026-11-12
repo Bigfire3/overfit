@@ -1700,3 +1700,24 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
     ins Feld, keine KI-Anfrage.
 - **Hinweis von BI (Alternativen A/B):** `coach/PlanDiff.kt` (nur noch für alte strukturierte Auswertungen, „Alle annehmen“)
   kennt keine Alternativen. Der neue Übernehmen-Weg geht über Share-Format und Editor, dort trägt BIs Format `alt` mit.
+- **Sonnet-Gegencheck (Befunde und Umgang):**
+  - Behoben (hoch): Nach „Übernehmen“ → „Speichern“ lag die alte Workout-Ansicht noch darunter. Zurück zeigte den alten Stand,
+    Autosave hätte ihn zurückgeschrieben. Jetzt schließt „Übernehmen“ die alte Ansicht, Zurück führt zur Liste (Test).
+  - Behoben: „Übernehmen“ ohne Ziel (Tag, Übung) öffnete den Import-Editor unter dem Coach. Der Coach schließt jetzt.
+  - Behoben: „Rückgängig“ tat nach einer späteren Änderung still nichts. Jetzt steht dort „Rückgängig geht nicht mehr …“.
+  - Behoben: Der Übernommen-Zustand der Karte ging beim Scrollen und Drehen verloren (doppeltes Übernehmen möglich). Er liegt
+    jetzt prozessweit je Nachricht.
+  - Behoben: Das Zusammenführen geschieht jetzt im selben Schritt am aktuellen Training. Ein dazwischen abgehakter Satz geht
+    nicht mehr verloren.
+  - Behoben: Eine Übung, die die App nur über den Namen kennt (z. B. eine eigene Übung), wurde gelöscht und als „ausgelassen“
+    gemeldet. Jetzt bleibt sie unverändert.
+  - Behoben: Fehlschlag beim Übernehmen ohne Rückmeldung (jetzt ein Hinweis mit erneutem Versuch).
+  - Behoben: System-Zurück schließt den Coach auch über Screens mit eigenem Zurück-Handler (Test über dem Editor). Ein
+    Textfeld darunter verliert beim Öffnen den Fokus.
+  - Behoben: Der Knopf „Ausfüllen“ im Übungsformular war tippbar, bevor der Preis da war.
+  - Bewusst so: Bei der Übernahme stehen erledigte Sätze vor den offenen, und Übungen mit erledigten Sätzen, die im Vorschlag
+    fehlen, rücken nach vorn (selten, nichts geht verloren).
+  - Bewusst so: In offene, noch nicht abgehakte Sätze getippte Werte überschreibt der Vorschlag. Das ist der Sinn von
+    „Übernehmen“, und „Rückgängig“ holt sie zurück.
+  - Bewusst so: TalkBack kann den Screen unter dem Coach noch erreichen. Das gilt für alle Ebenen der App gleich und gehört
+    ins UI-Audit.

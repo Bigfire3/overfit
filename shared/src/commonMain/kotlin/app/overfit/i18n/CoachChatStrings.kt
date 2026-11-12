@@ -41,6 +41,10 @@ class CoachChatStrings(
     val changeNone: String,
     /** The proposal was applied (with "Undo" next to it). */
     val applied: String,
+    /** Undo after the workout was changed since. */
+    val undoTooLate: String,
+    /** Apply did not work (workout ended, proposal not readable). */
+    val applyFailed: String,
     /** Exercises of a proposal the app does not know were left out: "Nicht im Katalog, ausgelassen: X, Y". */
     val leftOut: (names: String) -> String,
     /** Chip of the running workout: "Push · läuft". */
@@ -141,6 +145,8 @@ val GermanCoachChat = CoachChatStrings(
     changeRunning = "Änderung am laufenden Training",
     changeNone = "Keine Änderung zum jetzigen Stand.",
     applied = "Übernommen",
+    undoTooLate = "Übernommen. Rückgängig geht nicht mehr, du hast seitdem etwas geändert.",
+    applyFailed = "Ließ sich nicht übernehmen: Das Training läuft nicht mehr oder der Vorschlag ist unlesbar.",
     leftOut = { "Nicht im Katalog, ausgelassen: $it" },
     runningLabel = { "$it · läuft" },
     dayLabel = { "Tag · $it" },
@@ -241,6 +247,8 @@ val EnglishCoachChat = CoachChatStrings(
     changeRunning = "Change to the running workout",
     changeNone = "No change to the current state.",
     applied = "Applied",
+    undoTooLate = "Applied. Undo is no longer possible, you changed something since.",
+    applyFailed = "Could not be applied: the workout is no longer running or the proposal is unreadable.",
     leftOut = { "Not in the catalogue, left out: $it" },
     runningLabel = { "$it · running" },
     dayLabel = { "Day · $it" },
