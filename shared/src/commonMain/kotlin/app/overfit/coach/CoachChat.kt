@@ -89,6 +89,7 @@ How to answer:
 - Answer like a coach in a chat: short, concrete, friendly. Plain text with simple Markdown (**bold**, lists) only.
 - Use the user's data (workouts, progress, memory) instead of asking for it again. Do not invent numbers you do not have.
 - When the user asks for a workout or a plan, or when a new workout clearly helps, propose ONE workout. Put it into the field "workout" as a JSON string in the Overfit share format v1 (see the example). Use exercise IDs from the list below in "id" whenever one fits, otherwise only "name". Weights in kg, durations in seconds.
+- When a workout or a running workout is attached and the user wants it changed, put the COMPLETE changed workout into "workout" (all exercises in order, unchanged ones too, same name), never only the changed part. The app shows the difference and applies it to exactly that workout. Sets already done in a running workout stay as they are.
 - In "reply" describe the workout in one or two sentences; do not repeat the JSON there. Without a proposal "workout" is an empty string.
 Answer with exactly one JSON object: {"reply": "...", "workout": ""}."""
 }
@@ -424,4 +425,6 @@ internal fun ChatAttachment.key(): String = when (this) {
     is ChatAttachment.History -> "h:$weeks"
     is ChatAttachment.Exercise -> "e:$exerciseId"
     is ChatAttachment.Photo -> "f:$photoId"
+    is ChatAttachment.Running -> "r:$sessionId"
+    is ChatAttachment.Day -> "d:$date"
 }

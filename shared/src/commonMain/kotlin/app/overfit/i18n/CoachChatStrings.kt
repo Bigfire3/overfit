@@ -31,6 +31,26 @@ class CoachChatStrings(
     val reviewCard: String,
     /** Line under the card. */
     val reviewCardHint: String,
+    /** Screen reader text of the coach icon in screen headers (opens the coach over that screen). */
+    val openCoach: String,
+    /** Proposal card of an opened coach: "Änderung für „Push“". */
+    val changeFor: (name: String) -> String,
+    /** Proposal card for the running workout. */
+    val changeRunning: String,
+    /** Proposal without any difference to the workout. */
+    val changeNone: String,
+    /** The proposal was applied (with "Undo" next to it). */
+    val applied: String,
+    /** Undo after the workout was changed since. */
+    val undoTooLate: String,
+    /** Apply did not work (workout ended, proposal not readable). */
+    val applyFailed: String,
+    /** Exercises of a proposal the app does not know were left out: "Nicht im Katalog, ausgelassen: X, Y". */
+    val leftOut: (names: String) -> String,
+    /** Chip of the running workout: "Push · läuft". */
+    val runningLabel: (name: String) -> String,
+    /** Chip of a calendar day: "Tag · 08.11.". */
+    val dayLabel: (date: String) -> String,
     val addContext: String,
     /** Screen readers: "Modell: Claude Sonnet 5.5". */
     val modelChip: (label: String) -> String,
@@ -120,6 +140,16 @@ val GermanCoachChat = CoachChatStrings(
     priceDemo = "Demo · kostenlos",
     reviewCard = "Training auswerten lassen",
     reviewCardHint = "Öffnet den Coach-Chat mit diesem Training. Gesendet wird erst, wenn du selbst auf Senden tippst.",
+    openCoach = "Coach fragen",
+    changeFor = { "Änderung für „$it“" },
+    changeRunning = "Änderung am laufenden Training",
+    changeNone = "Keine Änderung zum jetzigen Stand.",
+    applied = "Übernommen",
+    undoTooLate = "Übernommen. Rückgängig geht nicht mehr, du hast seitdem etwas geändert.",
+    applyFailed = "Ließ sich nicht übernehmen: Das Training läuft nicht mehr oder der Vorschlag ist unlesbar.",
+    leftOut = { "Nicht im Katalog, ausgelassen: $it" },
+    runningLabel = { "$it · läuft" },
+    dayLabel = { "Tag · $it" },
     addContext = "Kontext hinzufügen",
     modelChip = { "Modell: $it" },
     thinking = "Denkt nach …",
@@ -212,6 +242,16 @@ val EnglishCoachChat = CoachChatStrings(
     priceDemo = "Demo · free",
     reviewCard = "Get this training reviewed",
     reviewCardHint = "Opens the coach chat with this training attached. Nothing is sent until you tap send yourself.",
+    openCoach = "Ask the coach",
+    changeFor = { "Change for “$it”" },
+    changeRunning = "Change to the running workout",
+    changeNone = "No change to the current state.",
+    applied = "Applied",
+    undoTooLate = "Applied. Undo is no longer possible, you changed something since.",
+    applyFailed = "Could not be applied: the workout is no longer running or the proposal is unreadable.",
+    leftOut = { "Not in the catalogue, left out: $it" },
+    runningLabel = { "$it · running" },
+    dayLabel = { "Day · $it" },
     addContext = "Add context",
     modelChip = { "Model: $it" },
     thinking = "Thinking …",

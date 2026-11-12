@@ -112,6 +112,8 @@ fun WorkoutScreen(
     onMinimize: () -> Unit = {},
     /** After "Finish": opens the finish flow (summary, feeling, note, photos) for this workout. */
     onFinished: (workoutId: String) -> Unit = { onClosed() },
+    /** Coach icon: opens the coach over this screen with the running workout attached (null = no icon). */
+    onCoach: (() -> Unit)? = null,
 ) {
     val t = LocalStrings.current
     val state by controller.state.collectAsStateWithLifecycle()
@@ -180,6 +182,7 @@ fun WorkoutScreen(
                 NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.fillMaxWidth())
                 ProgressCaption(workout, now)
             }
+            if (onCoach != null) app.overfit.ui.components.CoachIconButton(onCoach)
             ConfirmButton(t.finishWorkout, onConfirm = { scope.launch { controller.finish() } }, modifier = Modifier, compact = true, kind = ConfirmKind.Complete)
         }
         Spacer(Modifier.height(Space.xs))

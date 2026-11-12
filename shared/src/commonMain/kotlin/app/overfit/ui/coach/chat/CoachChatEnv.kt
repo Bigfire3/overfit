@@ -48,3 +48,49 @@ class CoachChatRequests {
     /** Clears [request] once the Coach tab has taken it; a newer request that arrived meanwhile stays pending. */
     fun consumed(request: ChatOpenRequest) { pending.compareAndSet(request, null) }
 }
+
+/**
+ * The coach opened from a screen (coach icon top right): the same chat as the Coach tab, as a layer over that screen,
+ * with what the screen shows attached as chips ([attachments], removable) and, where it makes sense, the [target] a
+ * proposed workout applies to.
+ */
+data class CoachOverlayRequest(val attachments: List<ChatAttachment>, val target: ApplyTarget? = null)
+
+/** What "Apply" on a proposal changes in an opened coach. */
+sealed interface ApplyTarget {
+    /** A saved workout: the proposal opens in its editor (save overwrites it). */
+    data class Template(val templateId: Long, val name: String) : ApplyTarget
+
+    /** The workout that runs right now: applied directly, done sets stay, "Undo" restores it. */
+    data class Running(val sessionId: String, val name: String) : ApplyTarget
+}
+
+/** Result of "Apply" that stays in the chat: [undo] restores the old state, [note] says what was left out. */
+/**
+ * Result of "Apply" that stays in the chat. [undo] restores the old state and returns false when that is no longer
+ * possible (changed since); null = nothing to undo (failed: [note] says why).
+ */
+class AppliedChange(val undo: (() -> Boolean)?, val note: String? = null) {
+    val failed: Boolean get() = undo == null
+}
+
+/**
+ * How proposal cards of an opened coach show and apply a change: [title] ("Änderung für „Push“"), [diff] (lines what
+ * changes, from the proposal's share JSON) and [apply] (null result = the app navigated away, e.g. into the editor).
+ */
+class ProposalHandler(
+    val title: String,
+    val diff: suspend (workoutJson: String) -> List<String>,
+    val apply: suspend (workoutJson: String) -> AppliedChange?,
+    /** Where applied cards remember their state (see [CoachOverlay.applied]). */
+    val applied: MutableMap<String, AppliedChange> = mutableMapOf(),
+)
+
+/** App-wide holder of the opened coach (null = closed). */
+class CoachOverlay {
+    val request = MutableStateFlow<CoachOverlayRequest?>(null)
+    /** Applied proposals by message id: survive scrolling and rotation (the card keeps "Undo"). Process-wide only. */
+    val applied = androidx.compose.runtime.mutableStateMapOf<String, AppliedChange>()
+    fun open(r: CoachOverlayRequest) { request.value = r }
+    fun close() { request.value = null }
+}
