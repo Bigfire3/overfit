@@ -8,12 +8,31 @@
 | 2 | Workout-Modus, Pausentimer | erledigt |
 | 4 | KI-Coach | erledigt (Session G): Auswertung, Plan-Diff, Gedächtnis, Fortschritt, Warteschlange, Demo |
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
-| 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); Feinschliff laufend |
+| 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); UI/UX-Audit mit Design-Skills (12.11.); Feinschliff laufend |
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Session Z, seit Session AB über Stripe, Web 1:1, Store-Aufpreis offen, Aufschlag 28 %); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## UI/UX-Feinschliff mit Design-Skills (12.11.)
+**Erledigt:** Bestandsaufnahme (`PRODUCT.md`, `DESIGN.md`), Audit mit P0–P2 (`docs/UI-AUDIT.md`, 14 → 16/20) und die wichtigsten
+Fixes: Kontrast der Grautöne und des Menü-Rots (neuer `ContrastTest`), Tabellenziffern überall (Timer wackeln nicht mehr),
+konzentrische Radien in Übungskarten, Tippflächen ≥ 44–48 dp (Tab-Leiste, Pausentimer, ×-Knöpfe, Segmente), ⋮-Menü und
+Pausentimer animieren weich, Fehler-/Lade-/Leerzustände (Backup, Abschluss speichern, Posteingang, Coach-Archiv, Guthaben, QR-Import,
+Katalog-Filter, leerer Training-Tab). Screenshots: `docs/screenshots/ui-polish/vorher|nachher`.
+**Offen:** siehe „P2 – offen“ in `docs/UI-AUDIT.md` (u. a. still verworfene Fotos, Guthaben-Fehler im Chip, Ladezustände in Detail-Screens).
+
+### Bitte auf dem Handy testen (UI-Feinschliff)
+1. Kalender: leere Tage und Wochentage sind deutlich lesbarer grau; Platzhalter in Feldern (z. B. Notiz) sind hellgrau, Werte weiß.
+2. Training starten, Satz abhaken: Der Countdown unten zählt, ohne dass die Ziffern hin- und herspringen. Auf den Countdown tippen:
+   Die Leiste wächst weich, „Nächste: …“ steht groß; nochmal tippen klappt weich zu.
+3. ⋮ an einer Übung: Das Menü wächst aus der Ecke des ⋮; „Entfernen“ ist gut lesbar rot. Satz nach links wischen: rote Fläche mit
+   gut lesbarem weißem Text.
+4. Tab-Leiste: Auch knapp über/unter Icon und Beschriftung tippen wechselt den Tab.
+5. Übungskatalog: Muskel-Filter so wählen, dass nichts passt (z. B. „Eigene“ + Suchtext) → „Filter zurücksetzen“ hilft.
+6. Alle Workouts löschen: Training-Tab zeigt unten „Neues Workout“.
+7. Profil → Backup exportieren: klappt wie bisher (bei einem Fehler stünde jetzt ein Hinweis unter dem Panel).
 
 ## Alternativen (A/B) im Workout (Session BI, 8.11.)
 **Erledigt:** Im Workout ⋮ einer Übung → „Alternative hinzufügen“; die Alternative hat eigene Sätze. Im Training zeigt die Karte Chips
