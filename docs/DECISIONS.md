@@ -1687,6 +1687,17 @@ Fabians Feedback vom 8.11. (Zitate in PROGRESS.md), Vorgaben der Koordination. T
   Training und wird nirgends mehr angezeigt (bleibt, weil das Entfernen viele Tests ohne Nutzen ändert). Vollbild und Vergleich zeigen
   das Datum des Foto-Tages; „Training ansehen“ im Vollbild führt bei neuen Fotos zum letzten Training ihres Tages.
 
+## Alternativen (A/B) im Workout (Session BI, 8.11.)
+- **Auftrag (Fabian):** „ein bisschen Variabilität in die Workouts einbauen, ohne jetzt ein komplett neues Workout bauen zu müssen … zwei Übungen, die ähnlich sind, und ich mache halt mal in der A-Woche die eine Übung, in der anderen Woche die andere.“
+- **Editor/Workout-Ansicht:** ⋮ einer Übung → „Alternative hinzufügen“ → Übung aus dem Katalog (oder eigene, über „Neue Übung“ im Picker). Die Alternative steht in derselben Karte unter der Übung („Alternative“, Bild, Name, „3 Sätze · Pause“, „Letztes Mal“) mit eigenen Sätzen, Pause, Notiz und eigenem ⋮ (Ersetzen, Entfernen mit Rückgängig). Mehrere Alternativen sind möglich (A/B/C). Eine Karte statt eigener Karten, damit klar ist: hier wird eine von beiden gemacht, und Verschieben bewegt die Gruppe.
+- **Training:** Übungen mit Alternativen zeigen unter dem Kopf eine Chip-Reihe (eine Chip pro Variante, die aktuelle gefüllt). Tipp auf eine andere Chip tauscht Übung, Sätze (Vorgaben dieser Variante, Lücken aus ihrem „Letztes Mal“), Pause und Notiz. Nur solange kein Satz abgehakt ist; danach verschwinden die Chips (der Name zeigt die gemachte Variante). So bleiben Werte nie zwischen zwei Übungen hängen.
+- **Voreinstellung (A/B-Wechsel):** beim Start die Variante nach der, die beim letzten beendeten Training dieses Workouts gemacht (nicht ausgelassen) wurde; reihum bei mehr als zwei (A → B → C → A); nie gemacht → die Hauptübung. Abfrage `WorkoutDao.lastVariant` über die Übungs-IDs der Varianten (keine Extra-Spalte im Training nötig).
+- **Plan folgt dem Training:** `WorkoutPlan.adopt` ordnet eine Trainingsübung der Workout-Übung zu, zu deren Varianten sie gehört; nur die trainierte Variante übernimmt die Satzanzahl, die anderen bleiben. Wird eine Variante im Training ersetzt, ersetzt das nur diese Variante (Alternativen gehen nicht verloren).
+- **Datenmodell (DB v15, AutoMigration 14→15; v14 hat Session BJ):** `template_exercise.variant` (0 = Übung, 1… = Alternativen an derselben `position`). Reine Ergänzung; alte Zeilen sind 0. Kein neues Feld im Training: die gemachte Variante ist einfach die Übung des Trainings. Die Varianten eines laufenden Trainings werden nach einem Prozess-Neustart aus dem Workout wieder angehängt (`WorkoutRepository.loadActive`). Die Workout-Liste zeigt nur die Hauptübungen.
+- **Teilen/Export (.overfit, Link, Datei, Zwischenablage):** optionales `alt` je Übung (Array gleicher Übungsobjekte, eine Ebene, höchstens 5). Version bleibt 1: ältere Apps ignorieren `alt` und importieren nur die Hauptübungen; Dateien ohne `alt` sind unverändert gültig. Der kompakte QR-Inhalt (`OF1:`) hat keinen Platz für Alternativen: Hat ein Workout Alternativen, trägt der QR-Code stattdessen den Link (mit `alt`); ohne Alternativen bleibt es beim kompakten QR (Sonnet-Gegencheck). **Backup:** `alternatives` verschachtelt in `BTemplateExercise` (ältere Apps ignorieren es, Backup-Version unverändert).
+- **KI (mit BH abgestimmt):** Coach-Prompt listet unter einer Übung „alternative (done instead in other sessions): Name [id] …“; KI-Chat-Workout-JSON trägt `alternatives`. Coach-Vorschläge laufen über `ShareFormat`, `alt` kommt damit automatisch mit.
+- **Sonnet-Gegencheck (behoben):** ein mit Zurück abgebrochenes „Alternative hinzufügen“ machte das nächste „Ersetzen“ zum Hinzufügen (jetzt immer nur eine offene Auswahl); die A/B-Voreinstellung zählte auch eine Variante, von der kein Satz gemacht wurde (Training abgebrochen) oder die ad hoc hinzugefügt war (jetzt nur mit mindestens einem abgehakten Satz, wie „Letztes Mal“); QR siehe oben; dieselbe Übung als eigene Alternative wird ignoriert (Editor) bzw. zusammengefasst (Import, Training); wird eine Übung im Training durch eine ganz andere ersetzt, verschwinden die Varianten-Chips. **Offen (BH):** Der Coach-Planvergleich (`coach/PlanDiff.kt`) kennt Alternativen noch nicht: Schlägt der Coach Variante B vor, erscheint das als „A entfernt, B hinzugefügt“. An BH gemeldet. Bewusst so: Kommt dieselbe Übung in zwei Plan-Übungen vor, ordnet `adopt` sie der ersten zu.
+
 ## Kalender einheitlich, Tag auf einer Seite (8.11., Session BJ, Teil 2)
 - **Auftrag (Fabian, 8.11.):** „dass alle Symbole, zum Beispiel im Kalender, die Kreise gleich groß sind und alles ein bisschen einheitlich
   ist, die Menüs nicht so überladen sind“ und „dass man möglichst wenig tippen muss“.
@@ -1775,3 +1786,9 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
     „Übernehmen“, und „Rückgängig“ holt sie zurück.
   - Bewusst so: TalkBack kann den Screen unter dem Coach noch erreichen. Das gilt für alle Ebenen der App gleich und gehört
     ins UI-Audit.
+- **Alternativen (#105) bleiben:**
+  - Ein Vorschlag für ein gespeichertes Workout nennt deren Alternativen meist nicht. Vor dem Überschreiben bekommt jede
+    vorgeschlagene Übung ohne eigene Alternativen die der gleichen Übung im alten Workout (`KeepAlternatives`).
+  - Nennt der Vorschlag selbst Alternativen, gelten diese.
+  - Schlägt der Coach statt der Hauptübung deren Alternative vor, bleibt das wie im Editor eine neue Übung. Der Editor zeigt
+    das vor dem Speichern.

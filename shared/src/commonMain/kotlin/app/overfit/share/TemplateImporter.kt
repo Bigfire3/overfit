@@ -34,7 +34,7 @@ class TemplateImporter(
      */
     suspend fun accept(preview: ImportPreview, replaceId: Long? = null): Long {
         val created = LinkedHashMap<String, String>()
-        preview.exercises.mapNotNull { it.newExercise }.forEach { input ->
+        preview.exercises.flatMap { listOf(it) + it.alternatives }.mapNotNull { it.newExercise }.forEach { input ->
             created.getOrPut(input.name.lowercase()) { exercises.createCustom(input) }
         }
         return templates.save(ShareMapper.toTemplate(preview, created).let { if (replaceId != null) it.copy(id = replaceId) else it })

@@ -78,7 +78,7 @@ interface TemplateDao {
 
     @Query(
         """SELECT te.templateId AS templateId, e.name AS name FROM template_exercise te
-           JOIN exercise e ON e.id = te.exerciseId ORDER BY te.templateId, te.position""",
+           JOIN exercise e ON e.id = te.exerciseId WHERE te.variant = 0 ORDER BY te.templateId, te.position""",
     )
     fun observeTemplateExerciseNames(): Flow<List<TemplateExerciseName>>
 
@@ -199,6 +199,17 @@ interface WorkoutDao {
            ORDER BY ws.startedAt DESC, se2.position DESC LIMIT 1""",
     )
     suspend fun lastPerformance(exerciseId: String, templateId: Long?): LastPerformanceRow?
+
+    /** A/B rotation: which of [exerciseIds] the newest finished training of the template did (not skipped). */
+    @Query(
+        """SELECT se.exerciseId FROM session_exercise se
+           JOIN workout_session ws ON ws.id = se.sessionId
+           WHERE ws.templateId = :templateId AND ws.status = 'FINISHED' AND se.skipped = 0
+             AND se.exerciseId IN (:exerciseIds) AND se.origin != 'ADDED'
+             AND EXISTS (SELECT 1 FROM set_entry s2 WHERE s2.sessionExerciseId = se.id AND s2.completed = 1)
+           ORDER BY ws.startedAt DESC, se.position LIMIT 1""",
+    )
+    suspend fun lastVariant(templateId: Long, exerciseIds: List<String>): String?
 
     @Query("SELECT * FROM set_entry WHERE sessionExerciseId = :sessionExerciseId AND completed = 1 ORDER BY position")
     suspend fun completedSetsOf(sessionExerciseId: String): List<SetEntryEntity>

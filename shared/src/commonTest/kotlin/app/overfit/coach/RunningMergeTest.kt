@@ -159,4 +159,23 @@ class RunningMergeTest {
     fun chatRulesAskForTheCompleteChangedWorkout() {
         assertTrue(CoachChatSchema.RULES.contains("put the COMPLETE changed workout"))
     }
+
+    @Test
+    fun proposalKeepsTheAlternativesOfTheWorkout() {
+        val old = Template(1, "Push", null, listOf(TemplateExercise(bench, 120, null, List(3) { PlannedSet(60.0, 8) }, alternatives = listOf(TemplateExercise(fly, 60, null, List(3) { PlannedSet(15.0, 12) })))))
+        val proposal = app.overfit.share.ImportPreview(
+            "Push", null,
+            listOf(
+                app.overfit.share.PreviewExercise(bench, null, 120, null, List(4) { PlannedSet(62.5, 6) }),
+                app.overfit.share.PreviewExercise(dips, null, 90, null, List(2) { PlannedSet(0.0, 12) }),
+            ),
+        )
+        val kept = KeepAlternatives.apply(old, proposal)
+        assertEquals(listOf("wg:fly"), kept.exercises[0].alternatives.map { it.exercise?.id })
+        assertEquals(List(3) { PlannedSet(15.0, 12) }, kept.exercises[0].alternatives[0].sets)
+        assertTrue(kept.exercises[1].alternatives.isEmpty())
+        // Named by the proposal itself: those win.
+        val own = proposal.copy(exercises = listOf(proposal.exercises[0].copy(alternatives = listOf(app.overfit.share.PreviewExercise(dips, null, 90, null, emptyList())))))
+        assertEquals(listOf("wg:dips"), KeepAlternatives.apply(old, own).exercises[0].alternatives.map { it.exercise?.id })
+    }
 }

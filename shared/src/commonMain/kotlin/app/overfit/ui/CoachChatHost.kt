@@ -143,8 +143,9 @@ internal fun proposalHandler(
                 if (old == null || p == null) emptyList() else app.overfit.chat.TemplateDiff.lines(old, p, c, unit, language)
             },
             apply = { json ->
-                val p = preview(json)
                 val old = deps.data.templates.get(target.templateId)
+                // Alternatives of the workout survive a proposal that does not mention them.
+                val p = preview(json)?.let { if (old != null) app.overfit.coach.KeepAlternatives.apply(old, it) else it }
                 if (p != null) {
                     val lines = if (old == null) emptyList() else app.overfit.chat.TemplateDiff.lines(old, p, c, unit, language)
                     editorSeeds.put(

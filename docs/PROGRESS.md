@@ -36,6 +36,18 @@
 5. Eigene Übung anlegen → Sprechblase: Sheet „Vom Coach ausfüllen lassen“ mit Preis. Erst „Ausfüllen · …“ füllt die Felder.
 6. Der Chat aus der Ebene steht danach unter Coach → „Frühere Chats“.
 
+## Alternativen (A/B) im Workout (Session BI, 8.11.)
+**Erledigt:** Im Workout ⋮ einer Übung → „Alternative hinzufügen“; die Alternative hat eigene Sätze. Im Training zeigt die Karte Chips
+mit den Varianten; voreingestellt ist die, die beim letzten Training dieses Workouts nicht dran war (A/B-Wechsel, reihum bei mehr).
+DB v15 (`template_exercise.variant`), Teilen/Export (`alt`), Backup und Coach/KI tragen Alternativen; alte Dateien bleiben lesbar.
+Screenshots: `docs/screenshots/workout-alternativen/`.
+
+### Bitte auf dem Handy testen (Alternativen)
+1. Workout öffnen, bei einer Übung ⋮ → „Add alternative“ → Übung wählen: In derselben Karte steht „Alternative“ mit eigenen Sätzen.
+2. Starten: Die Karte zeigt zwei Chips, die Hauptübung ist gewählt. Auf die Alternative tippen: Name und Sätze wechseln.
+3. Training mit der Hauptübung beenden, Workout erneut starten: Jetzt ist die Alternative vorgewählt (A/B-Wechsel).
+4. Einen Satz abhaken: Chips verschwinden. Workout teilen und auf einem zweiten Gerät/über die Zwischenablage importieren: Alternative ist dabei.
+
 ## Coach/KI Teil 1: frühere Chats, Preis vor jeder Anfrage, Gewichte (8.11., Session BH)
 Fabian: „im Chatfenster [kann man] die vergangenen Chats zwar sehen, aber man kann da nicht rein“, „ich will auch, dass man vorher
 gefragt wird, wenn wirklich eine KI-Anfrage geschickt wird … Man sieht keinen Preis … Ein Bild kostet ja viel mehr“, „dass bei 0 Kilo …

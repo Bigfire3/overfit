@@ -179,4 +179,6 @@ object NoShortCodes : ShortCodeService {
 
 /** QR text to show for a training: short code if the backend gives one, else the full offline content. */
 suspend fun qrTextFor(training: SharedTraining, shortCodes: ShortCodeService = NoShortCodes): String =
-    runCatching { shortCodes.upload(training) }.getOrNull()?.let { QrPayload.SHORT_PREFIX + it } ?: QrPayload.encode(training)
+    runCatching { shortCodes.upload(training) }.getOrNull()?.let { QrPayload.SHORT_PREFIX + it }
+        // The compact binary form has no place for alternatives (A/B): then the QR carries the link (with `alt`).
+        ?: if (training.exercises.any { it.alternatives.isNotEmpty() }) ShareFormat.toLink(training) else QrPayload.encode(training)

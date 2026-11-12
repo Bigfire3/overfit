@@ -68,3 +68,25 @@ object RunningMerge {
         },
     )
 }
+
+/**
+ * A coach proposal for a saved workout rarely repeats its alternatives (A/B, #105). Before it overwrites the workout,
+ * every proposed exercise without alternatives gets those of the same exercise in the old workout, so "Apply" never
+ * drops them silently. Alternatives the proposal names itself win.
+ */
+object KeepAlternatives {
+    fun apply(old: Template, proposal: app.overfit.share.ImportPreview): app.overfit.share.ImportPreview {
+        val byId = old.exercises.associateBy { it.exercise.id }
+        return proposal.copy(
+            exercises = proposal.exercises.map { line ->
+                val oldLine = line.exercise?.id?.let(byId::get)
+                if (line.alternatives.isNotEmpty() || oldLine == null || oldLine.alternatives.isEmpty()) line
+                else line.copy(
+                    alternatives = oldLine.alternatives.map { alt ->
+                        app.overfit.share.PreviewExercise(alt.exercise, null, alt.restSec, alt.note, alt.sets)
+                    },
+                )
+            },
+        )
+    }
+}
