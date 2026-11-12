@@ -1792,3 +1792,17 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
   - Nennt der Vorschlag selbst Alternativen, gelten diese.
   - Schlägt der Coach statt der Hauptübung deren Alternative vor, bleibt das wie im Editor eine neue Übung. Der Editor zeigt
     das vor dem Speichern.
+
+## Design-Skills per `skills`-CLI (12.11.)
+- Owner-Wunsch: impeccable (`pbakaus/impeccable`) und die Skills von Jakub Krehel (`jakubkrehel/skills`) für Claude Code auf
+  Projektebene in `.claude/skills/` installieren. Installiert mit `npx skills add <repo> --agent claude-code --skill '*' --copy -y`
+  (alle Skills, keine Rückfragen). Für impeccable mit dem Pfad zur Claude-Variante
+  (`https://github.com/pbakaus/impeccable/tree/main/.claude/skills/impeccable`): Ohne Pfad nimmt die CLI die generische
+  `.agents`-Variante (Codex-Befehle `$impeccable`, falsche Skriptpfade, kein `argument-hint`); gefunden im Sonnet-Gegencheck. `--copy` statt Symlinks: sonst lägen die Dateien unter `.agents/skills/` und Cloud-Sessions
+  bekämen nur Links. `skills-lock.json` im Repo-Wurzelverzeichnis hält Quelle und Hash fest (`npx skills update -p -y`).
+- impeccable dadurch von 4.8.0 auf 4.8.2 aktualisiert; die vier `impeccable-*`-Agenten in `.claude/agents/` aus dem gleichen
+  Upstream-Stand übernommen (`.claude/agents`, Projektpfade statt `${CLAUDE_PLUGIN_ROOT}`). Die CLI löscht beim Kopieren Dateien, die nicht aus dem Repo kommen
+  (vorher `LICENSE`, `NOTICE.md`, `VENDORED.md` im Skill-Ordner). Lizenzen (Apache-2.0, MIT) und Herkunft liegen deshalb in
+  `.claude/skills/_licenses/` (kein `SKILL.md`, wird nicht als Skill geladen); die Skill-Ordner bleiben unverändert.
+- Alle Skills sind Anregungen; das Overfit-Designsystem (CLAUDE.md) hat Vorrang. Die Krehel-Skills zielen auf Web
+  (temporäre Seiten, CSS, ARIA) und gelten für Compose sinngemäß. `agents/openai.yaml` in den Krehel-Ordnern ist für Codex.
