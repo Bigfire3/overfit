@@ -184,8 +184,9 @@ Monochrom mit zwei Signalfarben, die nur Daten und Bestätigungen tragen.
 **Display Font:** Inter (SemiBold)
 **Body Font:** Inter (Regular/Medium)
 
-**Character:** Eine einzige, neutrale Grotesk in wenigen Größen. Zahlen sind das wichtigste Material der App und laufen
-überall in Tabellenziffern (`tnum`), damit Timer und Gewichte beim Hochzählen nicht springen.
+**Character:** Eine einzige, neutrale Grotesk in wenigen Größen. Zahlen sind das wichtigste Material der App: die großen
+Zahlstile (Hero, Title, Number) und jeder laufende Wert (Countdown, Trainingsdauer) stehen in Tabellenziffern (`tnum`),
+damit sie beim Hochzählen nicht springen. Fließtext behält proportionale Ziffern.
 
 ### Hierarchy
 - **Hero** (600, 56sp, 62sp): Countdown im großen Pausentimer, Kennzahlen im Abschluss.
@@ -196,7 +197,9 @@ Monochrom mit zwei Signalfarben, die nur Daten und Bestätigungen tragen.
 - **Number** (600, 20sp, 26sp, tnum): Zahlenfelder der Satzzeilen.
 
 ### Named Rules
-**The Tabular Rule.** Jede Ziffer läuft in Tabellenziffern. Ein Timer, der beim Zählen wackelt, ist ein Fehler.
+**The Tabular Rule.** Was sich sichtbar ändert, steht in Tabellenziffern (`Theme.type.tabular(…)` für Body/Label/Caption).
+Ein Timer, der beim Zählen wackelt, ist ein Fehler. Knopftexte mit Ziffern („±15 s“) bleiben proportional, sonst wird es
+auf 360 dp eng.
 
 **The Shrink-Before-Cut Rule.** Knopftexte schrumpfen bis 12sp, bevor sie gekürzt werden.
 

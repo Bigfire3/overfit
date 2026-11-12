@@ -91,8 +91,9 @@ val DarkColors = Colors(
 )
 
 /**
- * Tabular figures for every style (DESIGN.md "The Tabular Rule"): timers, weights and counters keep their width while
- * they change, so a ticking clock does not jitter.
+ * Tabular figures (DESIGN.md "The Tabular Rule") for the big number styles. Running text keeps proportional figures
+ * (tabular "1"s widen labels like "±15 s" and cut "Überspringen" off on 360 dp); a ticking value in body/label/caption
+ * uses [Typography.tabular].
  */
 private const val TNUM = "tnum"
 
@@ -106,7 +107,10 @@ data class Typography(
     val caption: TextStyle,
     /** Numbers in input fields (set rows): large, tabular digits. */
     val number: TextStyle,
-)
+) {
+    /** [style] with tabular figures, for values that change while visible (countdown, elapsed time). */
+    fun tabular(style: TextStyle): TextStyle = style.copy(fontFeatureSettings = TNUM)
+}
 
 object Space {
     val xs = 4.dp
@@ -139,9 +143,9 @@ fun OverfitTheme(content: @Composable () -> Unit) {
     val typography = Typography(
         hero = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 56.sp, lineHeight = 62.sp, letterSpacing = (-1.5).sp, fontFeatureSettings = TNUM),
         title = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.8).sp, fontFeatureSettings = TNUM),
-        body = TextStyle(fontFamily = family, fontWeight = FontWeight.Normal, fontSize = 17.sp, lineHeight = 24.sp, fontFeatureSettings = TNUM),
-        label = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 24.sp, fontFeatureSettings = TNUM),
-        caption = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 18.sp, fontFeatureSettings = TNUM),
+        body = TextStyle(fontFamily = family, fontWeight = FontWeight.Normal, fontSize = 17.sp, lineHeight = 24.sp),
+        label = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 24.sp),
+        caption = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 18.sp),
         number = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp, fontFeatureSettings = TNUM),
     )
     CompositionLocalProvider(

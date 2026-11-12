@@ -67,7 +67,9 @@ fun ChatInboxScreen(
     val inbox by chat.inbox.state.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf<InboxTemplate?>(null) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { chat.inbox.refresh() }
+    // Until the first refresh on this screen has answered, an empty list means "loading", not "nothing new".
+    var refreshed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { chat.inbox.refresh(); refreshed = true }
 
     val current = open
     if (current != null) {
@@ -80,7 +82,7 @@ fun ChatInboxScreen(
         if (inbox.full) Text(c.inboxFull, Modifier.padding(bottom = Space.m), style = Theme.type.caption)
         // Loading and failure are their own states: "Nothing new" only once the server really said so.
         if (inbox.items.isEmpty()) when {
-            inbox.loading -> Text(c.inboxLoading, tone = Tone.Muted)
+            inbox.loading || !refreshed -> Text(c.inboxLoading, tone = Tone.Muted)
             inbox.failed -> {
                 Text(c.inboxFailed, tone = Tone.Muted)
                 Spacer(Modifier.height(Space.m))

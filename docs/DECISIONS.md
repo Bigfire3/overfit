@@ -1733,7 +1733,10 @@ Fabians Feedback vom 8.11. (Zitate in PROGRESS.md), Vorgaben der Koordination. T
   `armed` bleibt #FF453A für das Mülleimer-Icon). Hierarchie bleibt sichtbar (muted 7,3 vs. faint 4,6 auf Schwarz, Test). Abgesichert
   in `ContrastTest`. Zahlen auf der grünen Satzzeile erreichen 4,1 : 1 – als großer Text (20 sp halbfett) über der 3 : 1-Grenze, bewusst
   so gelassen, weil die grüne Zeile (`confirmFill`) aus „Grüne Satzzeile“ (7.11.) stammt.
-- **Tabellenziffern in allen Schriftstilen:** vorher nur `number`, Timer im Pausentimer und die Trainingsdauer wackelten jede Sekunde.
+- **Tabellenziffern, wo Ziffern laufen:** vorher nur `number`; der kleine Countdown im Pausentimer und die Trainingsdauer wackelten
+  jede Sekunde. Jetzt `hero`, `title`, `number` mit `tnum`, laufende Werte in Body/Label/Caption über `Theme.type.tabular(…)`.
+  Verworfen: `tnum` für alle Stile – tabellarische „1“ machen „−15 s“/„+15 s“ breiter und schnitten „Überspringen“ auf 360 dp ab
+  (Sonnet-Gegencheck, Screenshot `ui-polish/nachher/06-training-pause`).
 - **Konzentrische Radien:** `Block` 16 → 20 dp (Satzzeile 12 dp + 8 dp Innenabstand), `SetField` 10 → 8 dp (12 − 4). Karten 24 dp und
   Panels 16 dp bleiben.
 - **Tippflächen ≥ 44–48 dp:** Tab-Leiste (Padding in die Klickfläche), Countdown im Pausentimer, Segmente, Foto-×, Kontext-Chip-×,

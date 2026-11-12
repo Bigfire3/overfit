@@ -46,7 +46,7 @@ Keine. Kein Ablauf ist blockiert, kein Datenverlust-Pfad gefunden.
 ### P2 (nächster Durchgang) – behoben
 | Befund | Ort | Nachher |
 |---|---|---|
-| Timer-Ziffern springen beim Zählen | Pausentimer, Trainingsdauer, alle Zahlen | Alle Schriftstile mit Tabellenziffern (`tnum`) |
+| Timer-Ziffern springen beim Zählen | Pausentimer (klein), Trainingsdauer | Tabellenziffern für Hero/Title/Number und laufende Werte (`Theme.type.tabular`). Erster Versuch „alle Stile“ schnitt „Überspringen“ auf 360 dp ab (Sonnet-Gegencheck), deshalb gezielt |
 | Radien nicht konzentrisch | `Block` 16 dp um Satzzeile 12 dp bei 8 dp Abstand, Feld 10 dp | Block 20 dp (12 + 8), Feld 8 dp (12 − 4) |
 | Pausentimer springt beim Auf-/Zuklappen | `RestBar` | weiche Größenanimation ohne Nachfedern; „Nächste“ groß zweizeilig |
 | ⋮-Menü erscheint hart, kein Druck-Feedback | `MoreMenu` | wächst aus der ⋮-Ecke (150 ms, Scale 0,96 → 1 + Fade), gedrückter Eintrag heller |

@@ -17,7 +17,7 @@
 
 ## UI/UX-Feinschliff mit Design-Skills (12.11.)
 **Erledigt:** Bestandsaufnahme (`PRODUCT.md`, `DESIGN.md`), Audit mit P0–P2 (`docs/UI-AUDIT.md`, 14 → 16/20) und die wichtigsten
-Fixes: Kontrast der Grautöne und des Menü-Rots (neuer `ContrastTest`), Tabellenziffern überall (Timer wackeln nicht mehr),
+Fixes: Kontrast der Grautöne und des Menü-Rots (neuer `ContrastTest`), Tabellenziffern für laufende Werte (Timer wackeln nicht mehr),
 konzentrische Radien in Übungskarten, Tippflächen ≥ 44–48 dp (Tab-Leiste, Pausentimer, ×-Knöpfe, Segmente), ⋮-Menü und
 Pausentimer animieren weich, Fehler-/Lade-/Leerzustände (Backup, Abschluss speichern, Posteingang, Coach-Archiv, Guthaben, QR-Import,
 Katalog-Filter, leerer Training-Tab). Screenshots: `docs/screenshots/ui-polish/vorher|nachher`.

@@ -97,7 +97,8 @@ fun RestBar(
                     // 48 dp high target (the digits alone are 24 dp), text centred in it.
                     Modifier.pressableRow { expanded = true }.heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically)
                         .semantics { contentDescription = toggleLabel },
-                    style = Theme.type.label,
+                    // Tabular digits: the countdown keeps its width every second.
+                    style = Theme.type.tabular(Theme.type.label),
                 )
                 Spacer(Modifier.width(Space.s))
                 Actions(Modifier.weight(1f, fill = false))
