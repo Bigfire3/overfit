@@ -14,6 +14,13 @@ data class TrainingStrings(
     val finishTraining: String,
     /** Finish flow: how many exercises were skipped. */
     val skippedExercises: (Int) -> String,
+    /** Workout view: changes are stored right away (no "Save"). */
+    val autosaved: String,
+    /** Footer next to "Undo" in the workout view. */
+    val exerciseRemoved: String,
+    val exerciseReplaced: String,
+    /** Play button on a workout card in the list. */
+    val startNamed: (workout: String) -> String,
 )
 
 val TrainingGerman = TrainingStrings(
@@ -23,6 +30,10 @@ val TrainingGerman = TrainingStrings(
     skippedCardHint = { "$it wieder aufnehmen" },
     finishTraining = "Training beenden",
     skippedExercises = { if (it == 1) "1 Übung ausgelassen" else "$it Übungen ausgelassen" },
+    autosaved = "speichert automatisch",
+    exerciseRemoved = "Übung entfernt",
+    exerciseReplaced = "Übung ersetzt",
+    startNamed = { "$it starten" },
 )
 
 val TrainingEnglish = TrainingStrings(
@@ -32,4 +43,8 @@ val TrainingEnglish = TrainingStrings(
     skippedCardHint = { "Take $it back in" },
     finishTraining = "Finish workout",
     skippedExercises = { if (it == 1) "1 exercise skipped" else "$it exercises skipped" },
+    autosaved = "saves automatically",
+    exerciseRemoved = "Exercise removed",
+    exerciseReplaced = "Exercise replaced",
+    startNamed = { "Start $it" },
 )

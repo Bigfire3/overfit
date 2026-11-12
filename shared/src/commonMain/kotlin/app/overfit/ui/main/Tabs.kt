@@ -1,6 +1,16 @@
 package app.overfit.ui.main
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import app.overfit.ui.components.pressScale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.platform.testTag
@@ -72,6 +82,8 @@ fun StartScreen(
     onExercises: () -> Unit,
     onOpenWorkout: (Long) -> Unit,
     share: ShareDependencies,
+    /** Play button on a card: starts that workout right away (one tap); hidden while a workout runs. */
+    onStartWorkout: ((Long) -> Unit)? = null,
     chatInboxCount: Int = 0,
     chatInboxFull: Boolean = false,
     onChatInbox: () -> Unit = {},
@@ -112,7 +124,10 @@ fun StartScreen(
         }
         if (templates != null && templates.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().padding(bottom = Space.l), verticalArrangement = Arrangement.spacedBy(Space.m)) {
-                templates.forEach { w -> WorkoutRow(w, lastDoneText(t, lastDone[w.id], today)) { onOpenWorkout(w.id) } }
+                val start = onStartWorkout.takeIf { running == null }
+                templates.forEach { w ->
+                    WorkoutRow(w, lastDoneText(t, lastDone[w.id], today), onStart = start?.let { { it(w.id) } }) { onOpenWorkout(w.id) }
+                }
             }
         }
     }
@@ -120,7 +135,7 @@ fun StartScreen(
 
 /** One saved workout: name, exercises in short, "last done 3 days ago". */
 @Composable
-fun WorkoutRow(workout: TemplateSummary, lastDone: String, onClick: () -> Unit) {
+fun WorkoutRow(workout: TemplateSummary, lastDone: String, onStart: (() -> Unit)? = null, onClick: () -> Unit) {
     val t = LocalStrings.current
     FloatingCard(Modifier.testTag("workout-card"), onClick = onClick) {
         Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = Space.m, vertical = Space.m), verticalAlignment = Alignment.CenterVertically) {
@@ -131,9 +146,25 @@ fun WorkoutRow(workout: TemplateSummary, lastDone: String, onClick: () -> Unit) 
                 Text(lastDone, style = Theme.type.caption, tone = Tone.Muted)
             }
             Spacer(Modifier.width(Space.m))
-            LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+            if (onStart != null && workout.exerciseNames.isNotEmpty()) StartCircle(t.training.startNamed(workout.name), onStart)
+            else LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
         }
     }
+}
+
+/**
+ * White round start button on a workout card (the main action, like [PrimaryButton]): the most frequent task in
+ * one tap. It takes its own tap, the rest of the card opens the workout.
+ */
+@Composable
+private fun StartCircle(description: String, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        Modifier.size(48.dp).pressScale(interaction).clip(CircleShape).background(Theme.colors.inverseBackground)
+            .clickable(interaction, indication = null, role = Role.Button, onClickLabel = description) { onClick() }
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) { LineIcon(Icon.Play, size = 22.dp, color = Theme.colors.inverseForeground) }
 }
 
 /** "last done 3 days ago" / "not done yet" from the start of the last session (epoch ms). */

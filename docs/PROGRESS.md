@@ -40,6 +40,19 @@ Screenshots: `docs/screenshots/coach-ki/`.
 5. Ein Training mit 0 kg (z. B. Dips) und eine Maschinen-Übung auswerten lassen: Der Coach nennt die Werte nicht „vergessen“ oder
    „unrealistisch“ und rechnet von deinen Zahlen aus weiter.
 
+## Wenig tippen: Workout direkt bearbeiten, Start aus der Liste (Session BI, 8.11.)
+**Erledigt:** Workout-Ansicht und Editor sind ein Screen: Sätze, Name, Übungen direkt änderbar, wird automatisch gespeichert
+(kein Stift, kein Speichern), „Rückgängig“ nach Entfernen/Ersetzen, unten „Starten“. ▶ auf jeder Workout-Karte startet direkt.
+Neues Workout öffnet sich nach „Speichern“. Vergangene Trainings bleiben Ansicht + Stift. Tipp-Zählung in DECISIONS.md.
+Tests: `FewerTapsTest` (+ angepasste UI-Tests). Screenshots: `docs/screenshots/workout-direkt-bearbeiten/`.
+
+### Bitte auf dem Handy testen (Wenig tippen)
+1. Workouts-Tab: rechts auf jeder Karte ein weißer ▶; antippen startet das Training sofort.
+2. Karte antippen: Workout mit allen Sätzen als Felder, oben Teilen/Löschen, unten „Start“. Gewicht ändern, Zurück, wieder öffnen: Wert ist gespeichert.
+3. Wert ändern und direkt „Start“: Training startet mit dem neuen Wert.
+4. ⋮ → „Remove“ bei einer Übung: unten „Exercise removed · Undo“; Undo bringt sie zurück.
+5. „+“ → neues Workout erstellen → Save: das neue Workout ist offen, „Start“ unten.
+
 ## Übung auslassen, „Training beenden“ unten (Session BI, 8.11.)
 **Erledigt:** Im laufenden Training ⋮ einer Übung → „Heute auslassen“: Karte eingeklappt und gedimmt („Ausgelassen“), „Nicht auslassen“
 macht es rückgängig. Offene Sätze ausgelassener Übungen zählen nicht als offen. Ist nichts mehr offen, wird der schwebende Knopf unten

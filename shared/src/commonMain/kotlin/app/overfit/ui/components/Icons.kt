@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.Theme
 
 /** Thin line icons, drawn on a 24×24 grid. No icon font, no Material icons. */
-enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link, List, Body, Today, Compare, ArrowUp }
+enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link, List, Body, Today, Compare, ArrowUp, Play }
 
 @Composable
 fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
@@ -91,6 +91,8 @@ fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foregroun
             Icon.ChevronRight -> path(9.5f to 6f, 15.5f to 12f, 9.5f to 18f)
             Icon.ChevronUp -> path(6f to 14.5f, 12f to 8.5f, 18f to 14.5f)
             // Arrow up: send (chat).
+            // Start a workout: a plain triangle pointing right.
+            Icon.Play -> path(8.5f to 5.5f, 18.5f to 12f, 8.5f to 18.5f, close = true)
             Icon.ArrowUp -> {
                 line(12f, 19f, 12f, 5.5f)
                 path(6.5f to 11f, 12f to 5.5f, 17.5f to 11f)

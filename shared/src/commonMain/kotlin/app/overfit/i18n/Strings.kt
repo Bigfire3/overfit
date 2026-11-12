@@ -312,7 +312,7 @@ val German = Strings(
     otherWorkoutRunning = "Gerade läuft ein anderes Training. Beende es zuerst.",
     runningNow = "Läuft gerade",
     newWorkoutName = { "Workout vom ${it.day}. ${GERMAN_MONTHS[it.month.ordinal]}" },
-    workoutPlanEmpty = "Noch keine Übungen. Tippe auf Bearbeiten, um welche hinzuzufügen.",
+    workoutPlanEmpty = "Noch keine Übungen. Füge unten welche hinzu.",
 
     exercisesTitle = "Übungen",
     photosTitle = "Kalender",
@@ -535,7 +535,7 @@ val English = Strings(
     otherWorkoutRunning = "Another workout is running. Finish it first.",
     runningNow = "Running now",
     newWorkoutName = { "Workout, ${ENGLISH_MONTHS[it.month.ordinal]} ${it.day}" },
-    workoutPlanEmpty = "No exercises yet. Tap Edit to add some.",
+    workoutPlanEmpty = "No exercises yet. Add some below.",
 
     exercisesTitle = "Exercises",
     photosTitle = "Calendar",
