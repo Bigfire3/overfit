@@ -565,7 +565,7 @@ private fun ContextChip(label: String, icon: Icon, removeLabel: String, tag: Str
     val interaction = remember { MutableInteractionSource() }
     Row(
         Modifier
-            .heightIn(min = 40.dp)
+            .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Theme.colors.surface)
             .widthIn(max = 240.dp),
@@ -586,7 +586,8 @@ private fun ContextChip(label: String, icon: Icon, removeLabel: String, tag: Str
         val removeInteraction = remember { MutableInteractionSource() }
         Box(
             Modifier
-                .size(36.dp)
+                // 44 dp: the × keeps a comfortable target although the chip itself is small.
+                .size(44.dp)
                 .pressScale(removeInteraction, PressScale.icon)
                 .clickable(removeInteraction, indication = null, role = Role.Button, onClick = onRemove)
                 .semantics { contentDescription = removeLabel }

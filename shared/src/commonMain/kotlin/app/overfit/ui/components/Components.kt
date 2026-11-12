@@ -624,7 +624,8 @@ fun <T> Segmented(value: T, options: List<Pair<T, String>>, onChange: (T) -> Uni
                     .background(if (active) Theme.colors.inverseBackground else Color.Transparent, RoundedCornerShape(50))
                     .semantics { selected = active }
                     .pressable(role = Role.Tab, haptic = !active) { onChange(option) }
-                    .padding(horizontal = Space.m, vertical = 9.dp),
+                    // 12 dp: segment 42 dp + 3 dp track inset on each side = 48 dp to tap.
+                    .padding(horizontal = Space.m, vertical = 12.dp),
             ) {
                 Text(label, style = Theme.type.caption, tone = if (active) Tone.Inverse else Tone.Muted)
             }

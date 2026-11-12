@@ -1,5 +1,10 @@
 package app.overfit.ui.workout
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,18 +72,19 @@ fun RestBar(
     }
 
     @Composable
-    fun NextLine(style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) {
+    fun NextLine(style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier, maxLines: Int = 1) {
         val target = next?.exercise?.id
         Text(
             nextLine,
             modifier.then(if (target != null) Modifier.pressableRow { onJumpToNext(target) } else Modifier),
             style = style,
             tone = Tone.Muted,
-            maxLines = 1,
+            maxLines = maxLines,
         )
     }
 
-    Column(Modifier.fillMaxWidth()) {
+    // Expanding/collapsing grows the bar smoothly instead of jumping (no bounce); the list above keeps its place.
+    Column(Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow))) {
         Hairline()
         if (!expanded) {
             Row(
@@ -88,7 +94,9 @@ fun RestBar(
             ) {
                 Text(
                     countdown,
-                    Modifier.pressableRow { expanded = true }.padding(vertical = Space.xs).semantics { contentDescription = toggleLabel },
+                    // 48 dp high target (the digits alone are 24 dp), text centred in it.
+                    Modifier.pressableRow { expanded = true }.heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically)
+                        .semantics { contentDescription = toggleLabel },
                     style = Theme.type.label,
                 )
                 Spacer(Modifier.width(Space.s))
@@ -101,7 +109,7 @@ fun RestBar(
                 Modifier.fillMaxWidth().pressableRow { expanded = false }.padding(top = Space.s).semantics { contentDescription = toggleLabel },
                 style = Theme.type.hero,
             )
-            NextLine(Theme.type.body, Modifier.fillMaxWidth().padding(vertical = Space.s))
+            NextLine(Theme.type.body, Modifier.fillMaxWidth().padding(vertical = Space.s), maxLines = 2)
         }
         Box(Modifier.fillMaxWidth().height(2.dp).background(Theme.colors.hairline)) {
             Box(Modifier.fillMaxWidth(rest.progress(now)).fillMaxHeight().background(Theme.colors.foreground))
