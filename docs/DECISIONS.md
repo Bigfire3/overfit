@@ -1722,3 +1722,15 @@ Fabians Feedback vom 8.11. (Zitate in PROGRESS.md), Vorgaben der Koordination. T
 - **Tag-Screen:** Gewicht, Trainings-Karten, Fotos (Raster aus Teil 1 mit Hinzufügen-Kacheln statt zweier Knöpfe) auf einer Seite.
   Session BH setzt ein Coach-Symbol in die Kopfzeile (`BackHeader`-Aktionen), abgestimmt.
 - Belege: `docs/screenshots/kalender-einheitlich/vorher|nachher` (`raster.png`, `liste.png`, `tag.png`; 360 dp, dunkel).
+
+## Design-Skills per `skills`-CLI (12.11.)
+- Owner-Wunsch: impeccable (`pbakaus/impeccable`) und die Skills von Jakub Krehel (`jakubkrehel/skills`) für Claude Code auf
+  Projektebene in `.claude/skills/` installieren. Installiert mit `npx skills add <repo> --agent claude-code --skill '*' --copy -y`
+  (alle Skills, keine Rückfragen). `--copy` statt Symlinks: sonst lägen die Dateien unter `.agents/skills/` und Cloud-Sessions
+  bekämen nur Links. `skills-lock.json` im Repo-Wurzelverzeichnis hält Quelle und Hash fest (`npx skills update -p -y`).
+- impeccable dadurch von 4.8.0 auf 4.8.2 aktualisiert; die vier `impeccable-*`-Agenten in `.claude/agents/` aus dem gleichen
+  Upstream-Stand (`plugin/agents`) übernommen. Die CLI löscht beim Kopieren Dateien, die nicht aus dem Repo kommen
+  (vorher `LICENSE`, `NOTICE.md`, `VENDORED.md` im Skill-Ordner). Lizenzen (Apache-2.0, MIT) und Herkunft liegen deshalb in
+  `.claude/skills/_licenses/` (kein `SKILL.md`, wird nicht als Skill geladen); die Skill-Ordner bleiben unverändert.
+- Alle Skills sind Anregungen; das Overfit-Designsystem (CLAUDE.md) hat Vorrang. Die Krehel-Skills zielen auf Web
+  (temporäre Seiten, CSS, ARIA) und gelten für Compose sinngemäß. `agents/openai.yaml`/`*.toml` in den Ordnern sind für Codex.
