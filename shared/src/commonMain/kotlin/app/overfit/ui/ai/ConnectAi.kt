@@ -108,7 +108,7 @@ fun ConnectAiScreen(
                     label = p.label,
                     tone = if (active) Tone.Default else Tone.Muted,
                     onClick = { providerId = p.id; status = Status.IDLE },
-                    trailing = if (active) ({ LineIcon(Icon.Check, size = Space.l) }) else null,
+                    trailing = if (active) ({ LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.action) }) else null,
                 )
             }
         }

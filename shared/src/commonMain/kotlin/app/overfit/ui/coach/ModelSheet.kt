@@ -328,7 +328,7 @@ private fun TierRow(info: FuelTierInfo, perMessage: Long, selected: Boolean, lan
             Text(name, tone = if (selected) Tone.Default else Tone.Muted)
             Text(s.perMessage(formatCents(perMessage, language)), style = Theme.type.caption, tone = Tone.Muted)
         }
-        if (selected) LineIcon(Icon.Check, size = 20.dp)
+        if (selected) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline)
     }
 }
 
@@ -346,7 +346,7 @@ private fun KeyResultLine(r: KeyTestResult, s: CoachSettingsStrings) {
     }
     Row(Modifier.fillMaxWidth().padding(top = Space.s).testTag("key:result"), verticalAlignment = Alignment.CenterVertically) {
         if (r is KeyTestResult.Ok) {
-            LineIcon(Icon.Check, size = 18.dp, color = Theme.colors.foreground)
+            LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.foreground)
             Spacer(Modifier.width(Space.s))
         }
         Text(text, style = Theme.type.caption)

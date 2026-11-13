@@ -141,7 +141,7 @@ fun CoachStoryScreen(
             }
             Row(Modifier.fillMaxWidth().padding(top = Space.s), horizontalArrangement = Arrangement.End) {
                 Box(
-                    Modifier.size(44.dp).testTag("story:close")
+                    Modifier.size(app.overfit.ui.theme.TouchTarget.min).testTag("story:close")
                         .semantics { contentDescription = s.close }
                         .clickable(role = Role.Button) { onClose() },
                     contentAlignment = Alignment.Center,
@@ -154,7 +154,7 @@ fun CoachStoryScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                LineIcon(storyIcons[page], size = 96.dp)
+                LineIcon(storyIcons[page], size = app.overfit.ui.theme.IconSize.hero)
                 Spacer(Modifier.height(Space.xl))
                 Text(p.title, style = Theme.type.title, align = TextAlign.Center, modifier = Modifier.testTag("story:title").semantics { heading() })
                 Spacer(Modifier.height(Space.m))

@@ -65,6 +65,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import app.overfit.i18n.LocalStrings
+import androidx.compose.ui.platform.testTag
+import app.overfit.ui.theme.TouchTarget
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -146,7 +150,7 @@ fun BlockButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
         horizontalArrangement = Arrangement.Center,
     ) {
         if (icon != null) {
-            LineIcon(icon, size = 20.dp)
+            LineIcon(icon, size = app.overfit.ui.theme.IconSize.inline)
             Spacer(Modifier.width(Space.xs))
         }
         BasicText(
@@ -205,7 +209,7 @@ fun SetRowSurface(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
-                LineIcon(Icon.Delete, size = 20.dp, color = Color.White)
+                LineIcon(Icon.Delete, size = app.overfit.ui.theme.IconSize.inline, color = Color.White)
                 Spacer(Modifier.width(Space.xs))
                 BasicText(deleteLabel, style = Theme.type.caption.copy(color = Color.White), maxLines = 1)
             }
@@ -311,7 +315,15 @@ fun SetField(
     )
 }
 
-class MenuItem(val label: String, val destructive: Boolean = false, val onClick: () -> Unit)
+/**
+ * One entry of a [MoreMenu]. [destructive] = red label. [confirm] = two-tap like [ConfirmButton]: the first tap fills
+ * the entry red ("… – tap again to confirm") and keeps the menu open, a second tap within 3 s runs [onClick]
+ * (deleting a workout or training moved from the header into the ⋮, UI audit 12.11.).
+ */
+class MenuItem(val label: String, val destructive: Boolean = false, val confirm: Boolean = false, val onClick: () -> Unit)
+
+/** Test tag of an open [MoreMenu]'s entry list. */
+const val MORE_MENU_TAG = "menu:items"
 
 /**
  * ⋮ button with a small menu of [items] below it (replace, move, remove …). The menu grows out of the ⋮ corner
@@ -320,15 +332,18 @@ class MenuItem(val label: String, val destructive: Boolean = false, val onClick:
 @Composable
 fun MoreMenu(label: String, items: List<MenuItem>, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
+    var armed by remember { mutableStateOf<Int?>(null) }
     val c = Theme.colors
+    val again = LocalStrings.current.tapAgainToConfirm
     val below = with(LocalDensity.current) { 44.dp.roundToPx() }
+    LaunchedEffect(armed) { if (armed != null) { kotlinx.coroutines.delay(3_000); armed = null } }
     Box(modifier) {
-        HeaderIconButton(Icon.More, label, { open = true })
+        HeaderIconButton(Icon.More, label, { armed = null; open = true })
         if (open) {
             Popup(
                 alignment = Alignment.TopEnd,
                 offset = IntOffset(0, below),
-                onDismissRequest = { open = false },
+                onDismissRequest = { open = false; armed = null },
                 properties = PopupProperties(focusable = true),
             ) {
                 val shown = remember { MutableTransitionState(false).apply { targetState = true } }
@@ -337,8 +352,14 @@ fun MoreMenu(label: String, items: List<MenuItem>, modifier: Modifier = Modifier
                     enter = fadeIn(tween(MENU_IN_MS, easing = LinearOutSlowInEasing)) +
                         scaleIn(tween(MENU_IN_MS, easing = LinearOutSlowInEasing), initialScale = 0.96f, transformOrigin = TransformOrigin(1f, 0f)),
                 ) {
-                    Column(Modifier.width(220.dp).clip(BlockShape.row).background(c.surfacePressed).padding(vertical = Space.xs)) {
-                        items.forEach { item -> MenuEntry(item) { open = false; item.onClick() } }
+                    Column(Modifier.width(220.dp).clip(BlockShape.row).background(c.surfacePressed).padding(vertical = Space.xs).testTag(MORE_MENU_TAG)) {
+                        items.forEachIndexed { i, item ->
+                            val isArmed = armed == i
+                            MenuEntry(item, isArmed, again) {
+                                if (item.confirm && !isArmed) armed = i
+                                else { open = false; armed = null; item.onClick() }
+                            }
+                        }
                     }
                 }
             }
@@ -348,20 +369,34 @@ fun MoreMenu(label: String, items: List<MenuItem>, modifier: Modifier = Modifier
 
 private const val MENU_IN_MS = 150
 
+/** One entry of a [MoreMenu]; [armed] = first tap of a confirm entry done (red fill, "– tap again to confirm"). */
 @Composable
-private fun MenuEntry(item: MenuItem, onClick: () -> Unit) {
+private fun MenuEntry(item: MenuItem, armed: Boolean, again: String, onClick: () -> Unit) {
     val c = Theme.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     Box(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .background(if (pressed) c.foreground.copy(alpha = 0.08f) else Color.Transparent)
+            .heightIn(min = TouchTarget.min)
+            .background(
+                when {
+                    armed -> c.armedFill
+                    pressed -> c.foreground.copy(alpha = 0.08f)
+                    else -> Color.Transparent
+                },
+            )
+            .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
+            .semantics { if (armed) stateDescription = again }
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
             .padding(horizontal = Space.m),
         contentAlignment = Alignment.CenterStart,
     ) {
-        BasicText(item.label, style = Theme.type.body.copy(color = if (item.destructive) c.negative else c.foreground))
+        val color = when {
+            armed -> Color.White
+            item.destructive -> c.negative
+            else -> c.foreground
+        }
+        BasicText(if (armed) "${item.label} – $again" else item.label, style = Theme.type.body.copy(color = color))
     }
 }

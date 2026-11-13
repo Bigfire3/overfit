@@ -15,6 +15,24 @@
 | 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
 
+## Einheitlich: Größen, Kopfzeilen, Menüs (UI-Audit, 12.11.)
+**Erledigt:** Alle Icons in vier Größen (`IconSize`), alles Tippbare mindestens 48 dp (`TouchTarget`), Chips 40 dp als Pille, runde
+Knöpfe 40 dp. Jede Kopfzeile rechts gleich aufgebaut (`HeaderActions`): [häufige Icons] [⋮] [Coach ganz rechts], höchstens 3.
+Workout-Ansicht und Trainingsdetail: Teilen und Löschen ins ⋮ (Löschen weiter per Doppeltipp). Unter dem offenen Coach liest
+TalkBack nur noch den Coach. Test: `UiUniformTest`. Details: DECISIONS „Einheitlich“. Bilder: `docs/screenshots/einheitlich/`.
+**Offen:** Bottom-Sheets und Popups innerhalb eines Screens sind für TalkBack noch nicht abgeschottet.
+
+### Bitte auf dem Handy testen (Einheitlich)
+1. Workouts: Die Icons „Übungen“ und „+“ stehen bündig rechts, gleich groß wie im Kalender. ▶ auf der Karte ist ein weißer Kreis
+   so groß wie der Senden-Knopf im Coach.
+2. Workout öffnen: oben rechts nur ⋮ und Sprechblase. ⋮ → „Teilen“ öffnet Teilen. ⋮ → „Workout löschen“: Eintrag wird rot, erst der
+   zweite Tipp löscht; 3 s warten, dann ist er wieder normal.
+3. Training starten: Sprechblase steht ganz rechts, „Beenden“ links daneben.
+4. Kalender → Tag → Training: oben Stift, ⋮ (Teilen, Löschen), Sprechblase ganz rechts. Auf allen Screens steht die Sprechblase an
+   derselben Stelle.
+5. Coach-Tab: Kontext-Chips im Chat sind gleich hoch wie die Modell-/Guthaben-Chips; das ✕ am Chip trifft man leicht.
+6. Mit TalkBack: Workout → Sprechblase. Wischen erreicht nur den Coach, nicht mehr das Workout darunter. ✕ → Workout wieder erreichbar.
+
 ## UI/UX-Feinschliff mit Design-Skills (12.11.)
 **Erledigt:** Bestandsaufnahme (`PRODUCT.md`, `DESIGN.md`), Audit mit P0–P2 (`docs/UI-AUDIT.md`, 14 → 16/20) und die wichtigsten
 Fixes: Kontrast der Grautöne und des Menü-Rots (neuer `ContrastTest`), Tabellenziffern für laufende Werte (Timer wackeln nicht mehr),

@@ -121,6 +121,42 @@ object Space {
     val xxl = 64.dp
 }
 
+/**
+ * Icon sizes: only these four (UI audit 12.11., DECISIONS "Einheitlich"). [action] = every tappable icon on its own
+ * (header, tool buttons, photo tiles), [inline] = icons inside a row or button next to text (chevrons, ticks, plus),
+ * [small] = icons inside a chip, badge or checkbox, [hero] = the one big picture of an explainer page.
+ */
+object IconSize {
+    val action = 24.dp
+    val inline = 20.dp
+    val small = 16.dp
+    val hero = 96.dp
+}
+
+/** Minimum touch target of everything tappable (Android 48 dp; iOS needs 44 pt, 48 covers both). */
+object TouchTarget {
+    val min = 48.dp
+}
+
+/**
+ * Sizes of the round and pill-shaped parts (UI audit 12.11.): one chip height, one day circle, one marker,
+ * one round icon button. Circles of the same role are the same size on every screen.
+ */
+object Sizes {
+    /** Visible height of every chip (filter, choice, context, credit); tapped through a [TouchTarget.min] area. */
+    val chip = 40.dp
+    /** Round filled icon button (start ▶, send, add to chat). */
+    val roundButton = 40.dp
+    /** Round check button of a set row (running workout). */
+    val checkCircle = 36.dp
+    /** Small round badge on a photo or a choice (✕ to remove, tick, count). */
+    val badge = 24.dp
+    /** Day number circle in the calendar. */
+    val dayCircle = 22.dp
+    /** Box of every calendar marker (dot, ring, dash) and of the legend. */
+    val marker = 8.dp
+}
+
 val LocalColors = staticCompositionLocalOf { DarkColors }
 val LocalTypography = staticCompositionLocalOf<Typography> { error("No typography provided") }
 

@@ -78,7 +78,7 @@ private fun ChoiceRow(title: String, hint: String, onClick: (() -> Unit)?) {
             }
             if (onClick != null) {
                 Spacer(Modifier.width(Space.m))
-                LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+                LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
             }
         }
         RowDivider()

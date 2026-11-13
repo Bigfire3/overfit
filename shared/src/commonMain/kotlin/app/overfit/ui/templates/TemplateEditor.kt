@@ -397,13 +397,16 @@ fun TemplateEditorScreen(
 
     Screen(
         header = {
-            BackHeader(t.back, back) {
-                if (autosave && !state.loading) {
-                    onCoach?.let { app.overfit.ui.components.CoachIconButton(it) }
-                    HeaderIconButton(Icon.Share, t.share.shareTemplate, { viewModel.flush { if (it != null) onShare() } })
-                    HeaderDeleteButton(t.deleteTemplate, viewModel::delete)
-                }
-            }
+            // [⋮ share, delete] [coach]: sharing and deleting are rare, the corner is the coach's (UI audit 12.11.).
+            val ready = autosave && !state.loading
+            BackHeader(
+                t.back, back,
+                coach = if (ready) onCoach else null,
+                menu = if (ready) listOf(
+                    MenuItem(t.share.shareTemplate) { viewModel.flush { if (it != null) onShare() } },
+                    MenuItem(t.deleteTemplate, destructive = true, confirm = true, onClick = viewModel::delete),
+                ) else emptyList(),
+            )
         },
         footer = {
             // Autosave: a problem is only shown once it blocks leaving/starting (not while typing "62," or a new name).
@@ -534,7 +537,7 @@ private fun ExerciseBlock(
                 .semantics { contentDescription = t.reorder },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+            LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
             Spacer(Modifier.width(Space.s))
             ExerciseThumb(entry) { onDetails(entry) }
             Spacer(Modifier.width(Space.m))

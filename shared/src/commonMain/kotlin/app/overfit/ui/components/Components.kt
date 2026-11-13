@@ -82,7 +82,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.overfit.ui.theme.IconSize
+import app.overfit.ui.theme.Sizes
 import app.overfit.ui.theme.Space
+import app.overfit.ui.theme.TouchTarget
 import app.overfit.ui.theme.Theme
 
 enum class Tone { Default, Muted, Faint, Inverse }
@@ -185,32 +188,66 @@ fun Screen(
     }
 }
 
+/** Test tag of the right-hand action group of every header ([HeaderActions]). */
+const val HEADER_ACTIONS_TAG = "header:actions"
+
+/** At most this many tappable things stand in a header's action group; rarer actions go into the ⋮ menu. */
+const val MAX_HEADER_ACTIONS = 3
+
 /**
- * Header row with a back button. Detail screens put their icon actions (share, delete, edit) into
- * [actions]: always top right, as [HeaderIconButton] / [HeaderDeleteButton]. Edit modes show none.
+ * Header row with a back button. Detail screens put their actions into [HeaderActions] (via [coach], [menu] and
+ * [actions]): always top right, coach icon in the corner. Edit modes show none.
  */
 @Composable
-fun BackHeader(label: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit = {}) {
-    Row(Modifier.height(44.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+fun BackHeader(
+    label: String,
+    onBack: () -> Unit,
+    coach: (() -> Unit)? = null,
+    menu: List<MenuItem> = emptyList(),
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    Row(Modifier.height(TouchTarget.min).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(Icon.Back, label, onBack)
         Spacer(Modifier.weight(1f))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.xs), content = actions)
+        HeaderActions(coach = coach, menu = menu, actions = actions)
     }
     Spacer(Modifier.height(Space.l))
 }
 
-/** Icon action in a [BackHeader] (share, edit): 44 dp touch target, [label] for screen readers. */
+/**
+ * The right-hand side of every header, one order everywhere (UI audit 12.11.):
+ * [frequent icon actions] [⋮ with the rare ones] [coach]. The coach icon always sits in the top right corner,
+ * so it is in the same place on every screen. Each icon is a [TouchTarget.min] square without gaps (the icons are
+ * [IconSize.action], so 24 dp of air lies between two of them). At most [MAX_HEADER_ACTIONS] (test).
+ */
+@Composable
+fun HeaderActions(
+    coach: (() -> Unit)? = null,
+    menu: List<MenuItem> = emptyList(),
+    menuLabel: String = LocalStrings.current.moreOptions,
+    modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    Row(modifier.testTag(HEADER_ACTIONS_TAG), verticalAlignment = Alignment.CenterVertically) {
+        actions()
+        if (menu.isNotEmpty()) MoreMenu(menuLabel, menu)
+        if (coach != null) CoachIconButton(coach)
+    }
+}
+
+/** Icon action in a header (share, edit): [TouchTarget.min] square, [IconSize.action] icon, [label] for screen readers. */
 @Composable
 fun HeaderIconButton(icon: Icon, label: String, onClick: () -> Unit, color: Color = Theme.colors.foreground) {
     Box(
-        Modifier.size(48.dp).semantics { contentDescription = label }.pressable(onClick = onClick),
+        Modifier.size(TouchTarget.min).semantics { contentDescription = label }.pressable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { LineIcon(icon, color = color) }
+    ) { LineIcon(icon, size = IconSize.action, color = color) }
 }
 
 /**
  * The one way into the AI from a screen (Fabian 8.11.: no scattered "Fill in with AI" buttons): the coach icon top
  * right, the same everywhere. It opens the coach over the screen with the screen's context attached.
+ * Use it through [HeaderActions] (`coach = …`), which puts it in the corner.
  */
 @Composable
 fun CoachIconButton(onClick: () -> Unit) {
@@ -236,7 +273,7 @@ fun HeaderDeleteButton(
     Box(
         Modifier
             .then(arm.modifier)
-            .size(48.dp)
+            .size(TouchTarget.min)
             .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
             .semantics {
                 contentDescription = if (armed) "$label – $again" else label
@@ -247,7 +284,7 @@ fun HeaderDeleteButton(
                 else { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); arm.arm() }
             },
         contentAlignment = Alignment.Center,
-    ) { LineIcon(Icon.Delete, color = if (armed) Theme.colors.armed else color) }
+    ) { LineIcon(Icon.Delete, size = IconSize.action, color = if (armed) Theme.colors.armed else color) }
 }
 
 // ---------------------------------------------------------------------------
@@ -489,11 +526,11 @@ fun SmallButton(
 fun IconButton(icon: Icon, label: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(48.dp)
+            .size(TouchTarget.min)
             .semantics { contentDescription = label }
             .pressable(onClick = onClick),
         contentAlignment = Alignment.CenterStart,
-    ) { LineIcon(icon) }
+    ) { LineIcon(icon, size = IconSize.action) }
 }
 
 // ---------------------------------------------------------------------------
@@ -522,9 +559,11 @@ fun BigInput(
             cursorBrush = SolidColor(Theme.colors.foreground),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); onDone() }),
-            modifier = (if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth()).textInputArea(),
+            modifier = (if (suffix != null) Modifier.width(IntrinsicTextWidth(value.ifEmpty { placeholder }, style)) else Modifier.fillMaxWidth()).textInputArea()
+                .heightIn(min = TouchTarget.min)
+                .semantics { contentDescription = placeholder },
             decorationBox = { inner ->
-                Box {
+                Box(contentAlignment = Alignment.CenterStart) {
                     if (value.isEmpty()) BasicText(placeholder, style = style.copy(color = Theme.colors.faint))
                     inner()
                 }
@@ -786,7 +825,7 @@ fun ListRow(
             Text(label, Modifier.weight(1f, fill = false), tone = tone)
             if (onClick != null) {
                 Spacer(Modifier.width(Space.m))
-                LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+                LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
             }
         }
         if (!inPanel) Hairline()
@@ -798,7 +837,7 @@ fun ListRow(label: String, value: String, tone: Tone = Tone.Default, onClick: ((
     ListRow(label, tone, onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(value, tone = Tone.Muted)
-            if (onClick != null) { Spacer(Modifier.width(Space.xs)); LineIcon(Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted) }
+            if (onClick != null) { Spacer(Modifier.width(Space.xs)); LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted) }
         }
     }
 }
@@ -836,7 +875,7 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (checked) LineIcon(Icon.Check, size = 18.dp, color = Theme.colors.inverseForeground)
+                if (checked) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.inverseForeground)
             }
         }
         if (!inPanel) Hairline()

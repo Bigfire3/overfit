@@ -49,3 +49,25 @@ fun ComposeTestRule.openCalendarDay(dayOfMonth: Int, dayWord: String = "Tag", se
     onAllNodes(matcher).onFirst().performScrollTo().performClick()
     waitUntil(20_000) { onAllNodes(hasText(sectionTitle, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty() }
 }
+
+/** Opens the ⋮ of the screen header ("Weitere Optionen") and taps the entry [label] (share, delete … since the UI audit 12.11.). */
+fun ComposeTestRule.openMenuEntry(label: String) {
+    waitUntil(20_000) { onAllNodes(androidx.compose.ui.test.hasContentDescription("Weitere Optionen")).fetchSemanticsNodes().isNotEmpty() }
+    onNode(androidx.compose.ui.test.hasContentDescription("Weitere Optionen")).performClick()
+    waitUntil(5_000) { onAllNodes(hasText(label)).fetchSemanticsNodes().isNotEmpty() }
+    onNode(hasText(label)).performClick()
+}
+
+/**
+ * Start of a training "an hour ago" that still lies on [realToday]: between midnight and 1 am an hour ago is
+ * yesterday, and a test that opens today in the calendar would not find it (failed at 00:55, 13.11.).
+ */
+fun startEarlierToday(): Long {
+    val now = System.currentTimeMillis()
+    val zone = kotlinx.datetime.TimeZone.currentSystemDefault()
+    val midnight = kotlinx.datetime.LocalDateTime(realToday(), kotlinx.datetime.LocalTime(0, 0)).let { with(zone) { it.toInstant() } }.toEpochMilliseconds()
+    return maxOf(now - 3_600_000L, midnight + 1_000L)
+}
+
+/** End of a training started at [start]: half an hour later, but never in the future. */
+fun endOf(start: Long): Long = maxOf(start + 2_000L, minOf(start + 1_800_000L, System.currentTimeMillis()))

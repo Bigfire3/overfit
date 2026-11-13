@@ -3,6 +3,7 @@ package app.overfit.ui
 import kotlinx.coroutines.runBlocking
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -131,7 +132,7 @@ open class ScreenshotTest {
         waitFor("Starten")
         shot("workout-detail")
         // Share (icon top right)
-        compose.onNodeWithContentDescription("Teilen").performClick()
+        compose.openMenuEntry("Teilen")
         waitFor("Link kopieren")
         shot("teilen")
         back()
@@ -160,7 +161,7 @@ open class ScreenshotTest {
         waitFor("Push")
         shot("kalender-tag")
         compose.onAllNodes(hasText("Push"))[0].performClick()
-        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Teilen").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Training bearbeiten").fetchSemanticsNodes().isNotEmpty() }
         shot("training-detail")
         compose.onNodeWithContentDescription("Training bearbeiten").performClick()
         waitFor("Satz hinzufügen")

@@ -82,6 +82,14 @@ class OverfitUITestCase: XCTestCase {
             return
         }
         if let shotName { usleep(200_000); save(XCUIScreen.main.screenshot(), name: shotName) }
+        // The button disarms itself after 3 s; saving the screenshot can take that long on CI. Then arm it again.
+        if !armed.exists {
+            tap(label, file: file, line: line)
+            guard armed.waitForExistence(timeout: 5) else {
+                XCTFail("\"\(label)\" ließ sich nicht erneut scharf schalten", file: file, line: line)
+                return
+            }
+        }
         for _ in 0..<2 {
             guard armed.exists else { return }
             armed.tap()
@@ -194,6 +202,8 @@ final class ScreenshotTests: OverfitUITestCase {
         waitFor("Push").tap()
         waitFor("Starten")
         shot("03-workout-detail")
+        // Share sits in the ⋮ of the header since the UI audit (12.11.).
+        tap("Weitere Optionen")
         tap("Teilen")
         waitFor("Link kopieren")
         shot("04-teilen")

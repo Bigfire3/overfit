@@ -1832,3 +1832,58 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
   `.claude/skills/_licenses/` (kein `SKILL.md`, wird nicht als Skill geladen); die Skill-Ordner bleiben unverändert.
 - Alle Skills sind Anregungen; das Overfit-Designsystem (CLAUDE.md) hat Vorrang. Die Krehel-Skills zielen auf Web
   (temporäre Seiten, CSS, ARIA) und gelten für Compose sinngemäß. `agents/openai.yaml` in den Krehel-Ordnern ist für Codex.
+
+## Einheitlich: Größen, Kopfzeilen, Menüs (12.11., UI-Audit)
+- **Auftrag (Fabian):** „Gehe nochmal über die gesamte App drüber und schaue nochmal, dass alle Symbole, zum Beispiel im Kalender,
+  die Kreise gleich groß sind und alles ein bisschen einheitlich ist, die Menüs nicht so überladen sind.“ Den Kalender hatte
+  Session BJ schon vereinheitlicht (`CalendarUniformTest`); hier der Querschnitt über alle Screens.
+- **Bestandsaufnahme** (Skill „impeccable“, `audit.native.md` sinngemäß für Compose; das Overfit-Designsystem hat Vorrang):
+  - Icon-Größen: sieben verschiedene Werte (14, 16, 18, 20, 22, 24, 96 dp) ohne Regel, z. B. Haken 18/20/22 dp, Schließen-✕ 14/16/18/20 dp,
+    Kopfzeilen-Icons im Coach-Tab 24 dp, Senden-Pfeil 22 dp.
+  - Kopfzeilen: Workouts-Tab nahm `IconButton` (Icon links im 48-dp-Feld) statt `HeaderIconButton` (mittig), die Icons standen
+    dadurch versetzt und mit 8 dp Lücke; `BackHeader` mit 4 dp Lücke, Kalender ohne Lücke. `BackHeader` war 44 dp hoch bei 48-dp-Knöpfen.
+  - Überladen: Trainingsdetail 4 Icons (Coach, Stift, Teilen, Löschen), Workout-Ansicht 3 (Coach, Teilen, Löschen).
+  - Coach-Symbol an wechselnder Stelle: mal ganz links in der Gruppe (Workout, Trainingsdetail, Übung), mal vor „Beenden“ (Training).
+  - Kreise: ▶ auf der Workout-Karte 48 dp sichtbar, Senden/„+“ im Chat 40 dp; Guthaben-Chip 36 dp hoch, andere Chips 40 dp;
+    Chip-Ecken teils Pille, teils 16 dp.
+  - Touch-Ziele unter 48 dp: ✕ an Kontext-Chips (36 dp), Guthaben-Chip (36 dp), Auswahl-Chips im Coach-Profil (40 dp).
+  - Kleines Eingabefeld (`SmallInput`, z. B. „Pause (Sekunden)“ im Workout): zum Tippen nur so hoch wie die Textzeile, jetzt 48 dp
+    (vom Test gefunden).
+  - Barrierefreiheit: Unter der Coach-Ebene blieb der Screen für TalkBack erreichbar (BH „bewusst so“, fürs Audit vorgemerkt).
+  - Eckenradien (Knopf/Karte 24, Panel/Block 16, Zeile 12, Feld 10 dp) und Titelgrößen (`Title` 34 sp auf allen Tabs) waren schon
+    einheitlich; leere Zustände sind durchgängig ein grauer Hinweistext (`Tone.Muted`), unverändert.
+- **Tokens statt Einzelwerte** (`ui/theme/Theme.kt`): `IconSize` (24 action, 20 inline, 16 small, 96 hero), `TouchTarget.min` (48),
+  `Sizes` (Chip 40, runder Knopf 40, Haken-Kreis 36, Tageskreis 22, Marker 8); `ChipShape` (Pille) für alle Chips. Alle `LineIcon`-Größen
+  laufen über `IconSize` (18/22 → 16/20, 14 → 16). Regel in CLAUDE.md übernommen.
+- **Kopfzeile = `HeaderActions`:** feste Reihenfolge [häufige Icons] [⋮ Seltenes] [Coach]. **Coach immer ganz rechts**: die einzige Stelle,
+  die nicht davon abhängt, wie viele andere Aktionen ein Screen hat, und mit dem Daumen gut erreichbar. ⋮ bleibt dafür links daneben
+  (sonst wäre die Ecke je nach Screen mal ⋮, mal Coach). Höchstens 3 tippbare Elemente, 48 × 48 dp ohne Lücke (Icons 24 dp → 24 dp Luft).
+- **Was wohin wanderte:**
+  - Workout-Ansicht: [Teilen] [Löschen] → ⋮ (Teilen, Workout löschen). Sichtbar: ⋮, Coach.
+  - Trainingsdetail: [Teilen] [Löschen] → ⋮. Sichtbar: Stift, ⋮, Coach (Stift bleibt sichtbar, CLAUDE.md-Regel für vergangene Trainings).
+  - Laufendes Training: Coach von vor „Beenden“ in die Ecke rechts daneben („Beenden“ ist der einzige Textknopf einer Kopfzeile und
+    bleibt links vom Coach).
+  - Übung/eigene Übung, Tag, Formular eigene Übung: Coach in die Ecke (eigene Übung: Stift, Löschen, Coach).
+  - Workouts-Tab, Kalender, Coach-Tab, Coach-Ebene: unverändert in der Anzahl, nur auf `HeaderActions` umgestellt (gleiche Größe, Linie, Abstand).
+  - Doppelte Wege: keine gefunden, die sich lohnten zu entfernen (Teilen gibt es nur noch im ⋮; Starten auf der Karte ▶ und unten in der
+    Ansicht ist gewollt, BI „Wenig tippen“).
+- **Löschen im ⋮ behält den Doppeltipp:** `MenuItem(confirm = true)`: erster Tipp färbt den Eintrag rot („Workout löschen – zum Bestätigen
+  erneut tippen“), das Menü bleibt offen, zweiter Tipp in 3 s löscht. Gleiche Regel wie `ConfirmButton`/`HeaderDeleteButton`, kein Popup.
+- **Coach-Ebene und TalkBack:** Solange der Coach offen ist, nimmt `AppScaffold` alles darunter (Screen, Mini-Training, Tab-Leiste) aus dem
+  Barrierefreiheits-Baum (`clearAndSetSemantics`). Schließen gibt es zurück (Test). Die Bottom-Sheets/`CenterPopup` liegen als Ebene im
+  jeweiligen Screen; für sie gilt das noch nicht (offen, eigener Schritt: braucht einen gemeinsamen Ebenen-Host).
+- **Test:** `UiUniformTest` läuft durch Workouts, Übungen, Workout, Training, Tag, Trainingsdetail, Kalender und Coach: genau eine
+  Aktionsgruppe, ≤ 3 Aktionen, alle ≥ 48 dp auf einer Linie, Icons genau 48 × 48, Coach ganz rechts, jeder Icon-Knopf ohne Text ≥ 48 dp,
+  Löschen im ⋮ wird erst scharf geschaltet, Coach-Ebene verdeckt das Training für Screenreader.
+- Belege: `docs/screenshots/einheitlich/vorher|nachher` (360 dp, dunkel).
+- **Sonnet-Gegencheck:** keine Verhaltensfehler. Behoben: Touch-Ziele unter 48 dp außerhalb der Hauptscreens (✕ der Coach-Story 44,
+  ✕ im Guthaben-Popup 40, Foto-Vollbild Zurück/Kopfzeile 44, ✕ „Foto entfernen“ 40 bzw. 32 dp); die runden Badges darauf und im
+  Kontext-Sheet nutzen `Sizes.badge` (24 dp). Der Test prüft jetzt auch, dass nichts Tippbares ohne Beschriftung ist; dabei fielen
+  Textfelder ohne Namen für Screenreader auf (Notiz, Workout-Name: leer hörte man nur „Eingabefeld“). Sie tragen jetzt ihren
+  Platzhalter als Beschreibung, und der Workout-Name ist 48 dp hoch. Bewusst so: Übungsdetail, Foto-Vollbild, Profil/Einstellungen
+  laufen nicht im Test (keine oder ≤ 3 Kopfzeilen-Aktionen, im Code geprüft); die Checkbox (22 dp in 56-dp-Zeile) bleibt.
+- **Merge mit #108 (UI-Feinschliff, parallel):** Beide änderten ⋮-Menü, Chips und ✕-Knöpfe. Behalten: die Menü-Animation und
+  Druckfläche aus #108 plus das Doppeltipp-Löschen von hier (`MenuEntry` mit `armed`); Touch-Ziele mit 48 dp (`TouchTarget.min`) statt
+  44 dp, Badge-Position aus #108 mit `Sizes.badge`; Tab-Suche im ScreenshotTest aus #108 (Rolle Tab).
+- **Zeitabhängiger Testfehler behoben:** `CoachFlowTest`/`CoachOverlayTest` legten ein Training „vor einer Stunde“ an und öffneten
+  heute im Kalender. Zwischen 0 und 1 Uhr war das gestern (fiel um 00:55 auf). Jetzt `startEarlierToday()` in `TestWaits.kt`.

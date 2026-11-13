@@ -201,8 +201,7 @@ fun ExerciseDetailScreen(
     Screen(
         scroll = true,
         header = {
-            BackHeader(t.back, onBack) {
-                if (onCoach != null && !readOnly) app.overfit.ui.components.CoachIconButton { onCoach(e.id, e.name) }
+            BackHeader(t.back, onBack, coach = if (onCoach != null && !readOnly) ({ onCoach(e.id, e.name) }) else null) {
                 if (e.isCustom && !readOnly) {
                     HeaderIconButton(Icon.Edit, t.edit, { onEditCustom(e.id) })
                     HeaderDeleteButton(t.delete, onConfirm = { viewModel.delete { onBack() } })
@@ -364,7 +363,7 @@ fun CustomExerciseScreen(
     Screen(
         scroll = true,
         // The one way into the AI here too: the coach icon (no "Fill in with AI" row any more, Fabian 8.11.).
-        header = { BackHeader(t.back, onBack) { app.overfit.ui.components.CoachIconButton { coachSheet = true } } },
+        header = { BackHeader(t.back, onBack, coach = { coachSheet = true }) },
         footer = {
             PrimaryButton(t.save, {
                 val input = CustomExerciseInput(

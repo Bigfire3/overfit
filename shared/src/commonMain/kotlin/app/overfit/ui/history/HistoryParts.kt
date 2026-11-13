@@ -89,14 +89,13 @@ internal fun PhotoThumb(
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    // 44 dp target around the 24 dp badge (the badge stays in the corner).
-                    .size(44.dp)
+                    .size(app.overfit.ui.theme.TouchTarget.min)
                     .semantics { contentDescription = removeLabel }
                     .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onRemove),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(24.dp).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
-                    LineIcon(Icon.Close, size = 16.dp)
+                Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(app.overfit.ui.theme.Sizes.badge).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
+                    LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small)
                 }
             }
         }

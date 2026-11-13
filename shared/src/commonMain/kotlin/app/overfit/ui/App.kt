@@ -1,5 +1,6 @@
 package app.overfit.ui
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -539,7 +540,9 @@ fun OverfitApp(deps: AppDependencies) {
                 }
             }
             ConfirmArea(Modifier.fillMaxSize()) {
-            AppScaffold(nav, workoutState.workout, deps.clock, onOpenWorkout = { nav.openWorkout() }) {
+            // While the coach lies over the screen, TalkBack/VoiceOver only reach the coach (UI audit 12.11.).
+            val coachOpen = deps.coachOverlay.request.collectAsStateWithLifecycle().value != null
+            AppScaffold(nav, workoutState.workout, deps.clock, onOpenWorkout = { nav.openWorkout() }, hiddenFromAccessibility = coachOpen) {
                 NavHost(
                     nav,
                     startDestination = start,
@@ -1222,6 +1225,8 @@ private fun AppScaffold(
     runningWorkout: Workout?,
     clock: () -> Long,
     onOpenWorkout: () -> Unit,
+    /** True while a layer (the coach) lies over everything: the screen below is left out of the accessibility tree. */
+    hiddenFromAccessibility: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val entry by nav.currentBackStackEntryAsState()
@@ -1242,7 +1247,10 @@ private fun AppScaffold(
     LaunchedEffect(screenKey, transitioning) {
         if (transitioning) { delay(ScreenMotion.MAX_BLOCK_MS); blockExpired = true }
     }
-    Column(Modifier.fillMaxSize().background(Theme.colors.background)) {
+    Column(
+        Modifier.fillMaxSize().background(Theme.colors.background)
+            .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
+    ) {
         Box(Modifier.weight(1f)) {
             content()
             if (transitioning && !blockExpired) Box(Modifier.matchParentSize().testTag("nav-transition").pointerInput(Unit) {

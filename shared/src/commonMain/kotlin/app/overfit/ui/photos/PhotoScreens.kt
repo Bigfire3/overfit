@@ -164,21 +164,22 @@ fun PhotosScreen(
             } else {
                 // Icons only (48 dp each, same icon size): [today, only while away] [muscles] [⋮]. The rest (switch
                 // view, compare photos) lives in the ⋮ menu, so the header stays calm.
-                Row(Modifier.testTag(DIARY_HEADER_TAG), verticalAlignment = Alignment.CenterVertically) {
-                    if (loaded && awayFromToday) Box(Modifier.testTag(TODAY_BUTTON_TAG)) {
-                        HeaderIconButton(Icon.Today, t.bodyWeight.jumpTodayDescription, {
-                            jumpScope.launch { if (asList) listState.animateScrollToItem(0) else gridState.animateScrollToItem(todayIndex) }
-                        })
-                    }
-                    if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
-                    MoreMenu(
-                        p.moreOptions,
-                        buildList {
+                Box(Modifier.testTag(DIARY_HEADER_TAG)) {
+                    app.overfit.ui.components.HeaderActions(
+                        menu = buildList {
                             // The entry names the other view: list while the calendar is up, calendar while the list is up.
                             add(MenuItem(if (asList) p.showCalendar else p.showList) { asList = !asList; onListViewChange(asList) })
                             if (!asList && photoList.size >= 2) add(MenuItem(p.comparePhotos) { selecting = true })
                         },
-                    )
+                        menuLabel = p.moreOptions,
+                    ) {
+                        if (loaded && awayFromToday) Box(Modifier.testTag(TODAY_BUTTON_TAG)) {
+                            HeaderIconButton(Icon.Today, t.bodyWeight.jumpTodayDescription, {
+                                jumpScope.launch { if (asList) listState.animateScrollToItem(0) else gridState.animateScrollToItem(todayIndex) }
+                            })
+                        }
+                        if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
+                    }
                 }
             }
         }
@@ -279,13 +280,13 @@ private fun LegendEntry(kind: DayMarker, label: String) {
 internal enum class DayMarker { Workout, Sauna, Weight }
 
 /** Every day marker (calendar day and legend) sits in a box of this size, so all of them line up. */
-internal val MARKER_SIZE = 8.dp
+internal val MARKER_SIZE = app.overfit.ui.theme.Sizes.marker
 /** Gap between the markers of one day. */
 internal val MARKER_GAP = 3.dp
 private val MARKER_STROKE = 1.5.dp
 private val WEIGHT_DASH_HEIGHT = 2.dp
 /** Circle slot of the day number (filled on today). */
-internal val DAY_NUMBER_SIZE = 22.dp
+internal val DAY_NUMBER_SIZE = app.overfit.ui.theme.Sizes.dayCircle
 
 /**
  * One marker in a [MARKER_SIZE] box: workout = filled dot, sauna = ring, body weight = short muted dash (vertically
@@ -446,7 +447,7 @@ private fun DayCell(
         when {
             photo != null -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface)) {
                 AsyncImage(photo.photo.path, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                if (selecting && picked) Box(Modifier.fillMaxSize().background(Theme.colors.foreground.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) { LineIcon(Icon.Check, size = 24.dp) }
+                if (selecting && picked) Box(Modifier.fillMaxSize().background(Theme.colors.foreground.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.action) }
             }
             training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface))
             else -> Spacer(Modifier.weight(1f))
@@ -487,9 +488,9 @@ fun PhotoViewerScreen(
         // Header like every detail screen: back left, share and delete as icons top right (for the photo shown).
         var shown by remember { mutableStateOf<String?>(null) }
         val scope = rememberCoroutineScope()
-        Row(Modifier.padding(horizontal = Space.l, vertical = Space.m).height(44.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = Space.l, vertical = Space.m).height(app.overfit.ui.theme.TouchTarget.min).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(44.dp).semantics { contentDescription = t.back }.clickable(onClick = onBack),
+                Modifier.size(app.overfit.ui.theme.TouchTarget.min).semantics { contentDescription = t.back }.clickable(onClick = onBack),
                 contentAlignment = Alignment.CenterStart,
             ) { LineIcon(Icon.Back, color = white) }
             Spacer(Modifier.weight(1f))

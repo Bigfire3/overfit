@@ -261,7 +261,7 @@ private fun SheetRow(
         }
         when {
             checked != null -> CheckCircle(checked)
-            chevron -> LineIcon(Icon.ChevronRight, size = 20.dp, color = c.muted)
+            chevron -> LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = c.muted)
         }
     }
 }
@@ -273,15 +273,15 @@ private fun SheetRow(
 @Composable
 private fun CheckCircle(checked: Boolean) {
     val c = Theme.colors
-    Box(Modifier.size(24.dp).clip(CircleShape).background(if (checked) c.foreground else c.background), contentAlignment = Alignment.Center) {
-        if (checked) LineIcon(Icon.Check, size = 16.dp, color = c.background)
+    Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(if (checked) c.foreground else c.background), contentAlignment = Alignment.Center) {
+        if (checked) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = c.background)
     }
 }
 
 @Composable
 private fun CountBadge(n: Int) {
     val c = Theme.colors
-    Box(Modifier.size(24.dp).clip(CircleShape).background(c.foreground), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(c.foreground), contentAlignment = Alignment.Center) {
         BasicText(n.toString(), style = Theme.type.caption.copy(color = c.background, fontWeight = FontWeight.SemiBold, fontSize = 12.sp))
     }
 }
@@ -300,7 +300,7 @@ private fun CameraTile(label: String, onClick: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        LineIcon(Icon.Photos, size = 22.dp)
+        LineIcon(Icon.Photos, size = app.overfit.ui.theme.IconSize.inline)
         Spacer(Modifier.height(Space.xs))
         Text(label, style = Theme.type.caption, tone = Tone.Muted)
     }
@@ -320,7 +320,7 @@ private fun PhotoTile(p: DiaryPhoto, number: Int?, enabled: Boolean, s: CoachCha
         PhotoThumb(p.photo, p.workoutName ?: s.photos, size = TILE, onClick = if (enabled) onClick else null)
         if (number != null) {
             Box(
-                Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).clip(CircleShape).background(c.foreground),
+                Modifier.align(Alignment.TopEnd).padding(6.dp).size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(c.foreground),
                 contentAlignment = Alignment.Center,
             ) {
                 BasicText(number.toString(), style = Theme.type.caption.copy(color = c.background, fontWeight = FontWeight.SemiBold, fontSize = 12.sp))

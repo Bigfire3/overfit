@@ -175,15 +175,16 @@ fun WorkoutScreen(
             )
         },
     ) {
-        // One slim header row: minimize, name + clock, finish.
+        // One slim header row: minimize, name + clock, [finish] [coach] (coach in the corner like on every screen).
         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.s)) {
             IconButton(Icon.ChevronDown, t.minimizeWorkout, onMinimize)
             Column(Modifier.weight(1f)) {
                 NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.fillMaxWidth())
                 ProgressCaption(workout, now)
             }
-            if (onCoach != null) app.overfit.ui.components.CoachIconButton(onCoach)
+            // The text button stays a direct child of this row: inside a nested row its auto-sized label was squeezed.
             ConfirmButton(t.finishWorkout, onConfirm = { scope.launch { controller.finish() } }, modifier = Modifier, compact = true, kind = ConfirmKind.Complete)
+            if (onCoach != null) app.overfit.ui.components.HeaderActions(coach = onCoach)
         }
         Spacer(Modifier.height(Space.xs))
         Hairline()
@@ -318,7 +319,7 @@ private fun ExerciseSection(
             modifier = Modifier.clip(BlockShape.row).pressableRow(onToggle)
                 .dragHandle(reorder, entry.id).semantics { contentDescription = t.reorder },
             leading = {
-                LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = 20.dp, color = Theme.colors.muted)
+                LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
                 Spacer(Modifier.width(Space.s))
             },
         ) {
@@ -526,11 +527,11 @@ private fun CheckButton(done: Boolean, description: String, onClick: () -> Unit)
         // lighter fill than the grey row, so it reads as a button.
         Box(
             Modifier
-                .size(36.dp)
+                .size(app.overfit.ui.theme.Sizes.checkCircle)
                 .background(Theme.colors.inputFill, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            if (done) LineIcon(Icon.Check, size = 22.dp, color = Color.White)
+            if (done) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline, color = Color.White)
         }
     }
 }

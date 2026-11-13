@@ -122,7 +122,7 @@ private fun GridPhoto(photo: WorkoutPhoto, description: String, size: Dp, onOpen
             Modifier
                 .align(Alignment.TopEnd)
                 .then(arm.modifier)
-                .size(40.dp)
+                .size(app.overfit.ui.theme.TouchTarget.min)
                 .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
                 .semantics {
                     contentDescription = if (armed) "${t.history.removePhoto} – ${t.tapAgainToConfirm}" else t.history.removePhoto
@@ -134,8 +134,8 @@ private fun GridPhoto(photo: WorkoutPhoto, description: String, size: Dp, onOpen
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.size(24.dp).background(c.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
-                LineIcon(Icon.Close, size = 16.dp, color = if (armed) c.armed else c.foreground)
+            Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).background(c.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
+                LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small, color = if (armed) c.armed else c.foreground)
             }
         }
     }
