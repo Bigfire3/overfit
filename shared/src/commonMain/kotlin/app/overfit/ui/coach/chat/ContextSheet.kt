@@ -1,5 +1,6 @@
 package app.overfit.ui.coach.chat
 
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -125,7 +126,7 @@ internal fun ColumnScope.ContextSheet(
                 }
                 val shown = list?.filter { query.isBlank() || it.first.label.contains(query.trim(), ignoreCase = true) }
                 val subs = list.orEmpty().associate { it.first.key() to it.second }
-                ItemList(shown?.map { it.first }, s.emptyExercises, state) { it.label to subs[it.key()] }
+                ItemList(shown?.map { it.first }, if (query.isBlank()) s.emptyExercises else s.noExerciseMatch, state) { it.label to subs[it.key()] }
             }
         }
     }
@@ -241,7 +242,8 @@ private fun SheetRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .background(if (pressed) c.faint else c.surfacePressed)
+            // Pressed: a light white veil over the row (like the ⋮ menu), so the grey hint on it stays readable.
+            .background(if (pressed) c.foreground.copy(alpha = 0.08f).compositeOver(c.surfacePressed) else c.surfacePressed)
             .clickable(interaction, indication = null, role = if (checked != null) Role.Checkbox else Role.Button, onClick = onClick)
             .then(if (checked != null) Modifier.semantics { selected = checked } else Modifier)
             .testTag(tag)

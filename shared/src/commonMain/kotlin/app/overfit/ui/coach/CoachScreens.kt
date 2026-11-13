@@ -1,5 +1,6 @@
 package app.overfit.ui.coach
 
+import kotlinx.coroutines.flow.onEach
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -97,12 +98,16 @@ class CoachNav(
 fun CoachHomeScreen(coach: CoachService, nav: CoachNav) {
     val c = LocalCoachStrings.current
     val t = LocalStrings.current
-    val reviews by coach.reviews.collectAsState(initial = emptyList())
+    // null until the database answered: no "no reviews yet" flash before the list arrives.
+    val loaded by coach.reviews.collectAsState(initial = null)
+    val reviews = loaded.orEmpty()
     Screen(scroll = true, header = { BackHeader(t.back, nav.back) }) {
         Title(c.coachTitle)
         Spacer(Modifier.height(Space.l))
         // Archive of the reviews before the coach chat (8.11.: no AI buttons here any more, new reviews go through the chat).
-        if (reviews.isEmpty()) {
+        if (loaded == null) {
+            SectionTitle(c.reviews)
+        } else if (reviews.isEmpty()) {
             SectionTitle(c.reviews)
             Text(c.reviewsEmpty, tone = Tone.Muted)
         } else PanelSection(c.reviews) {
@@ -143,7 +148,19 @@ private fun dateText(ms: Long): String =
 
 @Composable
 fun CoachReviewScreen(coach: CoachService, reviewId: String, unit: WeightUnit, language: Language, nav: CoachNav) {
-    val item by remember(reviewId) { coach.review(reviewId) }.collectAsState(initial = null)
+    // Tells "still loading" (null before the first emission) apart from "gone" (null emitted): a deleted review
+    // must not show "the coach is looking at your training" forever.
+    var answered by remember(reviewId) { mutableStateOf(false) }
+    val item by remember(reviewId) { coach.review(reviewId).onEach { answered = true } }.collectAsState(initial = null)
+    if (answered && item == null) {
+        val c = LocalCoachStrings.current
+        Screen(header = { BackHeader(LocalStrings.current.back, nav.back) }) {
+            Title(c.reviewTitle)
+            Spacer(Modifier.height(Space.l))
+            Text(c.reviewMissing, tone = Tone.Muted)
+        }
+        return
+    }
     ReviewScreen(coach, item, unit, language, nav, onDemo = item?.sessionId?.let { s -> { nav.demo(s) } })
 }
 
@@ -163,7 +180,8 @@ private fun ReviewScreen(
     var plan by remember(item?.id) { mutableStateOf<PlanState?>(null) }
     LaunchedEffect(item?.id, item?.review != null) {
         if (item?.review?.nextSession != null) {
-            plan = coach.planDiff(item)?.let { PlanState(it.first, it.second) } ?: PlanState(null, null)
+            // A failing diff ends the "…" state like a missing plan instead of leaving it forever.
+            plan = runCatching { coach.planDiff(item) }.getOrNull()?.let { PlanState(it.first, it.second) } ?: PlanState(null, null)
         }
     }
     var message by remember(item?.id) { mutableStateOf<String?>(null) }
@@ -183,15 +201,19 @@ private fun ReviewScreen(
         onRetry = { item?.let { coach.retry(it.id) } },
         onAccept = { keys ->
             item?.let { i ->
-                coach.launch { coach.acceptPlan(i.id, keys) }
-                message = if (plan?.diff?.changes?.size == keys.size) c.planAccepted else c.planPartial
+                val done = if (plan?.diff?.changes?.size == keys.size) c.planAccepted else c.planPartial
+                // The confirmation only after the write worked; otherwise say so (the buttons stay usable).
+                coach.launch { message = if (runCatching { coach.acceptPlan(i.id, keys) }.isSuccess) done else c.planActionFailed }
             }
         },
-        onReject = { item?.let { i -> coach.launch { coach.rejectPlan(i.id) }; message = c.planRejected } },
+        onReject = {
+            item?.let { i -> coach.launch { message = if (runCatching { coach.rejectPlan(i.id) }.isSuccess) c.planRejected else c.planActionFailed } }
+        },
         onSaveAsTemplate = {
             item?.let { i ->
-                coach.launch { coach.saveAsTemplate(i.id, c.planTemplateName) }
-                message = c.planSavedAsTemplate
+                coach.launch {
+                    message = if (runCatching { coach.saveAsTemplate(i.id, c.planTemplateName) }.isSuccess) c.planSavedAsTemplate else c.planActionFailed
+                }
             }
         },
         message = message,

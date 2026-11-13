@@ -238,7 +238,8 @@ private fun ProgressCaption(workout: Workout, now: State<Long>) {
     val t = LocalStrings.current
     Text(
         WorkoutFormat.elapsed(now.value - workout.startedAt) + " · " + t.setsDone(workout.completedSets, workout.totalSets),
-        style = Theme.type.caption,
+        // Ticks every second: tabular digits, so the caption does not jitter.
+        style = Theme.type.tabular(Theme.type.caption),
         tone = Tone.Muted,
     )
 }

@@ -86,6 +86,9 @@ class TabBarTest {
             assertTrue("$label ($natural px) fits its tab (${node.size.width} px)", natural <= node.size.width)
             assertFalse("$label ellipsized", l.isLineEllipsized(0))
             assertEquals("$label fully visible", label.length, l.getLineEnd(0, visibleEnd = true))
+            // The whole tab column is the touch target (padding inside the clickable): at least 48 dp high.
+            val minPx = 48 * ApplicationProvider.getApplicationContext<android.content.Context>().resources.displayMetrics.density
+            assertTrue("tab ${tab.name} is ${node.size.height} px high, needs ≥ $minPx", node.size.height >= minPx)
         }
 
     }

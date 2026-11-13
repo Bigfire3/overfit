@@ -1,5 +1,6 @@
 package app.overfit.ui.history
 
+import androidx.compose.ui.text.style.TextAlign
 import app.overfit.ui.photos.DayPhotoGrid
 
 import androidx.compose.foundation.horizontalScroll
@@ -113,25 +114,32 @@ fun FinishScreen(
         }
     }
     var saving by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
 
     fun save(review: Boolean) {
         if (!saving) {
             saving = true
+            failed = false
             val noteText = note
             val feelingValue = feeling
             val saunaValue = sauna
             val newName = name?.trim().orEmpty()
             val finishedWorkout = data?.finished?.workout
             appScope.launch {
-                if (data != null) {
-                    workouts.updateDetails(workoutId, noteText, feelingValue)
-                    // Saved before onSaved, so the coach review that starts there already sees it.
-                    if (saunaValue != null && saunaValue != data?.finished?.sauna) workouts.setSauna(workoutId, saunaValue)
-                }
-                if (finishedWorkout != null && newName.isNotEmpty() && newName != finishedWorkout.name) {
-                    runCatching { rename(finishedWorkout, newName) }
-                }
+                // A failed write keeps the screen open with a message (and the button usable again) instead of
+                // leaving it stuck on "…" or closing as if everything was saved.
+                val ok = runCatching {
+                    if (data != null) {
+                        workouts.updateDetails(workoutId, noteText, feelingValue)
+                        // Saved before onSaved, so the coach review that starts there already sees it.
+                        if (saunaValue != null && saunaValue != data?.finished?.sauna) workouts.setSauna(workoutId, saunaValue)
+                    }
+                    if (finishedWorkout != null && newName.isNotEmpty() && newName != finishedWorkout.name) {
+                        rename(finishedWorkout, newName)
+                    }
+                }.isSuccess
                 withContext(Dispatchers.Main) {
+                    if (!ok) { saving = false; failed = true; return@withContext }
                     onSaved(workoutId)
                     if (review) onReview(workoutId) else onClose()
                 }
@@ -141,12 +149,17 @@ fun FinishScreen(
     val save = { save(review = false) }
 
     // System back (Android gesture/button) saves note and feeling like the header back button does.
-    androidx.compose.ui.backhandler.BackHandler(enabled = true, onBack = save)
+    // After a failed save, back leaves anyway (the training itself is already stored; only note/feeling are lost).
+    val back = { if (failed) onClose() else save() }
+    androidx.compose.ui.backhandler.BackHandler(enabled = true, onBack = back)
 
     Screen(
         scroll = true,
-        header = { BackHeader(t.back, save) },
-        footer = { PrimaryButton(t.save, save, enabled = data != null, loading = saving) },
+        header = { BackHeader(t.back, back) },
+        footer = {
+            if (failed) Text(h.editSaveFailed, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
+            PrimaryButton(t.save, save, enabled = data != null, loading = saving)
+        },
     ) {
         val d = data
         Text(h.finishTitle, tone = Tone.Muted)

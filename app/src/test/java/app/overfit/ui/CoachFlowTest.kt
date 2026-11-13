@@ -74,10 +74,10 @@ class CoachFlowTest {
                     Template(0, "Push", null, listOf(TemplateExercise(bench, restSec = 60, note = null, sets = List(2) { PlannedSet(60.0, 8) }))),
                 )
                 // An hour ago, so the calendar shows it today.
-                val start = System.currentTimeMillis() - 3_600_000L
+                val start = startEarlierToday()
                 var w = Workout.fromTemplate(requireNotNull(data.templates.get(templateId)), start, id = "w1")
                 w.exercises.forEach { e -> e.sets.forEach { w = w.completeSet(it.id, start + 1_000L) } }
-                data.workouts.finish(w, start + 1_800_000L)
+                data.workouts.finish(w, endOf(start))
             }
         }
         val deps = AppDependencies(

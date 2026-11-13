@@ -210,10 +210,10 @@ class CoachOverlayTest {
     fun trainingDetailAndDayOpenTheCoachWithTheirContext() {
         setUp()
         runBlocking {
-            val start = System.currentTimeMillis() - 3_600_000L
+            val start = startEarlierToday()
             var w = Workout.fromTemplate(requireNotNull(data.templates.get(templateId)), start, id = "w1")
             w.exercises.forEach { e -> e.sets.forEach { w = w.completeSet(it.id, start + 1_000L) } }
-            data.workouts.finish(w, start + 1_800_000L)
+            data.workouts.finish(w, endOf(start))
         }
         compose.openCalendarDay(realToday().dayOfMonth)
         compose.onNodeWithTag("coach:open").performClick()

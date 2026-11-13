@@ -1,5 +1,6 @@
 package app.overfit.ui.history
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -93,7 +94,7 @@ internal fun PhotoThumb(
                     .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onRemove),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
+                Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(app.overfit.ui.theme.Sizes.badge).background(Theme.colors.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
                     LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small)
                 }
             }

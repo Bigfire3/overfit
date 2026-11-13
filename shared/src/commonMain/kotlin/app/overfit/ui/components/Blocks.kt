@@ -1,6 +1,12 @@
 package app.overfit.ui.components
 
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberUpdatedState
@@ -78,11 +84,14 @@ import kotlin.math.roundToInt
 // Lists of exercises and sets (workout editor, running workout) are set apart by grey areas instead of
 // hairlines: one [Block] per exercise, one [SetRowSurface] per set, [BlockButton] for "+ add". See DECISIONS.
 
-/** Corner radii of the area-based lists. */
+/**
+ * Corner radii of the area-based lists, concentric: outer radius = inner radius + inset. A [Block] pads its set rows
+ * by 8 dp (row 12 + 8 = block 20), a set row insets its 48 dp fields by 4 dp vertically (row 12 − 4 = field 8).
+ */
 object BlockShape {
-    val block = RoundedCornerShape(16.dp)
+    val block = RoundedCornerShape(20.dp)
     val row = RoundedCornerShape(12.dp)
-    val field = RoundedCornerShape(10.dp)
+    val field = RoundedCornerShape(8.dp)
 }
 
 /** One exercise (or other group) as a grey rounded area. */
@@ -195,7 +204,8 @@ fun SetRowSurface(
     Box(modifier.fillMaxWidth().clip(BlockShape.row).onSizeChanged { width = it.width }.then(swipe)) {
         if (dx < 0f) {
             Row(
-                Modifier.matchParentSize().background(c.negative).padding(horizontal = Space.m),
+                // armedFill, not negative: white text needs 4.5:1 (ContrastTest.whiteOnSwipeToDelete).
+                Modifier.matchParentSize().background(c.armedFill).padding(horizontal = Space.m),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
@@ -315,7 +325,10 @@ class MenuItem(val label: String, val destructive: Boolean = false, val confirm:
 /** Test tag of an open [MoreMenu]'s entry list. */
 const val MORE_MENU_TAG = "menu:items"
 
-/** ⋮ button with a small menu of [items] below it (replace, move, remove …). */
+/**
+ * ⋮ button with a small menu of [items] below it (replace, move, remove …). The menu grows out of the ⋮ corner
+ * (scale 0.96 → 1 plus fade, 150 ms ease-out) so it reads as coming from the button; a pressed entry gets a lighter fill.
+ */
 @Composable
 fun MoreMenu(label: String, items: List<MenuItem>, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
@@ -333,32 +346,57 @@ fun MoreMenu(label: String, items: List<MenuItem>, modifier: Modifier = Modifier
                 onDismissRequest = { open = false; armed = null },
                 properties = PopupProperties(focusable = true),
             ) {
-                Column(Modifier.width(220.dp).clip(BlockShape.row).background(c.surfacePressed).padding(vertical = Space.xs).testTag(MORE_MENU_TAG)) {
-                    items.forEachIndexed { i, item ->
-                        val isArmed = armed == i
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = TouchTarget.min)
-                                .then(if (isArmed) Modifier.testTag(ConfirmTags.armed).background(c.armedFill) else Modifier)
-                                .semantics { if (isArmed) stateDescription = again }
-                                .clickable(role = Role.Button) {
-                                    if (item.confirm && !isArmed) armed = i
-                                    else { open = false; armed = null; item.onClick() }
-                                }
-                                .padding(horizontal = Space.m),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            val color = when {
-                                isArmed -> androidx.compose.ui.graphics.Color.White
-                                item.destructive -> c.negative
-                                else -> c.foreground
+                val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+                AnimatedVisibility(
+                    shown,
+                    enter = fadeIn(tween(MENU_IN_MS, easing = LinearOutSlowInEasing)) +
+                        scaleIn(tween(MENU_IN_MS, easing = LinearOutSlowInEasing), initialScale = 0.96f, transformOrigin = TransformOrigin(1f, 0f)),
+                ) {
+                    Column(Modifier.width(220.dp).clip(BlockShape.row).background(c.surfacePressed).padding(vertical = Space.xs).testTag(MORE_MENU_TAG)) {
+                        items.forEachIndexed { i, item ->
+                            val isArmed = armed == i
+                            MenuEntry(item, isArmed, again) {
+                                if (item.confirm && !isArmed) armed = i
+                                else { open = false; armed = null; item.onClick() }
                             }
-                            BasicText(if (isArmed) "${item.label} – $again" else item.label, style = Theme.type.body.copy(color = color))
                         }
                     }
                 }
             }
         }
+    }
+}
+
+private const val MENU_IN_MS = 150
+
+/** One entry of a [MoreMenu]; [armed] = first tap of a confirm entry done (red fill, "– tap again to confirm"). */
+@Composable
+private fun MenuEntry(item: MenuItem, armed: Boolean, again: String, onClick: () -> Unit) {
+    val c = Theme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = TouchTarget.min)
+            .background(
+                when {
+                    armed -> c.armedFill
+                    pressed -> c.foreground.copy(alpha = 0.08f)
+                    else -> Color.Transparent
+                },
+            )
+            .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
+            .semantics { if (armed) stateDescription = again }
+            .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Space.m),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        val color = when {
+            armed -> Color.White
+            item.destructive -> c.negative
+            else -> c.foreground
+        }
+        BasicText(if (armed) "${item.label} – $again" else item.label, style = Theme.type.body.copy(color = color))
     }
 }

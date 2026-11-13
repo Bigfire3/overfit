@@ -26,7 +26,9 @@ import org.jetbrains.compose.resources.Font
  * typography, whitespace and a few greys. Dark only: there is no light mode (DECISIONS "Nur Dunkelmodus").
  *
  * Palette (see docs/DECISIONS.md, "Farbpalette"):
- * - Neutrals: [background], [foreground], [muted], [faint], [hairline], inverse pair.
+ * - Neutrals: [background], [foreground], [muted], [faint], [hairline], inverse pair. Contrast floor (ContrastTest):
+ *   [muted] text ≥ 4.5:1 on background, [surface] and [surfacePressed]; [faint] (placeholders, empty calendar days,
+ *   side notes on black) ≥ 4.5:1 on background and ≥ 3:1 on [surface]. Never [faint] text on [surfacePressed].
  * - Grey highlight: [surface] (highlighted row, chip, selected item, input field fill),
  *   [surfacePressed] (pressed / dragged state on top of a surface).
  * - Signal colours, ONLY for meaning in data, never decoration: [positive] (better than
@@ -55,7 +57,7 @@ data class Colors(
     /** Green: improvement, record, done. Only for data, never decoration. */
     val positive: Color,
     val positiveSubtle: Color,
-    /** Red: decline, missed, destructive. Only for data and confirmations. */
+    /** Red: decline, missed, destructive. Only for data and confirmations. Light enough for text on every surface. */
     val negative: Color,
     val negativeSubtle: Color,
     /** Red of an armed two-tap confirm button (first tap done). The only accent in the chrome. */
@@ -71,8 +73,8 @@ data class Colors(
 val DarkColors = Colors(
     background = Color(0xFF000000),
     foreground = Color(0xFFFFFFFF),
-    muted = Color(0xFF8E8E93),
-    faint = Color(0xFF48484A),
+    muted = Color(0xFF98989D),
+    faint = Color(0xFF757579),
     hairline = Color(0xFF262628),
     inverseBackground = Color(0xFFFFFFFF),
     inverseForeground = Color(0xFF000000),
@@ -80,13 +82,20 @@ val DarkColors = Colors(
     surfacePressed = Color(0xFF2C2C2E),
     positive = Color(0xFF30D158),
     positiveSubtle = Color(0xFF0F2A17),
-    negative = Color(0xFFFF453A),
+    negative = Color(0xFFFF6961),
     negativeSubtle = Color(0xFF331311),
     armed = Color(0xFFFF453A),
     armedFill = Color(0xFFD32F2F),
     confirmFill = Color(0xFF1E7D34),
     inputFill = Color(0x1FFFFFFF),
 )
+
+/**
+ * Tabular figures (DESIGN.md "The Tabular Rule") for the big number styles. Running text keeps proportional figures
+ * (tabular "1"s widen labels like "±15 s" and cut "Überspringen" off on 360 dp); a ticking value in body/label/caption
+ * uses [Typography.tabular].
+ */
+private const val TNUM = "tnum"
 
 /** Only a handful of sizes on purpose. */
 @Immutable
@@ -98,7 +107,10 @@ data class Typography(
     val caption: TextStyle,
     /** Numbers in input fields (set rows): large, tabular digits. */
     val number: TextStyle,
-)
+) {
+    /** [style] with tabular figures, for values that change while visible (countdown, elapsed time). */
+    fun tabular(style: TextStyle): TextStyle = style.copy(fontFeatureSettings = TNUM)
+}
 
 object Space {
     val xs = 4.dp
@@ -165,12 +177,12 @@ private fun inter() = FontFamily(
 fun OverfitTheme(content: @Composable () -> Unit) {
     val family = inter()
     val typography = Typography(
-        hero = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 56.sp, lineHeight = 62.sp, letterSpacing = (-1.5).sp),
-        title = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.8).sp),
+        hero = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 56.sp, lineHeight = 62.sp, letterSpacing = (-1.5).sp, fontFeatureSettings = TNUM),
+        title = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.8).sp, fontFeatureSettings = TNUM),
         body = TextStyle(fontFamily = family, fontWeight = FontWeight.Normal, fontSize = 17.sp, lineHeight = 24.sp),
         label = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 24.sp),
         caption = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 18.sp),
-        number = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp, fontFeatureSettings = "tnum"),
+        number = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp, fontFeatureSettings = TNUM),
     )
     CompositionLocalProvider(
         LocalColors provides DarkColors,

@@ -160,7 +160,11 @@ fun CreditPopupContent(
                     Text(it, Modifier.testTag("credit:reserved"), style = Theme.type.caption, tone = Tone.Muted)
                 }
             }
-            is Loaded.Failed -> Text(f.unreachable, tone = Tone.Muted)
+            is Loaded.Failed -> {
+                Text(f.unreachable, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.s))
+                app.overfit.ui.components.SmallButton(f.retry, { reload() })
+            }
             Loaded.Loading -> Text("…", style = Theme.type.title, tone = Tone.Muted)
         }
         Text(if (demo) "${s.neverExpires} · ${f.fuelRowDemo}" else s.neverExpires, style = Theme.type.caption, tone = Tone.Muted)

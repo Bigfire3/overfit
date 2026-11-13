@@ -36,6 +36,7 @@ data class ShareStrings(
     val importUnsupportedKind: String,
     val importInvalid: String,
     val importTooLarge: String,
+    val importNetwork: String,
     val importEmptyTraining: String,
 
     val aiTemplateCopy: String,
@@ -80,6 +81,7 @@ val ShareGerman = ShareStrings(
     importUnsupportedKind = "Dieses Format kann diese Version noch nicht importieren.",
     importInvalid = "Das Training ist beschädigt oder unvollständig.",
     importTooLarge = "Das Training ist zu groß.",
+    importNetwork = "Der Code konnte nicht geladen werden. Prüfe die Verbindung und versuche es noch einmal.",
     importEmptyTraining = "Keine Übung ließ sich zuordnen.",
 
     aiTemplateCopy = "KI-Prompt kopieren",
@@ -142,6 +144,7 @@ val ShareEnglish = ShareStrings(
     importUnsupportedKind = "This version can't import this format yet.",
     importInvalid = "The workout is damaged or incomplete.",
     importTooLarge = "The workout is too large.",
+    importNetwork = "Couldn't load the code. Check your connection and try again.",
     importEmptyTraining = "No exercise could be matched.",
 
     aiTemplateCopy = "Copy AI prompt",

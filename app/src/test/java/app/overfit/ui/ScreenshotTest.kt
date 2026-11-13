@@ -91,10 +91,9 @@ open class ScreenshotTest {
         node.performClick()
     }
     private fun tab(name: String) {
-        // The tab bar entry (the coach tab also has a chip "Profil").
-        val tabNode = hasText(name) and hasClickAction() and androidx.compose.ui.test.SemanticsMatcher("tab") { n ->
-            n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag)?.startsWith("tab:") == true
-        }
+        // Only the bottom-bar tab (role Tab): the Coach tab also has a "Profil" chip.
+        val tabNode = hasText(name) and hasClickAction() and
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Tab)
         repeat(4) {
             if (compose.onAllNodes(tabNode).fetchSemanticsNodes().isNotEmpty()) return@repeat
             if (compose.onAllNodes(hasContentDescription("Zurück")).fetchSemanticsNodes().isNotEmpty()) {
