@@ -55,6 +55,16 @@ data class Workout(
         return ordered.firstOrNull { !it.set.completed && !it.exercise.skipped }
     }
 
+    /**
+     * The set that is next right now: the one "Log next set" checks off and the workout screen marks. The first open
+     * set after the one that started the running rest, otherwise after the set that was checked off last.
+     */
+    fun nextToLog(): SetRef? = nextOpenSet(rest?.afterSetId ?: lastCompletedSetId)
+
+    /** Id of the set that was checked off last, null if none is. */
+    val lastCompletedSetId: String?
+        get() = exercises.flatMap { it.sets }.filter { it.completed }.maxByOrNull { it.completedAt ?: 0 }?.id
+
     fun withName(name: String) = copy(name = name)
 
     // --- Sets ----------------------------------------------------------------------------------

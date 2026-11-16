@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusTarget
 import app.overfit.ui.components.clearFocusOutsideTextInput
+import app.overfit.platform.systemReducedMotion
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -22,7 +23,7 @@ import app.overfit.shared.resources.inter_semibold
 import org.jetbrains.compose.resources.Font
 
 /**
- * Black & white design system. No decorative accent colour: hierarchy comes from
+ * Black & white design system. No decorative colour: hierarchy comes from
  * typography, whitespace and a few greys. Dark only: there is no light mode (DECISIONS "Nur Dunkelmodus").
  *
  * Palette (see docs/DECISIONS.md, "Farbpalette"):
@@ -39,6 +40,9 @@ import org.jetbrains.compose.resources.Font
  * - [confirmFill]: green fill of an armed two-tap button that completes something (finish workout). Red = delete, green = finish.
  *   Also the fill of a checked-off set row in the running workout (the whole row turns green).
  * - [inputFill]: translucent white of a number field, so it stands slightly lighter on any row (grey or green).
+ * - [accent] ("Kreidegelb", DECISIONS "Jetzt-Farbe"): the one colour that is not a judgement. It marks what is live
+ *   right now: the running rest timer, the running workout, the set that is next, today. Never decoration, never
+ *   selection (selected stays white), never a button fill. Green = done, yellow = now, red = delete.
  */
 @Immutable
 data class Colors(
@@ -68,6 +72,10 @@ data class Colors(
     val confirmFill: Color,
     /** Fill of a set row's number field: translucent white, slightly lighter than the row below (grey or green). */
     val inputFill: Color,
+    /** "Now": what is live at this moment (rest countdown, running workout, next set, today). Text and marks. */
+    val accent: Color,
+    /** Low-contrast fill behind [accent] content (the filled part of the rest timer). */
+    val accentSubtle: Color,
 )
 
 val DarkColors = Colors(
@@ -88,6 +96,8 @@ val DarkColors = Colors(
     armedFill = Color(0xFFD32F2F),
     confirmFill = Color(0xFF1E7D34),
     inputFill = Color(0x1FFFFFFF),
+    accent = Color(0xFFFFD60A),
+    accentSubtle = Color(0xFF3A3000),
 )
 
 /**
@@ -187,6 +197,7 @@ fun OverfitTheme(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalColors provides DarkColors,
         LocalTypography provides typography,
+        LocalReducedMotion provides systemReducedMotion(),
     ) {
         Box(Modifier.clearFocusOutsideTextInput()) {
             // Focus sink: after "Done" a text field clears its focus; Android then hands focus back to the

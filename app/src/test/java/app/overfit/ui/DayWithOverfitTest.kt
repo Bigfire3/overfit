@@ -218,9 +218,10 @@ class DayWithOverfitTest {
         assertTrue(HapticPattern.Tick in haptics.played)
         assertNotNull(alerts.pending)
         val before = alerts.pending!!
-        click("+15 s")
+        // The round ±15 buttons beside the countdown show "+15" / "−15" and are named "+15 s" / "−15 s".
+        compose.onNodeWithContentDescription("+15 s").performClick()
         compose.waitUntilState(5_000) { alerts.pending?.endsAt == before.endsAt + 15_000 }
-        click("−15 s")
+        compose.onNodeWithContentDescription("−15 s").performClick()
         compose.waitUntilState(5_000) { alerts.pending?.endsAt == before.endsAt }
         click("Überspringen")
         waitGone("Überspringen")

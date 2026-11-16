@@ -1,6 +1,39 @@
 package app.overfit.ui.workout
 
 import app.overfit.ui.components.ExerciseCardHeader
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import app.overfit.ui.components.motionItem
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
+import app.overfit.ui.components.PressScale
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.pressScale
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.graphics.graphicsLayer
+import app.overfit.ui.components.AnimatedItems
+import app.overfit.ui.components.PopIn
+import app.overfit.ui.components.ProgressLine
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.motionColor
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import app.overfit.ui.components.SetColumnsHeader
@@ -117,9 +150,9 @@ fun WorkoutScreen(
 ) {
     val t = LocalStrings.current
     val state by controller.state.collectAsStateWithLifecycle()
-    val workout = state.workout
-    LaunchedEffect(state.loaded, workout == null) {
-        if (!state.loaded || workout != null) return@LaunchedEffect
+    val current = state.workout
+    LaunchedEffect(state.loaded, current == null) {
+        if (!state.loaded || current != null) return@LaunchedEffect
         val finished = state.finishedId
         if (finished != null) {
             controller.consumeFinished()
@@ -128,7 +161,11 @@ fun WorkoutScreen(
             onClosed()
         }
     }
-    if (workout == null) return
+    // Finished or discarded: the screen is on its way out. It keeps showing the workout as it was instead of going
+    // black while the next screen comes in (edits no longer reach the controller, it has no workout any more).
+    val last = remember { arrayOfNulls<Workout>(1) }
+    if (current != null) last[0] = current
+    val workout = current ?: last[0] ?: return
 
     val scope = rememberCoroutineScope()
     val now = produceState(clock()) { while (true) { value = clock(); delay(250) } }
@@ -149,34 +186,90 @@ fun WorkoutScreen(
             w.moveExercise(w.exercises.indexOfFirst { it.id == from }, w.exercises.indexOfFirst { it.id == to })
         }
     }
+    // The set that is next right now (what the main button logs): marked in the list, named in the button.
+    val upNext = workout.nextToLog()
+    val showExercise: (String) -> Unit = { id ->
+        collapsed = collapsed - id
+        val index = workout.exercises.indexOfFirst { it.id == id }
+        if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
+    }
+    // The screen shows what is to do, not what is done: an exercise whose last set was just checked off folds up and
+    // the list moves on to the exercise that is next. Only at that moment; opened again by hand, it stays open.
+    val finished = workout.exercises.filter { !it.skipped && it.sets.isNotEmpty() && it.sets.all { s -> s.completed } }.map { it.id }
+    var knownFinished by rememberSaveable { mutableStateOf(finished) }
+    LaunchedEffect(finished) {
+        val fresh = finished - knownFinished.toSet()
+        knownFinished = finished
+        val next = upNext?.exercise?.id
+        // Nothing open any more: stay, the button below now finishes the training.
+        if (fresh.isEmpty() || next == null) return@LaunchedEffect
+        collapsed = collapsed + fresh - next
+        val index = workout.exercises.indexOfFirst { it.id == next }
+        if (index >= 0) listState.animateScrollToItem(index)
+    }
+
+    // Exercises that were just added (picker) land below the fold: the list goes there.
+    val exerciseIds = workout.exercises.map { it.id }
+    var knownExercises by rememberSaveable { mutableStateOf(exerciseIds) }
+    LaunchedEffect(exerciseIds) {
+        val added = exerciseIds.firstOrNull { it !in knownExercises }
+        val grew = exerciseIds.size > knownExercises.size
+        knownExercises = exerciseIds
+        if (added != null && grew) listState.animateScrollToItem(exerciseIds.indexOf(added))
+    }
+    // While a number is typed, the keyboard takes half the screen: the main button steps aside (the set is checked
+    // off at its row), only the rest timer stays.
+    val typing = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val background = Theme.colors.background
 
     Screen(
         compact = true,
         footer = {
-            undo?.let { (before, after) ->
-                if (workout == after) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // One column without gaps of its own: what comes and goes brings its gap along, so nothing jumps at the end.
+            Column(
+                // The list does not end at a hard edge: its last 24 dp fade into the dock.
+                Modifier.drawBehind {
+                    val fade = 24.dp.toPx()
+                    val gap = Space.s.toPx()
+                    drawRect(
+                        Brush.verticalGradient(listOf(Color.Transparent, background), startY = -gap - fade, endY = -gap),
+                        topLeft = Offset(0f, -gap - fade), size = Size(size.width, fade),
+                    )
+                },
+            ) {
+                RevealNotNull(undo?.takeIf { (_, after) -> workout == after }, from = Alignment.Bottom) { (before, after) ->
+                    Row(Modifier.fillMaxWidth().padding(bottom = Space.s), verticalAlignment = Alignment.CenterVertically) {
                         Text(t.setDeleted, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
                         SmallButton(t.undo, { undo = null; controller.edit { w -> if (w == after) before else w } })
                     }
                 }
+                WorkoutFooter(
+                    workout = workout,
+                    upNext = upNext,
+                    now = now,
+                    unit = unit,
+                    language = language,
+                    controller = controller,
+                    typing = typing,
+                    onShowExercise = showExercise,
+                )
             }
-            WorkoutFooter(
-                workout = workout,
-                now = now,
-                unit = unit,
-                language = language,
-                controller = controller,
-                onJumpToNext = { id ->
-                    collapsed = collapsed - id
-                    val index = workout.exercises.indexOfFirst { it.id == id }
-                    if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
-                },
-            )
         },
     ) {
         // One slim header row: minimize, name + clock, [finish] [coach] (coach in the corner like on every screen).
-        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+        // Pulling the header down minimizes as well: the workout came up from the bottom and goes back there.
+        val minimize by rememberUpdatedState(onMinimize)
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 52.dp).pointerInput(Unit) {
+                var pulled = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { pulled = 0f },
+                    onVerticalDrag = { _, delta -> pulled += delta },
+                    onDragEnd = { if (pulled > 40.dp.toPx()) minimize() },
+                )
+            },
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.s),
+        ) {
             IconButton(Icon.ChevronDown, t.minimizeWorkout, onMinimize)
             Column(Modifier.weight(1f)) {
                 NameField(workout.id, workout.name, { v -> controller.edit { it.withName(v.take(60)) } }, Modifier.fillMaxWidth())
@@ -187,7 +280,8 @@ fun WorkoutScreen(
             if (onCoach != null) app.overfit.ui.components.HeaderActions(coach = onCoach)
         }
         Spacer(Modifier.height(Space.xs))
-        Hairline()
+        // How far the training is: fills with every set that is checked off.
+        ProgressLine(if (workout.totalSets > 0) workout.completedSets.toFloat() / workout.totalSets else 0f)
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
@@ -196,7 +290,7 @@ fun WorkoutScreen(
             verticalArrangement = Arrangement.spacedBy(Space.s),
         ) {
             if (workout.exercises.isEmpty()) {
-                item(key = "empty") { Text(t.workoutEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted) }
+                item(key = "empty") { Text(t.workoutEmpty, Modifier.then(motionItem()).padding(vertical = Space.m), tone = Tone.Muted) }
             }
             items(workout.exercises, key = { it.id }) { e ->
                 ExerciseSection(
@@ -207,6 +301,7 @@ fun WorkoutScreen(
                     unit = unit,
                     language = language,
                     expanded = e.id !in collapsed,
+                    upNextSetId = upNext?.set?.id,
                     onToggle = { collapsed = if (e.id in collapsed) collapsed - e.id else collapsed + e.id },
                     controller = controller,
                     onRemoveSet = removeSet,
@@ -215,9 +310,12 @@ fun WorkoutScreen(
                 )
             }
             item(key = "actions") {
-                BlockButton(t.addExercise, onAddExercises)
-                Spacer(Modifier.height(Space.l))
-                ConfirmButton(t.discardWorkout, onConfirm = { scope.launch { controller.discard() } })
+                // Moves along when an exercise is added, removed or folded, like the cards above it.
+                Column(motionItem()) {
+                    BlockButton(t.addExercise, onAddExercises)
+                    Spacer(Modifier.height(Space.l))
+                    ConfirmButton(t.discardWorkout, onConfirm = { scope.launch { controller.discard() } })
+                }
             }
         }
     }
@@ -236,52 +334,80 @@ private fun NameField(id: String, name: String, onChange: (String) -> Unit, modi
 @Composable
 private fun ProgressCaption(workout: Workout, now: State<Long>) {
     val t = LocalStrings.current
-    Text(
-        WorkoutFormat.elapsed(now.value - workout.startedAt) + " · " + t.setsDone(workout.completedSets, workout.totalSets),
+    // The clock ticks four times a second, the text changes once: only then this recomposes.
+    val elapsed by remember(workout.startedAt) { derivedStateOf { WorkoutFormat.elapsed(now.value - workout.startedAt) } }
+    val style = Theme.type.tabular(Theme.type.caption)
+    // Shown short ("12:05 · 3/20": the bar below says the same), read out in full ("… 3/20 erledigt"). One line, so the
+    // header keeps its height next to "Finish" and the coach icon on a 360 dp phone.
+    Row(Modifier.clearAndSetSemantics { text = AnnotatedString("$elapsed · ${t.setsDone(workout.completedSets, workout.totalSets)}") }) {
         // Ticks every second: tabular digits, so the caption does not jitter.
-        style = Theme.type.tabular(Theme.type.caption),
-        tone = Tone.Muted,
-    )
+        Text("$elapsed · ", style = style, tone = Tone.Muted, maxLines = 1)
+        // The number of finished sets rolls up when a set is checked off.
+        RollingText(workout.completedSets.toString(), style = style, tone = Tone.Muted)
+        Text("/${workout.totalSets}", style = style, tone = Tone.Muted, maxLines = 1)
+    }
 }
 
+/**
+ * The dock at the bottom of the running workout: the rest timer (only while a rest runs; it rises out of the button
+ * and sinks back into it) above the one main button. The button says what it will do: its second line names the set
+ * that is next, so that set is visible with or without a rest.
+ */
 @Composable
 private fun WorkoutFooter(
     workout: Workout,
+    upNext: Workout.SetRef?,
     now: State<Long>,
     unit: WeightUnit,
     language: Language,
     controller: WorkoutController,
-    onJumpToNext: (String) -> Unit,
+    typing: Boolean,
+    onShowExercise: (String) -> Unit,
 ) {
     val t = LocalStrings.current
     val finishScope = rememberCoroutineScope()
+    val nextText = upNext?.let { WorkoutFormat.next(it, unit, language, t) }
+    // The clock ticks four times a second; this only changes when a rest begins or ends.
     val rest = workout.rest
-    if (rest != null && !rest.isOver(now.value)) {
-        RestBar(
-            rest = rest,
-            now = now.value,
-            next = workout.nextOpenSet(rest.afterSetId),
-            unit = unit,
-            language = language,
-            onAdjust = controller::adjustRest,
-            onSkip = controller::skipRest,
-            onJumpToNext = onJumpToNext,
-        )
+    val resting by remember(rest) { derivedStateOf { rest != null && !rest.isOver(now.value) } }
+    RevealNotNull(rest.takeIf { resting }, from = Alignment.Bottom) { running ->
+        Column {
+            RestBar(
+                rest = running,
+                now = now,
+                nextLine = nextText?.let(t.nextUp),
+                onAdjust = controller::adjustRest,
+                onSkip = controller::skipRest,
+                onShowNext = upNext?.let { ref -> { onShowExercise(ref.exercise.id) } },
+            )
+            Spacer(Modifier.height(Space.s))
+        }
     }
-    // Nothing open any more (every set done or its exercise skipped): the floating button finishes the training,
-    // green on the first tap, saved on the second (same double tap as "Finish" at the top).
-    if (workout.allDone) {
-        ConfirmButton(
-            t.training.finishTraining,
-            onConfirm = { finishScope.launch { controller.finish() } },
-            modifier = Modifier.fillMaxWidth().testTag(FINISH_BUTTON_TAG),
-            primary = true,
-            kind = ConfirmKind.Complete,
-        )
-    } else {
-        PrimaryButton(t.logNextSet, onClick = { controller.logNextSet() }, enabled = workout.totalSets > 0)
+    Reveal(!typing, from = Alignment.Bottom) {
+        // Nothing open any more (every set done or its exercise skipped): the button finishes the training, green on
+        // the first tap, saved on the second (same double tap as "Finish" at the top). "Log" and "finish" change
+        // softly, and the finish button only takes taps after a moment: tapping "log" quickly must not finish.
+        Swap(workout.allDone, contentAlignment = Alignment.BottomCenter) { allDone ->
+            if (allDone) {
+                var ready by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { delay(FINISH_GUARD_MS); ready = true }
+                ConfirmButton(
+                    t.training.finishTraining,
+                    onConfirm = { finishScope.launch { controller.finish() } },
+                    modifier = Modifier.fillMaxWidth().testTag(FINISH_BUTTON_TAG),
+                    enabled = ready,
+                    primary = true,
+                    kind = ConfirmKind.Complete,
+                )
+            } else {
+                PrimaryButton(t.logNextSet, onClick = { controller.logNextSet() }, enabled = workout.totalSets > 0, caption = nextText)
+            }
+        }
     }
 }
+
+/** How long the "finish training" button ignores taps after it replaced "log next set". */
+private const val FINISH_GUARD_MS = 450L
 
 /** Test tag of the floating "Finish workout" button (shown once nothing is open). */
 const val FINISH_BUTTON_TAG = "workout-finish-bottom"
@@ -296,6 +422,8 @@ private fun ExerciseSection(
     unit: WeightUnit,
     language: Language,
     expanded: Boolean,
+    /** Id of the set that is next in the whole workout (marked in the "now" colour), if it is one of this exercise. */
+    upNextSetId: String?,
     onToggle: () -> Unit,
     controller: WorkoutController,
     onRemoveSet: (setId: String) -> Unit,
@@ -303,12 +431,13 @@ private fun ExerciseSection(
     onDetails: () -> Unit,
 ) {
     val t = LocalStrings.current
+    val haptics = rememberHaptics()
     val type = entry.exercise.trackingType
-    if (entry.skipped) {
-        SkippedSection(modifier, entry, onUnskip = { controller.edit { it.setSkipped(entry.id, false) } }, onDetails = onDetails)
-        return
-    }
-    Block(modifier) {
+    // Skipping and taking back in: the card changes softly and the cards below slide, nothing jumps.
+    Swap(entry.skipped, modifier) { skipped ->
+    if (skipped) {
+        SkippedSection(Modifier, entry, onUnskip = { controller.edit { it.setSkipped(entry.id, false) } }, onDetails = onDetails)
+    } else Block {
         ExerciseCardHeader(
             entry.exercise,
             listOfNotNull(
@@ -317,9 +446,13 @@ private fun ExerciseSection(
             ),
             onDetails = onDetails,
             modifier = Modifier.clip(BlockShape.row).pressableRow(onToggle)
-                .dragHandle(reorder, entry.id).semantics { contentDescription = t.reorder },
+                .dragHandle(reorder, entry.id) { haptics.threshold() }.semantics { contentDescription = t.reorder },
             leading = {
-                LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
+                // One chevron that turns, instead of two icons that swap.
+                val turn by animateFloatAsState(if (expanded) 90f else 0f, Motion.snappy(), label = "chevron")
+                Box(Modifier.graphicsLayer { rotationZ = turn }) {
+                    LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
+                }
                 Spacer(Modifier.width(Space.s))
             },
         ) {
@@ -328,13 +461,14 @@ private fun ExerciseSection(
                 listOf(
                     MenuItem(t.training.skipToday) { controller.edit { it.setSkipped(entry.id, true) } },
                     MenuItem(t.replace, onClick = onReplace),
-                    MenuItem(t.remove, destructive = true) { controller.edit { it.removeExercise(entry.id) } },
+                    // Two taps: removing takes the sets logged so far with it.
+                    MenuItem(t.remove, destructive = true, confirm = true) { controller.edit { it.removeExercise(entry.id) } },
                 ),
             )
         }
         // Alternatives (A/B): one chip per variant, the current one filled. Switching is possible until a set of
         // it is done; the default is the variant not done last time (chosen at the start).
-        if (entry.variants.size > 1 && entry.sets.none { it.completed }) {
+        Reveal(entry.variants.size > 1 && entry.sets.none { it.completed }) {
             val scope = rememberCoroutineScope()
             androidx.compose.runtime.CompositionLocalProvider(app.overfit.ui.components.LocalInPanel provides true) {
                 Row(
@@ -347,36 +481,36 @@ private fun ExerciseSection(
                 }
             }
         }
-        if (expanded) {
-            Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        // Folding and unfolding moves the cards below along instead of making them jump.
+        Reveal(expanded) {
+            Column(Modifier.padding(top = Space.xs)) {
                 SetColumnsHeader(t.setColumn, setColumnLabels(type, unit, t), trailing = 48.dp)
+                Spacer(Modifier.height(Space.xs))
                 val focus = remember { mutableMapOf<String, FocusRequester>() }
                 fun focusOf(id: String) = focus.getOrPut(id) { FocusRequester() }
-                entry.sets.forEachIndexed { i, set ->
-                    key(set.id) {
-                        WorkoutSetRow(
-                            focusRequester = focusOf(set.id),
-                            next = entry.sets.getOrNull(i + 1)?.let { focusOf(it.id) },
-                            number = i + 1,
-                            type = type,
-                            unit = unit,
-                            language = language,
-                            set = set,
-                            onValues = { controller.setValues(set.id, it) },
-                            onToggle = { controller.toggleSet(set.id) },
-                            onRemove = { onRemoveSet(set.id) },
-                        )
-                    }
+                // A new set grows in, a deleted one shrinks away; the rows below slide.
+                AnimatedItems(entry.sets, key = { it.id }, spacing = Space.xs) { i, set ->
+                    WorkoutSetRow(
+                        focusRequester = focusOf(set.id),
+                        next = entry.sets.getOrNull(i + 1)?.let { focusOf(it.id) },
+                        number = i + 1,
+                        type = type,
+                        unit = unit,
+                        language = language,
+                        set = set,
+                        upNext = set.id == upNextSetId,
+                        onValues = { controller.setValues(set.id, it) },
+                        onToggle = { controller.toggleSet(set.id) },
+                        onRemove = { onRemoveSet(set.id) },
+                    )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                    BlockButton(t.addSet, { controller.edit { it.addSet(entry.id) } }, Modifier.weight(1.3f), inBlock = true)
-                    entry.sets.lastOrNull()?.let { last ->
-                        BlockButton(t.duplicateSet, { controller.edit { it.duplicateSet(last.id) } }, Modifier.weight(1f), icon = null, inBlock = true)
-                    }
-                }
+                // One button: a new set takes over the values of the last one (what "duplicate" did as well).
+                BlockButton(t.addSet, { controller.edit { it.addSet(entry.id) } }, inBlock = true)
+                Spacer(Modifier.height(Space.xs))
                 NoteField(entry.id, entry.note) { v -> controller.edit { it.setExerciseNote(entry.id, v.take(300)) } }
             }
         }
+    }
     }
 }
 
@@ -439,6 +573,8 @@ fun WorkoutSetRow(
     onRemove: () -> Unit,
     focusRequester: FocusRequester = remember { FocusRequester() },
     next: FocusRequester? = null,
+    /** This is the set that is next in the running workout: its number stands in the "now" colour. */
+    upNext: Boolean = false,
 ) {
     val t = LocalStrings.current
     val focusManager = LocalFocusManager.current
@@ -452,10 +588,22 @@ fun WorkoutSetRow(
     fun nextOf(): FocusRequester? = requesters.getOrNull(field + 1) ?: next
     val actual = set.actual
     val target = set.target
-    // Checked off = the whole row turns green (owner wish), fields and text stay white on it.
-    val fill = if (done) Theme.colors.confirmFill else Theme.colors.surfacePressed
-    SetRowSurface(t.removeSet(number), onRemove, Modifier.testTag("set-row:$number"), fill = fill) {
-        Text("$number", Modifier.width(24.dp), style = Theme.type.label, tone = if (done) Tone.Default else Tone.Muted, align = TextAlign.Center)
+    // Checked off = the whole row turns green (owner wish), fields and text stay white on it. The green spreads from
+    // the check button over the row (and draws back into it when the set is opened again).
+    val spread by animateFloatAsState(if (done) 1f else 0f, Motion.smooth(), label = "setDone")
+    val numberColor by motionColor(
+        when {
+            done -> Theme.colors.foreground
+            upNext -> Theme.colors.accent
+            else -> Theme.colors.muted
+        },
+        "setNumber",
+    )
+    SetRowSurface(
+        t.removeSet(number), onRemove, Modifier.testTag("set-row:$number"),
+        spreadFill = Theme.colors.confirmFill, spread = { spread },
+    ) {
+        BasicText("$number", Modifier.width(24.dp), style = Theme.type.label.copy(textAlign = TextAlign.Center), color = { numberColor })
         if (type.usesWeight) {
             NumberInput(
                 description = t.weightOfSet(number),
@@ -513,25 +661,38 @@ fun WorkoutSetRow(
     }
 }
 
-/** Round check-off button: open = grey fill, done = filled (tone, not colour). */
+/**
+ * Round check-off button. Open: a faint tick in the circle says "tap here when done". Done: the tick turns white and
+ * lands with a small bounce (the row around it turns green). Press feedback is the circle itself shrinking.
+ */
 @Composable
 private fun CheckButton(done: Boolean, description: String, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val tick by animateFloatAsState(if (done) 1f else 0.26f, Motion.snappy(), label = "tick")
+    // 1 at rest; drops and springs back the moment the set is checked off.
+    val pop = remember { Animatable(1f) }
+    var wasDone by remember { mutableStateOf(done) }
+    LaunchedEffect(done) {
+        if (done && !wasDone) { pop.snapTo(0.5f); pop.animateTo(1f, Motion.bouncy()) }
+        wasDone = done
+    }
     Box(
         Modifier
             .size(48.dp)
             .semantics { contentDescription = description; role = Role.Checkbox }
-            .pressableRow(onClick),
+            .pressScale(interaction, PressScale.icon)
+            .clickable(interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        // Done: the row itself is green, the circle a light translucent white with a white tick; open = slightly
-        // lighter fill than the grey row, so it reads as a button.
         Box(
             Modifier
                 .size(app.overfit.ui.theme.Sizes.checkCircle)
                 .background(Theme.colors.inputFill, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            if (done) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline, color = Color.White)
+            Box(Modifier.graphicsLayer { alpha = tick; scaleX = pop.value; scaleY = pop.value }) {
+                LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline, color = Color.White)
+            }
         }
     }
 }

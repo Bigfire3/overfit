@@ -1,6 +1,8 @@
 package app.overfit.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import app.overfit.ui.theme.Motion
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,19 +50,24 @@ val ChipShape = RoundedCornerShape(50)
 @Composable
 fun Chip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
+    val c = Theme.colors
+    val haptics = rememberHaptics()
+    // Selecting fills the chip softly instead of flipping it.
+    val fill by motionColor(if (selected) c.inverseBackground else if (LocalInPanel.current) c.surfacePressed else c.surface, "chipFill")
+    val tone by motionColor(if (selected) c.inverseForeground else c.muted, "chipLabel")
     Box(
         modifier
             .pressScale(interaction)
             // 48 dp touch area around the 40 dp chip.
-            .clickable(interaction, indication = null, role = Role.Checkbox, onClick = onClick)
+            .clickable(interaction, indication = null, role = Role.Checkbox) { haptics.tick(); onClick() }
             .padding(vertical = (TouchTarget.min - Sizes.chip) / 2)
             .heightIn(min = Sizes.chip)
-            .background(if (selected) Theme.colors.inverseBackground else if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface, ChipShape)
+            .background(fill, ChipShape)
             .semantics { this.selected = selected }
             .padding(horizontal = Space.m, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = Theme.type.caption, tone = if (selected) Tone.Inverse else Tone.Muted)
+        BasicText(label, style = Theme.type.caption, color = { tone })
     }
 }
 
@@ -88,16 +96,19 @@ fun SearchInput(value: String, onValueChange: (String) -> Unit, placeholder: Str
                     }
                 },
             )
-            if (value.isNotEmpty()) {
-                val clearInteraction = remember { MutableInteractionSource() }
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .semantics { contentDescription = clearLabel }
-                        .pressScale(clearInteraction, PressScale.icon)
-                        .clickable(clearInteraction, indication = null, role = Role.Button) { onValueChange("") },
-                    contentAlignment = Alignment.Center,
-                ) { LineIcon(Icon.Close, size = IconSize.small, color = Theme.colors.muted) }
+            // The slot is always there, so the text does not jump when the ✕ comes and goes; the ✕ itself fades in.
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Appear(value.isNotEmpty()) {
+                    val clearInteraction = remember { MutableInteractionSource() }
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .semantics { contentDescription = clearLabel }
+                            .pressScale(clearInteraction, PressScale.icon)
+                            .clickable(clearInteraction, indication = null, role = Role.Button) { onValueChange("") },
+                        contentAlignment = Alignment.Center,
+                    ) { LineIcon(Icon.Close, size = IconSize.small, color = Theme.colors.muted) }
+                }
             }
         }
         Hairline()
@@ -166,8 +177,9 @@ fun MultilineInput(
     val style = Theme.type.body.copy(color = c.foreground)
     val shape = RoundedCornerShape(16.dp)
     val inPanel = LocalInPanel.current
-    // Outer box carries the caller's modifier (test tags, weights), the field sits inside it as before.
-    Box(modifier.fillMaxWidth()) { BasicTextField(
+    // Outer box carries the caller's modifier (test tags, weights), the field sits inside it as before. A line more
+    // or less of text lets the field grow and shrink softly instead of pushing what is below in one step.
+    Box(modifier.fillMaxWidth().animateContentSize(Motion.smooth())) { BasicTextField(
         value = value,
         onValueChange = onValueChange,
         textStyle = style,

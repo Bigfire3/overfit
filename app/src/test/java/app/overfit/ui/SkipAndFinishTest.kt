@@ -3,6 +3,7 @@ package app.overfit.ui
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -120,6 +121,9 @@ class SkipAndFinishTest {
         compose.onNodeWithText("Nächsten Satz loggen").performClick()
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(FINISH_BUTTON_TAG)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Training beenden").assertExists()
+        // The button that just replaced "log next set" takes taps only after a moment: tapping "log" quickly must
+        // not arm (and then finish) the training by accident.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(FINISH_BUTTON_TAG) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         shot("training-beenden")
 
         // Double tap finishes and saves; the training keeps the exercise as skipped, the workout keeps it unchanged.

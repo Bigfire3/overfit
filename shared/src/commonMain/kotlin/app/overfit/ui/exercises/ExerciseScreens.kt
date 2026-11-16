@@ -363,7 +363,8 @@ fun CustomExerciseScreen(
     Screen(
         scroll = true,
         // The one way into the AI here too: the coach icon (no "Fill in with AI" row any more, Fabian 8.11.).
-        header = { BackHeader(t.back, onBack, coach = { coachSheet = true }) },
+        // The form rises from the bottom as a layer of its own (ScreenMotion): it closes with ✕.
+        header = { BackHeader(t.back, onBack, coach = { coachSheet = true }, icon = Icon.Close) },
         footer = {
             PrimaryButton(t.save, {
                 val input = CustomExerciseInput(

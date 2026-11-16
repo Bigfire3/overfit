@@ -4,6 +4,17 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.snap
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import app.overfit.ui.theme.Motion
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -91,7 +102,7 @@ import app.overfit.ui.theme.Theme
 enum class Tone { Default, Muted, Faint, Inverse }
 
 @Composable
-private fun Tone.color(): Color = when (this) {
+internal fun Tone.color(): Color = when (this) {
     Tone.Default -> Theme.colors.foreground
     Tone.Muted -> Theme.colors.muted
     Tone.Faint -> Theme.colors.faint
@@ -197,6 +208,8 @@ const val MAX_HEADER_ACTIONS = 3
 /**
  * Header row with a back button. Detail screens put their actions into [HeaderActions] (via [coach], [menu] and
  * [actions]): always top right, coach icon in the corner. Edit modes show none.
+ * [icon]: screens that rise from the bottom as a layer of their own (exercise picker, exercise form; see
+ * ScreenMotion) close with [Icon.Close] instead of the back chevron, which would point the wrong way.
  */
 @Composable
 fun BackHeader(
@@ -204,10 +217,11 @@ fun BackHeader(
     onBack: () -> Unit,
     coach: (() -> Unit)? = null,
     menu: List<MenuItem> = emptyList(),
+    icon: Icon = Icon.Back,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Row(Modifier.height(TouchTarget.min).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(Icon.Back, label, onBack)
+        IconButton(icon, label, onBack)
         Spacer(Modifier.weight(1f))
         HeaderActions(coach = coach, menu = menu, actions = actions)
     }
@@ -267,9 +281,10 @@ fun HeaderDeleteButton(
     color: Color = Theme.colors.foreground,
 ) {
     val arm = rememberConfirmArm()
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberHaptics()
     val again = LocalStrings.current.tapAgainToConfirm
     val armed = arm.armed
+    val tint by motionColor(if (armed) Theme.colors.armed else color, "deleteTint")
     Box(
         Modifier
             .then(arm.modifier)
@@ -281,10 +296,10 @@ fun HeaderDeleteButton(
             }
             .pressable {
                 if (armed) { arm.disarm(); onConfirm() }
-                else { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); arm.arm() }
+                else { haptics.arm(); arm.arm() }
             },
         contentAlignment = Alignment.Center,
-    ) { LineIcon(Icon.Delete, size = IconSize.action, color = if (armed) Theme.colors.armed else color) }
+    ) { LineIcon(Icon.Delete, size = IconSize.action, color = tint) }
 }
 
 // ---------------------------------------------------------------------------
@@ -298,23 +313,26 @@ private fun Modifier.pressable(
     onClick: () -> Unit,
 ): Modifier {
     val interaction = remember { MutableInteractionSource() }
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberHaptics()
     return this
         .pressScale(interaction, PressScale.icon)
         .clickable(interaction, indication = null, enabled = enabled, role = role) {
-            if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            if (haptic) haptics.tick()
             onClick()
         }
 }
 
-/** Press feedback for whole rows: grey [surface] fill while pressed. */
+/**
+ * Press feedback for whole rows: grey [surface] fill that is there the moment the finger lands and fades out after
+ * it lifts (like a table row on iOS), so even a quick tap leaves a visible trace. Drawn only, nothing recomposes.
+ */
 @Composable
 fun Modifier.pressableRow(onClick: () -> Unit): Modifier {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val pressedFill = if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface
+    val pressed = rememberPressProgress(interaction, press = snap(), release = tween(260, easing = LinearOutSlowInEasing))
     return this
-        .background(if (pressed) pressedFill else Color.Transparent)
+        .drawBehind { if (pressed.value > 0f) drawRect(pressedFill, alpha = pressed.value.coerceIn(0f, 1f)) }
         .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
 }
 
@@ -326,19 +344,22 @@ object PressScale {
 }
 
 /**
- * Tap feedback of every tappable button and card (no ripple, no colour change): while the finger is down
- * the element shrinks to [scale] in ~100 ms and springs back on release. The system animation scale (0 =
- * "remove animations") is respected by Compose itself: the animation then jumps instead of running.
+ * Tap feedback of every tappable button and card (no ripple, no colour change): the element shrinks to [scale] as
+ * the finger lands and springs back on release. A quick tap is not lost: the way down always finishes first
+ * ([rememberPressProgress]), so every tap is seen. Drawn in the layer only, nothing recomposes. The system animation
+ * scale (0 = "remove animations") is respected by Compose itself: the animation then jumps instead of running.
  */
 @Composable
 fun Modifier.pressScale(interaction: InteractionSource, scale: Float = PressScale.button): Modifier {
-    val pressed by interaction.collectIsPressedAsState()
-    val value by animateFloatAsState(
-        if (pressed) scale else 1f,
-        animationSpec = if (pressed) tween(durationMillis = 100) else spring(dampingRatio = 0.55f, stiffness = 600f),
-        label = "pressScale",
+    val pressed = rememberPressProgress(
+        interaction,
+        press = tween(Motion.MIN_PRESS_MS, easing = LinearOutSlowInEasing),
+        release = spring(dampingRatio = 0.55f, stiffness = 600f),
     )
-    return graphicsLayer { scaleX = value; scaleY = value }
+    return graphicsLayer {
+        val value = 1f - (1f - scale) * pressed.value
+        scaleX = value; scaleY = value
+    }
 }
 
 /** Big rounded corner of all filled buttons (nearly a pill, fully round on compact ones). */
@@ -361,14 +382,17 @@ private fun PillButton(
     fill: Color,
     contentTone: Color,
     icon: Icon? = null,
+    caption: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberHaptics()
     // A grey button inside a grey panel gets one shade lighter, so it still reads as a button.
     val c = Theme.colors
-    val fill = if (LocalInPanel.current && fill == c.surface) c.surfacePressed else fill
+    // Fill, label and the disabled state follow softly (a confirm button arming, a button becoming available).
+    val fill by motionColor(if (LocalInPanel.current && fill == c.surface) c.surfacePressed else fill, "buttonFill")
+    val contentTone by motionColor(contentTone, "buttonContent")
+    val alpha by animateFloatAsState(if (enabled) 1f else 0.3f, Motion.snappy(), label = "buttonEnabled")
     val textStyle = Theme.type.label.copy(
-        color = contentTone,
         fontWeight = if (compact) FontWeight.SemiBold else FontWeight.Bold,
         fontSize = if (compact) 16.sp else 18.sp,
     )
@@ -377,28 +401,46 @@ private fun PillButton(
             .pressScale(interaction)
             // Touch area first: compact buttons are 44 dp visible, the extra 2 dp above and below keep 48 dp to tap.
             .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) {
-                if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                if (haptic) haptics.press()
                 onClick()
             }
             .padding(vertical = if (compact) 2.dp else 0.dp)
             .heightIn(min = if (compact) ButtonHeight.compact else ButtonHeight.standard)
-            .alpha(if (enabled) 1f else 0.3f)
+            .graphicsLayer { this.alpha = alpha }
             .background(fill, ButtonShape)
             .padding(horizontal = if (compact) Space.m else Space.l),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         // Centred (text + icon as one group), bold; long labels on narrow phones shrink a little before they would be cut off.
-        BasicText(
-            label, modifier = Modifier.weight(1f, fill = false),
-            style = textStyle, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = textStyle.fontSize),
-        )
+        Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.CenterHorizontally) {
+            BasicText(
+                label,
+                style = textStyle, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = { contentTone },
+                autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = textStyle.fontSize),
+            )
+            // Second line: what exactly the button will do (the set it logs). Changes softly with the workout.
+            if (caption != null) Swap(caption, contentAlignment = Alignment.Center) { line ->
+                BasicText(
+                    line,
+                    style = Theme.type.caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = { contentTone.copy(alpha = BUTTON_CAPTION_ALPHA) },
+                )
+            }
+        }
         if (icon != null) { Spacer(Modifier.width(Space.s)); LineIcon(icon, color = contentTone) }
     }
 }
 
-/** The one primary action on a screen: white fill without border, black bold label left, optional [icon] right, 64 dp, large corners. */
+/** How strong the second line of a button stands against its label (black on white: still ≥ 4.5:1, ButtonContrastTest). */
+const val BUTTON_CAPTION_ALPHA = 0.64f
+
+/**
+ * The one primary action on a screen: white fill without border, black bold label, optional [icon] right, 64 dp,
+ * large corners. [caption] = a small second line under the label that says what exactly the tap does (the running
+ * workout: which set "log next set" logs).
+ */
 @Composable
 fun PrimaryButton(
     label: String,
@@ -408,11 +450,12 @@ fun PrimaryButton(
     modifier: Modifier = Modifier.fillMaxWidth(),
     compact: Boolean = false,
     icon: Icon? = null,
+    caption: String? = null,
 ) {
     val c = Theme.colors
     PillButton(
         if (loading) "…" else label, onClick, modifier, enabled && !loading, compact, haptic = true,
-        fill = c.inverseBackground, contentTone = c.inverseForeground, icon = icon,
+        fill = c.inverseBackground, contentTone = c.inverseForeground, icon = icon, caption = caption,
     )
 }
 
@@ -465,7 +508,7 @@ fun ConfirmButton(
     kind: ConfirmKind = ConfirmKind.Destructive,
 ) {
     val arm = rememberConfirmArm()
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberHaptics()
     val again = LocalStrings.current.tapAgainToConfirm
     val armed = arm.armed
     val c = Theme.colors
@@ -478,8 +521,8 @@ fun ConfirmButton(
     PillButton(
         if (loading) "…" else label,
         onClick = {
-            if (armed) { arm.disarm(); onConfirm() }
-            else { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); arm.arm() }
+            if (armed) { arm.disarm(); haptics.confirm(); onConfirm() }
+            else { haptics.arm(); arm.arm() }
         },
         modifier = modifier
             .then(arm.modifier)
@@ -659,24 +702,53 @@ fun RowInput(
 // ---------------------------------------------------------------------------
 // Segmented control
 
+/**
+ * Segmented choice. The white thumb is one shape that slides from the old segment to the new one (it does not
+ * blink off here and on there), the labels change colour with it.
+ */
 @Composable
 fun <T> Segmented(value: T, options: List<Pair<T, String>>, onChange: (T) -> Unit) {
+    val c = Theme.colors
+    val activeIndex = options.indexOfFirst { it.first == value }
+    // Left edge and width of every segment inside the track, reported by the segments once they are placed.
+    val bounds = remember(options.size) { mutableStateListOf<Pair<Float, Float>?>().apply { repeat(options.size) { add(null) } } }
+    val thumbLeft = remember { Animatable(0f) }
+    val thumbWidth = remember { Animatable(0f) }
+    var placed by remember { mutableStateOf(false) }
+    val target = bounds.getOrNull(activeIndex)
+    LaunchedEffect(target) {
+        val (left, width) = target ?: return@LaunchedEffect
+        if (!placed) {
+            thumbLeft.snapTo(left); thumbWidth.snapTo(width); placed = true
+        } else {
+            launch { thumbLeft.animateTo(left, Motion.snappy()) }
+            launch { thumbWidth.animateTo(width, Motion.snappy()) }
+        }
+    }
     Row(
         Modifier
-            .background(if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface, RoundedCornerShape(50))
-            .padding(3.dp),
+            .background(if (LocalInPanel.current) c.surfacePressed else c.surface, RoundedCornerShape(50))
+            .padding(3.dp)
+            .drawBehind {
+                if (placed && activeIndex >= 0) {
+                    drawRoundRect(c.inverseBackground, Offset(thumbLeft.value, 0f), Size(thumbWidth.value, size.height), CornerRadius(size.height / 2))
+                }
+            },
     ) {
-        options.forEach { (option, label) ->
-            val active = option == value
+        options.forEachIndexed { i, (option, label) ->
+            val active = i == activeIndex
+            val tone by motionColor(if (active) c.inverseForeground else c.muted, "segment")
             Box(
                 Modifier
-                    .background(if (active) Theme.colors.inverseBackground else Color.Transparent, RoundedCornerShape(50))
+                    .onPlaced { bounds[i] = it.positionInParent().x to it.size.width.toFloat() }
+                    // Until the thumb knows its place (first frame), the active segment carries the fill itself.
+                    .then(if (active && !placed) Modifier.background(c.inverseBackground, RoundedCornerShape(50)) else Modifier)
                     .semantics { selected = active }
                     .pressable(role = Role.Tab, haptic = !active) { onChange(option) }
                     // 12 dp: segment 42 dp + 3 dp track inset on each side = 48 dp to tap.
                     .padding(horizontal = Space.m, vertical = 12.dp),
             ) {
-                Text(label, style = Theme.type.caption, tone = if (active) Tone.Inverse else Tone.Muted)
+                BasicText(label, style = Theme.type.caption, color = { tone })
             }
         }
     }
@@ -849,13 +921,14 @@ fun ListRow(label: String, value: String, tone: Tone = Tone.Default, onClick: ((
 @Composable
 fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     val inPanel = LocalInPanel.current
+    val haptics = rememberHaptics()
     Column(
         (if (inPanel) Modifier.background(Theme.colors.surface).padding(horizontal = Space.m) else Modifier).toggleable(
             value = checked,
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
             role = Role.Checkbox,
-            onValueChange = onCheckedChange,
+            onValueChange = { haptics.toggle(it); onCheckedChange(it) },
         ),
     ) {
         Row(
@@ -866,16 +939,9 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
             Text(label, Modifier.weight(1f, fill = false))
             Spacer(Modifier.width(Space.m))
             val shape = RoundedCornerShape(4.dp)
-            Box(
-                Modifier
-                    .size(22.dp)
-                    .then(
-                        if (checked) Modifier.background(Theme.colors.inverseBackground, shape)
-                        else Modifier.background(Theme.colors.surfacePressed, shape),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (checked) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.inverseForeground)
+            val boxFill by motionColor(if (checked) Theme.colors.inverseBackground else Theme.colors.surfacePressed, "checkbox")
+            Box(Modifier.size(22.dp).background(boxFill, shape), contentAlignment = Alignment.Center) {
+                PopIn(checked) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.inverseForeground) }
             }
         }
         if (!inPanel) Hairline()
@@ -890,13 +956,14 @@ fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
 @Composable
 fun SwitchRow(label: String, checked: Boolean, modifier: Modifier = Modifier, onCheckedChange: (Boolean) -> Unit) {
     val inPanel = LocalInPanel.current
+    val haptics = rememberHaptics()
     Column(
         modifier.then(if (inPanel) Modifier.background(Theme.colors.surface).padding(horizontal = Space.m) else Modifier).toggleable(
             value = checked,
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
             role = Role.Switch,
-            onValueChange = onCheckedChange,
+            onValueChange = { haptics.toggle(it); onCheckedChange(it) },
         ),
     ) {
         Row(
@@ -922,15 +989,62 @@ private fun SwitchTrack(checked: Boolean) {
     val c = Theme.colors
     val shape = RoundedCornerShape(50)
     // BiasAlignment follows the layout direction: -1 = start (left in LTR), 1 = end.
-    val bias by animateFloatAsState(if (checked) 1f else -1f, label = "switch")
+    val bias by animateFloatAsState(if (checked) 1f else -1f, Motion.snappy(), label = "switch")
+    // Track and knob change colour together with the knob's way across, not in one frame.
+    val track by motionColor(if (checked) c.foreground else c.surfacePressed, "switchTrack")
+    val knob by motionColor(if (checked) c.background else c.muted, "switchKnob")
     Box(
         Modifier
             .size(width = 52.dp, height = 32.dp)
-            .background(if (checked) c.foreground else c.surfacePressed, shape)
+            .background(track, shape)
             .padding(4.dp),
         contentAlignment = BiasAlignment(bias, 0f),
     ) {
-        Box(Modifier.testTag(SWITCH_KNOB_TAG).size(24.dp).background(if (checked) c.background else c.muted, CircleShape))
+        Box(Modifier.testTag(SWITCH_KNOB_TAG).size(24.dp).background(knob, CircleShape))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Numbers
+
+/** One number of a [StatGrid]: [value] large, [label] small below it. [positive]: the value stands in green (a record). */
+class Stat(val label: String, val value: String, val positive: Boolean = false)
+
+/**
+ * A few key numbers as a compact grid of tiles (two per row) instead of one full-width row each: half the height,
+ * and the numbers are what the eye meets (finish summary, training detail, bests of an exercise). Tiles are
+ * [Colors.surface] areas without outline, like a [Block]. An odd last tile spans the row.
+ */
+@Composable
+fun StatGrid(stats: List<Stat>, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+        stats.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                row.forEach { stat -> StatTile(stat, Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatTile(stat: Stat, modifier: Modifier = Modifier) {
+    val c = Theme.colors
+    Column(
+        modifier
+            .heightIn(min = 72.dp)
+            .background(c.surface, RoundedCornerShape(20.dp))
+            // One tile reads as one thing: "Dauer, 42:10".
+            .semantics(mergeDescendants = true) {}
+            .padding(horizontal = Space.m, vertical = 12.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        BasicText(
+            stat.value,
+            style = Theme.type.number.copy(color = if (stat.positive) c.positive else c.foreground),
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = Theme.type.number.fontSize),
+        )
+        Text(stat.label, style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
     }
 }
 
@@ -941,12 +1055,8 @@ private fun SwitchTrack(checked: Boolean) {
 fun Progress(step: Int, total: Int) {
     Row(Modifier.fillMaxWidth().padding(bottom = Space.xl), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
         repeat(total) { i ->
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(2.dp)
-                    .background(if (i < step) Theme.colors.foreground else Theme.colors.hairline, RoundedCornerShape(1.dp)),
-            )
+            // A step reached fills its segment from the start instead of switching it on.
+            ProgressLine(if (i < step) 1f else 0f, Modifier.weight(1f))
         }
     }
 }

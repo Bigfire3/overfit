@@ -249,7 +249,8 @@ fun ExercisePickerScreen(
         onPicked(if (single) listOf(id) else (selected.toList() - id) + id)
     }
     Screen(
-        header = { BackHeader(t.back, onBack) },
+        // The picker rises from the bottom as a layer of its own (ScreenMotion): it closes with ✕.
+        header = { BackHeader(t.back, onBack, icon = Icon.Close) },
         footer = if (single) null else ({
             PrimaryButton(t.addExercises(selected.size), { onPicked(selected.toList()) }, enabled = selected.isNotEmpty())
         }),

@@ -105,7 +105,10 @@ class WorkoutFlowTest {
         assertTrue(HapticPattern.Tick in haptics.played)
         val alert = requireNotNull(alerts.pending)
         assertEquals(60_000L, alert.endsAt - alert.startedAt)
-        compose.onNodeWithText("Nächste: Bench Press · Satz 2", substring = true).assertExists()
+        // What comes next stands in the main button ("Nächsten Satz loggen" / "Bench Press · Satz 2 · …") and the
+        // countdown names it for screen readers.
+        compose.onNodeWithText("Bench Press · Satz 2", substring = true).assertExists()
+        compose.onNode(hasContentDescription("Nächste: Bench Press · Satz 2", substring = true)).assertExists()
 
         // Skip the rest, log the last set with the footer button
         compose.onNodeWithText("Überspringen").performClick()

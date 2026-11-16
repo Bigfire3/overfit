@@ -1,6 +1,7 @@
 package app.overfit.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import app.overfit.ui.theme.DarkColors
 import kotlin.math.pow
 import kotlin.test.Test
@@ -23,4 +24,10 @@ class ButtonContrastTest {
     @Test fun whiteOnArmedFill() = assertTrue(ratio(c.foreground, c.armedFill) >= 4.5f)
     @Test fun whiteOnConfirmFill() = assertTrue(ratio(c.foreground, c.confirmFill) >= 4.5f)
     @Test fun redOnSubtleRed() = assertTrue(ratio(c.negative, c.negativeSubtle) >= 4.5f)
+
+    /** Second line of the primary button (the set it logs): black at [BUTTON_CAPTION_ALPHA] on white. */
+    @Test fun captionOnPrimary() {
+        val caption = c.inverseForeground.copy(alpha = app.overfit.ui.components.BUTTON_CAPTION_ALPHA).compositeOver(c.inverseBackground)
+        assertTrue(ratio(caption, c.inverseBackground) >= 4.5f)
+    }
 }

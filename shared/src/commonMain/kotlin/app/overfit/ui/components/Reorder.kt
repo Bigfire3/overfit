@@ -1,6 +1,10 @@
 package app.overfit.ui.components
 
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import app.overfit.ui.theme.Motion
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
@@ -40,7 +44,11 @@ class ReorderState internal constructor(
     var dragOffset by mutableFloatStateOf(0f)
         private set
 
+    /** Counts drags, so the settling of an earlier drop cannot end a drag that began meanwhile. */
+    private var generation = 0
+
     internal fun start(key: Any) {
+        generation++
         draggingKey = key
         dragOffset = 0f
     }
@@ -48,6 +56,16 @@ class ReorderState internal constructor(
     internal fun end() {
         draggingKey = null
         dragOffset = 0f
+    }
+
+    /** Dropped: the card glides the last bit into its slot instead of snapping there, then lets go. */
+    internal suspend fun settle() {
+        val mine = generation
+        try {
+            animate(dragOffset, 0f, animationSpec = Motion.snappy()) { value, _ -> if (generation == mine) dragOffset = value }
+        } finally {
+            if (generation == mine) end()
+        }
     }
 
     internal fun drag(dy: Float) {
@@ -107,25 +125,30 @@ fun rememberReorderState(
     return remember(listState) { ReorderState(listState, { currentCanMove(it) }, { a, b -> currentOnMove(a, b) }) }
 }
 
-/** Lifts the dragged item above the others and lets the rest animate into place. */
+/**
+ * Lifts the dragged item above the others (a touch larger and lighter, like a card picked up) and lets the rest glide
+ * into place; items that are added or removed fade in and out ([motionItem]).
+ */
 @Composable
 fun LazyItemScope.reorderableItem(state: ReorderState, key: Any): Modifier =
     if (state.draggingKey == key) {
-        Modifier.zIndex(1f).graphicsLayer { translationY = state.dragOffset; alpha = 0.9f }
+        Modifier.zIndex(1f).graphicsLayer { translationY = state.dragOffset; alpha = 0.92f; scaleX = 1.02f; scaleY = 1.02f }
     } else {
-        Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+        motionItem()
     }
 
-/** Long press on this element starts dragging the item with [key]. */
+/** Long press on this element starts dragging the item with [key]; [onStart] is the moment it is picked up (haptic). */
 fun Modifier.dragHandle(state: ReorderState, key: Any, onStart: () -> Unit = {}): Modifier =
     pointerInput(state, key) {
-        detectDragGesturesAfterLongPress(
-            onDragStart = { state.start(key); onStart() },
-            onDragEnd = { state.end() },
-            onDragCancel = { state.end() },
-            onDrag = { change, amount ->
-                change.consume()
-                state.drag(amount.y)
-            },
-        )
+        coroutineScope {
+            detectDragGesturesAfterLongPress(
+                onDragStart = { state.start(key); onStart() },
+                onDragEnd = { launch { state.settle() } },
+                onDragCancel = { launch { state.settle() } },
+                onDrag = { change, amount ->
+                    change.consume()
+                    state.drag(amount.y)
+                },
+            )
+        }
     }
