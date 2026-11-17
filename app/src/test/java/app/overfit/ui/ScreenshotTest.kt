@@ -155,7 +155,8 @@ open class ScreenshotTest {
         click("Speichern")
         compose.waitForTrainingTab()
         tab("Kalender")
-        waitFor("1 Training")
+        // The calendar's figures stand in one line ("1 Training · …").
+        compose.waitUntil(20_000) { compose.onAllNodes(hasText("1 Training", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         shot("kalender")
         compose.openCalendarDay(realToday().dayOfMonth)
         waitFor("Push")
