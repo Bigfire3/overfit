@@ -1,15 +1,19 @@
 package app.overfit.ui.fuel
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.domain.Language
@@ -28,6 +32,9 @@ import app.overfit.ui.components.BigInput
 import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.Panel
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
@@ -55,6 +62,7 @@ fun WebCreditSection(
     val w = webCreditStringsFor(language)
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
     var opening by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     val web = !isDemo && config != null && config.showsWebPurchase(distribution)
@@ -78,6 +86,7 @@ fun WebCreditSection(
                         throw e
                     } catch (_: Exception) {
                         failed = true
+                        haptics.reject()
                     }
                     opening = false
                 }
@@ -88,7 +97,7 @@ fun WebCreditSection(
     if (web && config != null) {
         if (config.webPurchase.packages.isNotEmpty()) Hint(w.webChannel)
         Hint(if (config.webPurchase.testMode) "${w.webTopUpNote} ${w.webTopUpTestNote}" else w.webTopUpNote)
-        if (failed) Text(w.webTopUpFailed, Modifier.padding(start = Space.m, top = Space.xs), style = Theme.type.caption)
+        Reveal(failed) { Text(w.webTopUpFailed, Modifier.padding(start = Space.m, top = Space.xs), style = Theme.type.caption) }
     }
 }
 
@@ -100,6 +109,8 @@ fun RedeemCodeScreen(session: FuelSession, onBack: () -> Unit) {
     val isDemo by session.demo.collectAsStateWithLifecycle()
     val service = remember(isDemo) { session.current() }
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
+    val focus = remember { FocusRequester() }
     var input by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -112,10 +123,12 @@ fun RedeemCodeScreen(session: FuelSession, onBack: () -> Unit) {
             message = try {
                 val r = service.redeemCode(input)
                 input = ""
+                haptics.confirm()
                 w.redeemDone(formatEuro(r.creditedMicro, t.language))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: FuelException) {
+                haptics.reject()
                 when (e.code) {
                     "invalid_code" -> w.redeemInvalid
                     "already_redeemed" -> w.redeemUsed
@@ -123,6 +136,7 @@ fun RedeemCodeScreen(session: FuelSession, onBack: () -> Unit) {
                     else -> t.unreachable
                 }
             } catch (_: Exception) {
+                haptics.reject()
                 t.unreachable
             }
             busy = false
@@ -138,12 +152,16 @@ fun RedeemCodeScreen(session: FuelSession, onBack: () -> Unit) {
         Spacer(Modifier.height(Space.m))
         Text(w.redeemText, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
-        BigInput(input, { input = formatCodeInput(it); message = null }, w.redeemPlaceholder, onDone = ::redeem)
-        message?.let {
-            Spacer(Modifier.height(Space.m))
-            Text(it)
+        BigInput(input, { input = formatCodeInput(it); message = null }, w.redeemPlaceholder, Modifier.focusRequester(focus), onDone = ::redeem)
+        RevealNotNull(message) {
+            Column {
+                Spacer(Modifier.height(Space.m))
+                Text(it)
+            }
         }
     }
+    // The code is what this screen is for: the field has the focus (and the keyboard is up) as soon as it opens.
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 }
 
 /** Upper case, only letters, digits and dashes (the server ignores dashes and spaces). */
