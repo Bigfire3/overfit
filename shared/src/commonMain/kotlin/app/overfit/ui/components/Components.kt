@@ -582,10 +582,13 @@ fun SmallButton(
             .padding(horizontal = Space.m),
         contentAlignment = Alignment.Center,
     ) {
-        BasicText(
-            label, style = Theme.type.label.copy(color = tone.color(), fontWeight = FontWeight.SemiBold, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
-            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 16.sp),
-        )
+        // A label that changes ("Kopieren" → "Kopiert") fades over, like the big buttons.
+        Swap(label, contentAlignment = Alignment.Center) { text ->
+            BasicText(
+                text, style = Theme.type.label.copy(color = tone.color(), fontWeight = FontWeight.SemiBold, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 16.sp),
+            )
+        }
     }
 }
 
