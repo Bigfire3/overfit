@@ -47,6 +47,10 @@ class ReorderState internal constructor(
     /** Counts drags, so the settling of an earlier drop cannot end a drag that began meanwhile. */
     private var generation = 0
 
+    /** How often the dragged item has taken another item's place (the handle gives a tick for each). */
+    internal var swaps = 0
+        private set
+
     internal fun start(key: Any) {
         generation++
         draggingKey = key
@@ -89,6 +93,7 @@ class ReorderState internal constructor(
         // Where the dragged item will sit after the move; the finger position must not jump.
         val newOffset = if (down) target.offset + target.size - current.size else target.offset
         dragOffset = visualTop - newOffset
+        swaps++
         onMove(current.key, target.key)
     }
 
@@ -137,8 +142,11 @@ fun LazyItemScope.reorderableItem(state: ReorderState, key: Any): Modifier =
         motionItem()
     }
 
-/** Long press on this element starts dragging the item with [key]; [onStart] is the moment it is picked up (haptic). */
-fun Modifier.dragHandle(state: ReorderState, key: Any, onStart: () -> Unit = {}): Modifier =
+/**
+ * Long press on this element starts dragging the item with [key]. [onStart] is the moment it is picked up, [onSwap]
+ * every time it takes another item's place (both for haptics).
+ */
+fun Modifier.dragHandle(state: ReorderState, key: Any, onSwap: () -> Unit = {}, onStart: () -> Unit = {}): Modifier =
     pointerInput(state, key) {
         coroutineScope {
             detectDragGesturesAfterLongPress(
@@ -147,7 +155,9 @@ fun Modifier.dragHandle(state: ReorderState, key: Any, onStart: () -> Unit = {})
                 onDragCancel = { launch { state.settle() } },
                 onDrag = { change, amount ->
                     change.consume()
+                    val before = state.swaps
                     state.drag(amount.y)
+                    if (state.swaps != before) onSwap()
                 },
             )
         }

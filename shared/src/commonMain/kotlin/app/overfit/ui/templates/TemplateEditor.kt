@@ -624,7 +624,7 @@ private fun ExerciseBlock(
     Block(modifier) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(BlockShape.row).pressableRow(onToggle)
-                .dragHandle(reorder, key) { haptics.threshold() }
+                .dragHandle(reorder, key, onSwap = { haptics.tick() }) { haptics.threshold() }
                 .semantics { contentDescription = t.reorder },
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -150,7 +150,7 @@ open class ScreenshotTest {
         click("Beenden") // popup: its own screenshot in DialogShotTest (Robolectric does not draw dialog windows)
         compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Training beendet")
-        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.waitForFinishLoaded(timeoutMillis = 20_000)
         shot("beenden")
         click("Speichern")
         compose.waitForTrainingTab()

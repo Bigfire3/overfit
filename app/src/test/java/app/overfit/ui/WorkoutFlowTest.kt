@@ -125,7 +125,7 @@ class WorkoutFlowTest {
         waitFor("Wie war das Training?")
         compose.waitUntilState(5_000) { runBlocking { data.workouts.status(id) } == SessionStatus.FINISHED }
         // The name field comes first, the note field second.
-        compose.waitUntil(5_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.waitForFinishLoaded(timeoutMillis = 20_000)
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
         // "Sauna" checkbox: off by default, checked here.
         compose.onNodeWithText("Sauna").performScrollTo().assertIsOff().performClick()

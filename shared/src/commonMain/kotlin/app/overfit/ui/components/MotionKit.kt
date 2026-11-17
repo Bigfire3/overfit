@@ -244,6 +244,9 @@ fun <T> AnimatedItems(
  * A number that changes while you look at it (countdown, elapsed time, counter): every digit that changes rolls to
  * its new value, the others stand still. Always tabular figures. [countsDown]: new digits come from above.
  * Screen readers and tests see one text.
+ *
+ * For short values on one line ("2:30", "3/20 erledigt", "4 Sätze · Pause 2:30"): it does not wrap. A sentence that
+ * may need a second line is a `Swap(text) { Text(it) }`.
  */
 @Composable
 fun RollingText(
@@ -261,10 +264,12 @@ fun RollingText(
     }
     Row(modifier.clearAndSetSemantics { this.text = AnnotatedString(text) }) {
         val n = text.length
-        text.forEachIndexed { i, c ->
+        var i = 0
+        while (i < n) {
+            val c = text[i]
             // Columns are counted from the end: "9:59" → "10:00" keeps every digit in its place.
-            key(n - i) {
-                if (c.isDigit()) {
+            if (c.isDigit()) {
+                key(n - i) {
                     AnimatedContent(
                         targetState = c,
                         transitionSpec = {
@@ -274,9 +279,14 @@ fun RollingText(
                         },
                         label = "digit",
                     ) { digit -> BasicText(digit.toString(), style = resolved, maxLines = 1, softWrap = false) }
-                } else {
-                    BasicText(c.toString(), style = resolved, maxLines = 1, softWrap = false)
                 }
+                i++
+            } else {
+                // Everything between two digits is one piece of text: words keep their normal letter spacing.
+                var end = i
+                while (end < n && !text[end].isDigit()) end++
+                key(n - i) { BasicText(text.substring(i, end), style = resolved, maxLines = 1, softWrap = false) }
+                i = end
             }
         }
     }

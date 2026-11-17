@@ -78,8 +78,11 @@ internal object ScreenMotion {
             (from.isTab() && to.isTab()) || (from.isStory() && to.isTab()) -> Kind.Instant
             deeper.isViewer() -> Kind.Zoom
             deeper.isCover() -> Kind.Cover
-            // Leaving a cover forwards into a tab (workout discarded or closed): the layer is gone, nothing to slide.
-            !back && shallower.isCover() && deeper.isTab() -> Kind.Fade
+            // Forwards into a tab (workout closed, finish saved, onboarding done): that is going home, the stack
+            // below is gone and there is nothing to slide over.
+            !back && to.isTab() -> Kind.Fade
+            // The finished workout turns into its summary in place; the summary is the end of the same layer.
+            !back && from.isCover() && to.hasRoute(FinishRoute::class) -> Kind.Fade
             // "Save" on a new workout hands over to the same workout as a plan: one screen becoming the other, not a
             // second screen pushed in.
             !back && from.hasRoute(TemplateEditorRoute::class) && to.hasRoute(WorkoutPlanRoute::class) -> Kind.Fade

@@ -200,7 +200,7 @@ class UiUniformTest {
         click("Beenden")
         compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Training beendet")
-        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.waitForFinishLoaded(timeoutMillis = 20_000)
         click("Speichern")
         compose.waitForTrainingTab()
 

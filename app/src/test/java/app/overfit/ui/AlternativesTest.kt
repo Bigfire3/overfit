@@ -140,6 +140,8 @@ class AlternativesTest {
             data.workouts.finish(done, start + 3_600_000)
         }
         val deps = launch()
+        // The list fades in once the workouts are loaded: wait for the card's play button, not only for the tab.
+        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Push starten")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Push starten").performClick()
         waitFor("0/3 erledigt", substring = true)
         val entryId = deps.workout.state.value.workout!!.exercises.single().id

@@ -446,7 +446,7 @@ private fun ExerciseSection(
             ),
             onDetails = onDetails,
             modifier = Modifier.clip(BlockShape.row).pressableRow(onToggle)
-                .dragHandle(reorder, entry.id) { haptics.threshold() }.semantics { contentDescription = t.reorder },
+                .dragHandle(reorder, entry.id, onSwap = { haptics.tick() }) { haptics.threshold() }.semantics { contentDescription = t.reorder },
             leading = {
                 // One chevron that turns, instead of two icons that swap.
                 val turn by animateFloatAsState(if (expanded) 90f else 0f, Motion.snappy(), label = "chevron")

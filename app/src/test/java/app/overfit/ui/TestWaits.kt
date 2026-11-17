@@ -71,3 +71,11 @@ fun startEarlierToday(): Long {
 
 /** End of a training started at [start]: half an hour later, but never in the future. */
 fun endOf(start: Long): Long = maxOf(start + 2_000L, minOf(start + 1_800_000L, System.currentTimeMillis()))
+
+/**
+ * Finish screen: waits until the finished training is stored and loaded. The screen itself (title, name and note
+ * field) is there from the first frame; "Speichern" is the part that only becomes active with the loaded training.
+ */
+fun ComposeTestRule.waitForFinishLoaded(saveLabel: String = "Speichern", timeoutMillis: Long = 20_000) = waitUntil(timeoutMillis) {
+    onAllNodes(hasText(saveLabel) and androidx.compose.ui.test.isEnabled()).fetchSemanticsNodes().isNotEmpty()
+}

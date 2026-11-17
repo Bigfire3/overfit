@@ -334,8 +334,9 @@ private fun DiaryStats(workouts: Int, photos: Int, streakWeeks: Int) {
         p.statPhotos(photos).takeIf { photos > 0 },
         p.statStreak(streakWeeks).takeIf { streakWeeks > 0 },
     ).joinToString(" · ").ifEmpty { null }
-    RevealNotNull(line) {
-        RollingText(it, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+    RevealNotNull(line) { shown ->
+        // A sentence that may wrap with large type: it fades to its new wording instead of rolling digit by digit.
+        Swap(shown) { Text(it, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
     }
 }
 

@@ -284,10 +284,10 @@ class DayWithOverfitTest {
         click("Beenden")
         compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Training beendet")
-        // Wait via the UI first (the name field appears once the finished workout is stored): the saved
+        // Wait via the UI first ("Speichern" becomes active once the finished workout is stored and loaded): the saved
         // workout is updated in a DB transaction at the same time, which a blocking query polled on the
         // test's main thread would stall.
-        compose.waitUntil(20_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.waitForFinishLoaded(timeoutMillis = 20_000)
         assertEquals(SessionStatus.FINISHED, runBlocking { data.workouts.status(workoutId) })
         compose.onNodeWithContentDescription("Gefühl 4 von 5").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Gefühl 4 von 5").assertIsSelected()
@@ -409,7 +409,8 @@ class DayWithOverfitTest {
         tab("Workouts")
         compose.waitForTrainingTab("New workout")
         tab("Calendar")
-        waitFor("1 workout")
+        // The calendar's figures stand in one line ("1 workout · 1 photo · …").
+        waitFor("1 workout", substring = true)
         tab("Profile")
         click("Deutsch")
         waitFor("ÜBER DICH")

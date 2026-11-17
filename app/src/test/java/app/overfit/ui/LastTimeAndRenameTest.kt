@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasAnySibling
+import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.performScrollToNode
@@ -122,7 +123,9 @@ class LastTimeAndRenameTest {
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
         waitFor("Starten")
         waitFor(first)
-        val firstCaption = hasText("Letztes Mal: 62,5 kg × 8, 65 × 6") and hasAnySibling(hasText(first))
+        // The line can grow in (an exercise added later), so it sits in a wrapper of its own: that wrapper is what
+        // stands next to the name.
+        val firstCaption = hasText("Letztes Mal: 62,5 kg × 8, 65 × 6") and hasParent(hasAnySibling(hasText(first)))
         compose.waitUntil(20_000) { compose.onAllNodes(firstCaption, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         shot("workout-letzte-werte")
         // The second exercise was not trained yet: no "last time" line on its card.

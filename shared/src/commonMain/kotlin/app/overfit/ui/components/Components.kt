@@ -206,7 +206,16 @@ fun Screen(
                 content()
                 if (scroll) Spacer(Modifier.height(Space.xxl))
             }
-            if (footer != null) Column(footerModifier, verticalArrangement = footerSpacing, content = footer)
+            // A footer whose content has gone (Reveal/Appear) takes no room, gaps included.
+            if (footer != null) Column(
+                Modifier.fillMaxWidth().layout { measurable, constraints ->
+                    val gap = (if (compact) Space.s else Space.m).roundToPx()
+                    val content = measurable.measure(constraints.offset(vertical = -2 * gap))
+                    if (content.height == 0) layout(constraints.maxWidth, 0) { }
+                    else layout(constraints.maxWidth, content.height + 2 * gap) { content.place(0, gap) }
+                },
+                verticalArrangement = footerSpacing, content = footer,
+            )
         }
     }
 }
@@ -426,12 +435,15 @@ private fun PillButton(
     ) {
         // Centred (text + icon as one group), bold; long labels on narrow phones shrink a little before they would be cut off.
         Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.CenterHorizontally) {
-            BasicText(
-                label,
-                style = textStyle, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = { contentTone },
-                autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = textStyle.fontSize),
-            )
+            // A label that changes ("Übungen auswählen" → "3 hinzufügen", "…" while loading) fades over.
+            Swap(label, contentAlignment = Alignment.Center) { text ->
+                BasicText(
+                    text,
+                    style = textStyle, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = { contentTone },
+                    autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = textStyle.fontSize),
+                )
+            }
             // Second line: what exactly the button will do (the set it logs). Changes softly with the workout.
             if (caption != null) Swap(caption, contentAlignment = Alignment.Center) { line ->
                 BasicText(
