@@ -34,6 +34,13 @@ import app.overfit.ui.components.Screen
 import app.overfit.ui.components.SectionTitle
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.BigInput
+import app.overfit.ui.components.AnimatedItems
+import app.overfit.ui.components.Hint
+import app.overfit.ui.components.PanelItem
+import app.overfit.ui.components.PanelSection
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
@@ -82,7 +89,8 @@ fun WorkoutEditScreen(
     LaunchedEffect(backArmed) { if (backArmed) { delay(4000); backArmed = false } }
     val dirty = draft != null && draft != original
 
-    val back = { if (dirty && !backArmed) backArmed = true else onClose() }
+    val haptics = rememberHaptics()
+    val back = { if (dirty && !backArmed) { backArmed = true; haptics.arm() } else onClose() }
     BackHandler(enabled = dirty, onBack = back)
     val save = save@{
         val d = draft ?: return@save
@@ -104,62 +112,75 @@ fun WorkoutEditScreen(
         scroll = true,
         header = { BackHeader(t.back, back) },
         footer = {
-            when {
-                backArmed -> Text(t.unsavedHint, style = Theme.type.caption, tone = Tone.Muted)
-                failed -> Text(h.editSaveFailed, style = Theme.type.caption, tone = Tone.Muted)
+            // The hint grows in above the button (and away again) instead of jumping; switching between them fades.
+            val message = when {
+                backArmed -> t.unsavedHint
+                failed -> h.editSaveFailed
+                else -> null
+            }
+            RevealNotNull(message, from = Alignment.Bottom) { m ->
+                Swap(m) { Text(it, style = Theme.type.caption, tone = Tone.Muted) }
             }
             PrimaryButton(t.save, save, enabled = draft != null, loading = saving)
         },
     ) {
-        val d = draft ?: return@Screen
-        Text(h.editTitle, tone = Tone.Muted)
-        Spacer(Modifier.height(Space.s))
-        // The name of this training (not of its saved workout): tap and type, like the workout editor.
-        BigInput(d.workout.name, { draft = draft?.withName(it) }, h.trainingNamePlaceholder, Modifier.fillMaxWidth())
-        Spacer(Modifier.height(Space.s))
-        Text(h.editHint, style = Theme.type.caption, tone = Tone.Muted)
+        // Loaded a moment later: the content fades in instead of popping.
+        Swap(draft, contentKey = { it != null }) { loaded ->
+            val d = loaded ?: return@Swap
+            Column(Modifier.fillMaxWidth()) {
+                Text(h.editTitle, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.s))
+                // The name of this training (not of its saved workout): tap and type, like the workout editor.
+                BigInput(d.workout.name, { draft = draft?.withName(it) }, h.trainingNamePlaceholder, Modifier.fillMaxWidth())
 
-        SectionTitle(h.feeling)
-        FeelingPicker(d.feeling, h.feelingValue) { draft = draft?.withFeeling(it) }
-        Spacer(Modifier.height(Space.m))
-        CheckRow(h.sauna, d.sauna) { draft = draft?.withSauna(it) }
-
-        SectionTitle(h.note)
-        MultilineInput(d.note, { draft = draft?.withNote(it) }, h.notePlaceholder)
-
-        if (d.workout.exercises.isEmpty()) {
-            Spacer(Modifier.height(Space.l))
-            Text(h.editNoExercises, tone = Tone.Muted)
-        }
-        d.workout.exercises.forEach { e ->
-            key(e.id) {
-                Spacer(Modifier.height(Space.l))
-                Block {
-                    // Same card head as in the running workout (48 dp image, name, sets).
-                    app.overfit.ui.components.ExerciseCardHeader(e.exercise, listOf(t.setsDone(e.completedSets, e.sets.size)), onDetails = { onExerciseDetails(e.exercise.id) })
-                    Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                        SetColumnsHeader(t.setColumn, setColumnLabels(e.exercise.trackingType, unit, t), trailing = 48.dp)
-                        val focus = remember(e.id) { mutableMapOf<String, FocusRequester>() }
-                        fun focusOf(id: String) = focus.getOrPut(id) { FocusRequester() }
-                        e.sets.forEachIndexed { i, set ->
-                            key(set.id) {
-                                WorkoutSetRow(
-                                    focusRequester = focusOf(set.id),
-                                    next = e.sets.getOrNull(i + 1)?.let { focusOf(it.id) },
-                                    number = i + 1,
-                                    type = e.exercise.trackingType,
-                                    unit = unit,
-                                    language = language,
-                                    set = set,
-                                    onValues = { v -> draft = draft?.setValues(set.id, v) },
-                                    onToggle = { draft = draft?.toggleSet(set.id) },
-                                    onRemove = { draft = draft?.removeSet(set.id) },
-                                )
+                // The sets come first: the pencil is mostly used to correct them (audit 17.11.).
+                if (d.workout.exercises.isEmpty()) {
+                    Spacer(Modifier.height(Space.l))
+                    Text(h.editNoExercises, tone = Tone.Muted)
+                }
+                d.workout.exercises.forEach { e ->
+                    key(e.id) {
+                        Spacer(Modifier.height(Space.l))
+                        Block {
+                            // Same card head as in the running workout (48 dp image, name, sets).
+                            app.overfit.ui.components.ExerciseCardHeader(e.exercise, listOf(t.setsDone(e.completedSets, e.sets.size)), onDetails = { onExerciseDetails(e.exercise.id) })
+                            Column(Modifier.padding(top = Space.xs)) {
+                                SetColumnsHeader(t.setColumn, setColumnLabels(e.exercise.trackingType, unit, t), trailing = 48.dp)
+                                Spacer(Modifier.height(Space.xs))
+                                val focus = remember(e.id) { mutableMapOf<String, FocusRequester>() }
+                                fun focusOf(id: String) = focus.getOrPut(id) { FocusRequester() }
+                                // A new set grows in, a removed one shrinks away; the rows and cards below slide.
+                                AnimatedItems(e.sets, key = { it.id }, spacing = Space.xs) { i, set ->
+                                    WorkoutSetRow(
+                                        focusRequester = focusOf(set.id),
+                                        next = e.sets.getOrNull(i + 1)?.let { focusOf(it.id) },
+                                        number = i + 1,
+                                        type = e.exercise.trackingType,
+                                        unit = unit,
+                                        language = language,
+                                        set = set,
+                                        onValues = { v -> draft = draft?.setValues(set.id, v) },
+                                        onToggle = { draft = draft?.toggleSet(set.id) },
+                                        onRemove = { draft = draft?.removeSet(set.id) },
+                                    )
+                                }
+                                BlockButton(t.addSet, { haptics.tick(); draft = draft?.addSet(e.id) }, Modifier.fillMaxWidth(), inBlock = true)
                             }
                         }
-                        BlockButton(t.addSet, { draft = draft?.addSet(e.id) }, Modifier.fillMaxWidth(), inBlock = true)
                     }
                 }
+
+                // Same block as on the finish screen.
+                Spacer(Modifier.height(Space.l))
+                PanelSection(h.feeling) {
+                    PanelItem { FeelingPicker(d.feeling, h.feelingValue) { draft = draft?.withFeeling(it) } }
+                    CheckRow(h.sauna, d.sauna) { draft = draft?.withSauna(it) }
+                }
+
+                SectionTitle(h.note)
+                MultilineInput(d.note, { draft = draft?.withNote(it) }, h.notePlaceholder)
+
+                Hint(h.editHint)
             }
         }
     }
