@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,7 +47,13 @@ import app.overfit.domain.Language
 import app.overfit.domain.Muscle
 import app.overfit.domain.TemplateSummary
 import app.overfit.i18n.LocalStrings
+import app.overfit.ui.components.Appear
 import app.overfit.ui.components.Chip
+import app.overfit.ui.components.ExercisePoses
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.motionItem
+import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.components.ExerciseImage
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.share.ShareDependencies
@@ -59,6 +71,8 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
+import app.overfit.ui.theme.IconSize
+import app.overfit.ui.theme.Motion
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +81,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -105,8 +120,7 @@ fun ExercisesScreen(
     val t = LocalStrings.current
     // Only exercises here; the saved workouts live on the Training tab. Not a tab of its own: opened from Training.
     Screen(header = { BackHeader(t.back, onBack) }, footer = { PrimaryButton(t.newCustomExercise, onNewCustomExercise) }) {
-        Title(t.exercisesTitle)
-        Spacer(Modifier.height(Space.m))
+        CatalogTitle(catalog, t.exercisesTitle)
         CatalogList(catalog, language, onClick = onOpenExercise, onDetails = onOpenExercise)
     }
 }
@@ -127,7 +141,20 @@ fun ColumnScope.CatalogList(
     val filter by catalog.filter.collectAsStateWithLifecycle()
     val results by catalog.results.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    LaunchedEffect(filter) { listState.scrollToItem(0) }
+    // Back to the top only when the filter really changes: coming back from a detail keeps the list where it was
+    // (the effect restarts on re-entry, its first value is the unchanged filter and is dropped).
+    val currentFilter by rememberUpdatedState(filter)
+    LaunchedEffect(listState) { snapshotFlow { currentFilter }.drop(1).collect { listState.scrollToItem(0) } }
+    // Warm the pose data so the detail hero is ready on the first open (no placeholder that changes height).
+    LaunchedEffect(Unit) { runCatching { ExercisePoses.load() } }
+    // Rows move to their new place when a chip changes the result; while typing they only fade (every keystroke
+    // re-ranks the list, sliding rows would look restless). Decided at the last filter change, not per result.
+    val change = remember { FilterChange(filter) }
+    if (change.filter != filter) {
+        change.typing = change.filter.query != filter.query
+        change.filter = filter
+    }
+    val typing = change.typing
 
     SearchInput(filter.query, catalog::setQuery, t.searchPlaceholder, clearLabel = t.remove)
     // Chips and count scroll away with the list so the results get the room on small phones.
@@ -145,29 +172,34 @@ fun ColumnScope.CatalogList(
         }
         val list = results
         when {
-            list == null -> item(key = "loading") { Text(t.catalogLoading, Modifier.padding(top = Space.l), tone = Tone.Muted) }
+            list == null -> item(key = "loading") {
+                Text(t.catalogLoading, motionItem().padding(top = Space.l), tone = Tone.Muted)
+            }
             list.isEmpty() -> item(key = "empty") {
-                Column {
+                Column(motionItem()) {
                     Text(
                         if (filter.onlyCustom && filter.query.isBlank()) t.noCustomExercises else t.noResults,
                         Modifier.padding(top = Space.l),
                         tone = Tone.Muted,
                     )
                     // With a filter active the way out is one tap away, not three chip toggles.
-                    if (filter.muscle != null || filter.equipment != null || (filter.onlyCustom && filter.query.isNotBlank())) {
-                        Spacer(Modifier.height(Space.m))
-                        SmallButton(t.clearFilters, catalog::clearFilters)
+                    Reveal(filter.muscle != null || filter.equipment != null || (filter.onlyCustom && filter.query.isNotBlank())) {
+                        Column {
+                            Spacer(Modifier.height(Space.m))
+                            SmallButton(t.clearFilters, catalog::clearFilters)
+                        }
                     }
                 }
             }
             else -> {
                 item(key = "count") {
-                    Text(t.exerciseCount(list.size), Modifier.padding(top = Space.m), style = Theme.type.caption, tone = Tone.Faint)
+                    RollingText(t.exerciseCount(list.size), resultMotion(typing).padding(top = Space.m), style = Theme.type.caption, tone = Tone.Faint)
                 }
                 items(list, key = { it.id }) { exercise ->
                     ExerciseRow(
                         exercise, language, selected = selectedIds?.contains(exercise.id),
                         onImageClick = onDetails?.let { open -> { open(exercise) } },
+                        modifier = resultMotion(typing),
                     ) { onClick(exercise) }
                 }
             }
@@ -175,8 +207,33 @@ fun ColumnScope.CatalogList(
         if (onCreate != null && list != null) item(key = "create") {
             val f = LocalExerciseFormStrings.current
             val query = filter.query.trim()
-            Spacer(Modifier.height(Space.s))
-            ListRow(if (query.isEmpty()) f.createInPickerEmpty else f.createInPicker(query), onClick = { onCreate(query) })
+            Column(resultMotion(typing)) {
+                Spacer(Modifier.height(Space.s))
+                ListRow(if (query.isEmpty()) f.createInPickerEmpty else f.createInPicker(query), onClick = { onCreate(query) })
+            }
+        }
+    }
+}
+
+/** Last filter seen by [CatalogList] and whether its last change was typing (plain holder, not state). */
+private class FilterChange(var filter: ExerciseSearch.Filter, var typing: Boolean = false)
+
+/** [motionItem] for result rows; while typing fade only, without sliding to the new place. */
+private fun LazyItemScope.resultMotion(typing: Boolean): Modifier =
+    if (!typing) motionItem() else Modifier.animateItem(
+        fadeInSpec = Motion.fadeIn(),
+        placementSpec = null,
+        fadeOutSpec = Motion.fadeOut(),
+    )
+
+/** Big title of the catalogue; folds away while the search has text, so more results fit above the keyboard. */
+@Composable
+private fun CatalogTitle(catalog: CatalogViewModel, title: String) {
+    val filter by catalog.filter.collectAsStateWithLifecycle()
+    Reveal(filter.query.isEmpty()) {
+        Column {
+            Title(title)
+            Spacer(Modifier.height(Space.m))
         }
     }
 }
@@ -196,10 +253,11 @@ fun ExerciseRow(
     selected: Boolean?,
     /** Tap on the image only (the row itself does [onClick]); null = the image is not a separate target. */
     onImageClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val t = LocalStrings.current
-    Column(Modifier.fillMaxWidth().pressableRow(onClick)) {
+    Column(modifier.fillMaxWidth().pressableRow(onClick)) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = Space.s),
             verticalAlignment = Alignment.CenterVertically,
@@ -214,8 +272,13 @@ fun ExerciseRow(
                 ).joinToString(" · ")
                 if (sub.isNotEmpty()) Text(sub, style = Theme.type.caption, tone = Tone.Muted)
             }
-            if (selected == true) {
-                Box(Modifier.semantics { contentDescription = t.selected }) { LineIcon(Icon.Check) }
+            // Multi-select: the slot for the tick is always there, so the name never re-wraps when it appears.
+            if (selected != null) {
+                Box(Modifier.size(IconSize.action), contentAlignment = Alignment.Center) {
+                    Appear(selected) {
+                        Box(Modifier.semantics { contentDescription = t.selected }) { LineIcon(Icon.Check) }
+                    }
+                }
             }
         }
         Hairline()
@@ -243,6 +306,7 @@ fun ExercisePickerScreen(
 ) {
     val t = LocalStrings.current
     val selected = rememberSaveable(saver = selectionSaver) { mutableStateListOf<String>() }
+    val haptics = rememberHaptics()
     LaunchedEffect(created) {
         val id = created ?: return@LaunchedEffect
         onCreatedConsumed()
@@ -255,19 +319,19 @@ fun ExercisePickerScreen(
             PrimaryButton(t.addExercises(selected.size), { onPicked(selected.toList()) }, enabled = selected.isNotEmpty())
         }),
     ) {
-        Title(if (single) t.replaceExerciseTitle else t.chooseExercises)
-        Spacer(Modifier.height(Space.m))
+        CatalogTitle(catalog, if (single) t.replaceExerciseTitle else t.chooseExercises)
         CatalogList(
             catalog,
             language,
             onClick = { exercise ->
                 when {
                     single -> onPicked(listOf(exercise.id))
-                    exercise.id in selected -> selected.remove(exercise.id)
-                    else -> selected.add(exercise.id)
+                    exercise.id in selected -> { selected.remove(exercise.id); haptics.tick() }
+                    else -> { selected.add(exercise.id); haptics.tick() }
                 }
             },
-            selectedIds = selected,
+            // Replace mode finishes on the first tap: no tick, so no slot reserved for it.
+            selectedIds = if (single) null else selected,
             onCreate = onCreate,
             onDetails = onDetails?.let { open -> { e: Exercise -> open(e.id) } },
         )
