@@ -26,6 +26,7 @@ import app.overfit.domain.formatNumber
 import app.overfit.i18n.LocalCoachStrings
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.RevealNotNull
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.Tone
 import app.overfit.ui.history.formatVolume
@@ -108,16 +109,21 @@ private fun ExerciseBlock(c: ExerciseComparison, unit: WeightUnit, language: Lan
                 deltas.forEach { (text, d) -> DeltaText(text, d) }
             }
         }
-        c.ai?.comment?.takeIf { it.isNotBlank() }?.let {
-            Spacer(Modifier.height(Space.s))
-            Text(it)
-        }
-        c.ai?.next?.let { n ->
-            val v = app.overfit.domain.SetValues(n.weightKg, n.reps, n.durationSec)
-            val text = WorkoutFormat.values(v, c.type, unit, language, t)
-            if (text.isNotEmpty()) {
+        // The coach's words come in when the answer arrives (the numbers above stay): they grow in, all blocks together.
+        RevealNotNull(c.ai?.comment?.takeIf { it.isNotBlank() }) {
+            Column {
                 Spacer(Modifier.height(Space.s))
-                Text(s.nextTimeLine(text), style = Theme.type.label)
+                Text(it)
+            }
+        }
+        val next = c.ai?.next?.let { n ->
+            val v = app.overfit.domain.SetValues(n.weightKg, n.reps, n.durationSec)
+            WorkoutFormat.values(v, c.type, unit, language, t).takeIf { it.isNotEmpty() }
+        }
+        RevealNotNull(next) {
+            Column {
+                Spacer(Modifier.height(Space.s))
+                Text(s.nextTimeLine(it), style = Theme.type.label)
             }
         }
     }
