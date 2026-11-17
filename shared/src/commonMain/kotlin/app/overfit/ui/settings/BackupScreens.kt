@@ -16,7 +16,10 @@ import app.overfit.data.backup.BackupPreview
 import app.overfit.data.backup.BackupService
 import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.BackHeader
-import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
+import androidx.compose.foundation.layout.Column
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.Panel
 import app.overfit.ui.components.PrimaryButton
@@ -57,11 +60,15 @@ fun BackupImportScreen(
 ) {
     val t = LocalStrings.current
     val p = t.photos
-    val parsed = remember {
+    // Reading the archive (zip + JSON) is off the main thread, so the screen transition does not stutter;
+    // the preview fades in when it is ready (null = still reading).
+    var parsed by remember { mutableStateOf<Parsed?>(null) }
+    LaunchedEffect(Unit) {
         val bytes = pending.value
-        if (bytes == null) Parsed.Missing
-        else backup.preview(bytes).fold({ Parsed.Ok(it) }, { Parsed.Failed(it) })
+        parsed = if (bytes == null) Parsed.Missing
+        else withContext(Dispatchers.Default) { backup.preview(bytes) }.fold({ Parsed.Ok(it) }, { Parsed.Failed(it) })
     }
+    val haptics = rememberHaptics()
     DisposableEffect(Unit) { onDispose { pending.value = null } }
 
     var running by remember { mutableStateOf(false) }
@@ -72,7 +79,7 @@ fun BackupImportScreen(
         scroll = true,
         header = { BackHeader(t.back, onBack) },
         footer = {
-            failure?.let { Text(it, style = Theme.type.caption) }
+            RevealNotNull(failure) { Text(it, style = Theme.type.caption) }
             if (preview != null && !workoutRunning) {
                 val restore = {
                     running = true
@@ -88,7 +95,7 @@ fun BackupImportScreen(
                         }
                         withContext(Dispatchers.Main) {
                             running = false
-                            if (error == null) onRestored() else failure = error
+                            if (error == null) { haptics.confirm(); onRestored() } else { haptics.reject(); failure = error }
                         }
                     }
                 }
@@ -98,15 +105,16 @@ fun BackupImportScreen(
     ) {
         Title(p.importTitle)
         Spacer(Modifier.height(Space.m))
-        when (parsed) {
+        Swap(parsed) { result -> Column { when (result) {
+            null -> Unit
             Parsed.Missing -> Text(p.importNothing, tone = Tone.Muted)
             is Parsed.Failed -> {
-                val tooNew = parsed.error is BackupError.TooNew
+                val tooNew = result.error is BackupError.TooNew
                 if (tooNew) Text(p.importUpdateApp, style = Theme.type.label)
                 Text(if (tooNew) p.importTooNew else p.importUnreadable, tone = Tone.Muted)
             }
             is Parsed.Ok -> {
-                val pv = parsed.preview
+                val pv = result.preview
                 val date = Instant.fromEpochMilliseconds(pv.createdAt).toLocalDateTime(TimeZone.currentSystemDefault()).date
                 Text(p.importCreated(t.date(date)), tone = Tone.Muted)
                 Text(p.importVersion(pv.appVersion), style = Theme.type.caption, tone = Tone.Muted)
@@ -121,6 +129,6 @@ fun BackupImportScreen(
                 Spacer(Modifier.height(Space.m))
                 Text(if (workoutRunning) p.importWorkoutRunning else p.importWarning, style = Theme.type.caption, tone = if (workoutRunning) Tone.Default else Tone.Muted)
             }
-        }
+        } } }
     }
 }

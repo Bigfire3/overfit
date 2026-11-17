@@ -9,6 +9,16 @@ import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.share.ShareDependencies
 import app.overfit.ui.components.pressableRow
+import app.overfit.ui.components.Icon
+import app.overfit.ui.components.LineIcon
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.IconSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -95,6 +105,13 @@ fun SettingsScreen(
     LaunchedEffect(confirmReset) {
         if (confirmReset) { delay(4000); confirmReset = false }
     }
+    // Export finished: confirm when the share sheet opens, reject when it failed.
+    val haptics = rememberHaptics()
+    var wasExporting by remember { mutableStateOf(exportingBackup) }
+    LaunchedEffect(exportingBackup) {
+        if (wasExporting && !exportingBackup) { if (backupExportFailed) haptics.reject() else haptics.confirm() }
+        wasExporting = exportingBackup
+    }
 
     Screen(scroll = true) {
         Title(t.settingsTitle)
@@ -130,19 +147,26 @@ fun SettingsScreen(
         }
 
         PanelSection(t.notifications) {
-            when (notificationsAllowed) {
-                true -> ListRow(t.notificationsPermission, t.notificationsAllowed, onClick = restAlerts::openNotificationSettings)
-                false -> ListRow(t.notificationsPermission, t.exactAlarmAllow, onClick = restAlerts::allowNotifications)
-                null -> Unit
-            }
-            if (exactAllowed == false) {
+            // Always there; only its value fades in once the permission is known (no row popping in).
+            SwapValueRow(
+                t.notificationsPermission,
+                when (notificationsAllowed) { true -> t.notificationsAllowed; false -> t.exactAlarmAllow; null -> "" },
+                onClick = {
+                    when (notificationsAllowed) {
+                        true -> restAlerts.openNotificationSettings()
+                        false -> restAlerts.allowNotifications()
+                        null -> Unit
+                    }
+                },
+            )
+            Reveal(exactAllowed == false) {
                 ListRow(t.exactAlarm, t.exactAlarmAllow, onClick = restAlerts::openExactAlarmSettings)
             }
             SwitchRow(t.vibration, state.settings.vibration, onCheckedChange = store::setVibration)
             SwitchRow(t.restTicks, state.settings.restTicks, onCheckedChange = store::setRestTicks)
         }
-        if (notificationsAllowed == false) Hint(t.notificationsDeniedHint)
-        if (exactAllowed == false) Hint(t.exactAlarmHint)
+        Reveal(notificationsAllowed == false) { Hint(t.notificationsDeniedHint) }
+        Reveal(exactAllowed == false) { Hint(t.exactAlarmHint) }
 
         // Everything about the coach and the AI access (the Coach tab is the chat).
         CoachSettingsSection(state, providers, coach, coachPrefs, chatFeature, fuelSession, coachNav)
@@ -152,15 +176,33 @@ fun SettingsScreen(
         }
 
         PanelSection(t.photos.backupSection) {
-            ListRow(if (exportingBackup) t.photos.backupExporting else t.photos.backupExport, onClick = { if (!exportingBackup) onExportBackup() })
+            Swap(exportingBackup) { exporting ->
+                ListRow(if (exporting) t.photos.backupExporting else t.photos.backupExport, onClick = { if (!exportingBackup) onExportBackup() })
+            }
             ListRow(t.photos.backupImport, onClick = onImportBackup)
         }
-        Hint(if (backupExportFailed) t.photos.backupExportFailed else t.photos.backupExportHint)
+        Swap(backupExportFailed) { failed -> Hint(if (failed) t.photos.backupExportFailed else t.photos.backupExportHint) }
 
         SectionTitle(t.data)
         Spacer(Modifier.height(Space.s))
         ConfirmButton(t.reset, onConfirm = onReset)
+        Hint(t.resetHint)
     }
+}
+
+/**
+ * [ListRow] with a value and a chevron, whose value fades over when it changes or arrives a moment later
+ * (permission, balance, count) instead of the row being replaced in one frame.
+ */
+@Composable
+internal fun SwapValueRow(label: String, value: String, onClick: () -> Unit) {
+    ListRow(label, onClick = onClick, trailing = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Swap(value, contentAlignment = Alignment.CenterEnd) { Text(it, tone = Tone.Muted) }
+            Spacer(Modifier.width(Space.xs))
+            LineIcon(Icon.ChevronRight, size = IconSize.inline, color = Theme.colors.muted)
+        }
+    })
 }
 
 @Composable
@@ -168,12 +210,16 @@ fun AboutScreen(versionName: String, onBack: () -> Unit, fuel: FuelAccess? = nul
     val t = LocalStrings.current
     var taps by remember { mutableStateOf(0) }
     val devUnlocked = fuel != null && taps >= DEV_TAPS
+    val haptics = rememberHaptics()
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         Title(t.appName)
         Spacer(Modifier.height(Space.s))
         // Hidden developer option: tap the version seven times.
-        Text(t.aboutVersion(versionName), tone = Tone.Muted, modifier = Modifier.pressableRow { taps++ })
-        if (devUnlocked && fuel != null) DeveloperSection(fuel)
+        Text(t.aboutVersion(versionName), tone = Tone.Muted, modifier = Modifier.pressableRow {
+            taps++
+            if (fuel != null && taps == DEV_TAPS) haptics.confirm()
+        })
+        RevealNotNull(fuel?.takeIf { devUnlocked }) { f -> Column { DeveloperSection(f) } }
         Spacer(Modifier.height(Space.m))
         Text(t.aboutTagline)
         Spacer(Modifier.height(Space.m))
@@ -226,6 +272,6 @@ internal fun FuelRow(session: FuelSession, fuelActive: Boolean, onClick: () -> U
         else -> ((account as? Loaded.Ready)?.value?.let { app.overfit.ui.fuel.creditSummary(it, f) } ?: "") +
             if (demo) " · ${f.fuelRowDemo}" else ""
     }
-    ListRow(f.fuel, value.trim(), onClick = onClick)
+    SwapValueRow(f.fuel, value.trim(), onClick = onClick)
 }
 

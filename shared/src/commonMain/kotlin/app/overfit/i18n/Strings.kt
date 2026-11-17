@@ -242,6 +242,8 @@ data class Strings(
     val coachMemory: String,
     val data: String,
     val reset: String,
+    /** Hint under the reset button: what it deletes, and to export a backup first. */
+    val resetHint: String,
     val app: String,
     val about: String,
 
@@ -470,6 +472,7 @@ val German = Strings(
     coachMemory = "Coach-Gedächtnis",
     data = "Daten",
     reset = "Alle Daten löschen",
+    resetHint = "Löscht alle Trainings, Workouts, eigenen Übungen, Fotos, dein Profil und die Einstellungen; danach beginnt die Einrichtung neu. Exportiere vorher eine Sicherung.",
     app = "App",
     about = "Über Overfit",
 
@@ -694,6 +697,7 @@ val English = Strings(
     coachMemory = "Coach memory",
     data = "Data",
     reset = "Delete all data",
+    resetHint = "Deletes all sessions, saved workouts, own exercises, photos, your profile and settings; setup starts over afterwards. Export a backup first.",
     app = "App",
     about = "About Overfit",
 
