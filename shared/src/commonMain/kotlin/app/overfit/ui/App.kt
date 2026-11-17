@@ -621,7 +621,9 @@ fun OverfitApp(deps: AppDependencies) {
                     composable<StartRoute> {
                         tabScreen(Tab.START) {
                             val startScope = rememberCoroutineScope()
-                            val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = emptyMap())
+                            // null until loaded: the cards then leave their "last done" line empty instead of showing
+                            // "never trained" for a frame.
+                            val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = null)
                             StartScreen(
                                 templates = templates,
                                 lastDone = lastDone,
@@ -669,7 +671,7 @@ fun OverfitApp(deps: AppDependencies) {
                         // A saved workout: shown and edited in one screen (autosave), "Start" at the bottom.
                         val id = entry.toRoute<WorkoutPlanRoute>().templateId
                         val scope = rememberCoroutineScope()
-                        val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = emptyMap())
+                        val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = null)
                         val editor = viewModel(key = "plan-$id") {
                             TemplateEditorViewModel(id, deps.data.templates, deps.data.exercises, state.profile.unit, state.language)
                         }
@@ -681,7 +683,7 @@ fun OverfitApp(deps: AppDependencies) {
                             viewModel = editor,
                             unit = state.profile.unit,
                             language = state.language,
-                            lastDone = lastDoneText(LocalStrings.current, lastDone[id], deps.today()),
+                            lastDone = lastDone?.let { lastDoneText(LocalStrings.current, it[id], deps.today()) }.orEmpty(),
                             workoutRunning = workoutState.workout != null,
                             onClose = nav::popBackStack,
                             // A replace whose picker was left with back must not turn the next add into a replace.

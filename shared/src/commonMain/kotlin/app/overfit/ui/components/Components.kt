@@ -11,7 +11,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.layout.positionInParent
 import app.overfit.ui.theme.Motion
 import kotlinx.coroutines.launch
@@ -176,15 +178,25 @@ fun Screen(
                     Spacer(Modifier.height(maxOf(footerHeight, Space.xxl)))
                 }
                 val bg = Theme.colors.background
+                val topGap = if (compact) Space.s else Space.m
+                val bottomGap = if (compact) Space.s else Space.m
                 Column(
                     Modifier.align(Alignment.BottomCenter)
+                        .fillMaxWidth()
                         .onSizeChanged { footerHeight = with(density) { it.height.toDp() } }
                         .drawBehind {
                             // One soft gradient over the whole footer area (no hard edge, no flat bar).
-                            drawRect(Brush.verticalGradient(listOf(Color.Transparent, bg.copy(alpha = 0.85f)), startY = 0f, endY = size.height))
+                            if (size.height > 0f) drawRect(Brush.verticalGradient(listOf(Color.Transparent, bg.copy(alpha = 0.85f)), startY = 0f, endY = size.height))
                         }
-                        .padding(top = 24.dp)
-                        .then(footerModifier),
+                        // A footer whose content has gone (a button that left with Reveal/Appear) takes no room and
+                        // draws nothing: the fade and the gaps belong to the content, not to the empty slot.
+                        .layout { measurable, constraints ->
+                            val top = (24.dp + topGap).roundToPx()
+                            val bottom = bottomGap.roundToPx()
+                            val content = measurable.measure(constraints.offset(vertical = -(top + bottom)))
+                            if (content.height == 0) layout(constraints.maxWidth, 0) { }
+                            else layout(constraints.maxWidth, content.height + top + bottom) { content.place(0, top) }
+                        },
                     verticalArrangement = footerSpacing,
                     content = footer,
                 )

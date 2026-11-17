@@ -1887,3 +1887,83 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
   44 dp, Badge-Position aus #108 mit `Sizes.badge`; Tab-Suche im ScreenshotTest aus #108 (Rolle Tab).
 - **Zeitabhängiger Testfehler behoben:** `CoachFlowTest`/`CoachOverlayTest` legten ein Training „vor einer Stunde“ an und öffneten
   heute im Kalender. Zwischen 0 und 1 Uhr war das gestern (fiel um 00:55 auf). Jetzt `startEarlierToday()` in `TestWaits.kt`.
+
+## Bewegung, „Jetzt“-Farbe und Workout-Dock (Session BL, 16.11.)
+- **Auftrag (Fabian):** „Baue in der App überall Animationen ein. Die App soll aber schnell und reaktiv bleiben. Schlage Verbesserungen
+  vor, welche die Bedienung vereinfachen. Du kannst auch eine weitere Farbe einbauen. Der Screenspace soll sinnvoll aufgeteilt und
+  genutzt werden. Im Workoutmodus gibt es zum Beispiel noch die Funktionen, nur die Pausenzeit etwas größer zu machen, was absolut
+  nutzlos ist. […] sehr generisch, starr und abgehackt […]. Es fehlt der typische Apple Flow.“ Dazu: „Nutze Ultracode.“ Das hebt für
+  diese Aufgabe „Kein Ultracode“ aus CLAUDE.md auf; Umsetzungs-Subagents blieben `kmp-worker` (Opus 5.5, medium), Gegencheck Sonnet.
+- **Vorgehen:** Workflow 1: neun Lese-Audits (je UI-Bereich plus ein Durchgang durch die Abläufe), rund 300 Befunde. Fundament,
+  Navigation und Workout-Modus in der Hauptsession (Architektur bleibt dort). Workflow 2: je Dateigruppe ein `kmp-worker` im eigenen
+  Worktree mit den Befunden seines Bereichs. Workflow 3: Gegencheck. Was die Audits an Bedienungs-Ideen brachten und nicht hierher
+  gehört, steht in `docs/VORSCHLAEGE.md`.
+- **Was „Apple Flow“ hier heißt (und was nicht):** (1) Rückmeldung beim Aufsetzen des Fingers, auch bei einem schnellen Tipp. (2) Federn
+  statt fester Zeiten: eine Feder lässt sich mitten in der Bewegung umlenken, ein zweiter Tipp oder ein umkehrender Finger erzeugt
+  keinen Sprung. (3) Dinge haben Orte: tiefer = von der Seite, das Training = von unten, ein Sheet = von unten, das Menü = aus dem ⋮.
+  (4) Flächen folgen dem Finger (Zurück-Geste, Sheet, Satz wischen, Karte ziehen) und laufen mit dessen Geschwindigkeit aus.
+  (5) Layout springt nicht. Nicht übernommen: Unschärfe-Materialien (auf Schwarz wirkungslos, in Compose teuer), gestaffelt
+  einfliegende Listen (macht jeden Screen langsamer), Endlos-Animationen.
+- **Ein System statt vieler Werte:** `ui/theme/Motion.kt` hat vier Federn (`snappy` ~180 ms für Zustände, `smooth` ~300 ms für Layout,
+  `screen` für Screens, `bouncy` für den seltenen Moment „geschafft“), zwei Blenden und `tick`. Screens schreiben keine Dauern mehr;
+  sie nutzen die Bausteine in `ui/components/MotionKit.kt` (`Reveal`, `Appear`, `Swap`, `AnimatedItems`, `motionItem`, `RollingText`,
+  `ProgressLine`, `motionColor`, `rememberHaptics`). Regeln in DESIGN.md „Motion“.
+- **Schnell bleiben:** Alles, was pro Frame läuft, wird beim Zeichnen gelesen (`graphicsLayer`, `drawBehind`, `color = { }`); eine
+  Animation setzt keine Liste neu zusammen. Die Uhr des Trainings tickt weiter alle 250 ms, aber Fuß und Pausen-Insel hängen nur noch
+  an abgeleiteten Werten (Text einmal pro Sekunde, „Pause läuft“ nur beim Wechsel); der Fortschritt läuft außerhalb der Komposition.
+  Taps werden beim Screen-Wechsel nur noch 300 ms geschluckt (Doppeltipp), nicht bis die Feder ausgeschwungen ist.
+- **Keine Endlos-Animation, keine, die sich selbst anstößt (`Motion.tick`):** Compose-UI-Tests warten, bis nichts mehr animiert. Eine
+  Animation, die am 250-ms-Takt hängt und selbst 250 ms dauert, wird nie fertig. Deshalb 200 ms linear: auf dem Balken nicht zu sehen
+  (unter 1 px pro Frame), und die Oberfläche kommt zur Ruhe (Akku).
+- **Druck-Rückmeldung verliert keinen Tipp mehr:** `pressScale` hing an „ist gedrückt“. Bei einem schnellen Tipp fallen Drücken und
+  Loslassen in denselben Frame, es war nichts zu sehen. Jetzt läuft der Weg nach unten immer zu Ende (70 ms), dann federt der Knopf
+  zurück. Zeilen (`pressableRow`) sind beim Aufsetzen sofort grau und blenden nach dem Loslassen aus.
+- **Navigation (`ScreenMotion.kt`):** Vorher ein Fade-through für alles (3.11., weil die 700-ms-Standardblende „verbuggt“ wirkte).
+  Jetzt: tiefer/zurück als Schieben mit Parallaxe (der untere Screen rückt ein Viertel und dunkelt ab); Training, Übungsauswahl und
+  Übungsformular als eigene Ebene von unten (ihre Kopfzeile schließt mit ⌄ bzw. ✕ statt mit dem Zurück-Pfeil); Foto-Vollbild und Story
+  wachsen heraus; Tabs wechseln weiter ohne Übergang (Test „instant“ bleibt), der neue Inhalt kommt nur kurz aus leichter Abdunklung.
+  Story schließt weiter sofort (Entscheidung 7.11.). „Speichern“ eines neuen Workouts blendet in die Plan-Ansicht über statt sie
+  hereinzuschieben (fast derselbe Screen).
+- **Zurück-Geste führt den Screen:** navigation-compose 2.10 hat eigene Übergänge für die Geste (`predictivePop…`). Dort dieselben
+  Bilder, aber linear in der Zeit, weil der Fortschritt der Geste darauf abgebildet wird: mit einer Feder liefe der Screen dem Finger
+  davon (nach 30 % Geste schon 80 % Weg). Vom rechten Rand gewischt geht der Screen nach links, dem Finger nach.
+- **Tab-Leiste gehört zum Tab-Screen (`TabScreen`):** Sie lag neben dem `NavHost` und verschwand in einem Frame, sobald ein Screen
+  darüber kam; der Tab-Screen sprang dabei um ihre Höhe. Beim Fade fiel das nicht auf, beim Schieben schon. Jetzt wandern Mini-Leiste
+  und Tab-Leiste mit ihrem Screen. Die graue Marke hinter dem aktiven Tab gleitet beim Wechsel vom alten zum neuen Tab; dafür merkt
+  sich `TabSwitch`, welcher Tab zuletzt zu sehen war. Nebenbei behoben: Der Screen über den Leisten zog den Abstand zur Systemleiste
+  noch einmal ab (toter Streifen über der Tab-Leiste auf Geräten mit Gestenleiste, Lücke zwischen Eingabefeld und Tastatur im
+  Coach-Tab). `consumeWindowInsets` in `TabScreen`. Auf dem Gerät zu prüfen, im Robolectric-Bild nicht sichtbar (Insets 0).
+- **Sheets:** federn herein, der Scrim dunkelt mit. Sie folgen dem Finger am Griff, am Fuß und am Inhalt, sobald der am Anfang steht
+  (verschachteltes Scrollen); ab 30 % der Höhe oder bei einem Schnipp schließen sie, sonst federn sie zurück, jeweils mit der
+  Geschwindigkeit des Fingers. Ein Haptik-Tick markiert den Punkt, ab dem Loslassen schließt.
+- **Neue Farbe: Kreidegelb `accent` #FFD60A = „jetzt“.** Erlaubt war „eine weitere Farbe“. Gewählt nach der Regel, die schon galt
+  (Farbe ist Bedeutung, nie Deko): grün = erledigt, rot = löschen, gelb = läuft gerade. Gelb, weil es zur Leitidee passt (gelbe Kreide
+  auf der Tafel hebt hervor, was gerade dran ist), auf Schwarz den höchsten Kontrast hat und im Farbton zwischen Rot und Grün klar
+  abgesetzt ist (Test `accentIsNeitherGreenNorRed`). Verworfen: Blau (sieht nach System-Standard aus, genau das „Generische“),
+  Orange (zu nah am Rot scharf geschalteter Knöpfe). Einsatz bewusst eng: Countdown der Pause (Insel und Mini-Leiste), gefüllter
+  Teil der Insel (`accentSubtle`), Nummer des Satzes, der dran ist, Fortschritt der Pause an der Mini-Leiste. Nicht: Auswahl (bleibt
+  weiß), Knöpfe, „Heute“ im Kalender (bleibt weiß; sonst stünde Gelb auf jedem Kalender-Screen und verlöre das „läuft gerade“).
+- **Workout-Modus, unten:** „Tipp auf die Zeit macht sie groß“ entfällt (Fabian: nutzlos), samt Texten. Stattdessen eine Insel:
+  `−15` · Countdown groß in Gelb, Ziffern rollen · `+15` · „Überspringen“ über die restliche Breite; die Insel füllt sich, wie die
+  Pause vergeht. Der Hauptknopf trägt als zweite Zeile, welchen Satz er loggt („Bench Press · Satz 2 · 60 kg × 8“), auch ohne Pause;
+  dafür entfällt die „Nächste: …“-Zeile. Ein Tipp auf den Countdown scrollt zum Satz. Höhe unten in der Pause vorher rund 172 dp, jetzt rund 150 dp, bei deutlich größerer Zeit.
+  „±15 s“ heißen sichtbar „−15“/„+15“ (für Screenreader weiter „−15 s“/„+15 s“), sonst passt „Überspringen“ auf 360 dp nicht in
+  lesbarer Größe. Bei großer Schrift (ab 1,15) oder Pausen ab 10 min rutscht „Überspringen“ in eine eigene Zeile, statt abgeschnitten
+  zu werden (`RestBarTest`).
+- **Workout-Modus, Liste:** Abhaken: das Grün breitet sich vom Haken über die Zeile aus, der Haken landet mit kleinem Überschwinger
+  (die eine Stelle, an der die App jubeln darf). Offene Sätze zeigen einen blassen Haken im Kreis („hier tippen“). Der Satz, der dran
+  ist, hat eine gelbe Nummer. Sätze und Übungen klappen, kommen und gehen weich. **Fertige Übung klappt zu und die Liste rückt zur
+  nächsten** (nur in dem Moment; von Hand geöffnet bleibt sie offen): der Screen zeigt, was zu tun ist. **„Duplizieren“ entfällt:**
+  `addSet` übernimmt die Werte des letzten Satzes, `duplicateSet(letzter)` tat dasselbe. **„Entfernen“ einer Übung braucht den
+  Doppeltipp** (nahm bisher mit einem Tipp alle geloggten Sätze mit, ohne Rückgängig). Nach „Übung hinzufügen“ scrollt die Liste zur
+  neuen Übung. Solange die Tastatur offen ist, weicht der Hauptknopf (abgehakt wird an der Zeile), es bleiben mehr Zeilen sichtbar.
+  Kopfzeile: „12:05 · 3/20“ in einer Zeile (vorgelesen weiter „… 3/20 erledigt“), darunter ein Balken über alle Sätze statt der Linie.
+- **„Training beenden“ nimmt erst nach 0,45 s Taps an:** Der Knopf ersetzt „Nächsten Satz loggen“ an derselben Stelle. Wer die letzten
+  Sätze schnell durchtippt, hätte ihn sonst mit den nächsten zwei Tipps scharf geschaltet und ausgelöst.
+- **Beim Beenden bleibt das Training stehen, bis der Screen weg ist:** Vorher wurde der Screen in dem Moment schwarz, in dem der
+  Controller kein Training mehr hatte. Mit einem Übergang, der den alten Screen zeigt, sähe man das.
+- **Haptik nach Bedeutung (`rememberHaptics`):** `tick` Auswahl wandert, `toggle` Schalter, `press` Hauptaktion, `arm` Doppeltipp
+  scharf, `confirm` erledigt, `threshold` Ziehen überschreitet den Punkt, ab dem Loslassen wirkt. Ob man sie spürt, entscheidet die
+  Systemeinstellung; das Vibrieren von Satz und Pausenende (eigene Einstellung im Profil) bleibt, wie es war.
+- **„Bewegung reduzieren“:** iOS-Einstellung bzw. abgeschaltete Animationen auf Android werden gelesen (`systemReducedMotion`,
+  `expect/actual`): Screen-Wechsel werden zur alten kurzen Überblendung, Ziffern wechseln ohne Rollen. Der Punkt stand seit 3.11. offen.

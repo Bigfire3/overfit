@@ -78,7 +78,8 @@ import kotlin.time.Instant
 @Composable
 fun StartScreen(
     templates: List<TemplateSummary>?,
-    lastDone: Map<Long, Long>,
+    /** Start of the last training per workout; null while it is still loading (the line then stays empty). */
+    lastDone: Map<Long, Long>?,
     today: LocalDate,
     running: Workout?,
     onOpenRunning: () -> Unit,
@@ -154,7 +155,7 @@ fun StartScreen(
                 else -> Column(Modifier.fillMaxWidth().padding(bottom = Space.l - Space.m)) {
                     val start = onStartWorkout.takeIf { running == null }
                     AnimatedItems(list, key = { it.id }, spacing = Space.m) { _, w ->
-                        WorkoutRow(w, lastDoneText(t, lastDone[w.id], today), onStart = start?.let { { it(w.id) } }) { onOpenWorkout(w.id) }
+                        WorkoutRow(w, lastDone?.let { lastDoneText(t, it[w.id], today) }.orEmpty(), onStart = start?.let { { it(w.id) } }) { onOpenWorkout(w.id) }
                     }
                 }
             }
