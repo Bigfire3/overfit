@@ -1,10 +1,21 @@
 package app.overfit.ui.coach.chat
 
-import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.backhandler.BackHandler
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.PopIn
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.motionColor
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.components.rememberPressProgress
+import app.overfit.ui.theme.Motion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +32,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
@@ -33,7 +43,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -92,6 +101,7 @@ internal class ContextSelection(val maxPhotos: Int = MAX_PHOTOS) {
 }
 
 /** "+" sheet: photos (camera + recent, numbered multi-select), training / workout / history / exercise, profile again. */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 internal fun ColumnScope.ContextSheet(
     env: CoachChatEnv,
@@ -102,31 +112,40 @@ internal fun ColumnScope.ContextSheet(
     onProfileAgain: () -> Unit,
 ) {
     val s = chatStrings()
-    when (state.page) {
-        ContextPage.Main -> MainPage(env, photos, state, profileRemoved, onCamera, onProfileAgain, s)
-        ContextPage.Trainings -> {
-            val list by env.trainings.collectAsState(initial = null)
-            SubPage(s.rowTraining, s, state) {
-                ItemList(list?.take(MAX_LIST), s.emptyTrainings, state) { attachmentText(it) to null }
-            }
-        }
-        ContextPage.Plans -> {
-            val list by env.plans.collectAsState(initial = null)
-            SubPage(s.rowWorkout, s, state) {
-                ItemList(list, s.emptyPlans, state) { it.label to null }
-            }
-        }
-        ContextPage.Exercises -> {
-            val list by produceState<List<Pair<ChatAttachment.Exercise, String>>?>(null) { value = env.exercises() }
-            var query by remember { mutableStateOf("") }
-            SubPage(s.rowExercise, s, state) {
-                if ((list?.size ?: 0) > SEARCH_FROM) {
-                    SearchInput(query, { query = it }, s.searchExercise, s.clearSearch)
-                    Spacer(Modifier.height(Space.s))
+    // System back on a sub page goes back to the main page; only there it closes the sheet (the sheet's own handler).
+    BackHandler(enabled = state.page != ContextPage.Main) { state.page = ContextPage.Main }
+    // Pages change in place: the old one fades out, the new one in, the sheet height follows.
+    Swap(state.page, Modifier.fillMaxWidth()) { page ->
+        Column(Modifier.fillMaxWidth()) {
+            when (page) {
+                ContextPage.Main -> MainPage(env, photos, state, profileRemoved, onCamera, onProfileAgain, s)
+                ContextPage.Trainings -> {
+                    val list by env.trainings.collectAsState(initial = null)
+                    SubPage(s.rowTraining, s, state) {
+                        ItemList(list?.take(MAX_LIST), s.emptyTrainings, state) { attachmentText(it) to null }
+                    }
                 }
-                val shown = list?.filter { query.isBlank() || it.first.label.contains(query.trim(), ignoreCase = true) }
-                val subs = list.orEmpty().associate { it.first.key() to it.second }
-                ItemList(shown?.map { it.first }, if (query.isBlank()) s.emptyExercises else s.noExerciseMatch, state) { it.label to subs[it.key()] }
+                ContextPage.Plans -> {
+                    val list by env.plans.collectAsState(initial = null)
+                    SubPage(s.rowWorkout, s, state) {
+                        ItemList(list, s.emptyPlans, state) { it.label to null }
+                    }
+                }
+                ContextPage.Exercises -> {
+                    val list by produceState<List<Pair<ChatAttachment.Exercise, String>>?>(null) { value = env.exercises() }
+                    var query by remember { mutableStateOf("") }
+                    SubPage(s.rowExercise, s, state) {
+                        Reveal((list?.size ?: 0) > SEARCH_FROM) {
+                            Column {
+                                SearchInput(query, { query = it }, s.searchExercise, s.clearSearch)
+                                Spacer(Modifier.height(Space.s))
+                            }
+                        }
+                        val shown = list?.filter { query.isBlank() || it.first.label.contains(query.trim(), ignoreCase = true) }
+                        val subs = list.orEmpty().associate { it.first.key() to it.second }
+                        ItemList(shown?.map { it.first }, if (query.isBlank()) s.emptyExercises else s.noExerciseMatch, state) { it.label to subs[it.key()] }
+                    }
+                }
             }
         }
     }
@@ -167,9 +186,12 @@ private fun MainPage(
         SheetRow(s.rowHistory, s.rowHistoryHint, checked = state.selected(history), tag = "context:history") { state.toggle(history) }
         SheetRow(s.rowExercise, s.rowExerciseHint, count = exercises, tag = "context:exercise") { state.page = ContextPage.Exercises }
     }
-    if (profileRemoved) {
-        Spacer(Modifier.height(Space.m))
-        SheetGroup { SheetRow(s.profileAgain, null, tag = "context:profile", chevron = false) { onProfileAgain() } }
+    val haptics = rememberHaptics()
+    Reveal(profileRemoved) {
+        Column {
+            Spacer(Modifier.height(Space.m))
+            SheetGroup { SheetRow(s.profileAgain, null, tag = "context:profile", chevron = false) { haptics.confirm(); onProfileAgain() } }
+        }
     }
 }
 
@@ -201,13 +223,16 @@ private fun SubPage(title: String, s: CoachChatStrings, state: ContextSelection,
 
 @Composable
 private fun <T : ChatAttachment> ItemList(list: List<T>?, empty: String, state: ContextSelection, text: @Composable (T) -> Pair<String, String?>) {
-    when {
-        list == null -> Unit
-        list.isEmpty() -> Text(empty, Modifier.padding(vertical = Space.m), style = Theme.type.caption, tone = Tone.Muted)
-        else -> SheetGroup {
-            list.forEach { a ->
-                val (label, sub) = text(a)
-                SheetRow(label, sub, checked = state.selected(a), tag = "context:item") { state.toggle(a) }
+    // Loaded a moment later: the list (or the empty text) fades in; filtering within a list does not fade.
+    Swap(list, Modifier.fillMaxWidth(), contentKey = { if (it == null) 0 else if (it.isEmpty()) 1 else 2 }) { shown ->
+        when {
+            shown == null -> Unit
+            shown.isEmpty() -> Text(empty, Modifier.padding(vertical = Space.m), style = Theme.type.caption, tone = Tone.Muted)
+            else -> SheetGroup {
+                shown.forEach { a ->
+                    val (label, sub) = text(a)
+                    SheetRow(label, sub, checked = state.selected(a), tag = "context:item") { state.toggle(a) }
+                }
             }
         }
     }
@@ -238,13 +263,20 @@ private fun SheetRow(
 ) {
     val c = Theme.colors
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
+    // Every tap is seen for a moment and the veil fades back (read while drawing, no recomposition per frame).
+    val pressed = rememberPressProgress(interaction, press = Motion.snappy(), release = Motion.smooth())
+    val haptics = rememberHaptics()
+    val veil = c.foreground.copy(alpha = 0.08f)
     Row(
         Modifier
             .fillMaxWidth()
+            .background(c.surfacePressed)
             // Pressed: a light white veil over the row (like the ⋮ menu), so the grey hint on it stays readable.
-            .background(if (pressed) c.foreground.copy(alpha = 0.08f).compositeOver(c.surfacePressed) else c.surfacePressed)
-            .clickable(interaction, indication = null, role = if (checked != null) Role.Checkbox else Role.Button, onClick = onClick)
+            .drawBehind { if (pressed.value > 0f) drawRect(veil, alpha = pressed.value.coerceIn(0f, 1f)) }
+            .clickable(interaction, indication = null, role = if (checked != null) Role.Checkbox else Role.Button) {
+                if (checked != null) haptics.tick()
+                onClick()
+            }
             .then(if (checked != null) Modifier.semantics { selected = checked } else Modifier)
             .testTag(tag)
             .heightIn(min = 56.dp)
@@ -255,9 +287,14 @@ private fun SheetRow(
             Text(label)
             if (hint != null) Text(hint, style = Theme.type.caption, tone = Tone.Muted)
         }
-        if (count > 0) {
-            CountBadge(count)
-            Spacer(Modifier.width(Space.s))
+        // The badge appears in place and its number rolls; the last count stays while it goes.
+        val lastCount = remember { intArrayOf(count) }
+        if (count > 0) lastCount[0] = count
+        Appear(count > 0) {
+            Row {
+                CountBadge(lastCount[0])
+                Spacer(Modifier.width(Space.s))
+            }
         }
         when {
             checked != null -> CheckCircle(checked)
@@ -273,8 +310,9 @@ private fun SheetRow(
 @Composable
 private fun CheckCircle(checked: Boolean) {
     val c = Theme.colors
-    Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(if (checked) c.foreground else c.background), contentAlignment = Alignment.Center) {
-        if (checked) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = c.background)
+    val fill = motionColor(if (checked) c.foreground else c.background)
+    Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).drawBehind { drawRect(fill.value) }, contentAlignment = Alignment.Center) {
+        PopIn(checked) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small, color = c.background) }
     }
 }
 
@@ -282,7 +320,7 @@ private fun CheckCircle(checked: Boolean) {
 private fun CountBadge(n: Int) {
     val c = Theme.colors
     Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(c.foreground), contentAlignment = Alignment.Center) {
-        BasicText(n.toString(), style = Theme.type.caption.copy(color = c.background, fontWeight = FontWeight.SemiBold, fontSize = 12.sp))
+        RollingText(n.toString(), style = badgeText(), color = c.background)
     }
 }
 
@@ -309,27 +347,36 @@ private fun CameraTile(label: String, onClick: () -> Unit) {
 @Composable
 private fun PhotoTile(p: DiaryPhoto, number: Int?, enabled: Boolean, s: CoachChatStrings, onClick: () -> Unit) {
     val c = Theme.colors
+    val haptics = rememberHaptics()
+    // Limit reached: the other tiles dim softly instead of jumping (alpha read while drawing).
+    val alpha = animateFloatAsState(if (enabled) 1f else 0.35f, Motion.snappy(), label = "tileAlpha")
+    val lastNumber = remember { intArrayOf(number ?: 1) }
+    if (number != null) lastNumber[0] = number
     Box(
-        Modifier.size(TILE).alpha(if (enabled) 1f else 0.35f).testTag("context:photo").semantics(mergeDescendants = true) {
+        Modifier.size(TILE).graphicsLayer { this.alpha = alpha.value }.testTag("context:photo").semantics(mergeDescendants = true) {
             selected = number != null
             if (number != null) contentDescription = s.selectedPhoto(number)
             if (!enabled) disabled()
         },
     ) {
         // Limit reached: the other photos cannot be chosen (dimmed, no tap).
-        PhotoThumb(p.photo, p.workoutName ?: s.photos, size = TILE, onClick = if (enabled) onClick else null)
-        if (number != null) {
+        PhotoThumb(p.photo, p.workoutName ?: s.photos, size = TILE, onClick = if (enabled) ({ haptics.tick(); onClick() }) else null)
+        // The number badge appears in place; when an earlier photo is removed, its number rolls down.
+        Appear(number != null, Modifier.align(Alignment.TopEnd)) {
             Box(
-                Modifier.align(Alignment.TopEnd).padding(6.dp).size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(c.foreground),
+                Modifier.padding(6.dp).size(app.overfit.ui.theme.Sizes.badge).clip(CircleShape).background(c.foreground),
                 contentAlignment = Alignment.Center,
             ) {
-                BasicText(number.toString(), style = Theme.type.caption.copy(color = c.background, fontWeight = FontWeight.SemiBold, fontSize = 12.sp))
+                RollingText(lastNumber[0].toString(), style = badgeText(), color = c.background, countsDown = true)
             }
         }
     }
 }
 
 private val TILE = 76.dp
+
+@Composable
+private fun badgeText() = Theme.type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
 private const val MAX_PHOTOS_SHOWN = 20
 private const val MAX_LIST = 40
 private const val SEARCH_FROM = 8

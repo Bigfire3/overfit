@@ -69,6 +69,11 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
+import androidx.compose.ui.backhandler.BackHandler
+import kotlinx.coroutines.delay
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,6 +123,8 @@ class ImportViewModel(private val importer: TemplateImporter, private val shortC
         val error: ShareFailure? = null,
         /** Shown as a note instead of a failure reason (e.g. "this is a backup"). */
         val note: Boolean = false,
+        /** A short code is being fetched or the preview is being built: the button shows that it works. */
+        val loading: Boolean = false,
     )
 
     private val _state = MutableStateFlow(State())
@@ -127,6 +134,7 @@ class ImportViewModel(private val importer: TemplateImporter, private val shortC
     /** Reads text from link, file, scan or clipboard; the result opens in the workout editor. */
     fun handle(text: String?) {
         QrPayload.shortId(text.orEmpty())?.let { id ->
+            _state.value = State(loading = true)
             viewModelScope.launch {
                 // A thrown fetch is a connection problem (retry helps), null is an unknown code.
                 val result = runCatching { shortCodes.fetch(id) }
@@ -147,6 +155,7 @@ class ImportViewModel(private val importer: TemplateImporter, private val shortC
 
     private fun openEditor(parsed: ShareParse.Ok) {
         input = parsed
+        _state.value = State(loading = true)
         viewModelScope.launch {
             val preview = importer.preview(parsed.training)
             _state.value = if (preview.exercises.isEmpty()) State(error = ShareFailure.INVALID) else State(preview = preview)
@@ -165,6 +174,7 @@ class ImportViewModel(private val importer: TemplateImporter, private val shortC
     fun reset() { _state.value = State() }
 }
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun ImportScreen(
     viewModel: ImportViewModel,
@@ -187,52 +197,70 @@ fun ImportScreen(
     // The imported workout opens in the normal editor (nothing is saved before "Save").
     LaunchedEffect(state.preview) { state.preview?.let { viewModel.reset(); onImported(it) } }
 
-    when {
-        state.preview != null -> Screen {}
-        scanning -> Screen(header = { BackHeader(t.back, { scanning = false }) }) {
-            Title(s.scanQr)
-            Spacer(Modifier.height(Space.s))
-            Text(s.scanHint, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.l))
-            Box(Modifier.fillMaxWidth().weight(1f).background(Theme.colors.hairline)) {
-                QrScanner(
-                    Modifier.fillMaxSize(),
-                    onScanned = { scanning = false; viewModel.handle(it) },
-                    onPermissionDenied = { scanning = false; denied = true },
-                )
-            }
-            Spacer(Modifier.height(Space.m))
-        }
-        else -> Screen(
-            scroll = true,
-            header = { BackHeader(t.back, onBack) },
-            footer = {
-                state.error?.let { Text(it.message(s), style = Theme.type.caption, tone = Tone.Default) }
-                if (state.note) Text(s.importIsBackup, style = Theme.type.caption, tone = Tone.Default)
-                if (denied) Text(s.scanCameraDenied, style = Theme.type.caption, tone = Tone.Muted)
-                PrimaryButton(s.importFromClipboard, onClick = { denied = false; viewModel.handle(share.platform.pasteText()) })
-            },
-        ) {
-            Title(s.importTitle)
-            Spacer(Modifier.height(Space.m))
-            Text(s.importIntro, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.l))
-            Panel {
-                if (share.platform.canScanInApp) {
-                    ListRow(s.scanQr, onClick = { denied = false; scanning = true })
-                } else {
-                    PanelItem { Text(s.scanIosHint, tone = Tone.Muted) }
+    val haptics = rememberHaptics()
+    // A failed read is felt as well as seen (the message sits above the button).
+    LaunchedEffect(state.error) { if (state.error != null) haptics.reject() }
+    // System back while scanning closes only the scanner, not the whole import.
+    BackHandler(enabled = scanning) { scanning = false }
+
+    // While the editor opens, the import page simply stays (no empty screen in between); the scanner fades over it.
+    Swap(scanning, Modifier.fillMaxSize()) { scan ->
+        if (scan) {
+            Screen(header = { BackHeader(t.back, { scanning = false }) }) {
+                Title(s.scanQr)
+                Spacer(Modifier.height(Space.s))
+                Text(s.scanHint, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.l))
+                Box(Modifier.fillMaxWidth().weight(1f).background(Theme.colors.hairline)) {
+                    QrScanner(
+                        Modifier.fillMaxSize(),
+                        onScanned = { haptics.confirm(); scanning = false; viewModel.handle(it) },
+                        onPermissionDenied = { scanning = false; denied = true },
+                    )
                 }
-                ListRow(s.importPickFile, onClick = { denied = false; pickFile() })
+                Spacer(Modifier.height(Space.m))
             }
-            // The AI prompt with its full text (shared component with the Coach tab).
-            app.overfit.ui.components.PromptView(
-                title = s.aiTemplateCopy,
-                hint = if (aiCopied) s.aiTemplateCopied else null,
-                text = remember { aiTemplateText(s, share.aiProfile()) },
-                onCopy = { share.platform.copyText(it); aiCopied = true },
-            )
-            Hint(s.importFileHint)
+        } else {
+            Screen(
+                scroll = true,
+                header = { BackHeader(t.back, onBack) },
+                footer = {
+                    // One message at a time above the button, in normal text size: it grows in and changes in place.
+                    val message: Pair<String, Tone>? = when {
+                        state.error != null -> state.error!!.message(s) to Tone.Default
+                        state.note -> s.importIsBackup to Tone.Default
+                        denied -> s.scanCameraDenied to Tone.Muted
+                        else -> null
+                    }
+                    RevealNotNull(message) { m -> Swap(m) { (text, tone) -> Text(text, tone = tone) } }
+                    PrimaryButton(
+                        s.importFromClipboard,
+                        onClick = { denied = false; viewModel.handle(share.platform.pasteText()) },
+                        loading = state.loading,
+                    )
+                },
+            ) {
+                Title(s.importTitle)
+                Spacer(Modifier.height(Space.m))
+                Text(s.importIntro, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.l))
+                Panel {
+                    if (share.platform.canScanInApp) {
+                        ListRow(s.scanQr, onClick = { denied = false; scanning = true })
+                    } else {
+                        PanelItem { Text(s.scanIosHint, tone = Tone.Muted) }
+                    }
+                    ListRow(s.importPickFile, onClick = { denied = false; pickFile() })
+                }
+                // The AI prompt with its full text (shared component with the Coach tab).
+                app.overfit.ui.components.PromptView(
+                    title = s.aiTemplateCopy,
+                    hint = if (aiCopied) s.aiTemplateCopied else null,
+                    text = remember { aiTemplateText(s, share.aiProfile()) },
+                    onCopy = { share.platform.copyText(it); aiCopied = true },
+                )
+                Hint(s.importFileHint)
+            }
         }
     }
 }
@@ -289,6 +317,9 @@ fun ShareScreen(
     val link = state.link
     val qrText = state.qrText
     var copied by remember { mutableStateOf(false) }
+    val haptics = rememberHaptics()
+    // "Link copied" goes back to "Copy link" after a moment, so a second copy is possible and visible.
+    LaunchedEffect(copied) { if (copied) { delay(COPIED_RESET_MS); copied = false } }
     Screen(
         scroll = true,
         header = { BackHeader(t.back, onBack) },
@@ -298,7 +329,8 @@ fun ShareScreen(
     ) {
         Text(s.shareTemplate, tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
-        Title(state.name)
+        // The content is built asynchronously: name, preview and link part fade in instead of popping.
+        Swap(state.name) { Title(it) }
         if (description != null) {
             Spacer(Modifier.height(Space.s))
             Text(description, style = Theme.type.caption, tone = Tone.Muted)
@@ -307,27 +339,40 @@ fun ShareScreen(
             Spacer(Modifier.height(Space.m))
             extra()
         }
-        state.training?.takeIf { showPreview }?.let { training ->
-            Spacer(Modifier.height(Space.m))
-            SharePreview(training, unit, language)
+        Swap(state.training?.takeIf { showPreview }, Modifier.fillMaxWidth()) { training ->
+            if (training != null) {
+                Column {
+                    Spacer(Modifier.height(Space.m))
+                    SharePreview(training, unit, language)
+                }
+            }
         }
         Spacer(Modifier.height(Space.l))
-        if (link != null) {
-            if (qrText != null) {
-                QrView(qrText, Modifier.size(QR_DISPLAY_SIZE).align(Alignment.CenterHorizontally))
-                Spacer(Modifier.height(Space.m))
-                Text(s.qrHint, style = Theme.type.caption, tone = Tone.Muted)
-            } else {
-                Text(s.qrTooLarge, tone = Tone.Muted)
-            }
-            Spacer(Modifier.height(Space.l))
-            Panel {
-                ListRow(if (copied) s.linkCopied else s.copyLink, onClick = { platform.copyText(link); copied = true })
-                state.json?.let { json ->
-                    ListRow(s.shareFile, onClick = {
-                        val file = state.name.filter { it.isLetterOrDigit() || it == ' ' || it == '-' }.trim().ifEmpty { "overfit" }
-                        platform.shareFile("$file.${ShareFormat.FILE_EXTENSION}", json)
-                    })
+        Swap(link, Modifier.fillMaxWidth(), contentKey = { it != null }) { shown ->
+            if (shown != null) {
+                Column(Modifier.fillMaxWidth()) {
+                    // A new code (e.g. with or without actual values) cross-fades in place.
+                    Swap(qrText, Modifier.fillMaxWidth()) { qr ->
+                        if (qr != null) {
+                            Column(Modifier.fillMaxWidth()) {
+                                QrView(qr, Modifier.size(QR_DISPLAY_SIZE).align(Alignment.CenterHorizontally))
+                                Spacer(Modifier.height(Space.m))
+                                Text(s.qrHint, style = Theme.type.caption, tone = Tone.Muted)
+                            }
+                        } else {
+                            Text(s.qrTooLarge, tone = Tone.Muted)
+                        }
+                    }
+                    Spacer(Modifier.height(Space.l))
+                    Panel {
+                        ListRow(if (copied) s.linkCopied else s.copyLink, onClick = { platform.copyText(shown); haptics.confirm(); copied = true })
+                        state.json?.let { json ->
+                            ListRow(s.shareFile, onClick = {
+                                val file = state.name.filter { it.isLetterOrDigit() || it == ' ' || it == '-' }.trim().ifEmpty { "overfit" }
+                                platform.shareFile("$file.${ShareFormat.FILE_EXTENSION}", json)
+                            })
+                        }
+                    }
                 }
             }
         }
@@ -336,6 +381,9 @@ fun ShareScreen(
 
 /** Display size of the share QR code (before: 320 dp wide). The quiet zone is part of it. */
 private val QR_DISPLAY_SIZE = 200.dp
+
+/** How long "Link copied" stays before the row reads "Copy link" again (like the AI prompt). */
+private const val COPIED_RESET_MS = 3000L
 
 /** "What gets shared": counts and, if values are included, one example set. */
 @Composable
