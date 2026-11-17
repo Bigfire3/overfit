@@ -145,8 +145,27 @@ private data class DetailData(val finished: FinishedWorkout, val summary: Workou
  * photo or exercise details recreates the screen: with this it is there at once (and keeps its scroll position)
  * instead of starting empty; `changes` then refreshes it as before.
  */
-private val detailCache = object : LinkedHashMap<String, DetailData>(8, 0.75f, true) {
-    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DetailData>?) = size > 6
+private val detailCache = DetailCache()
+
+/**
+ * The six trainings opened last, most recent last. Written by hand: an access-ordered map with a size limit exists
+ * on the JVM only, this is shared code (iOS).
+ */
+private class DetailCache {
+    private val entries = LinkedHashMap<String, DetailData>()
+
+    /** Reading an entry makes it the most recent one. */
+    operator fun get(id: String): DetailData? = entries.remove(id)?.also { entries[id] = it }
+
+    operator fun set(id: String, data: DetailData) {
+        entries.remove(id)
+        entries[id] = data
+        while (entries.size > MAX) entries.remove(entries.keys.first())
+    }
+
+    fun remove(id: String) { entries.remove(id) }
+
+    private companion object { const val MAX = 6 }
 }
 
 /**
