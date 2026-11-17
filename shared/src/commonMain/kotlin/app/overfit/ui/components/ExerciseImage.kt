@@ -159,7 +159,7 @@ private fun ExerciseImageContent(exercise: Exercise, model: String?, vector: Boo
  * Large image for the detail screen, in a [Panel]: start and end pose next to each other (stacked for wide, lying
  * poses), both crops the same size and scale with the figure standing on the same line (data from poses.json), small
  * "Start"/"End" captions. Holds and static stretches show frame 1 alone, cropped the same way; a bundled image
- * without an entry shows the whole frame; custom exercises without an image get the large initials tile. Theme colour, no animation.
+ * without an entry shows the whole frame; custom exercises without an image get the large initials tile. Theme colour; only the first load fades in.
  */
 @Composable
 fun ExerciseHero(exercise: Exercise, modifier: Modifier = Modifier) {
@@ -169,15 +169,19 @@ fun ExerciseHero(exercise: Exercise, modifier: Modifier = Modifier) {
         }
         return
     }
-    val t = LocalStrings.current
     val pairs by produceState(ExercisePoses.cached()) { value = runCatching { ExercisePoses.load() }.getOrElse { emptyMap() } }
-    if (pairs == null) {
-        // poses.json not read yet (first detail view after start, a few ms): keep the space, avoid a jump.
-        Box(modifier.fillMaxWidth().aspectRatio(1f))
-        return
+    // poses.json not read yet (first detail view after start, a few ms; the catalogue warms it): keep a square space,
+    // then fade to the panel while the height follows smoothly instead of jumping.
+    Swap(pairs, modifier.fillMaxWidth(), contentKey = { it == null }) { loaded ->
+        if (loaded == null) Box(Modifier.fillMaxWidth().aspectRatio(1f)) else HeroPanel(exercise, loaded)
     }
+}
+
+@Composable
+private fun HeroPanel(exercise: Exercise, pairs: Map<String, PosePair>) {
+    val t = LocalStrings.current
     val poses = remember(exercise.id, exercise.imageRef, pairs) { ExerciseImages.poses(exercise, pairs) }
-    Panel(modifier) {
+    Panel(Modifier.fillMaxWidth()) {
         if (poses?.size == 1) {
             PoseCell(poses[0], null, Modifier.fillMaxWidth())
             return@Panel
