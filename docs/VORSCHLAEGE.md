@@ -85,4 +85,34 @@ Aufwand: **S** = Stunden, **M** = ein halber bis ganzer Tag, **L** = mehr.
 - **55 · Anfrage-Protokoll zweizeilig** (S): doppelt so viele Einträge pro Bildschirm.
 
 ## In diesem PR schon umgesetzt (ohne Entscheidung möglich)
-Siehe PROGRESS „Bewegung“ und die PR-Beschreibung.
+
+**Laufendes Training**
+- Pausen-Insel statt „Pause groß anzeigen“; der Hauptknopf nennt den Satz, den er loggt; Tipp auf den Countdown zeigt diesen Satz.
+- Fertige Übung klappt zu, die Liste rückt zur nächsten. Nach „Übung hinzufügen“ scrollt die Liste zur neuen Übung.
+- „Duplizieren“ entfernt (tat dasselbe wie „Satz hinzufügen“). „Entfernen“ einer Übung braucht den Doppeltipp.
+- Der Hauptknopf weicht der Tastatur. Kopfzeile in einer Zeile, darunter ein Balken über alle Sätze.
+- „Training beenden“ nimmt erst nach einem Moment Taps an (schnelles Durchtippen beendet nicht versehentlich).
+- Kopfzeile nach unten ziehen minimiert das Training.
+
+**Workouts, Editor, Übungen**
+- Editor: nach der Übungsauswahl zur neuen Übung scrollen; Name ist bei einem neuen Workout fokussiert; Knopf weicht der Tastatur.
+- Katalog: springt nach „Zurück“ nicht mehr an den Anfang; der große Titel klappt beim Suchen weg.
+- Übungsdetail: „Speichern“ erscheint erst, wenn etwas geändert ist; Bestwerte als Kacheln. Neue eigene Übung: Name fokussiert.
+
+**Kalender, Abschluss, Verlauf**
+- Kalender: Gewichtskarte und Statistik scrollen weg, die Statistik steht in einer Zeile.
+- Abschluss: vier Kennzahlen als Kacheln (halbe Höhe), unter „Gefühl“ steht, was die gewählte Zahl bedeutet.
+- Trainingsdetail: Übungen vor Notiz, Muskelkarte und Fotos. Bearbeiten: Übungen direkt unter dem Namen.
+- Muskelkarte liegt auf dem normalen Sheet (federt, lässt sich wegziehen).
+
+**Coach, Chat, Profil, Guthaben**
+- Chat: eine neue Antwort beginnt oben statt am Ende; Senden schließt die Tastatur; die Vorschläge stehen über dem Eingabefeld.
+- Zurück schließt nur die jeweilige Ebene: Unterseite des Kontext-Sheets, QR-Scanner, Einwilligung.
+- „Trennen“, „Verwerfen“, „Löschen“ bei den Chat-Verbindungen per Doppeltipp wie überall.
+- Auswertung: Übungsnamen statt interner Kennungen. Guthaben-Popup ohne doppelten Rand. Story: Wegwischen erst ab einem echten Wisch.
+- Profil: unter „Alle Daten löschen“ steht, was gelöscht wird. Guthaben: Fehler steht am Knopf, der ihn ausgelöst hat; „Code einlösen“
+  hat das Feld sofort im Fokus.
+
+**Überall**
+- Die Zurück-Geste führt den Screen mit dem Finger. Sheets lassen sich nach unten wegziehen.
+- Kein toter Streifen mehr über der Tab-Leiste, das Eingabefeld im Coach-Tab sitzt direkt auf der Tastatur (auf dem Gerät prüfen).
