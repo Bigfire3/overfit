@@ -11,6 +11,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.core.VisibilityThreshold
 import app.overfit.data.AppState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -94,12 +98,25 @@ internal fun CoachOverlayHost(
     // Keeps the last request while the layer slides out.
     var shown by androidx.compose.runtime.remember { mutableStateOf<app.overfit.ui.coach.chat.CoachOverlayRequest?>(null) }
     request?.let { shown = it }
+    // A layer of its own, like the running workout: rises from the bottom over everything while the screen underneath
+    // darkens, sinks back on close (reduce motion: a plain fade).
+    val reduced = app.overfit.ui.theme.LocalReducedMotion.current
+    Box(Modifier.fillMaxSize()) {
     androidx.compose.animation.AnimatedVisibility(
         visible = request != null,
-        enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { it / 4 } +
-            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)),
-        exit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(150)) { it / 4 } +
-            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)),
+        enter = androidx.compose.animation.fadeIn(app.overfit.ui.theme.Motion.fadeIn()),
+        exit = androidx.compose.animation.fadeOut(app.overfit.ui.theme.Motion.fadeOut()),
+        label = "coachScrim",
+    ) {
+        Box(Modifier.fillMaxSize().drawBehind { drawRect(Color.Black, alpha = SCRIM_ALPHA) })
+    }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = request != null,
+        enter = if (reduced) androidx.compose.animation.fadeIn(app.overfit.ui.theme.Motion.fadeIn())
+        else androidx.compose.animation.slideInVertically(app.overfit.ui.theme.Motion.screen(IntOffset.VisibilityThreshold)) { it },
+        exit = if (reduced) androidx.compose.animation.fadeOut(app.overfit.ui.theme.Motion.fadeOut())
+        else androidx.compose.animation.slideOutVertically(app.overfit.ui.theme.Motion.screen(IntOffset.VisibilityThreshold)) { it },
+        label = "coachLayer",
     ) {
         val r = shown ?: return@AnimatedVisibility
         // A fresh chat screen per request (its state is keyed to the request).
@@ -110,8 +127,11 @@ internal fun CoachOverlayHost(
             }
         }
     }
+    }
 }
 
+/** How dark the screen underneath gets while the coach lies over it (same as behind a sheet). */
+private const val SCRIM_ALPHA = 0.6f
 
 /**
  * "Apply" for an opened coach:
