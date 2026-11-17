@@ -105,7 +105,8 @@ class CalendarUniformTest {
             assertNear(8f, it.height.dp(), "marker height")
         }
         // The legend (outside the grid) uses the very same markers: dot, ring, dash.
-        assertEquals(3, bounds(markerTag and !hasAnyAncestor(hasTestTag(DIARY_GRID_TAG))).size)
+        // (The legend scrolls with the grid now: it is the set of markers outside any day's marker row.)
+        assertEquals(3, bounds(markerTag and !hasAnyAncestor(hasTestTag(DAY_MARKERS_TAG))).size)
 
         // One marker row per day of the week 2–8 Nov, all at the same height, each centred in its cell.
         val rowCentersY = (2..8).map { day ->
