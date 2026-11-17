@@ -91,7 +91,7 @@ class FewerTapsTest {
     fun weightIsChangedDirectlyAndSavedOnBack() {
         val id = launch()
         compose.onNodeWithText("Push").performClick()
-        waitFor("Starten")
+        waitForPlan()
         // No pencil any more: the sets are right there.
         compose.onAllNodes(hasContentDescription("Bearbeiten")).fetchSemanticsNodes().let { assertEquals(0, it.size) }
         compose.onNodeWithContentDescription("Gewicht Satz 1").performTextReplacement("62,5")
@@ -105,7 +105,7 @@ class FewerTapsTest {
     fun startAfterAnEditStartsWithTheNewValue() {
         val id = launch()
         compose.onNodeWithText("Push").performClick()
-        waitFor("Starten")
+        waitForPlan()
         compose.onNodeWithContentDescription("Gewicht Satz 2").performTextReplacement("65")
         compose.onNodeWithText("Starten").performClick()
         waitFor("0/2 erledigt", substring = true)
@@ -116,7 +116,7 @@ class FewerTapsTest {
     fun invalidValue_firstBackExplains_secondBackDiscards() {
         val id = launch()
         compose.onNodeWithText("Push").performClick()
-        waitFor("Starten")
+        waitForPlan()
         compose.onNodeWithContentDescription("Gewicht Satz 1").performTextReplacement("6,,5")
         compose.onNodeWithContentDescription("Zurück").performClick()
         // Not stored and not left: the footer says why.
@@ -131,13 +131,13 @@ class FewerTapsTest {
     fun replaceLeftWithBack_thenAdd_addsInsteadOfReplacing() {
         val id = launch()
         compose.onNodeWithText("Push").performClick()
-        waitFor("Starten")
+        waitForPlan()
         compose.onAllNodes(hasContentDescription("Weitere Aktionen für Bench Press", substring = true))[0].performClick()
         waitFor("Ersetzen")
         compose.onNodeWithText("Ersetzen").performClick()
         waitFor("Übung ersetzen")
         compose.onNodeWithContentDescription("Zurück").performClick()
-        waitFor("Starten")
+        waitForPlan()
         compose.onNodeWithText("Übung hinzufügen").performScrollTo().performClick()
         waitFor("Übungen hinzufügen")
         // Pick some squat (any exercise but Bench Press): search for it, the list is long.
@@ -145,7 +145,7 @@ class FewerTapsTest {
         waitFor("Belt Squat")
         compose.onAllNodes(hasText("Belt Squat"))[0].performClick()
         compose.onNodeWithText("1 hinzufügen").performClick()
-        waitFor("Starten")
+        waitForPlan()
         compose.onNodeWithContentDescription("Zurück").performClick()
         compose.waitForTrainingTab()
         compose.waitUntilState { runBlocking { data.templates.get(id) }!!.exercises.size == 2 }
@@ -162,6 +162,12 @@ class FewerTapsTest {
         File(out, "$name.png").outputStream().use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
+    }
+
+    // "Starten" is there from the first frame; the plan's exercises fade in once it is loaded.
+    private fun waitForPlan() {
+        waitFor("Starten")
+        compose.waitUntil(20_000) { compose.onAllNodes(hasContentDescription("Weitere Aktionen für Bench Press", substring = true)).fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun waitFor(text: String, substring: Boolean = false) = compose.waitUntil(20_000) {

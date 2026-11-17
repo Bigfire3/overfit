@@ -221,6 +221,8 @@ class UiFeedbackTest {
     fun deletingAWorkout_landsInTheWorkoutList_notOnABlackScreen() {
         launchApp()
         compose.onNodeWithText("Push").performClick()
+        // The ⋮ is there from the first frame; its entries act once the workout is loaded.
+        compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Details zu", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         // Delete sits in the ⋮ and keeps its two taps: first tap arms the entry, the second deletes.
         compose.openMenuEntry("Workout löschen")
         compose.onNodeWithText("Workout löschen – zum Bestätigen erneut tippen").assertExists()
@@ -249,6 +251,7 @@ class UiFeedbackTest {
         val deps = launchApp()
         compose.onNodeWithText("Push").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Details zu", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         // Workout screen = editor: share and delete in the ⋮ top right (UI audit 12.11.), no pencil.
         compose.onNodeWithContentDescription("Weitere Optionen").performClick()
         compose.onNodeWithText("Teilen").assertExists()
