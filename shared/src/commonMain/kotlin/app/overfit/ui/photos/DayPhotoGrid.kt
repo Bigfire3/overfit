@@ -19,7 +19,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.animation.animateContentSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.motionColor
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -65,16 +74,31 @@ fun DayPhotoGrid(
 ) {
     val h = LocalStrings.current.history
     val picker = rememberPhotoPicker(onAdd)
+    val haptics = rememberHaptics()
+    // Photos that were there when the grid appeared are simply there; only later ones pop in.
+    val initial = remember { photos.map { it.id }.toSet() }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val tile = (maxWidth - Space.s * (COLUMNS - 1)) / COLUMNS
         Column {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            FlowRow(
+                // A new row (or one less) grows and shrinks instead of jumping.
+                Modifier.animateContentSize(Motion.smooth()),
+                horizontalArrangement = Arrangement.spacedBy(Space.s),
+                verticalArrangement = Arrangement.spacedBy(Space.s),
+            ) {
                 photos.forEachIndexed { i, photo ->
-                    GridPhoto(
-                        photo, h.photoDescription(i + 1), tile,
-                        onOpen = onOpen?.let { { it(photo.id) } },
-                        onRemove = onRemove?.let { { it(photo.id) } },
-                    )
+                    key(photo.id) {
+                        val isNew = photo.id !in initial
+                        var shown by remember { mutableStateOf(!isNew) }
+                        LaunchedEffect(Unit) { if (isNew) { shown = true; haptics.confirm() } }
+                        Appear(shown) {
+                            GridPhoto(
+                                photo, h.photoDescription(i + 1), tile,
+                                onOpen = onOpen?.let { { it(photo.id) } },
+                                onRemove = onRemove?.let { { it(photo.id) } },
+                            )
+                        }
+                    }
                 }
                 if (picker.canTakePhoto) AddTile(Icon.Photos, h.takePhoto, tile, picker.takePhoto, Modifier.testTag(PHOTO_ADD_CAMERA_TAG))
                 AddTile(Icon.Plus, h.pickPhoto, tile, picker.pickFromLibrary, Modifier.testTag(PHOTO_ADD_LIBRARY_TAG))
@@ -115,7 +139,9 @@ private fun GridPhoto(photo: WorkoutPhoto, description: String, size: Dp, onOpen
     val arm = rememberConfirmArm()
     val armed = arm.armed
     val c = Theme.colors
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberHaptics()
+    // The armed "x" turns red softly and back.
+    val xColor by motionColor(if (armed) c.armed else c.foreground, "photoRemove")
     Box {
         PhotoThumb(photo, description, size = size, onClick = onOpen)
         if (onRemove != null) Box(
@@ -130,12 +156,12 @@ private fun GridPhoto(photo: WorkoutPhoto, description: String, size: Dp, onOpen
                 }
                 .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) {
                     if (armed) { arm.disarm(); onRemove() }
-                    else { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); arm.arm() }
+                    else { haptics.arm(); arm.arm() }
                 },
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).background(c.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
-                LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small, color = if (armed) c.armed else c.foreground)
+                LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small, color = xColor)
             }
         }
     }
