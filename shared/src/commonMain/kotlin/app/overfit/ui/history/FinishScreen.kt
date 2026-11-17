@@ -3,7 +3,9 @@ package app.overfit.ui.history
 import androidx.compose.ui.text.style.TextAlign
 import app.overfit.ui.photos.DayPhotoGrid
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +35,16 @@ import app.overfit.i18n.Strings
 import app.overfit.platform.prepareJpeg
 import app.overfit.platform.rememberPhotoPicker
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.PopIn
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Stat
+import app.overfit.ui.components.StatGrid
+import app.overfit.ui.components.rememberCountUp
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import app.overfit.ui.components.CheckRow
 import app.overfit.ui.components.BigInput
 import app.overfit.domain.Workout
@@ -115,6 +127,17 @@ fun FinishScreen(
     }
     var saving by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    // The summary celebrates once (count-up, record pop, one confirm haptic); after rotation or a return it just stands.
+    var celebrated by rememberSaveable { mutableStateOf(false) }
+    val celebrate = remember { !celebrated }
+    val haptics = rememberHaptics()
+    LaunchedEffect(data != null) {
+        if (data != null && !celebrated) {
+            celebrated = true
+            haptics.confirm()
+        }
+    }
+    LaunchedEffect(failed) { if (failed) haptics.reject() }
 
     fun save(review: Boolean) {
         if (!saving) {
@@ -157,31 +180,30 @@ fun FinishScreen(
         scroll = true,
         header = { BackHeader(t.back, back) },
         footer = {
-            if (failed) Text(h.editSaveFailed, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
+            Reveal(failed) {
+                Text(h.editSaveFailed, Modifier.fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted, align = TextAlign.Center)
+            }
             PrimaryButton(t.save, save, enabled = data != null, loading = saving)
         },
     ) {
         val d = data
         Text(h.finishTitle, tone = Tone.Muted)
         Spacer(Modifier.height(Space.s))
-        if (name != null) {
-            BigInput(name.orEmpty(), { name = it.take(60) }, t.workoutNamePlaceholder, Modifier.fillMaxWidth())
-        } else {
-            Title(d?.finished?.workout?.name.orEmpty())
-        }
-        if (d != null) {
-            Spacer(Modifier.height(Space.l))
-            SummaryRows(d.summary, unit, language, t)
-
-            if (d.summary.records.isNotEmpty()) {
+        // Always the input (empty until the name has loaded): no swap from a title to a field of another height.
+        BigInput(name ?: d?.finished?.workout?.name.orEmpty(), { name = it.take(60) }, t.workoutNamePlaceholder, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(Space.l))
+        // The tiles stand from the start ("–" while loading), so nothing below jumps when the data arrives.
+        FinishStats(d?.summary, unit, language, t, celebrate)
+        RevealNotNull(d?.summary?.records?.takeIf { it.isNotEmpty() }) { records ->
+            Column {
                 PanelSection(h.newRecords) {
-                    d.summary.records.forEach { r -> RecordRow(r, unit, language, t) }
+                    records.forEach { r -> RecordRow(r, unit, language, t, celebrate) }
                 }
             }
         }
 
         PanelSection(h.feeling) {
-            PanelItem { FeelingPicker(feeling, h.feelingValue) { feeling = it } }
+            PanelItem { FeelingPicker(feeling, h.feelingValue, showMeaning = true) { feeling = it } }
             CheckRow(h.sauna, sauna == true) { sauna = it }
         }
 
@@ -189,12 +211,14 @@ fun FinishScreen(
         MultilineInput(note, { note = it.take(2000) }, h.notePlaceholder)
 
         SectionTitle(h.dayPhotos)
-        if (day != null) DayPhotoGrid(
-            photos,
-            onAdd = { bytes -> addDayPhoto(workouts, appScope, day, bytes) },
-            onOpen = null,
-            onRemove = { id -> appScope.launch { workouts.deletePhoto(id) } },
-        )
+        RevealNotNull(day) { photoDay ->
+            DayPhotoGrid(
+                photos,
+                onAdd = { bytes -> addDayPhoto(workouts, appScope, photoDay, bytes) },
+                onOpen = null,
+                onRemove = { id -> appScope.launch { workouts.deletePhoto(id) } },
+            )
+        }
         Hint(h.photosPrivate)
 
         Spacer(Modifier.height(Space.l))
@@ -218,15 +242,54 @@ internal fun SummaryRows(
         ListRow(h.exercisesLabel, s.exerciseCount.toString())
         extra()
     }
+    SummaryDeviations(s, t)
+}
+
+/** "1 Übung ausgelassen · 2 Sätze übersprungen": what differed from the plan, as a hint under the summary. */
+@Composable
+internal fun SummaryDeviations(s: WorkoutSummary, t: Strings) {
     if (s.skippedSets > 0 || s.addedExercises > 0 || s.replacedExercises > 0 || s.skippedExercises > 0) {
         val skipped = s.skippedExercises.takeIf { it > 0 }?.let(t.training.skippedExercises)
-        val other = h.deviations(s.skippedSets, s.addedExercises, s.replacedExercises).ifEmpty { null }
+        val other = t.history.deviations(s.skippedSets, s.addedExercises, s.replacedExercises).ifEmpty { null }
         Hint(listOfNotNull(skipped, other).joinToString(" · "))
     }
 }
 
+/**
+ * Finish summary as tiles (half the height of four rows). While [s] is loading the tiles show "–"; once it is there
+ * the numbers count up once ([celebrate]), a new record shows as a green tile.
+ */
 @Composable
-private fun RecordRow(r: PersonalRecord, unit: WeightUnit, language: Language, t: Strings) {
+private fun FinishStats(s: WorkoutSummary?, unit: WeightUnit, language: Language, t: Strings, celebrate: Boolean) {
+    val h = t.history
+    val modifier = Modifier.animateContentSize(Motion.smooth())
+    if (s == null) {
+        StatGrid(listOf(h.duration, h.setsLabel, h.volume, h.exercisesLabel).map { Stat(it, "–") }, modifier)
+        return
+    }
+    @Composable
+    fun count(target: Double): Double = if (celebrate) rememberCountUp(target.toFloat()).value.toDouble() else target
+    val duration = count(s.durationMs.toDouble())
+    val sets = count(s.completedSets.toDouble())
+    val volume = count(s.volumeKg)
+    val exercises = count(s.exerciseCount.toDouble())
+    // Ends exactly on the real values (the float count-up may stop a hair below).
+    fun int(v: Double, real: Int) = if (v >= real) real else v.roundToInt().coerceAtMost(real)
+    StatGrid(
+        listOfNotNull(
+            Stat(h.duration, WorkoutFormat.elapsed(if (duration >= s.durationMs) s.durationMs else duration.roundToLong())),
+            Stat(h.setsLabel, h.setsOf(int(sets, s.completedSets), s.totalSets)),
+            if (s.volumeKg > 0) Stat(h.volume, formatVolume(if (volume >= s.volumeKg) s.volumeKg else volume, unit, language)) else null,
+            Stat(h.exercisesLabel, int(exercises, s.exerciseCount).toString()),
+            if (s.records.isNotEmpty()) Stat(h.newRecords, s.records.size.toString(), positive = true) else null,
+        ),
+        modifier,
+    )
+    SummaryDeviations(s, t)
+}
+
+@Composable
+private fun RecordRow(r: PersonalRecord, unit: WeightUnit, language: Language, t: Strings, celebrate: Boolean = false) {
     val delta = r.value - r.previous
     ListRow(recordText(r, unit, language, t)) {
         if (delta > 0) {
@@ -235,7 +298,17 @@ private fun RecordRow(r: PersonalRecord, unit: WeightUnit, language: Language, t
                 RecordKind.REPS -> "+${delta.toInt()} ${t.repsUnit}"
                 RecordKind.DURATION -> "+${delta.toInt()} s"
             }
-            androidx.compose.foundation.text.BasicText(text, style = Theme.type.caption.copy(color = Theme.colors.positive))
+            // The green delta pops in once the numbers above have counted up (all rows together, no stagger).
+            var shown by remember { mutableStateOf(!celebrate) }
+            LaunchedEffect(Unit) {
+                if (!shown) {
+                    kotlinx.coroutines.delay(Motion.COUNT_UP_MS.toLong())
+                    shown = true
+                }
+            }
+            PopIn(shown) {
+                androidx.compose.foundation.text.BasicText(text, style = Theme.type.caption.copy(color = Theme.colors.positive))
+            }
         }
     }
 }
