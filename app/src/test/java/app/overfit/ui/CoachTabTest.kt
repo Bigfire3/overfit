@@ -225,7 +225,7 @@ class CoachTabTest {
         assertEquals(2, chatPrompts().last().history.size)
 
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("chat:apply")).fetchSemanticsNodes().size == 2 }
-        compose.onAllNodes(hasTestTag("chat:apply"))[1].performClick()
+        compose.onAllNodes(hasTestTag("chat:apply"))[1].performScrollTo().performClick()
         // The proposal opens in the normal editor; "Speichern" saves it.
         waitFor("Speichern")
         waitFor("Coach Oberkörper")
