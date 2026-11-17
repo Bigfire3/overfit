@@ -89,6 +89,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.daysUntil
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.semantics.Role
+import kotlin.math.abs
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.PressScale
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.motionItem
+import app.overfit.ui.components.pressScale
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
 
 // ---------------------------------------------------------------------------------------------
 // Diary tab: BeReal-style "Memories" — month by month calendar grid
@@ -120,12 +136,14 @@ fun PhotosScreen(
     var asList by remember { mutableStateOf(listView) }
     var selecting by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(listOf<String>()) }
+    val haptics = rememberHaptics()
     val photoList = photos.orEmpty()
     val historyList = history.orEmpty()
     val weightList = weights.orEmpty()
     val days = remember(photos, history, weights) { buildDiaryDays(photoList, historyList, weightList) }
     val weekStart = DiaryCalendar.weekStart(language)
-    // Future months on top (newest first): the current month sits at index MONTHS_AHEAD, the list starts there.
+    // Future months on top (newest first): the current month sits at index MONTHS_AHEAD. The weight card and the stats
+    // line are list items right above it ([HEAD_ITEMS]), so they scroll away; the grid starts on them.
     val months = remember(days, today) { DiaryCalendar.months(days.keys.filter { it <= today }.minOrNull(), today, DiaryCalendar.MONTHS_AHEAD) }
     val todayIndex = months.indexOf(today.year to today.monthNumber).coerceAtLeast(0)
     val gridState = rememberLazyListState(initialFirstVisibleItemIndex = todayIndex)
@@ -138,18 +156,51 @@ fun PhotosScreen(
     val loaded = photos != null && history != null
     // Calendar: the hint speaks of workouts and photos, a weight alone keeps it. List: weight days are rows, so not empty.
     val empty = loaded && photoList.isEmpty() && historyList.isEmpty() && (!asList || weightList.isEmpty())
-    // "Today" only while away from it: grid not on the current month, list not at its top (newest day = today's end).
+    // "Today" only while away from it: grid not on the head items or the current month, list not at its top.
     val awayFromToday by remember(asList, todayIndex) {
         derivedStateOf {
             if (asList) listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
-            else gridState.firstVisibleItemIndex != todayIndex
+            else gridState.firstVisibleItemIndex.let { it < todayIndex || it > todayIndex + HEAD_ITEMS }
+        }
+    }
+    // Days without a photo fade back while photos are being picked (read in the draw phase of each cell).
+    val selectDim = animateFloatAsState(if (selecting) 0.4f else 1f, Motion.snappy(), label = "selectDim")
+    val dim = remember(selectDim) { { selectDim.value } }
+
+    /** Weight card (0) and stats line plus legend (1): the first items, they scroll away with the list. */
+    @Composable
+    fun Head(index: Int, grid: Boolean) {
+        if (index == 0) {
+            Reveal(weights != null && !selecting) {
+                Column(Modifier.fillMaxWidth().padding(top = Space.s)) {
+                    WeightCard(weightList, today, unit, language, onWeightToday)
+                }
+            }
+        } else {
+            Column(Modifier.fillMaxWidth().padding(top = Space.s)) {
+                Reveal(empty) {
+                    // The calendar stays visible even without a single photo or workout.
+                    Column(Modifier.fillMaxWidth().padding(bottom = Space.xs)) {
+                        Text(if (asList) p.listEmpty else t.photosEmpty, tone = Tone.Muted)
+                        Spacer(Modifier.height(Space.xs))
+                        Text(if (asList) p.listEmptyHint else p.emptyHint, style = Theme.type.caption, tone = Tone.Muted)
+                    }
+                }
+                DiaryStats(historyList.size, photoList.size, streak)
+                if (grid) {
+                    val anySauna = days.values.any { it.sauna }
+                    val anyWeight = days.values.any { it.weightKg != null }
+                    // The legend explains the grid's markers; the list shows no markers.
+                    Reveal(anySauna || anyWeight) { DiaryLegend(anySauna, anyWeight) }
+                }
+            }
         }
     }
 
     Screen(
         footer = if (selecting) {
             {
-                if (valid.size < 2) Text(p.selectTwo, style = Theme.type.caption, tone = Tone.Muted)
+                Reveal(valid.size < 2) { Text(p.selectTwo, style = Theme.type.caption, tone = Tone.Muted) }
                 PrimaryButton(p.compare, enabled = valid.size == 2, onClick = {
                     val chosen = photoList.filter { it.photo.id in valid }.sortedBy { it.photo.takenAt }
                     if (chosen.size == 2) onCompare(chosen[0].photo.id, chosen[1].photo.id)
@@ -159,82 +210,111 @@ fun PhotosScreen(
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Title(t.photosTitle)
-            if (selecting) {
-                SmallButton(p.cancel, onClick = { selecting = false; selected = emptyList() })
-            } else {
-                // Icons only (48 dp each, same icon size): [today, only while away] [muscles] [⋮]. The rest (switch
-                // view, compare photos) lives in the ⋮ menu, so the header stays calm.
-                Box(Modifier.testTag(DIARY_HEADER_TAG)) {
-                    app.overfit.ui.components.HeaderActions(
-                        menu = buildList {
-                            // The entry names the other view: list while the calendar is up, calendar while the list is up.
-                            add(MenuItem(if (asList) p.showCalendar else p.showList) { asList = !asList; onListViewChange(asList) })
-                            if (!asList && photoList.size >= 2) add(MenuItem(p.comparePhotos) { selecting = true })
-                        },
-                        menuLabel = p.moreOptions,
-                    ) {
-                        if (loaded && awayFromToday) Box(Modifier.testTag(TODAY_BUTTON_TAG)) {
-                            HeaderIconButton(Icon.Today, t.bodyWeight.jumpTodayDescription, {
-                                jumpScope.launch { if (asList) listState.animateScrollToItem(0) else gridState.animateScrollToItem(todayIndex) }
-                            })
+            Swap(selecting, contentAlignment = Alignment.CenterEnd) { picking ->
+                if (picking) {
+                    SmallButton(p.cancel, onClick = { selecting = false; selected = emptyList() })
+                } else {
+                    // Icons only (48 dp each, same icon size): [today, only while away] [muscles] [⋮]. The rest (switch
+                    // view, compare photos) lives in the ⋮ menu, so the header stays calm.
+                    Box(Modifier.testTag(DIARY_HEADER_TAG)) {
+                        app.overfit.ui.components.HeaderActions(
+                            menu = buildList {
+                                // The entry names the other view: list while the calendar is up, calendar while the list is up.
+                                add(MenuItem(if (asList) p.showCalendar else p.showList) { asList = !asList; onListViewChange(asList) })
+                                if (!asList && photoList.size >= 2) add(MenuItem(p.comparePhotos) { selecting = true })
+                            },
+                            menuLabel = p.moreOptions,
+                        ) {
+                            Appear(loaded && awayFromToday) {
+                                Box(Modifier.testTag(TODAY_BUTTON_TAG)) {
+                                    HeaderIconButton(Icon.Today, t.bodyWeight.jumpTodayDescription, {
+                                        haptics.tick()
+                                        jumpScope.launch {
+                                            if (asList) {
+                                                // From far down: jump close first, then glide the last stretch.
+                                                if (listState.firstVisibleItemIndex > 3) listState.scrollToItem(2)
+                                                listState.animateScrollToItem(0)
+                                            } else {
+                                                val at = gridState.firstVisibleItemIndex
+                                                if (at < todayIndex - 2) gridState.scrollToItem(todayIndex - 1)
+                                                else if (at > todayIndex + HEAD_ITEMS + 2) gridState.scrollToItem(todayIndex + HEAD_ITEMS + 1)
+                                                gridState.animateScrollToItem(todayIndex)
+                                            }
+                                        }
+                                    })
+                                }
+                            }
+                            if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
                         }
-                        if (onMuscles != null) HeaderIconButton(Icon.Body, t.muscles.open, onMuscles)
                     }
                 }
             }
         }
         Spacer(Modifier.height(Space.s))
-        if (weights != null && !selecting) {
-            WeightCard(weightList, today, unit, language, onWeightToday)
-            Spacer(Modifier.height(Space.s))
-        }
-        if (empty) {
-            // The calendar stays visible even without a single photo or workout.
-            Text(if (asList) p.listEmpty else t.photosEmpty, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.xs))
-            Text(if (asList) p.listEmptyHint else p.emptyHint, style = Theme.type.caption, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.s))
-        }
-        if (loaded) {
-            DiaryStats(historyList.size, photoList.size, streak)
-            val anySauna = days.values.any { it.sauna }
-            val anyWeight = days.values.any { it.weightKg != null }
-            // The legend explains the grid's markers; the list shows no markers.
-            if (!asList && (anySauna || anyWeight)) DiaryLegend(anySauna, anyWeight)
-            Spacer(Modifier.height(Space.s))
-            if (!asList) {
+        // Only the weekday row stays pinned (grid only); everything else scrolls.
+        Reveal(loaded && !asList) {
+            Column(Modifier.fillMaxWidth()) {
                 WeekdayRow(weekStart)
                 Hairline()
             }
         }
-        if (asList) {
-            val listMonths = remember(days) { diaryListMonths(days) }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("diary-list"), state = listState) {
-                if (loaded) items(listMonths, key = { "${it.first.first}-${it.first.second}" }) { (ym, monthDays) ->
-                    Text(p.monthHeader(ym.second, ym.first), Modifier.padding(top = Space.l, bottom = Space.s), style = Theme.type.title)
-                    // One floating card per day.
-                    Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
-                        monthDays.forEach { DiaryListRow(it, unit, language) { onDay(it.date) } }
-                    }
-                }
-            }
-            return@Screen
-        }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag(DIARY_GRID_TAG), state = gridState, verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-            if (loaded) items(months, key = { "${it.first}-${it.second}" }) { (year, month) ->
-                MonthBlock(year, month, weekStart, days, today, valid, selecting, unit, language) { date, day ->
-                    val last = day?.photos?.lastOrNull()
-                    if (selecting) {
-                        if (last != null) {
-                            val id = last.photo.id
-                            selected = when {
-                                id in valid -> valid - id
-                                valid.size < 2 -> valid + id
-                                else -> listOf(valid[1], id)
+        // Grid <-> list (and loading -> loaded) cross-fade in place; both lists keep their scroll state.
+        Swap(if (loaded) asList else null, Modifier.weight(1f).fillMaxWidth()) { view ->
+            when (view) {
+                null -> Box(Modifier.fillMaxSize())
+                true -> {
+                    val listMonths = remember(days) { diaryListMonths(days) }
+                    LazyColumn(Modifier.fillMaxSize().testTag("diary-list"), state = listState) {
+                        items(HEAD_ITEMS, key = { "head-$it" }) { Head(it, grid = false) }
+                        listMonths.forEach { (ym, monthDays) ->
+                            item(key = "${ym.first}-${ym.second}") {
+                                Text(
+                                    p.monthHeader(ym.second, ym.first),
+                                    motionItem().padding(top = Space.s, bottom = Space.s),
+                                    style = Theme.type.label,
+                                )
+                            }
+                            // One floating card per day, each its own item: added and removed days animate.
+                            items(monthDays, key = { "day-${it.date}" }) { day ->
+                                Box(motionItem().padding(bottom = Space.m)) {
+                                    DiaryListRow(day, unit, language) { onDay(day.date) }
+                                }
                             }
                         }
-                    } else {
-                        onDay(date)
+                    }
+                }
+                false -> LazyColumn(Modifier.fillMaxSize().testTag(DIARY_GRID_TAG), state = gridState, verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                    items(
+                        months.size + HEAD_ITEMS,
+                        key = { i ->
+                            when {
+                                i < todayIndex -> months[i].let { "${it.first}-${it.second}" }
+                                i < todayIndex + HEAD_ITEMS -> "head-${i - todayIndex}"
+                                else -> months[i - HEAD_ITEMS].let { "${it.first}-${it.second}" }
+                            }
+                        },
+                    ) { i ->
+                        if (i >= todayIndex && i < todayIndex + HEAD_ITEMS) {
+                            Head(i - todayIndex, grid = true)
+                        } else {
+                            val (year, month) = months[if (i < todayIndex) i else i - HEAD_ITEMS]
+                            MonthBlock(year, month, weekStart, days, today, valid, selecting, dim, unit, language) { date, day ->
+                                val last = day?.photos?.lastOrNull()
+                                if (selecting) {
+                                    if (last != null) {
+                                        val id = last.photo.id
+                                        haptics.tick()
+                                        selected = when {
+                                            id in valid -> valid - id
+                                            valid.size < 2 -> valid + id
+                                            else -> listOf(valid[1], id)
+                                        }
+                                    }
+                                } else {
+                                    onDay(date)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -242,13 +322,20 @@ fun PhotosScreen(
     }
 }
 
+/** Items in front of the current month (grid) or at the top (list): weight card, stats line. */
+private const val HEAD_ITEMS = 2
+
+/** One caption line ("4 Trainings · 1 Foto · 3 Wochen in Folge"), zero values left out; digits roll when they change. */
 @Composable
 private fun DiaryStats(workouts: Int, photos: Int, streakWeeks: Int) {
     val p = LocalStrings.current.photos
-    Row(Modifier.fillMaxWidth().padding(vertical = Space.s), horizontalArrangement = Arrangement.spacedBy(Space.l)) {
-        Text(p.statWorkouts(workouts), style = Theme.type.label)
-        Text(p.statPhotos(photos), style = Theme.type.label)
-        if (streakWeeks > 0) Text(p.statStreak(streakWeeks), style = Theme.type.label, tone = Tone.Muted)
+    val line = listOfNotNull(
+        p.statWorkouts(workouts).takeIf { workouts > 0 },
+        p.statPhotos(photos).takeIf { photos > 0 },
+        p.statStreak(streakWeeks).takeIf { streakWeeks > 0 },
+    ).joinToString(" · ").ifEmpty { null }
+    RevealNotNull(line) {
+        RollingText(it, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
     }
 }
 
@@ -351,6 +438,7 @@ private fun MonthBlock(
     today: LocalDate,
     selected: List<String>,
     selecting: Boolean,
+    dim: () -> Float,
     unit: WeightUnit,
     language: Language,
     onDay: (LocalDate, DiaryDay?) -> Unit,
@@ -360,8 +448,8 @@ private fun MonthBlock(
     Column(Modifier.fillMaxWidth()) {
         Text(
             p.monthHeader(month, year),
-            Modifier.padding(top = Space.l, bottom = Space.s),
-            style = Theme.type.title,
+            Modifier.padding(top = Space.m, bottom = Space.s),
+            style = Theme.type.label,
         )
         cells.chunked(7).forEach { week ->
             // One height for the whole week (square tile from the cell width plus fixed chrome), so every cell – and its
@@ -378,7 +466,7 @@ private fun MonthBlock(
             ) {
                 week.forEach { date ->
                     Box(Modifier.weight(1f).fillMaxHeight()) {
-                        if (date != null) DayCell(date, days[date], date == today, date <= today, selected, selecting, unit, language, onDay)
+                        if (date != null) DayCell(date, days[date], date == today, date <= today, selected, selecting, dim, unit, language, onDay)
                     }
                 }
             }
@@ -395,12 +483,15 @@ private fun DayCell(
     tappable: Boolean,
     selected: List<String>,
     selecting: Boolean,
+    /** Alpha of days without a photo (animated, 1 normally, lower while picking photos); read while drawing. */
+    dim: () -> Float,
     unit: WeightUnit,
     language: Language,
     onDay: (LocalDate, DiaryDay?) -> Unit,
 ) {
     val p = LocalStrings.current.photos
     val photo = day?.photos?.lastOrNull()
+    val interaction = remember { MutableInteractionSource() }
     val training = day != null && day.workouts.isNotEmpty()
     val sauna = day != null && day.sauna
     val weightKg = day?.weightKg
@@ -417,11 +508,13 @@ private fun DayCell(
     Column(
         Modifier
             .fillMaxSize()
-            // Future days: greyed out and not tappable (nothing to log there yet).
-            .then(if (!tappable) Modifier.alpha(0.5f) else Modifier)
+            // Future days: greyed out and not tappable (nothing to log there yet). Days without a photo fade back
+            // while photos are picked. Both in the layer, nothing recomposes.
+            .graphicsLayer { alpha = minOf(if (tappable) 1f else 0.5f, if (photo == null) dim() else 1f) }
+            .pressScale(interaction, PressScale.card)
             .padding(vertical = 2.dp)
             .semantics { contentDescription = desc }
-            .then(if (if (selecting) photo != null else tappable) Modifier.clickable { onDay(date, day) } else Modifier),
+            .then(if (if (selecting) photo != null else tappable) Modifier.clickable(interaction, indication = null) { onDay(date, day) } else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Day number in a fixed circle slot; today fills the circle (inverse number).
@@ -447,7 +540,15 @@ private fun DayCell(
         when {
             photo != null -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface)) {
                 AsyncImage(photo.photo.path, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                if (selecting && picked) Box(Modifier.fillMaxSize().background(Theme.colors.foreground.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.action) }
+                // Picked: a light veil fades over the photo and the tick pops in (veil alpha read while drawing).
+                val veil = Theme.colors.foreground
+                val pick = animateFloatAsState(if (selecting && picked) 1f else 0f, Motion.snappy(), label = "pick")
+                Box(
+                    Modifier.fillMaxSize().drawBehind { if (pick.value > 0f) drawRect(veil, alpha = 0.35f * pick.value) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Appear(selecting && picked) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.action) }
+                }
             }
             training -> Box(Modifier.weight(1f).fillMaxWidth().clip(shape).background(Theme.colors.surface))
             else -> Spacer(Modifier.weight(1f))
@@ -485,35 +586,44 @@ fun PhotoViewerScreen(
     val startDay = days.indexOfFirst { d -> d.photos.any { it.photo.id == photoId } }
 
     Column(Modifier.fillMaxSize().background(Color.Black).windowInsetsPadding(WindowInsets.safeDrawing)) {
-        // Header like every detail screen: back left, share and delete as icons top right (for the photo shown).
-        var shown by remember { mutableStateOf<String?>(null) }
         val scope = rememberCoroutineScope()
-        Row(Modifier.padding(horizontal = Space.l, vertical = Space.m).height(app.overfit.ui.theme.TouchTarget.min).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(app.overfit.ui.theme.TouchTarget.min).semantics { contentDescription = t.back }.clickable(onClick = onBack),
-                contentAlignment = Alignment.CenterStart,
-            ) { LineIcon(Icon.Back, color = white) }
+        val pager = rememberPagerState(initialPage = startDay.coerceAtLeast(0)) { days.size }
+        // Index of the shown photo within each day (vertical pager), by day index.
+        val inner = remember { mutableStateMapOf<Int, Int>() }
+        // The photo shown, straight from the pager state (no frame without it, so the header icons do not pop).
+        val item = if (startDay < 0 || days.isEmpty()) null else {
+            val currentDay = days[pager.currentPage.coerceIn(0, days.lastIndex)]
+            val innerIndex = (inner[pager.currentPage] ?: initialInner(days, startDay, pager.currentPage, photoId))
+                .coerceIn(0, currentDay.photos.lastIndex)
+            currentDay.photos[innerIndex]
+        }
+        val shownId = item?.photo?.id
+        val lastShown = remember { arrayOfNulls<String>(1) }
+        if (shownId != null) lastShown[0] = shownId
+        // Header like every detail screen: back left, share and delete as icons top right (for the photo shown).
+        // The start padding puts the back arrow where the other headers have it (the 48-dp button centres its icon).
+        Row(
+            Modifier.padding(start = Space.m - Space.xs, end = Space.l, top = Space.m, bottom = Space.m)
+                .height(app.overfit.ui.theme.TouchTarget.min).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HeaderIconButton(Icon.Back, t.back, onBack, color = white)
             Spacer(Modifier.weight(1f))
-            shown?.let { id ->
-                HeaderIconButton(Icon.Share, p.sharePhoto, {
-                    scope.launch { loadJpeg(id)?.let { platform.shareBytes("overfit-$id.jpg", it, "image/jpeg") } }
-                }, color = white)
-                Spacer(Modifier.width(Space.xs))
-                HeaderDeleteButton(p.deletePhoto, onConfirm = { onDelete(id) }, color = white)
+            Appear(shownId != null) {
+                val id = shownId ?: lastShown[0] ?: return@Appear
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HeaderIconButton(Icon.Share, p.sharePhoto, {
+                        scope.launch { loadJpeg(id)?.let { platform.shareBytes("overfit-$id.jpg", it, "image/jpeg") } }
+                    }, color = white)
+                    Spacer(Modifier.width(Space.xs))
+                    HeaderDeleteButton(p.deletePhoto, onConfirm = { onDelete(id) }, color = white)
+                }
             }
         }
-        if (startDay < 0) {
+        if (item == null) {
             if (photos != null) BasicText(p.notFound, Modifier.padding(horizontal = Space.l), style = body)
             return@Column
         }
-        val pager = rememberPagerState(initialPage = startDay) { days.size }
-        // Index of the shown photo within each day (vertical pager), by day index.
-        val inner = remember { mutableStateMapOf<Int, Int>() }
-        val currentDay = days[pager.currentPage.coerceIn(0, days.lastIndex)]
-        val innerIndex = (inner[pager.currentPage] ?: initialInner(days, startDay, pager.currentPage, photoId))
-            .coerceIn(0, currentDay.photos.lastIndex)
-        val item = currentDay.photos[innerIndex]
-        SideEffect { shown = item.photo.id }
 
         HorizontalPager(pager, Modifier.fillMaxWidth().weight(1f), key = { days[it].date.toString() }) { page ->
             val day = days[page]
@@ -533,13 +643,22 @@ fun PhotoViewerScreen(
                     }
                     Column(Modifier.align(Alignment.CenterEnd).padding(end = Space.s), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         repeat(day.photos.size) { i ->
-                            Box(Modifier.size(6.dp).background(if (i == v.currentPage) white else white.copy(alpha = 0.35f), CircleShape))
+                            // The bright dot follows the finger: brightness from the pager position, read while drawing.
+                            Box(
+                                Modifier.size(6.dp).drawBehind {
+                                    val near = (1f - abs(i - (v.currentPage + v.currentPageOffsetFraction))).coerceIn(0f, 1f)
+                                    drawCircle(white, alpha = 0.35f + 0.65f * near)
+                                },
+                            )
                         }
                     }
                 }
             }
         }
-        ViewerInfo(item, history, language, unit, loadSummary, onWorkout)
+        // The info of a new photo cross-fades in place; its height changes softly, so the photo above does not jump.
+        Swap(item, Modifier.fillMaxWidth(), contentKey = { it.photo.id }) {
+            ViewerInfo(it, history, language, unit, loadSummary, onWorkout)
+        }
     }
 }
 
@@ -576,11 +695,16 @@ private fun ViewerInfo(
             val volume = row?.volumeKg ?: summary?.volumeKg ?: 0.0
             if (volume > 0) add("${h.volume} ${formatVolume(volume, unit, language)}")
         }
-        if (facts.isNotEmpty()) BasicText(facts.joinToString(" · "), style = Theme.type.caption.copy(color = dim))
-        summary?.records?.takeIf { it.isNotEmpty() }?.let { records ->
-            Spacer(Modifier.height(Space.xs))
-            BasicText(p.viewerBests, style = Theme.type.caption.copy(color = dim))
-            records.take(3).forEach { BasicText(recordText(it, unit, language, t), style = Theme.type.caption.copy(color = white)) }
+        // Volume and bests may arrive a moment later (summary): they grow in instead of pushing the photo.
+        RevealNotNull(facts.takeIf { it.isNotEmpty() }?.joinToString(" · ")) {
+            BasicText(it, style = Theme.type.caption.copy(color = dim))
+        }
+        RevealNotNull(summary?.records?.takeIf { it.isNotEmpty() }) { records ->
+            Column {
+                Spacer(Modifier.height(Space.xs))
+                BasicText(p.viewerBests, style = Theme.type.caption.copy(color = dim))
+                records.take(3).forEach { BasicText(recordText(it, unit, language, t), style = Theme.type.caption.copy(color = white)) }
+            }
         }
         if (sessionId != null && workoutName != null) {
             Spacer(Modifier.height(Space.s))
@@ -591,8 +715,14 @@ private fun ViewerInfo(
 
 @Composable
 private fun ViewerAction(label: String, color: Color, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
     Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.2f)))
-    Box(Modifier.fillMaxWidth().height(48.dp).clickable(onClick = onClick), contentAlignment = Alignment.CenterStart) {
+    Box(
+        Modifier.fillMaxWidth().height(48.dp)
+            .pressScale(interaction, PressScale.card)
+            .clickable(interaction, indication = null, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.CenterStart,
+    ) {
         BasicText(label, style = Theme.type.body.copy(color = color))
     }
 }
