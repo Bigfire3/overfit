@@ -1139,7 +1139,8 @@ private fun StatTile(stat: Stat, modifier: Modifier = Modifier) {
             // One tile reads as one thing: "Dauer, 42:10".
             .semantics(mergeDescendants = true) {}
             .padding(horizontal = Space.m, vertical = Space.s + Space.xs),
-        verticalArrangement = Arrangement.Center,
+        // Top, not centre: in a row where one label takes two lines, the numbers still stand on one line.
+        verticalArrangement = Arrangement.Top,
     ) {
         StatValue(stat)
         // Two lines rather than "Bestes geschätz…" on a narrow phone; with large type it shrinks a little before a
@@ -1209,21 +1210,20 @@ private val STAT_MIN_FONT = 14.sp
  * size for every text shown on the way there: the search runs once per width, not on every frame of the count-up.
  */
 private class FitText(private val sizedFor: String, private val min: TextUnit, private val max: TextUnit) : TextAutoSize {
-    private var key: Triple<Constraints, Float, Float>? = null
-    private var size: TextUnit = max
+    // One entry per width: the intrinsic pass of the tile row (unbounded) and the real pass must not evict each other,
+    // or the search would run again on every frame of the count-up.
+    private val sizes = HashMap<Triple<Int, Float, Float>, TextUnit>(4)
 
     override fun TextAutoSizeLayoutScope.getFontSize(constraints: Constraints, text: AnnotatedString): TextUnit {
-        val now = Triple(constraints, density, fontScale)
-        if (now == key) return size
+        val now = Triple(constraints.maxWidth, density, fontScale)
+        sizes[now]?.let { return it }
         val target = AnnotatedString(sizedFor)
         var candidate = max.value
         while (candidate - FIT_STEP >= min.value) {
             if (fitsInWholeWords(performLayout(constraints, target, candidate.sp), sizedFor)) break
             candidate -= FIT_STEP
         }
-        key = now
-        size = candidate.sp
-        return size
+        return candidate.sp.also { sizes[now] = it }
     }
 
     override fun equals(other: Any?): Boolean =
