@@ -2,6 +2,7 @@ package app.overfit.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -62,6 +63,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import app.overfit.ui.theme.LocalReducedMotion
 import app.overfit.ui.theme.Motion
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
@@ -109,7 +111,7 @@ private const val SHEET_DISMISS_FRACTION = 0.3f
  * primary button). No border, no shadow. A tap on the scrim or system back calls [onDismiss]. Put it last in a
  * full-size Box so it lies above the screen.
  *
- * Motion: the sheet slides up on a spring and the scrim darkens with it. It follows the finger: pulled down by the
+ * Motion: the sheet slides up on a spring and the scrim darkens with it (reduced motion: it fades in place instead). It follows the finger: pulled down by the
  * handle, by its content once that is scrolled to the top, or by the footer, it comes along, the scrim lightens, and
  * letting go either closes it (pulled far enough or flicked) or lets it spring back, keeping the finger's speed.
  * On its way out it takes no part any more: it cannot be grabbed back, its entries do not react a second time and a
@@ -140,6 +142,7 @@ fun BottomSheet(
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     val flick = with(LocalDensity.current) { 900.dp.toPx() }
+    val reducedMotion = LocalReducedMotion.current
 
     LaunchedEffect(visible) {
         if (visible) {
@@ -179,6 +182,16 @@ fun BottomSheet(
         val close = velocity > flick || (dragPx / h > SHEET_DISMISS_FRACTION && velocity > -flick)
         if (close) leaving = true
         scope.launch {
+            if (reducedMotion) {
+                // Reduced motion: the sheet stays where the finger left it and fades out, or goes back up to it.
+                if (close) {
+                    hidden.animateTo(1f, Motion.smooth())
+                    dismiss()
+                } else {
+                    animate(dragPx, 0f, animationSpec = Motion.smooth()) { value, _ -> dragPx = value }
+                }
+                return@launch
+            }
             // Same place on screen, now owned by the spring; then on with the finger's speed.
             hidden.snapTo((hidden.value + dragPx / h).coerceIn(0f, 1f))
             dragPx = 0f
@@ -213,7 +226,11 @@ fun BottomSheet(
             modifier
                 .align(Alignment.BottomCenter)
                 .onSizeChanged { sheetHeight = it.height }
-                .graphicsLayer { translationY = fraction() * size.height }
+                // Reduced motion: opening and closing fade in place; only the finger moves the sheet.
+                .graphicsLayer {
+                    if (reducedMotion) { translationY = dragPx; alpha = 1f - hidden.value }
+                    else translationY = fraction() * size.height
+                }
                 .fillMaxWidth()
                 .heightIn(max = maxSheet)
                 .clip(SheetShape)

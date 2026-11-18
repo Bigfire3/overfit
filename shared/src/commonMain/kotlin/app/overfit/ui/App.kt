@@ -6,6 +6,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Stable
+import androidx.navigation.NavBackStackEntry
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.flow.Flow
+import androidx.compose.runtime.State
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -561,11 +567,15 @@ fun OverfitApp(deps: AppDependencies) {
             // The four main screens carry the bars themselves (mini workout bar, tab bar): the bars travel with their
             // screen when another one is pushed over it, instead of vanishing in one frame.
             val tabSwitch = remember { TabSwitch() }
-            val tabScreen: @Composable (Tab, @Composable () -> Unit) -> Unit = { tab, content ->
-                TabScreen(tab, tabSwitch, workoutState.workout, deps.clock, onOpenWorkout = { nav.openWorkout() }, onSelect = { nav.selectTab(it) }, content = content)
+            val currentEntry by nav.currentBackStackEntryAsState()
+            // A tab screen on its way out (under the rising workout, under a pushed screen) keeps what it showed: the mini
+            // bar, "running now" and the play buttons change when the user comes back, not underneath the new screen.
+            val tabScreen: @Composable (Tab, NavBackStackEntry, @Composable (running: Workout?) -> Unit) -> Unit = { tab, entry, content ->
+                val running = heldUnlessCurrent(currentEntry?.id == entry.id, workoutState.workout)
+                TabScreen(tab, tabSwitch, running, deps.clock, onOpenWorkout = { nav.openWorkout() }, onSelect = { nav.selectTab(it) }) { content(running) }
             }
             val reducedMotion = LocalReducedMotion.current
-            AppScaffold(nav, hiddenFromAccessibility = coachOpen) {
+            AppScaffold(nav, hiddenFromAccessibility = coachOpen, barsHeight = { tabSwitch.barsHeight }) {
                 NavHost(
                     nav,
                     startDestination = start,
@@ -618,17 +628,17 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
 
-                    composable<StartRoute> {
-                        tabScreen(Tab.START) {
+                    composable<StartRoute> { entry ->
+                        tabScreen(Tab.START, entry) { running ->
                             val startScope = rememberCoroutineScope()
                             // null until loaded: the cards then leave their "last done" line empty instead of showing
-                            // "never trained" for a frame.
-                            val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = null)
+                            // "never trained" for a frame. Cached across entries, so it is there in the first frame.
+                            val lastDone by deps.data.templates.lastDone.collectCached(tabSwitch, "lastDone")
                             StartScreen(
                                 templates = templates,
                                 lastDone = lastDone,
                                 today = deps.today(),
-                                running = workoutState.workout,
+                                running = running,
                                 onOpenRunning = { nav.openWorkout() },
                                 onEndRunning = {
                                     // Ends the running workout (saved, finish flow): the workout screen takes it from there. Runs in the app scope.
@@ -926,12 +936,14 @@ fun OverfitApp(deps: AppDependencies) {
                             onCreatedConsumed = { picked.created.value = null },
                         )
                     }
-                    composable<PhotosRoute> {
-                        tabScreen(Tab.PHOTOS) {
-                            val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
-                            val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
+                    composable<PhotosRoute> { entry ->
+                        tabScreen(Tab.PHOTOS, entry) { _ ->
+                            // Cached across entries: the calendar opens with its days in the first frame instead of
+                            // fading in from empty on every tab switch.
+                            val photos by deps.data.workouts.photos.collectCached(tabSwitch, "photos")
+                            val history by deps.data.workouts.history.collectCached(tabSwitch, "history")
                             val viewPref = remember { app.overfit.ui.photos.DiaryViewPref(deps.kv) }
-                            val weights by deps.data.bodyWeights.entries.collectAsStateWithLifecycle(initialValue = null)
+                            val weights by deps.data.bodyWeights.entries.collectCached(tabSwitch, "weights")
                             var showMuscles by rememberSaveable { mutableStateOf(false) }
                             PhotosScreen(
                                 weights = weights,
@@ -1000,8 +1012,8 @@ fun OverfitApp(deps: AppDependencies) {
                             onRestored = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                         )
                     }
-                    composable<SettingsRoute> {
-                        tabScreen(Tab.PROFILE) {
+                    composable<SettingsRoute> { entry ->
+                        tabScreen(Tab.PROFILE, entry) { _ ->
                             var exportingBackup by remember { mutableStateOf(false) }
                             var backupExportFailed by remember { mutableStateOf(false) }
                             val pickBackup = rememberFilePicker { bytes ->
@@ -1140,8 +1152,8 @@ fun OverfitApp(deps: AppDependencies) {
                             },
                         )
                     }
-                    composable<CoachRoute> {
-                        tabScreen(Tab.COACH) {
+                    composable<CoachRoute> { entry ->
+                        tabScreen(Tab.COACH, entry) { _ ->
                             // First visit: the story opens once by itself; afterwards only via the title.
                             LaunchedEffect(Unit) {
                                 if (!deps.store.coachStorySeen()) {
@@ -1259,6 +1271,8 @@ private fun AppScaffold(
     nav: NavHostController,
     /** True while a layer (the coach) lies over everything: the screen below is left out of the accessibility tree. */
     hiddenFromAccessibility: Boolean = false,
+    /** Height of the bars of the tab screens ([TabSwitch.barsHeight]); read in layout only. */
+    barsHeight: () -> Dp = { 0.dp },
     content: @Composable () -> Unit,
 ) {
     // While a screen change runs, taps are swallowed: a double tap no longer opens a screen twice or pops two screens.
@@ -1273,6 +1287,16 @@ private fun AppScaffold(
     // stuck, erst Zurück, dann geht es wieder").
     val screenKey = screens.map { it.id }
     var blockExpired by remember(screenKey) { mutableStateOf(false) }
+    // The bars of a tab screen (mini bar, tab bar) stay usable during the change when that tab screen is the new
+    // current one and lies on top: going forward into a tab (finish saved, workout discarded, onboarding done). Not on
+    // the way back to a tab (back, minimize): the leaving screen lies above it until it has slid away, and a tap on the
+    // bars would land on its bottom button ("Starten", "Nächsten Satz loggen"). That stays blocked for at most 300 ms.
+    val current by nav.currentBackStackEntryAsState()
+    val seen = remember { mutableSetOf<String>() }
+    val currentId = current?.id
+    val returning = remember(currentId) { currentId != null && currentId in seen }
+    SideEffect { currentId?.let(seen::add) }
+    val barsFree = !returning && current?.destination?.let { d -> Tab.entries.any { d.hasRoute(it.routeClass) } } == true
     LaunchedEffect(screenKey, transitioning) {
         if (transitioning) { delay(ScreenMotion.MAX_BLOCK_MS); blockExpired = true }
     }
@@ -1281,9 +1305,20 @@ private fun AppScaffold(
             .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
     ) {
         content()
-        if (transitioning && !blockExpired) Box(Modifier.matchParentSize().testTag("nav-transition").pointerInput(Unit) {
-            awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
-        })
+        if (transitioning && !blockExpired) Box(
+            Modifier.matchParentSize()
+                // Leaves the bars at the bottom out when they are free (see above); the height is read in layout.
+                .layout { measurable, constraints ->
+                    val free = if (barsFree) barsHeight().roundToPx().coerceIn(0, constraints.maxHeight) else 0
+                    val height = constraints.maxHeight - free
+                    val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
+                }
+                .testTag("nav-transition")
+                .pointerInput(Unit) {
+                    awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
+                },
+        )
     }
 }
 
@@ -1295,6 +1330,36 @@ private fun AppScaffold(
 @Stable
 internal class TabSwitch {
     var last: Tab? = null
+    /**
+     * Height of the bars (mini bar + tab bar) as last measured. The next tab screen starts from it, so its first frame
+     * is laid out with the right room at the bottom (it is recreated on every entry); [AppScaffold] keeps it free of
+     * the tap blocker.
+     */
+    var barsHeight by mutableStateOf(0.dp)
+    /** Last value of each flow a tab screen shows ([collectCached]), so the tab opens with it instead of loading again. */
+    val cache = mutableMapOf<String, Any?>()
+}
+
+/**
+ * Collects a flow of a tab screen and remembers its last value in [switch]: on the next entry the screen starts with
+ * that value in its first frame (and only animates what really changed since), instead of null → loaded with a
+ * loading animation on every tab switch. Null until the first value ever.
+ */
+@Composable
+internal fun <T> Flow<T>.collectCached(switch: TabSwitch, key: String): State<T?> {
+    @Suppress("UNCHECKED_CAST")
+    val state = collectAsStateWithLifecycle(initialValue = switch.cache[key] as T?)
+    SideEffect { state.value?.let { switch.cache[key] = it } }
+    return state
+}
+
+/** [value] while [current]; the value it had when it stopped being current otherwise (a screen on its way out). */
+@Composable
+internal fun <T> heldUnlessCurrent(current: Boolean, value: T): T {
+    val held = remember { arrayOfNulls<Any?>(1).also { it[0] = value } }
+    if (current) held[0] = value
+    @Suppress("UNCHECKED_CAST")
+    return held[0] as T
 }
 
 /**
@@ -1315,25 +1380,28 @@ private fun TabScreen(
     val from = remember { switch.last?.takeIf { it != tab } }
     // After a tab switch the content comes up from slightly dimmed and slightly small; otherwise it is there at once.
     val settled = remember { Animatable(if (from != null) 0f else 1f) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) { settled.animateTo(1f, Motion.snappy()) }
+    // "Last tab" is only the one that really became the current screen: a tab composed underneath a back gesture that
+    // is then cancelled (preview of the screen below) does not count.
+    LifecycleResumeEffect(tab) {
         switch.last = tab
-        settled.animateTo(1f, Motion.snappy())
+        onPauseOrDispose { }
     }
     val density = LocalDensity.current
-    var barsHeight by remember { mutableStateOf(0.dp) }
     Column(Modifier.fillMaxSize().background(Theme.colors.background)) {
         Box(
             Modifier.weight(1f)
                 // The bars keep clear of the system bar themselves and take their own room: the screen above them must
-                // not add that again at its bottom, and an open keyboard only needs what the bars do not cover.
-                .consumeWindowInsets(PaddingValues(bottom = barsHeight))
+                // not add that again at its bottom, and an open keyboard only needs what the bars do not cover. Starts
+                // from the last measured height, so the first frame is already right.
+                .consumeWindowInsets(PaddingValues(bottom = switch.barsHeight))
                 .graphicsLayer {
                     alpha = 0.5f + 0.5f * settled.value
                     val scale = 0.985f + 0.015f * settled.value
                     scaleX = scale; scaleY = scale
                 },
         ) { content() }
-        Column(Modifier.onSizeChanged { barsHeight = with(density) { it.height.toDp() } }) {
+        Column(Modifier.onSizeChanged { switch.barsHeight = with(density) { it.height.toDp() } }) {
             // A workout that ends while its bar is shown: the bar sinks away, the screen takes the room.
             RevealNotNull(runningWorkout) { MiniWorkoutBar(it, clock, onOpenWorkout) }
             TabBar(tab, from, onSelect)
@@ -1369,9 +1437,11 @@ private fun TabBar(current: Tab, from: Tab?, onSelect: (Tab) -> Unit) {
         ) {
             Tab.entries.forEach { tab ->
                 val active = tab == current
-                // White under the marker, grey away from it.
-                val near = (1f - kotlin.math.abs(position.value - tab.ordinal)).coerceIn(0f, 1f)
-                val tint = lerp(c.muted, c.foreground, near)
+                // White under the marker, grey away from it. Read while drawing: the bar does not recompose while the
+                // marker slides, only the icons and labels redraw.
+                val tint = remember(tab, c) {
+                    { lerp(c.muted, c.foreground, (1f - kotlin.math.abs(position.value - tab.ordinal)).coerceIn(0f, 1f)) }
+                }
                 Column(
                     Modifier
                         .weight(1f)
@@ -1384,7 +1454,7 @@ private fun TabBar(current: Tab, from: Tab?, onSelect: (Tab) -> Unit) {
                 ) {
                     LineIcon(tab.icon, color = tint)
                     Spacer(Modifier.height(2.dp))
-                    BasicText(tab.label(strings), style = Theme.type.caption, color = { tint })
+                    BasicText(tab.label(strings), style = Theme.type.caption, color = tint)
                 }
             }
         }

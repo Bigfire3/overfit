@@ -8,6 +8,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.isSelected
+import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -54,6 +58,7 @@ import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -232,6 +237,113 @@ class UiFeedbackTest {
         compose.onAllNodesWithText("Legs").assertCountEquals(1)
         compose.onAllNodesWithText("Push").assertCountEquals(0)
         compose.onNodeWithTag("tab:PHOTOS").assertExists()
+    }
+
+    /**
+     * Going forward into a tab (finish saved → Training tab): the new tab screen lies on top, so its tab bar takes a tap
+     * at once, while the content is still blocked for the first moment (review finding I2).
+     */
+    @Test
+    fun forwardIntoATab_tabBarReactsDuringTheChange() {
+        val deps = launchApp()
+        compose.onNodeWithText("Push").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Starten") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Starten").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Satz 1 abhaken").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Beenden").performClick()
+        compose.onNodeWithTag("confirm:armed").performClick()
+        compose.waitForFinishLoaded()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("nav-transition").fetchSemanticsNodes().isEmpty() }
+
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("Speichern").performClick()
+        // Saving writes in the background first, then goes home: step frame by frame until the change has begun.
+        repeat(200) {
+            if (compose.onAllNodesWithTag("nav-transition").fetchSemanticsNodes().isNotEmpty()) return@repeat
+            Thread.sleep(10)
+            compose.mainClock.advanceTimeByFrame()
+        }
+        compose.mainClock.advanceTimeBy(32)
+        compose.onNodeWithTag("nav-transition").assertExists()
+        compose.onAllNodesWithTag("tab:PROFILE")[0].performClick()
+        compose.mainClock.advanceTimeBy(400)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("tab:PROFILE") and isSelected()).fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(null, deps.workout.state.value.workout)
+    }
+
+    /**
+     * On the way back to a tab the leaving screen still lies over the tab bar while it slides away: a tap there in the
+     * first moment is swallowed instead of reaching the leaving screen's bottom button ("Starten").
+     */
+    @Test
+    fun backToATab_tapOnTheBarsInTheFirstMoment_doesNotReachTheLeavingScreen() {
+        val deps = launchApp()
+        compose.onNodeWithText("Push").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Starten") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("nav-transition").fetchSemanticsNodes().isEmpty() }
+
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithContentDescription("Zurück").performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(32)
+        compose.onNodeWithTag("nav-transition").assertExists()
+        compose.onAllNodesWithTag("tab:PROFILE")[0].performClick()
+        compose.mainClock.advanceTimeBy(400)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onAllNodes(hasTestTag("tab:START") and isSelected()).assertCountEquals(1)
+        assertEquals(null, deps.workout.state.value.workout)
+    }
+
+    /**
+     * The calendar tab opens with its days in the first frame when it comes back (the last values are kept across tab
+     * entries), instead of fading in from empty on every switch (review finding P3).
+     */
+    @Test
+    fun calendarTab_reopensWithItsDays_noLoadingFade() {
+        launchApp()
+        compose.onNodeWithTag("tab:PHOTOS").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("diary-grid").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("tab:START").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("diary-grid").fetchSemanticsNodes().isEmpty() }
+
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("tab:PHOTOS").performClick()
+        // Step to the first frame of the calendar tab (its own tab bar shows it selected): the grid is already there.
+        repeat(100) {
+            if (compose.onAllNodes(hasTestTag("tab:PHOTOS") and isSelected()).fetchSemanticsNodes().isNotEmpty()) return@repeat
+            compose.mainClock.advanceTimeByFrame()
+        }
+        compose.onAllNodes(hasTestTag("tab:PHOTOS") and isSelected()).assertCountEquals(1)
+        compose.onAllNodesWithTag("diary-grid").assertCountEquals(1)
+        compose.mainClock.autoAdvance = true
+    }
+
+    /**
+     * Starting a workout right from the list: the Training tab, on its way out under the rising workout, keeps what it
+     * showed. No mini bar grows underneath the cover (review finding P4); it is there when the user comes back.
+     */
+    @Test
+    fun startFromTheList_leavingTabDoesNotGrowItsMiniBar() {
+        val deps = launchApp()
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Push starten").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("nav-transition").fetchSemanticsNodes().isEmpty() }
+
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithContentDescription("Push starten").performClick()
+        // The start loads the workout in the background, then opens it: step until the change has begun.
+        repeat(200) {
+            if (compose.onAllNodesWithTag("nav-transition").fetchSemanticsNodes().isNotEmpty()) return@repeat
+            Thread.sleep(10)
+            compose.mainClock.advanceTimeByFrame()
+        }
+        compose.mainClock.advanceTimeBy(48)
+        compose.onNodeWithTag("nav-transition").assertExists()
+        assertTrue(deps.workout.state.value.workout != null)
+        compose.onAllNodes(hasContentDescription("Training öffnen", substring = true)).assertCountEquals(0)
+        compose.mainClock.autoAdvance = true
     }
 
     @Test

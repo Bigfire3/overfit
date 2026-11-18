@@ -41,6 +41,7 @@ import app.overfit.ui.components.pressScale
 import app.overfit.ui.theme.Motion
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -107,8 +108,10 @@ fun CoachStoryScreen(
     // The middle column scrolls; pulling down only closes while it stands at its start (else the pull scrolls it back).
     // One per page, so a page that fades out keeps its position.
     val textScrolls = remember { List(pages.size) { androidx.compose.foundation.ScrollState(0) } }
-    // How far the content follows the finger while pulling down; springs back when let go before the threshold.
-    val pull = remember { Animatable(0f) }
+    // How far the content follows the finger while pulling down: written straight from the gesture (no coroutine per
+    // pointer event); let go before the threshold, the rest springs back on its own animation.
+    var fingerPull by remember { mutableFloatStateOf(0f) }
+    val springBack = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
     Box(
@@ -139,13 +142,18 @@ fun CoachStoryScreen(
                         val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) break
                         if (textScrolls[page].value == 0) total = (total + change.positionChange().y).coerceAtLeast(0f) else total = 0f
-                        if (!closed) {
-                            val now = total
-                            scope.launch { pull.snapTo(now) }
-                        }
+                        if (!closed) fingerPull = total
                         if (!closed && total > threshold) { closed = true; close() }
                     }
-                    if (!closed) scope.launch { pull.animateTo(0f, Motion.smooth()) }
+                    if (!closed) {
+                        // Hand the offset over to the spring in one step (the sum stays the same), then let it go back.
+                        val from = fingerPull
+                        scope.launch {
+                            springBack.snapTo(springBack.value + from)
+                            fingerPull = 0f
+                            springBack.animateTo(0f, Motion.smooth())
+                        }
+                    }
                 }
             }
             .testTag("story"),
@@ -155,8 +163,9 @@ fun CoachStoryScreen(
                 .fillMaxSize()
                 .graphicsLayer {
                     // Follows the finger down, a little smaller the further it goes (read here, so only this layer redraws).
-                    translationY = pull.value
-                    val shrink = 1f - (pull.value / CLOSE_DRAG.toPx()).coerceIn(0f, 1f) * PULL_SHRINK
+                    val pulled = fingerPull + springBack.value
+                    translationY = pulled
+                    val shrink = 1f - (pulled / CLOSE_DRAG.toPx()).coerceIn(0f, 1f) * PULL_SHRINK
                     scaleX = shrink; scaleY = shrink
                 }
                 .statusBarsPadding().navigationBarsPadding().padding(horizontal = Space.m)) {

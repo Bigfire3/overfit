@@ -91,8 +91,8 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.daysUntil
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.semantics.Role
 import kotlin.math.abs
 import app.overfit.ui.components.Appear
@@ -101,6 +101,7 @@ import app.overfit.ui.components.Reveal
 import app.overfit.ui.components.RevealNotNull
 import app.overfit.ui.components.RollingText
 import app.overfit.ui.components.Swap
+import app.overfit.ui.theme.LocalReducedMotion
 import app.overfit.ui.components.motionItem
 import app.overfit.ui.components.pressScale
 import app.overfit.ui.components.rememberHaptics
@@ -137,6 +138,7 @@ fun PhotosScreen(
     var selecting by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(listOf<String>()) }
     val haptics = rememberHaptics()
+    val reducedMotion = LocalReducedMotion.current
     val photoList = photos.orEmpty()
     val historyList = history.orEmpty()
     val weightList = weights.orEmpty()
@@ -232,8 +234,14 @@ fun PhotosScreen(
                                         jumpScope.launch {
                                             if (asList) {
                                                 // From far down: jump close first, then glide the last stretch.
-                                                if (listState.firstVisibleItemIndex > 3) listState.scrollToItem(2)
-                                                listState.animateScrollToItem(0)
+                                                // Reduced motion: jump straight there.
+                                                if (reducedMotion) listState.scrollToItem(0)
+                                                else {
+                                                    if (listState.firstVisibleItemIndex > 3) listState.scrollToItem(2)
+                                                    listState.animateScrollToItem(0)
+                                                }
+                                            } else if (reducedMotion) {
+                                                gridState.scrollToItem(todayIndex)
                                             } else {
                                                 val at = gridState.firstVisibleItemIndex
                                                 if (at < todayIndex - 2) gridState.scrollToItem(todayIndex - 1)
@@ -506,16 +514,24 @@ private fun DayCell(
         if (sauna) add(DayMarker.Sauna)
         if (weightKg != null) add(DayMarker.Weight)
     }
+    val clickable = if (selecting) photo != null else tappable
+    val veil = Theme.colors.background
     Column(
         Modifier
             .fillMaxSize()
+            // Only a cell that reacts gets the press feedback (and with it a layer); a month has 28-31 cells.
+            .then(if (clickable) Modifier.pressScale(interaction, PressScale.card) else Modifier)
             // Future days: greyed out and not tappable (nothing to log there yet). Days without a photo fade back
-            // while photos are picked. Both in the layer, nothing recomposes.
-            .graphicsLayer { alpha = minOf(if (tappable) 1f else 0.5f, if (photo == null) dim() else 1f) }
-            .pressScale(interaction, PressScale.card)
+            // while photos are picked. Drawn as a veil in the background colour (the grid lies on it), so no cell
+            // needs a layer of its own for its alpha; read while drawing, nothing recomposes.
+            .drawWithContent {
+                drawContent()
+                val alpha = minOf(if (tappable) 1f else 0.5f, if (photo == null) dim() else 1f)
+                if (alpha < 1f) drawRect(veil, alpha = 1f - alpha)
+            }
             .padding(vertical = 2.dp)
             .semantics { contentDescription = desc }
-            .then(if (if (selecting) photo != null else tappable) Modifier.clickable(interaction, indication = null) { onDay(date, day) } else Modifier),
+            .then(if (clickable) Modifier.clickable(interaction, indication = null) { onDay(date, day) } else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Day number in a fixed circle slot; today fills the circle (inverse number).

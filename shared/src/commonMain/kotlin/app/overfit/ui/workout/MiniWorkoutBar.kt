@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -48,10 +50,14 @@ import kotlinx.coroutines.delay
 @Composable
 fun MiniWorkoutBar(workout: Workout, clock: () -> Long, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val t = LocalStrings.current
-    val now by produceState(clock()) { while (true) { value = clock(); delay(250) } }
+    // The clock ticks every 250 ms, but the bar only recomposes when something it shows changes: the texts are derived
+    // from it (once a second at most), the rest line reads it while drawing.
+    val now = produceState(clock()) { while (true) { value = clock(); delay(250) } }
     val open by rememberUpdatedState(onOpen)
-    val rest = workout.rest?.takeIf { !it.isOver(now) }
-    val next = workout.nextOpenSet(rest?.afterSetId)
+    val rest by remember(workout) { derivedStateOf(structuralEqualityPolicy()) { workout.rest?.takeIf { !it.isOver(now.value) } } }
+    val next = remember(workout, rest?.afterSetId) { workout.nextOpenSet(rest?.afterSetId) }
+    val elapsed by remember(workout) { derivedStateOf { WorkoutFormat.elapsed(now.value - workout.startedAt) } }
+    val countdown by remember(workout) { derivedStateOf { WorkoutFormat.countdown(workout.rest?.takeIf { !it.isOver(now.value) }?.remainingMs(now.value) ?: 0) } }
     val label = t.openWorkout + ", " + workout.name
     val interaction = remember { MutableInteractionSource() }
 
@@ -73,7 +79,10 @@ fun MiniWorkoutBar(workout: Workout, clock: () -> Long, onOpen: () -> Unit, modi
             .semantics { contentDescription = label },
     ) {
         // During a rest the top edge is the rest's progress in the "now" colour; otherwise a plain hairline.
-        ProgressLine(rest?.progress(now) ?: 0f, color = Theme.colors.accent, height = 2.dp, spec = Motion.tick())
+        ProgressLine(
+            { workout.rest?.takeIf { !it.isOver(now.value) }?.progress(now.value) ?: 0f },
+            color = Theme.colors.accent, height = 2.dp, spec = Motion.tick(),
+        )
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Space.m, vertical = Space.s),
             verticalAlignment = Alignment.CenterVertically,
@@ -93,10 +102,10 @@ fun MiniWorkoutBar(workout: Workout, clock: () -> Long, onOpen: () -> Unit, modi
             Swap(rest != null, contentAlignment = Alignment.CenterEnd) { resting ->
                 if (resting) {
                     // Same countdown as in the workout: "now" colour, digits roll down. (Shows 0:00 while it leaves.)
-                    RollingText(WorkoutFormat.countdown(rest?.remainingMs(now) ?: 0), style = Theme.type.title, color = Theme.colors.accent, countsDown = true)
+                    RollingText(countdown, style = Theme.type.title, color = Theme.colors.accent, countsDown = true)
                 } else {
                     Text(
-                        WorkoutFormat.elapsed(now - workout.startedAt),
+                        elapsed,
                         style = Theme.type.label.copy(fontFeatureSettings = "tnum"),
                         tone = Tone.Muted,
                         maxLines = 1,

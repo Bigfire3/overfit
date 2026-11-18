@@ -40,6 +40,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -369,6 +371,36 @@ fun ProgressLine(
             val r = CornerRadius(size.height / 2)
             drawRoundRect(track, cornerRadius = r)
             if (shown > 0f) drawRoundRect(color, size = Size(size.width * shown, size.height), cornerRadius = r)
+        },
+    )
+}
+
+/**
+ * [ProgressLine] for a value that changes on its own clock (a rest running down): [progress] is read outside
+ * composition, so the caller does not recompose on every step; the filled part follows with [spec] and is read while
+ * drawing.
+ */
+@Composable
+fun ProgressLine(
+    progress: () -> Float,
+    modifier: Modifier = Modifier,
+    color: Color = Theme.colors.foreground,
+    track: Color = Theme.colors.hairline,
+    height: Dp = 2.dp,
+    spec: AnimationSpec<Float> = Motion.smooth(),
+) {
+    val target by rememberUpdatedState(progress)
+    val currentSpec by rememberUpdatedState(spec)
+    val shown = remember { Animatable(target().coerceIn(0f, 1f)) }
+    LaunchedEffect(shown) {
+        snapshotFlow { target().coerceIn(0f, 1f) }.collectLatest { shown.animateTo(it, currentSpec) }
+    }
+    Box(
+        modifier.fillMaxWidth().height(height).drawBehind {
+            val r = CornerRadius(size.height / 2)
+            drawRoundRect(track, cornerRadius = r)
+            val part = shown.value
+            if (part > 0f) drawRoundRect(color, size = Size(size.width * part, size.height), cornerRadius = r)
         },
     )
 }

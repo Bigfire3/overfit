@@ -1205,7 +1205,7 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - **Rot = Token `Colors.armed`** (`#FF453A` wie `negative`, nur dunkel, da es keinen Hell-Modus mehr gibt; Kontrast auf Schwarz 5,5 : 1): bewusst die einzige Akzentfarbe im Bedienrahmen, nur für scharf geschaltete Bestätigungen. Auch „Beenden“ wird rot (nicht grün): ein einziges, sofort lernbares Signal „gleich passiert etwas, das man nicht zurücknehmen kann“.
 - **Barrierefreiheit:** Scharf bekommt der Knopf `stateDescription` „zum Bestätigen erneut tippen“ / „tap again to confirm“; Icon-Knöpfe zusätzlich die Beschreibung „Löschen – zum Bestätigen erneut tippen“, damit TalkBack/VoiceOver es beim Fokus ansagen. Test-Tag (iOS: accessibilityIdentifier) `confirm:armed` nur im scharfen Zustand.
 - **Entfernt:** `Dialogs.kt` (`OverfitDialog`, `ConfirmDialog`), `Confirm`-Enum, `DialogShotTest`, die Popup-Texte (Fragen wie „Workout löschen?“, „Abbrechen“ bleibt für Editoren). Die Zusatzinfos aus den Popups entfallen: „Trainings bleiben im Kalender“ (Löschen eines Workouts) war nur ein Beruhigungssatz; „KI-Chat trennen“ hat darunter schon den Hinweis `disableHint`.
-- **Tests:** `UiFeedbackTest` (erster Tipp scharf mit Tag und Zustandsbeschreibung, Tipp woanders, gegenseitiges Entschärfen, zweiter Tipp führt genau einmal aus, Icon-Beschreibung, Timeout knapp davor/danach, Scrollen). Alle Flows tippen zweimal (zweiter Tipp auf `confirm:armed`). iOS-XCUITest: wartet nach dem ersten Tipp auf das Element `confirm:armed` und tippt genau dieses an (kein Koordinaten-Doppeltipp); war die Zeit inzwischen abgelaufen (langsamer Screenshot), ist es danach wieder scharf und bekommt einen weiteren Tipp.
+- **Tests:** `UiFeedbackTest` (erster Tipp scharf mit Tag und Zustandsbeschreibung, Tipp woanders, gegenseitiges Entschärfen, zweiter Tipp führt genau einmal aus, Icon-Beschreibung, Timeout knapp davor/danach, Scrollen). Alle Flows tippen zweimal (zweiter Tipp auf `confirm:armed`). iOS-XCUITest: wartet nach dem ersten Tipp auf das Element `confirm:armed` und tippt genau dieses an (kein Koordinaten-Doppeltipp). Seit 18.11. bleibt der Knopf im UI-Test-Modus (`-overfitUITest`) 30 s scharf statt 3 s, siehe „iOS-UI-Tests: Doppeltipp“ unten.
 
 ## Karten in Listen (Session AQ, 4.11.)
 - **Auftrag (Fabian):** „Diese schwebenden Karten sollen größtenteils in die Listen übernommen werden … wenn man ein Training anschaut, dann sollen auch die Übungen einzelne Karten sein mit den Bildern links, so wie das auch während dem Training dargestellt wird.“
@@ -1967,3 +1967,38 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
   Systemeinstellung; das Vibrieren von Satz und Pausenende (eigene Einstellung im Profil) bleibt, wie es war.
 - **„Bewegung reduzieren“:** iOS-Einstellung bzw. abgeschaltete Animationen auf Android werden gelesen (`systemReducedMotion`,
   `expect/actual`): Screen-Wechsel werden zur alten kurzen Überblendung, Ziffern wechseln ohne Rollen. Der Punkt stand seit 3.11. offen.
+
+## iOS-UI-Tests: Doppeltipp, Tab-Leiste beim Screen-Wechsel, Review-Befunde (18.11.)
+- **Rote iOS-CI (testScreensDark, „Beenden wurde nicht scharf geschaltet“):** Das Video zeigt den Kopfzeilen-Knopf nach dem Tipp
+  gut 3 s grün (scharf), danach wieder grau; XCUITest hat in diesen 3 s das Element `confirm:armed` nie gesehen. Ein Blick in den
+  Accessibility-Baum kostet XCUITest auf dem CI-Runner gut 1 s (ein `tap()` mit fünf Abfragen dauerte 6 s), und Compose gibt einen
+  geänderten Baum nur verzögert an iOS weiter (Abgleich-Schleife, `AccessibilityMediator`). 3 s reichten deshalb nur manchmal; der
+  frühere Fehler auf main („snapshot of confirm:armed not found“: gefunden, dann vor dem Tipp schon wieder weg) ist dasselbe Rennen.
+  **Lösung:** Im UI-Test-Modus bleibt ein Doppeltipp-Knopf 30 s scharf (`LaunchOptions.confirmArmedMillis` →
+  `LocalConfirmArmedMillis`), die App behält 3 s. `confirm()` wartet bis 15 s auf `confirm:armed` oder (zweites Zeichen) den Wert
+  „zum Bestätigen erneut tippen“ (die Zustandsbeschreibung, auf iOS `accessibilityValue`), tippt genau dieses Element und prüft,
+  dass es danach weg ist (sonst ein zweiter Tipp auf dasselbe Element). Kein Koordinaten-Doppeltipp, kein abgeschalteter Test.
+- **Start-Timeout „Failed to get background assertion“:** Infrastruktur, kein Test-Retry: nach dem Booten startet der Workflow
+  einmal die Einstellungen-App und wartet 25 s, bevor XCUITest die App startet.
+- **Swift-Helfer:** `waitFor` fragt die ganze Wartezeit „Label gleich ODER beginnt mit“ ab (zusammengeführte Labels wie
+  „Nächsten Satz loggen“ + zweite Zeile oder „1 Training · 1 Woche in Folge“ kosteten sonst je 20 s); „Starten“ wird erst getippt,
+  wenn es aktiv ist (`tapWhenEnabled`); `tab()` prüft, dass der Tab danach gewählt ist (oder die Leiste weg, Coach-Story), und tippt
+  sonst erneut.
+- **Tab-Leiste und Mini-Leiste während eines Screen-Wechsels:** Der Tipp-Blocker (`AppScaffold`, 300 ms) lässt die Leisten frei,
+  wenn der neue Screen ein Tab ist und *vorwärts* kommt (gespeichertes Training → Training-Tab): Dann liegt er oben, ein Tipp auf die
+  Leiste ist gemeint. Auf dem Weg *zurück* zu einem Tab (Zurück, Minimieren) bleibt die Leiste die ersten 300 ms gesperrt: der
+  gehende Screen liegt bis zum Wegrutschen darüber, ein Tipp landete sonst auf seinem unteren Knopf („Starten“, „Nächsten Satz
+  loggen“). Abgewogen gegen den Review-Wunsch „Leisten nie sperren“: ein versehentlich gestartetes Training oder geloggter Satz wiegt
+  schwerer als ein verschluckter Tab-Tipp in den ersten 300 ms (`UiFeedbackTest`).
+- **Tab-Screens (Review C8/C9/P3–P7):** Höhe der Leisten bleibt in `TabSwitch` (State), jeder Tab-Screen startet damit, das erste
+  Bild ist schon richtig. „Letzter Tab“ wird erst gesetzt, wenn der Tab wirklich aktiv ist (Lifecycle RESUMED), nicht bei der
+  Vorschau unter einer abgebrochenen Zurück-Geste. Kalender und Start-Tab behalten ihre letzten Daten über Tab-Wechsel
+  (`collectCached`): kein Laden→Geladen-Überblenden bei jedem Öffnen, animiert wird nur, was sich seitdem geändert hat. Ein Tab-Screen
+  auf dem Weg nach draußen (unter dem aufsteigenden Training) behält das laufende Training, wie es war (`heldUnlessCurrent`), statt
+  darunter Mini-Leiste und „Läuft gerade“ aufzuklappen. Tab-Leiste, Mini-Leiste, Kalenderzellen und Coach-Story lesen Bewegtes nur
+  noch beim Zeichnen (Farb-Lambda an `LineIcon`, `ProgressLine` mit Lambda, Schleier statt Alpha-Ebene je Kalendertag, Druck-Feedback
+  nur auf tippbaren Tagen, Zieh-Versatz der Story als Float-State).
+- **„Bewegung reduzieren“ (DA-6):** `BottomSheet` blendet dann an Ort und Stelle ein und aus, statt über die volle Höhe zu fahren
+  (nur der Finger bewegt es noch); Sprünge in Listen (Kalender „Heute“, Coach-Chat zur neuesten Nachricht, Anhang-Chips) springen
+  direkt statt zu gleiten. Laut Review stellt Compose Multiplatform auf iOS die Animationsdauer bei „Bewegung reduzieren“ womöglich
+  ohnehin herunter; das ist ungeprüft, die App verlässt sich nicht darauf.

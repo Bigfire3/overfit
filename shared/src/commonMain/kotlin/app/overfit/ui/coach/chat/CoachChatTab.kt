@@ -51,6 +51,7 @@ import app.overfit.ui.components.RollingText
 import app.overfit.ui.components.Swap
 import app.overfit.ui.components.motionItem
 import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.LocalReducedMotion
 import app.overfit.ui.theme.Motion
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -437,12 +438,13 @@ private fun Conversation(
     onRetry: (String) -> Unit,
 ) {
     val list = rememberLazyListState()
+    val reducedMotion = LocalReducedMotion.current
     // Own question (or a retry): show the very end of the chat. An answer that arrived: its beginning at the top, so a
-    // long answer is read from the start. Index: leading spacer + messages + trailing spacer.
+    // long answer is read from the start. Index: leading spacer + messages + trailing spacer. Reduced motion: jump.
     LaunchedEffect(messages.size, messages.lastOrNull()?.status) {
         val lastMessage = messages.lastOrNull() ?: return@LaunchedEffect
-        if (!lastMessage.fromUser && lastMessage.status != ChatMessageStatus.SENDING) list.animateScrollToItem(messages.size)
-        else list.animateScrollToItem(messages.size + 1)
+        val index = if (!lastMessage.fromUser && lastMessage.status != ChatMessageStatus.SENDING) messages.size else messages.size + 1
+        if (reducedMotion) list.scrollToItem(index) else list.animateScrollToItem(index)
     }
     LazyColumn(Modifier.fillMaxSize(), state = list, verticalArrangement = Arrangement.spacedBy(Space.m)) {
         item { Spacer(Modifier.height(Space.xs)) }
@@ -698,8 +700,10 @@ private fun ContextChips(
     val row = rememberLazyListState()
     // Chips added (from the sheet): the newest one comes into view.
     var shownCount by remember { mutableStateOf(chips.size) }
+    val reducedMotion = LocalReducedMotion.current
     LaunchedEffect(chips.size) {
-        if (chips.size > shownCount) row.animateScrollToItem((if (profile) 1 else 0) + chips.size - 1)
+        val newest = (if (profile) 1 else 0) + chips.size - 1
+        if (chips.size > shownCount) { if (reducedMotion) row.scrollToItem(newest) else row.animateScrollToItem(newest) }
         shownCount = chips.size
     }
     // The row opens and closes softly when the first chip comes or the last one goes; conversation and input slide.
