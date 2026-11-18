@@ -32,16 +32,35 @@ class OverfitUITestCase: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label))
     }
 
-    /** First element whose label is [label] (or starts with it), waiting up to [timeout] seconds. */
+    /**
+     * Elements labelled [label] or starting with it. Merged rows and buttons read as one label: the main workout button is
+     * "Nächsten Satz loggen" plus its second line, the calendar figures "1 Training · 1 Woche in Folge".
+     */
+    func labelled(_ label: String) -> XCUIElementQuery {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", label, label))
+    }
+
+    /** Waits until [element] matches [format] (an NSPredicate on the element, e.g. "isEnabled == true"). */
+    @discardableResult
+    func wait(_ element: XCUIElement, until format: String, timeout: TimeInterval) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: format), object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /**
+     * First element whose label is [label] or starts with it, waiting up to [timeout] seconds for either (one query for
+     * the whole time, so a merged label does not cost the full timeout first). The exact label wins when both exist.
+     */
     @discardableResult
     func waitFor(_ label: String, timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
-        let exact = elements(label).firstMatch
-        if exact.waitForExistence(timeout: timeout) { return exact }
-        let prefix = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch
-        if prefix.exists { return prefix }
+        let match = labelled(label).firstMatch
+        if match.waitForExistence(timeout: timeout) {
+            let exact = elements(label).firstMatch
+            return exact.exists ? exact : match
+        }
         failShot("missing-\(label)")
         XCTFail("Nicht gefunden: \"\(label)\"\n\(app.debugDescription)", file: file, line: line)
-        return exact
+        return match
     }
 
     func exists(_ label: String) -> Bool { elements(label).firstMatch.exists }
@@ -57,7 +76,7 @@ class OverfitUITestCase: XCTestCase {
 
     /** Taps the element labelled [label]; scrolls up to four screens down if it is not visible. */
     func tap(_ label: String, file: StaticString = #filePath, line: UInt = #line) {
-        _ = elements(label).firstMatch.waitForExistence(timeout: 3)
+        _ = labelled(label).firstMatch.waitForExistence(timeout: 3)
         for attempt in 0..<6 {
             if let e = find(label) { e.tap(); return }
             if attempt < 2 { sleep(1) } else { app.swipeUp(); sleep(1) } // first wait for animations, then scroll
@@ -68,34 +87,52 @@ class OverfitUITestCase: XCTestCase {
     }
 
     /**
-     * Confirm buttons use two taps: the first arms the button (it turns red and gets the accessibility
-     * identifier `confirm:armed`), a second tap within 3 s runs the action. No blind double tap: wait for the
-     * armed element, then tap exactly that element. If the 3 s ran out meanwhile (slow screenshot), that tap
-     * only arms it again; then it is still armed and gets one more tap.
+     * Taps [label] once it is enabled. "Starten" is on screen from the first frame, but disabled until the workout has
+     * loaded; a tap in that moment would be lost.
+     */
+    func tapWhenEnabled(_ label: String, file: StaticString = #filePath, line: UInt = #line) {
+        let element = waitFor(label, file: file, line: line)
+        if !wait(element, until: "isEnabled == true", timeout: 20) {
+            failShot("disabled-\(label)")
+            XCTFail("Bleibt deaktiviert: \"\(label)\"", file: file, line: line)
+            return
+        }
+        tap(label, file: file, line: line)
+    }
+
+    /**
+     * The armed confirm button: accessibility identifier `confirm:armed`; as a second sign its accessibility value, the
+     * state description "zum Bestätigen erneut tippen" (both are only set while it is armed).
+     */
+    var armedConfirm: XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == %@ OR value == %@", "confirm:armed", "zum Bestätigen erneut tippen"))
+            .firstMatch
+    }
+
+    /**
+     * Confirm buttons use two taps: the first arms the button (it fills red/green and gets the identifier
+     * `confirm:armed`), a second tap runs the action. No blind double tap: wait for the armed element, tap exactly
+     * that element, then check that it is gone (the action ran).
+     *
+     * Under `-overfitUITest` the button stays armed for 30 s instead of 3 s (LaunchOptions.confirmArmedMillis): each
+     * look at the accessibility tree takes XCUITest one to two seconds on CI, and Compose hands a changed tree to iOS
+     * with a delay, so with 3 s the armed button was on screen but never seen by the test (iOS CI, 17.11.).
      */
     func confirm(_ label: String, shotName: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
         tap(label, file: file, line: line)
-        let armed = app.descendants(matching: .any).matching(identifier: "confirm:armed").firstMatch
-        if !armed.waitForExistence(timeout: 5) {
+        let armed = armedConfirm
+        if !armed.waitForExistence(timeout: 15) {
             failShot("confirm-\(label)")
             XCTFail("\"\(label)\" wurde nicht scharf geschaltet\n\(app.debugDescription)", file: file, line: line)
             return
         }
         if let shotName { usleep(200_000); save(XCUIScreen.main.screenshot(), name: shotName) }
-        // The button disarms itself after 3 s; saving the screenshot can take that long on CI. Then arm it again.
-        if !armed.exists {
-            tap(label, file: file, line: line)
-            guard armed.waitForExistence(timeout: 5) else {
-                XCTFail("\"\(label)\" ließ sich nicht erneut scharf schalten", file: file, line: line)
-                return
-            }
-        }
-        for _ in 0..<2 {
-            guard armed.exists else { return }
-            armed.tap()
-            usleep(500_000)
-        }
-        if armed.exists {
+        armed.tap()
+        if wait(armed, until: "exists == false", timeout: 8) { return }
+        // Still armed after 8 s although it stays armed far longer: the tap did not arrive, tap it once more.
+        if armed.exists { armed.tap() }
+        if !wait(armed, until: "exists == false", timeout: 8) {
             failShot("confirm-still-armed-\(label)")
             XCTFail("\"\(label)\" wurde nicht bestätigt", file: file, line: line)
         }
@@ -110,7 +147,11 @@ class OverfitUITestCase: XCTestCase {
         }
     }
 
-    /** Taps a tab bar entry by its test tag (`tab:START`, `tab:COACH`, `tab:PHOTOS` = Kalender, `tab:PROFILE`). */
+    /**
+     * Taps a tab bar entry by its test tag (`tab:START`, `tab:COACH`, `tab:PHOTOS` = Kalender, `tab:PROFILE`) and checks
+     * that it took: the tab is selected afterwards, or its bar is gone (the Coach tab opens its story on the first
+     * visit). A tap that was lost (e.g. during a screen change) is repeated.
+     */
     func tab(_ id: String, file: StaticString = #filePath, line: UInt = #line) {
         let button = app.buttons["tab:\(id)"]
         for _ in 0..<3 where !button.waitForExistence(timeout: 5) {
@@ -118,7 +159,12 @@ class OverfitUITestCase: XCTestCase {
             if exists("Zurück") { elements("Zurück").firstMatch.tap() }
         }
         guard button.exists else { failShot("tab-\(id)"); XCTFail("Tab \(id) fehlt", file: file, line: line); return }
-        button.tap()
+        for _ in 0..<3 {
+            button.tap()
+            if wait(button, until: "exists == false OR isSelected == true", timeout: 3) { return }
+        }
+        failShot("tab-\(id)")
+        XCTFail("Tab \(id) wurde nicht gewählt", file: file, line: line)
     }
 
     // MARK: Screenshots
@@ -210,7 +256,7 @@ final class ScreenshotTests: OverfitUITestCase {
         tap("Link kopieren") // for the import preview at the end
         tap("Zurück")
 
-        tap("Starten")
+        tapWhenEnabled("Starten")
         allowNotificationsIfAsked()
         waitFor("Nächsten Satz loggen")
         shot("05-training-laufend")
@@ -288,7 +334,7 @@ final class SmokeTests: OverfitUITestCase {
     func testWorkoutFlow() {
         launch()
         waitFor("Push").tap()
-        tap("Starten")
+        tapWhenEnabled("Starten")
         allowNotificationsIfAsked()
         waitFor("Satz 1 abhaken").tap()
         waitFor("Überspringen")
@@ -308,7 +354,7 @@ final class SmokeTests: OverfitUITestCase {
     func testEdgeSwipeBack() {
         launch()
         waitFor("Push").tap()
-        tap("Starten")
+        tapWhenEnabled("Starten")
         allowNotificationsIfAsked()
         waitFor("Nächsten Satz loggen")
         swipeFromLeftEdge()
@@ -329,7 +375,7 @@ final class SmokeTests: OverfitUITestCase {
     func testWorkoutSurvivesRelaunch() {
         launch()
         waitFor("Push").tap()
-        tap("Starten")
+        tapWhenEnabled("Starten")
         allowNotificationsIfAsked()
         waitFor("Satz 1 abhaken").tap()
         app.terminate()

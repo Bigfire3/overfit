@@ -88,14 +88,25 @@ internal class ConfirmArm(private val arming: ConfirmArming, private val token: 
 /** How long a confirm button stays armed without the second tap. */
 const val CONFIRM_ARMED_MILLIS = 3000L
 
-/** Arms for at most [CONFIRM_ARMED_MILLIS]. */
+/**
+ * Armed window in the iOS UI tests only (launch argument `-overfitUITest`): XCUITest needs one to two seconds per
+ * look at the accessibility tree, and Compose hands a changed tree to iOS with a delay. With 3 s the test sometimes
+ * saw the armed button only after it had disarmed itself (DECISIONS "Doppeltipp", iOS CI). The app keeps 3 s.
+ */
+const val CONFIRM_ARMED_MILLIS_UI_TEST = 30_000L
+
+/** How long a confirm button stays armed; [CONFIRM_ARMED_MILLIS] except in the iOS UI tests. */
+val LocalConfirmArmedMillis = staticCompositionLocalOf { CONFIRM_ARMED_MILLIS }
+
+/** Arms for at most [LocalConfirmArmedMillis] (normally [CONFIRM_ARMED_MILLIS]). */
 @Composable
 internal fun rememberConfirmArm(): ConfirmArm {
     val arming = LocalConfirmArming.current
     val arm = remember(arming) { ConfirmArm(arming, Any()) }
     val armed = arm.armed
+    val armedMillis = LocalConfirmArmedMillis.current
     LaunchedEffect(armed) {
-        if (armed) { delay(CONFIRM_ARMED_MILLIS); arm.disarm() }
+        if (armed) { delay(armedMillis); arm.disarm() }
     }
     DisposableEffect(arm) { onDispose { arm.disarm() } }
     return arm
