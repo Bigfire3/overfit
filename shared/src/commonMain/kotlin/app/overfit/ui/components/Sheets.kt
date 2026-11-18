@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -73,20 +74,31 @@ val PopupShape = RoundedCornerShape(24.dp)
 /** Darkest the scrim behind a sheet or popup gets. */
 private const val SCRIM_ALPHA = 0.6f
 
-/** Black scrim behind a sheet or popup: a tap on it (or system back) closes. [alpha] is read while drawing. */
+/**
+ * Black scrim behind a sheet or popup: a tap on it (or system back) closes. [alpha] is read while drawing.
+ * Not [enabled] (the sheet is on its way out): it only fades, taps go through to the screen underneath.
+ */
 @Composable
-private fun Scrim(onDismiss: () -> Unit, closeLabel: String, alpha: () -> Float = { SCRIM_ALPHA }) {
+private fun Scrim(onDismiss: () -> Unit, closeLabel: String, enabled: Boolean = true, alpha: () -> Float = { SCRIM_ALPHA }) {
     Box(
         Modifier
             .fillMaxSize()
             .drawBehind { drawRect(Color.Black, alpha = alpha().coerceIn(0f, 1f)) }
-            .semantics { contentDescription = closeLabel }
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onDismiss),
+            .then(
+                if (!enabled) Modifier else Modifier
+                    .semantics { contentDescription = closeLabel }
+                    .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onDismiss),
+            ),
     )
 }
 
 /** Swallows taps on the sheet itself, so they do not reach the scrim underneath. */
 internal fun Modifier.absorbTaps(): Modifier = pointerInput(Unit) { detectTapGestures { } }
+
+/** Takes every touch before the children see it: what is on its way out no longer reacts (no second tap on an entry). */
+internal fun Modifier.ignoreTouches(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
+}
 
 /** Share of its height a sheet has to be pulled down so that letting go closes it; a quick flick down closes it earlier. */
 private const val SHEET_DISMISS_FRACTION = 0.3f
@@ -100,6 +112,8 @@ private const val SHEET_DISMISS_FRACTION = 0.3f
  * Motion: the sheet slides up on a spring and the scrim darkens with it. It follows the finger: pulled down by the
  * handle, by its content once that is scrolled to the top, or by the footer, it comes along, the scrim lightens, and
  * letting go either closes it (pulled far enough or flicked) or lets it spring back, keeping the finger's speed.
+ * On its way out it takes no part any more: it cannot be grabbed back, its entries do not react a second time and a
+ * tap next to it reaches the screen underneath.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -120,26 +134,36 @@ fun BottomSheet(
     var dragPx by remember { mutableFloatStateOf(0f) }
     var sheetHeight by remember { mutableIntStateOf(0) }
     val dismiss by rememberUpdatedState(onDismiss)
+    val open by rememberUpdatedState(visible)
+    // Flying out after a pull or a flick: the caller only hears of it at the end ([onDismiss]).
+    var leaving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     val flick = with(LocalDensity.current) { 900.dp.toPx() }
 
     LaunchedEffect(visible) {
         if (visible) {
+            leaving = false
             present = true
             hidden.animateTo(0f, Motion.smooth())
         } else if (present) {
-            hidden.animateTo(1f, Motion.smooth())
-            present = false
-            dragPx = 0f
+            try {
+                hidden.animateTo(1f, Motion.smooth())
+            } finally {
+                // Also when the slide-out is cut short: a sheet that is closed must not stay in the composition.
+                if (!open) { present = false; dragPx = 0f; leaving = false }
+            }
         }
     }
     if (!visible && !present) return
+    // Closed by the caller or flying out: no input any more, see the KDoc.
+    val interactive = visible && !leaving
 
     fun fraction(): Float = (hidden.value + if (sheetHeight > 0) dragPx / sheetHeight else 0f).coerceIn(0f, 1f)
 
     // Returns how much of [dy] moved the sheet.
     fun drag(dy: Float): Float {
+        if (!open || leaving) return 0f
         val before = dragPx
         val limit = sheetHeight * SHEET_DISMISS_FRACTION
         dragPx = (before + dy).coerceIn(0f, sheetHeight.toFloat())
@@ -149,9 +173,11 @@ fun BottomSheet(
     }
 
     fun settle(velocity: Float) {
+        if (!open || leaving) return
         if (dragPx == 0f && hidden.value == 0f) return
         val h = sheetHeight.coerceAtLeast(1).toFloat()
         val close = velocity > flick || (dragPx / h > SHEET_DISMISS_FRACTION && velocity > -flick)
+        if (close) leaving = true
         scope.launch {
             // Same place on screen, now owned by the spring; then on with the finger's speed.
             hidden.snapTo((hidden.value + dragPx / h).coerceIn(0f, 1f))
@@ -182,7 +208,7 @@ fun BottomSheet(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val maxSheet = maxHeight * 0.88f
-        Scrim(onDismiss, closeLabel) { SCRIM_ALPHA * (1f - fraction()) }
+        Scrim(onDismiss, closeLabel, enabled = interactive) { SCRIM_ALPHA * (1f - fraction()) }
         Column(
             modifier
                 .align(Alignment.BottomCenter)
@@ -192,9 +218,9 @@ fun BottomSheet(
                 .heightIn(max = maxSheet)
                 .clip(SheetShape)
                 .background(Theme.colors.surface)
-                .absorbTaps()
+                .then(if (interactive) Modifier.absorbTaps() else Modifier.ignoreTouches())
                 // Handle, footer and everything that does not scroll: the sheet follows the finger directly.
-                .draggable(rememberDraggableState { drag(it) }, Orientation.Vertical, onDragStopped = { settle(it) })
+                .draggable(rememberDraggableState { drag(it) }, Orientation.Vertical, enabled = interactive, onDragStopped = { settle(it) })
                 .nestedScroll(connection)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(horizontal = Space.m),

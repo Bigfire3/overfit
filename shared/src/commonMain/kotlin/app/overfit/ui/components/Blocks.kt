@@ -208,8 +208,9 @@ fun SetRowSurface(
         .pointerInput(Unit) {
             var settling: Job? = null
             val tracker = VelocityTracker()
-            fun settle(velocity: Float) {
-                val away = velocity < -flick || (dx < -width * SWIPE_DELETE_FRACTION && velocity < flick)
+            fun settle(velocity: Float, cancelled: Boolean = false) {
+                // A gesture the system took away (back gesture, notification shade) never deletes: the row comes back.
+                val away = !cancelled && (velocity < -flick || (dx < -width * SWIPE_DELETE_FRACTION && velocity < flick))
                 settling = scope.launch {
                     animate(dx, if (away) -width.toFloat() else 0f, initialVelocity = velocity, animationSpec = Motion.snappy()) { v, _ -> dx = v.coerceIn(-width.toFloat(), 0f) }
                     if (away) {
@@ -224,7 +225,7 @@ fun SetRowSurface(
             detectHorizontalDragGestures(
                 onDragStart = { settling?.cancel(); tracker.resetTracking() },
                 onDragEnd = { settle(tracker.calculateVelocity().x) },
-                onDragCancel = { settle(0f) },
+                onDragCancel = { settle(0f, cancelled = true) },
             ) { change, amount ->
                 change.consume()
                 tracker.addPosition(change.uptimeMillis, change.position)
@@ -404,6 +405,8 @@ fun MoreMenu(label: String, items: List<MenuItem>, modifier: Modifier = Modifier
                         items.forEachIndexed { i, item ->
                             val isArmed = armed == i
                             MenuEntry(item, isArmed, again) {
+                                // Already closing (the menu shrinks for a moment): a second tap must not run the entry again.
+                                if (!shown.targetState) return@MenuEntry
                                 if (item.confirm && !isArmed) armed = i
                                 else { close(); item.onClick() }
                             }

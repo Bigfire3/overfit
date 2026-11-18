@@ -61,7 +61,9 @@ import androidx.compose.ui.unit.dp
 import app.overfit.ui.theme.LocalReducedMotion
 import app.overfit.ui.theme.Motion
 import app.overfit.ui.theme.Theme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterIsInstance
 
 // The building blocks of the app's motion (DESIGN.md "Motion"). Screens use these instead of raw animation APIs, so
 // everything that appears, leaves, changes or moves does it the same way. Specs come from [Motion].
@@ -177,13 +179,36 @@ fun <T> Swap(
 
 /**
  * Item of a lazy list that moves to its new place, fades in when added and out when removed. Needs a stable `key`.
- * Not for the item being dragged by [reorderableItem].
+ * Not for the item being dragged by [reorderableItem]. [glide] = false: it takes its new place at once, see
+ * [rememberGlide].
  */
-fun LazyItemScope.motionItem(): Modifier = Modifier.animateItem(
+fun LazyItemScope.motionItem(glide: Boolean = true): Modifier = Modifier.animateItem(
     fadeInSpec = Motion.fadeIn(),
-    placementSpec = Motion.smooth(IntOffset.VisibilityThreshold),
+    placementSpec = if (glide) Motion.smooth(IntOffset.VisibilityThreshold) else null,
     fadeOutSpec = Motion.fadeOut(),
 )
+
+/** How long the items of a list keep gliding after the list changed (longer than [Motion.smooth] needs to settle). */
+private const val GLIDE_MS = 600L
+
+/**
+ * For lazy lists whose items change their own height on a spring (a card folds, a set is added inside it): whether
+ * the items should glide to a new place right now, for [motionItem] and [reorderableItem]. They should when the list
+ * itself changed (an item was added, removed or moved: [keys] differ) and while one is being dragged ([moving]).
+ * They must not while a card only resizes: its edge already moves on a spring, and neighbours that follow on a second
+ * spring lag behind that edge, overlap the card and settle late. Without gliding they sit on the edge frame by frame.
+ */
+@Composable
+fun rememberGlide(keys: List<Any>, moving: Boolean = false): Boolean {
+    var settled by remember { mutableStateOf(keys) }
+    LaunchedEffect(keys) {
+        if (settled != keys) {
+            delay(GLIDE_MS)
+            settled = keys
+        }
+    }
+    return moving || settled != keys
+}
 
 private class ItemSlot<T>(val key: Any, item: T, index: Int, visible: Boolean) {
     var item by mutableStateOf(item)
@@ -194,7 +219,8 @@ private class ItemSlot<T>(val key: Any, item: T, index: Int, visible: Boolean) {
 /**
  * The children of a plain (not lazy) column that are added and removed over time: sets of an exercise, rows of a
  * panel. A new item grows in, a removed one shrinks away while the others slide; what is there at the start just is
- * there. [key] must be stable and unique. [spacing] goes below every item (not between: it has to shrink with the
+ * there. [key] must be stable and unique; the order shown is the order of [items] (an item that changes its place
+ * is simply there, it does not glide). [spacing] goes below every item (not between: it has to shrink with the
  * item), so the column itself must not space its children.
  */
 @Composable
@@ -223,6 +249,22 @@ fun <T> AnimatedItems(
         }
     }
     first[0] = false
+    // The order follows [items] (a re-ranked list shows its new order); an item on its way out stays behind the item
+    // it stood behind.
+    if (slots.size > 1) {
+        val rank = HashMap<Any, Int>(keys.size)
+        keys.forEachIndexed { i, k -> rank[k] = i }
+        var anchor = -1
+        val ranked = slots.map { slot ->
+            val r = rank[slot.key]
+            if (r != null) { anchor = r; slot to r * 2 } else slot to anchor * 2 + 1
+        }
+        val sorted = ranked.sortedBy { it.second }
+        if (sorted.indices.any { sorted[it].first !== slots[it] }) {
+            slots.clear()
+            sorted.mapTo(slots) { it.first }
+        }
+    }
     slots.toList().forEach { slot ->
         key(slot.key) {
             AnimatedVisibility(
@@ -347,7 +389,9 @@ internal fun rememberPressProgress(
 ): State<Float> {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(interaction) {
-        interaction.interactions.collectLatest { event ->
+        // Only presses: hover and focus events (mouse, keyboard) come through the same source and would cut the
+        // release short, leaving the element half pressed.
+        interaction.interactions.filterIsInstance<PressInteraction>().collectLatest { event ->
             when (event) {
                 is PressInteraction.Press -> progress.animateTo(1f, press)
                 is PressInteraction.Release, is PressInteraction.Cancel -> {

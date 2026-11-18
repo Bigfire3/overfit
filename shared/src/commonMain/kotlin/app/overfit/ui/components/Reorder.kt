@@ -132,14 +132,15 @@ fun rememberReorderState(
 
 /**
  * Lifts the dragged item above the others (a touch larger and lighter, like a card picked up) and lets the rest glide
- * into place; items that are added or removed fade in and out ([motionItem]).
+ * into place; items that are added or removed fade in and out ([motionItem]). [glide]: see [rememberGlide] (lists
+ * whose cards resize themselves).
  */
 @Composable
-fun LazyItemScope.reorderableItem(state: ReorderState, key: Any): Modifier =
+fun LazyItemScope.reorderableItem(state: ReorderState, key: Any, glide: Boolean = true): Modifier =
     if (state.draggingKey == key) {
         Modifier.zIndex(1f).graphicsLayer { translationY = state.dragOffset; alpha = 0.92f; scaleX = 1.02f; scaleY = 1.02f }
     } else {
-        motionItem()
+        motionItem(glide)
     }
 
 /**
