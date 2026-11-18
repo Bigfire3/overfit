@@ -142,8 +142,12 @@ class LastTimeAndRenameTest {
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
         compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Training bearbeiten").fetchSemanticsNodes().isNotEmpty() }
+        // The pencil is there from the first frame; the name (tap = rename) only once the training is loaded and the
+        // day screen has slid away: wait for exactly that one tappable name.
+        val tappableName = hasText("Push") and hasClickAction()
+        compose.waitUntilState { compose.onAllNodes(tappableName).fetchSemanticsNodes().size == 1 }
         shot("training-detail")
-        compose.onNode(hasText("Push") and hasClickAction()).performClick()
+        compose.onNode(tappableName).performClick()
         waitFor("Statistiken und Bestwerte", substring = true)
         compose.onNode(hasSetTextAction() and hasText("Push")).performTextReplacement("Brust Montag")
         shot("training-umbenennen")
