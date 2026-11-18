@@ -34,8 +34,13 @@
   Daten ändern: deine Entscheidung.
 - Details und Begründungen: DECISIONS „Bewegung, ‚Jetzt‘-Farbe und Workout-Dock“. Bilder: `docs/screenshots/bewegung/vorher|nachher`.
 
+- **Gegencheck behoben (18.11.):** Sheet beim Schließen, Menü-Doppeltipp, abgebrochenes Wischen, Karten überdecken sich beim
+  Aufklappen nicht mehr, Tastatur ruckelt nicht, abgeschnittene Kacheln/Guthaben/Knopfzeile, Pausen-Insel über 10:00, Kalender ohne
+  Lade-Animation bei jedem Öffnen, iOS-UI-Test (Doppeltipp im Testmodus 30 s scharf). Details: DECISIONS „iOS-UI-Tests …(18.11.)“.
+
 **Offen:**
 - Auf einem Gerät prüfen (im Test nicht sichtbar): Abstände an der Tab-Leiste und über der Tastatur (Punkt 12), Gefühl der Zurück-Geste.
+- Nach „Zurück“ zu einem Tab nimmt die Tab-Leiste die ersten 0,3 s keinen Tipp an (bewusst, sonst trifft man den Knopf des gehenden Screens).
 - Sheets liegen weiter innerhalb ihres Screens: über einem Tab-Screen bleibt die Tab-Leiste sichtbar.
 - Foto antippen → Vollbild wächst noch nicht aus der Kachel heraus (Vorschlag 29).
 
@@ -57,7 +62,9 @@
 10. Alle Sätze erledigen → „Training beenden“ (grün, Doppeltipp): Die Kennzahlen stehen als vier Kacheln da und zählen hoch.
 11. Kalender → Muskel-Icon: Das Sheet federt herein und lässt sich nach unten wegziehen. Profil: Schalter und „kg / lb“ gleiten.
 12. Über der Tab-Leiste ist kein leerer Streifen. Coach-Tab, ins Textfeld tippen: Das Feld sitzt direkt auf der Tastatur.
-13. Android: Entwickleroptionen → Animationen aus. iPhone: Bedienungshilfen → Bewegung → „Bewegung reduzieren“. Die App schaltet
+13. Übung auf- und zuklappen, Satz hinzufügen: Die Karten darunter rücken mit, nichts überlappt. Pause auf über 10:00 drücken
+    (mehrmals „+15“): Die Knöpfe bleiben, wo sie sind. Neues Workout: Name tippen, „Speichern“ bleibt über der Tastatur.
+14. Android: Entwickleroptionen → Animationen aus. iPhone: Bedienungshilfen → Bewegung → „Bewegung reduzieren“. Die App schaltet
     dann hart bzw. blendet nur über, nichts hängt.
 
 ## Einheitlich: Größen, Kopfzeilen, Menüs (UI-Audit, 12.11.)

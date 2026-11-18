@@ -2002,3 +2002,25 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
   (nur der Finger bewegt es noch); Sprünge in Listen (Kalender „Heute“, Coach-Chat zur neuesten Nachricht, Anhang-Chips) springen
   direkt statt zu gleiten. Laut Review stellt Compose Multiplatform auf iOS die Animationsdauer bei „Bewegung reduzieren“ womöglich
   ohnehin herunter; das ist ungeprüft, die App verlässt sich nicht darauf.
+- **Workout und Editor (Review P1/P2/P12/C3/C5/DA-4/DA-5/DA-7/F2):** Die Tastatur zählt nur als Ja/Nein (`derivedStateOf`), der
+  Screen baut sich beim Ein-/Ausfahren nicht mehr pro Bild neu auf. Übungskarten gleiten nur, wenn sich die Liste selbst ändert
+  (hinzu, weg, verschoben, `rememberGlide`); klappt eine Karte nur auf oder zu, sitzen die Karten darunter Bild für Bild an ihrer
+  Kante, statt auf einer zweiten Feder hinterherzulaufen und sie zu überdecken. Der Schutz von „Training beenden“ (450 ms) greift nur,
+  wenn der Knopf gerade aus „Nächsten Satz loggen“ wird, und ignoriert Tipps, ohne den Knopf abzudunkeln. „Speichern“ eines neuen
+  Workouts bleibt über der Tastatur (einziger Weg zum Abschluss); nur „Starten“ weicht ihr. Der Namensfokus eines neuen Workouts kommt
+  einmal pro Editor, Fehlerhinweis und Brummen nur bei einem neuen Fehler, nicht bei jeder Rückkehr aus der Übungsauswahl. Die
+  Pausen-Insel legt ihr Layout einmal pro Pause fest; wächst der Countdown über 10:00, wird er etwas kleiner gezeichnet, −15/+15/
+  Überspringen bleiben unter dem Finger. Die zweite Zeile des Hauptknopfs schrumpft zuerst und kürzt dann den Übungsnamen, nie
+  „Satz 2 · 22,5 kg × 12“.
+- **Texte ohne Abschneiden (DA-2/DA-3):** Kachel-Beschriftungen dürfen zweizeilig werden (ganze Wörter, gleich hohe Kacheln je
+  Reihe; `StatGridTest` 360 dp, Schrift 1,0/1,3, DE/EN). Beim Guthaben rollt nur der Betrag, „Guthaben“ ist normaler Text und bricht um.
+- **Hochzählen und Fotos (P8/DA-1):** Die Kennzahlen im Abschluss lesen den Zählwert nur in ihrer Zahl; die Schriftgröße wird einmal
+  für den Endwert bestimmt. Fotos, die beim Öffnen eines Tages schon da sind, sind nicht „neu“ (kein Auftauchen, kein Brummen); die
+  Bestätigung gehört zum Hinzufügen.
+- **„Jetzt“-Farbe (DA-8):** Regel ist „eine Bedeutung, nicht eine Stelle“: während einer Pause sind Countdown, Inselfüllung und
+  Nummer des nächsten Satzes gelb, weil sie dasselbe meinen. Weitere Stellen: Ablauf des Kopplungscodes, Punkt „denkt nach“. Nie
+  für „heute“. Neue Tokens statt Einzelwerten: `Motion.press/pressRelease/rowRelease`, `Sizes.stepButton`, `Sizes.statTile` (DA-9).
+- **Android-Tests (T1):** „Starten“ steht ab dem ersten Bild da (deaktiviert, bis geladen); Tests warten mit `waitForPlanLoaded()`
+  auf den aktiven Knopf und die erste Übung, nicht auf den Text allein.
+- **Gegencheck (Sonnet + vier Linsen mit Gegenprüfung):** 44 Befunde, alle bestätigten behoben; I2 bewusst nur teilweise (siehe
+  oben), DA-6 (vom Prüfer als „unklar“ eingestuft) trotzdem umgesetzt.
