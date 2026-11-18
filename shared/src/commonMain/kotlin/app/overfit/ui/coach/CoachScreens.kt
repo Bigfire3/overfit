@@ -1,6 +1,7 @@
 package app.overfit.ui.coach
 
 import kotlinx.coroutines.flow.onEach
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -47,6 +50,8 @@ import app.overfit.coach.ReviewItem
 import app.overfit.coach.ReviewKind
 import app.overfit.coach.ReviewStatus
 import app.overfit.domain.Language
+import app.overfit.domain.PlannedSet
+import app.overfit.domain.TrackingType
 import app.overfit.domain.Template
 import app.overfit.domain.WeightUnit
 import app.overfit.fuel.formatEuro
@@ -72,6 +77,17 @@ import app.overfit.ui.components.SmallButton
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealInRow
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.motionColor
+import app.overfit.ui.components.rememberCountUp
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.IconSize
+import app.overfit.ui.theme.Motion
+import kotlin.math.roundToInt
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.coroutines.launch
@@ -105,21 +121,33 @@ fun CoachHomeScreen(coach: CoachService, nav: CoachNav) {
         Title(c.coachTitle)
         Spacer(Modifier.height(Space.l))
         // Archive of the reviews before the coach chat (8.11.: no AI buttons here any more, new reviews go through the chat).
-        if (loaded == null) {
-            SectionTitle(c.reviews)
-        } else if (reviews.isEmpty()) {
-            SectionTitle(c.reviews)
-            Text(c.reviewsEmpty, tone = Tone.Muted)
-        } else PanelSection(c.reviews) {
-            reviews.forEach { item ->
-                val title = (if (item.kind == ReviewKind.PROGRESS) c.progressTitle else c.reviewTitle) + " · " + dateText(item.createdAt)
-                val value = when (item.status) {
-                    ReviewStatus.DONE -> item.review?.rating?.let(c.rating) ?: "✓"
-                    ReviewStatus.QUEUED -> c.statusQueued
-                    ReviewStatus.SENDING -> c.statusSending
-                    ReviewStatus.FAILED -> c.statusFailed
+        // Loading → empty → list fades over in place instead of popping (the list arrives a moment after the screen).
+        val listState = when {
+            loaded == null -> 0
+            reviews.isEmpty() -> 1
+            else -> 2
+        }
+        Swap(listState, Modifier.fillMaxWidth()) { state ->
+            Column(Modifier.fillMaxWidth()) {
+                when (state) {
+                    0 -> SectionTitle(c.reviews)
+                    1 -> {
+                        SectionTitle(c.reviews)
+                        Text(c.reviewsEmpty, tone = Tone.Muted)
+                    }
+                    else -> PanelSection(c.reviews) {
+                        reviews.forEach { item ->
+                            val title = (if (item.kind == ReviewKind.PROGRESS) c.progressTitle else c.reviewTitle) + " · " + dateText(item.createdAt)
+                            val value = when (item.status) {
+                                ReviewStatus.DONE -> item.review?.rating?.let(c.rating) ?: "✓"
+                                ReviewStatus.QUEUED -> c.statusQueued
+                                ReviewStatus.SENDING -> c.statusSending
+                                ReviewStatus.FAILED -> c.statusFailed
+                            }
+                            ListRow(title, value, onClick = { nav.openReview(item.id) })
+                        }
+                    }
                 }
-                ListRow(title, value, onClick = { nav.openReview(item.id) })
             }
         }
 
@@ -186,7 +214,9 @@ private fun ReviewScreen(
     }
     var message by remember(item?.id) { mutableStateOf<String?>(null) }
     val sessionId = item?.sessionId?.takeIf { item.kind == ReviewKind.SESSION }
-    var comparisons by remember(sessionId, item?.review) { mutableStateOf<List<ExerciseComparison>>(emptyList()) }
+    // Keyed on the session only: when the answer arrives the old numbers stay and the coach's words are filled in
+    // (ExerciseBreakdown reveals them), instead of "Per exercise" vanishing for a moment and jumping back.
+    var comparisons by remember(sessionId) { mutableStateOf<List<ExerciseComparison>>(emptyList()) }
     LaunchedEffect(sessionId, item?.review) {
         if (sessionId != null) comparisons = coach.comparisons(sessionId, item?.review?.exerciseReviews.orEmpty())
     }
@@ -283,24 +313,54 @@ private fun ReviewContent(
     val diff = plan?.diff
     val planOpen = item?.planStatus == PlanStatus.OPEN && message == null
     var selected by remember(item?.id, diff) { mutableStateOf(diff?.changes?.map { it.key }?.toSet().orEmpty()) }
-    val footer: (@Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit)? = when {
-        item == null -> null
+    val haptics = rememberHaptics()
+    // Live arrival (waiting → answer while the screen is open): felt, and the rating counts up. Opening a finished
+    // review from the archive (null → DONE) is not an arrival.
+    val track = remember(item?.id) { StatusTrack(item?.status) }
+    track.update(item?.status)
+    LaunchedEffect(item?.status) {
+        when (track.event) {
+            ReviewStatus.DONE -> haptics.confirm()
+            ReviewStatus.FAILED -> haptics.reject()
+            else -> Unit
+        }
+        track.event = null
+    }
+    LaunchedEffect(message) {
+        if (message == c.planAccepted || message == c.planPartial || message == c.planSavedAsTemplate) haptics.confirm()
+    }
+    val footerKind = when {
+        item == null -> FooterKind.None
         item.status == ReviewStatus.FAILED || (item.status == ReviewStatus.QUEUED && item.errorKind != null) ->
-            if (item.errorKind == CoachErrorKind.NO_ACCESS) null else { { PrimaryButton(c.retry, onClick = onRetry) } }
-        review != null && planOpen && diff != null && !diff.isEmpty -> {
-            {
-                val all = selected.size == diff.changes.size
-                PrimaryButton(
-                    if (all) c.planAcceptAll else c.planAcceptSelected(selected.size),
-                    enabled = selected.isNotEmpty(),
-                    onClick = { onAccept(selected) },
-                )
+            if (item.errorKind == CoachErrorKind.NO_ACCESS) FooterKind.None else FooterKind.Retry
+        review != null && planOpen && diff != null && !diff.isEmpty -> FooterKind.Accept
+        review != null && planOpen && plan != null && plan.template == null -> FooterKind.SaveTemplate
+        else -> FooterKind.None
+    }
+    // The footer stays set; its button fades over or away (an empty footer takes no room).
+    val footer: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
+        Swap(footerKind, Modifier.fillMaxWidth()) { kind ->
+            when (kind) {
+                FooterKind.Retry -> PrimaryButton(c.retry, onClick = onRetry)
+                FooterKind.Accept -> diff?.let { d ->
+                    val all = selected.size == d.changes.size
+                    PrimaryButton(
+                        if (all) c.planAcceptAll else c.planAcceptSelected(selected.size),
+                        enabled = selected.isNotEmpty(),
+                        onClick = { onAccept(selected) },
+                    )
+                }
+                FooterKind.SaveTemplate -> PrimaryButton(c.planSaveAsTemplate, onClick = onSaveAsTemplate)
+                FooterKind.None -> Unit
             }
         }
-        review != null && planOpen && plan != null && plan.template == null -> {
-            { PrimaryButton(c.planSaveAsTemplate, onClick = onSaveAsTemplate) }
-        }
-        else -> null
+    }
+    val phase = when {
+        item == null -> ReviewPhase.Loading
+        item.status == ReviewStatus.SENDING || (item.status == ReviewStatus.QUEUED && item.errorKind == null) -> ReviewPhase.Thinking
+        item.status == ReviewStatus.QUEUED -> ReviewPhase.Queued
+        item.status == ReviewStatus.FAILED -> ReviewPhase.Failed
+        else -> ReviewPhase.Result
     }
     Screen(scroll = true, header = { BackHeader(t.back, nav.back) }, footer = footer) {
         if (item?.isDemo == true) {
@@ -309,33 +369,77 @@ private fun ReviewContent(
         }
         Title(if (item?.kind == ReviewKind.PROGRESS) c.progressTitle else c.reviewTitle)
         Spacer(Modifier.height(Space.l))
-        when {
-            item == null || item.status == ReviewStatus.SENDING ||
-                (item.status == ReviewStatus.QUEUED && item.errorKind == null) -> {
-                Text(c.thinking, tone = Tone.Muted)
-                if (item != null) LocalNumbers(comparisons, unit, language)
+        // Only the head of the page is replaced when the status changes (keyed on the phase, not on every database
+        // emission); "Per exercise" below stays in place between "thinking" and the result.
+        Swap(ReviewHead(phase, item), Modifier.fillMaxWidth(), contentKey = { it.phase }) { head ->
+            Column(Modifier.fillMaxWidth()) {
+                val i = head.item
+                when (head.phase) {
+                    ReviewPhase.Loading -> Unit
+                    ReviewPhase.Thinking -> Text(c.thinking, tone = Tone.Muted)
+                    ReviewPhase.Queued -> {
+                        Text(c.waitingForNetwork, style = Theme.type.label)
+                        Spacer(Modifier.height(Space.s))
+                        Text(c.queuedHint, tone = Tone.Muted)
+                    }
+                    ReviewPhase.Failed -> if (i != null) Failure(i, nav, onDemo)
+                    ReviewPhase.Result -> i?.review?.let { r ->
+                        r.rating?.let { Rating(it, countUp = track.live) }
+                        Spacer(Modifier.height(Space.m))
+                        if (r.summary.isNotBlank()) Text(r.summary)
+                    }
+                }
             }
-            item.status == ReviewStatus.QUEUED -> {
-                Text(c.waitingForNetwork, style = Theme.type.label)
-                Spacer(Modifier.height(Space.s))
-                Text(c.queuedHint, tone = Tone.Muted)
-                LocalNumbers(comparisons, unit, language)
+        }
+        val showNumbers = item != null && phase != ReviewPhase.Loading && comparisons.isNotEmpty() &&
+            (phase != ReviewPhase.Result || item.kind == ReviewKind.SESSION)
+        Reveal(showNumbers) {
+            Column(Modifier.fillMaxWidth()) {
+                SectionTitle(c.perExercise)
+                ExerciseBreakdown(comparisons, unit, language)
             }
-            item.status == ReviewStatus.FAILED -> {
-                Failure(item, nav, onDemo)
-                LocalNumbers(comparisons, unit, language)
+        }
+        RevealNotNull(item?.takeIf { phase == ReviewPhase.Result && it.review != null }) { i ->
+            Column(Modifier.fillMaxWidth()) {
+                Result(i, i.review!!, plan, comparisons, unit, language, selected, { selected = it }, onReject, planOpen, message)
             }
-            review != null -> Result(item, review, plan, comparisons, unit, language, selected, { selected = it }, onReject, planOpen, message)
         }
     }
 }
 
-/** "Per exercise" with the local numbers only (no coach text): while waiting, on errors and without AI. */
+private enum class ReviewPhase { Loading, Thinking, Queued, Failed, Result }
+
+private enum class FooterKind { None, Retry, Accept, SaveTemplate }
+
+private data class ReviewHead(val phase: ReviewPhase, val item: ReviewItem?)
+
+/** Remembers the last status of a review so a live change (waiting → answer/error) can be told apart from opening. */
+private class StatusTrack(private var last: ReviewStatus?) {
+    /** True once the answer arrived while the screen was open. */
+    var live = false
+    /** The status a live change ended in, until the haptic for it ran. */
+    var event: ReviewStatus? = null
+
+    fun update(now: ReviewStatus?) {
+        val prev = last
+        if (prev == now) return
+        if (prev == ReviewStatus.SENDING || prev == ReviewStatus.QUEUED) {
+            if (now == ReviewStatus.DONE) live = true
+            event = now
+        }
+        last = now
+    }
+}
+
+/** The rating; counts up once when the answer arrived live, otherwise simply there. */
 @Composable
-private fun LocalNumbers(list: List<ExerciseComparison>, unit: WeightUnit, language: Language) {
-    if (list.isEmpty()) return
-    SectionTitle(LocalCoachStrings.current.perExercise)
-    ExerciseBreakdown(list, unit, language)
+private fun Rating(value: Int, countUp: Boolean) {
+    val c = LocalCoachStrings.current
+    val shown = if (countUp) {
+        val v by rememberCountUp(value.toFloat())
+        v.roundToInt()
+    } else value
+    Text(c.rating(shown), Modifier.testTag("coach-rating"), style = Theme.type.hero)
 }
 
 @Composable
@@ -361,8 +465,8 @@ private fun RawAnswer(raw: String?) {
     val c = LocalCoachStrings.current
     var show by remember { mutableStateOf(false) }
     Spacer(Modifier.height(Space.m))
-    SmallButton(if (show) c.hideRaw else c.showRaw, onClick = { show = !show })
-    if (show) Text(raw.take(6_000), style = Theme.type.caption, tone = Tone.Muted)
+    Swap(show) { s -> SmallButton(if (s) c.hideRaw else c.showRaw, onClick = { show = !show }) }
+    Reveal(show) { Text(raw.take(6_000), style = Theme.type.caption, tone = Tone.Muted) }
 }
 
 private fun errorText(kind: CoachErrorKind?, c: CoachStrings) = when (kind) {
@@ -405,13 +509,7 @@ private fun Result(
     message: String?,
 ) {
     val c = LocalCoachStrings.current
-    review.rating?.let { Text(c.rating(it), Modifier.testTag("coach-rating"), style = Theme.type.hero) }
-    Spacer(Modifier.height(Space.m))
-    if (review.summary.isNotBlank()) Text(review.summary)
-    if (comparisons.isNotEmpty() && item.kind == ReviewKind.SESSION) {
-        SectionTitle(c.perExercise)
-        ExerciseBreakdown(comparisons, unit, language)
-    }
+    // Rating, summary and "Per exercise" stand above (ReviewContent), so they stay in place when the answer arrives.
     Bullets(c.positives, review.positives)
     Bullets(c.improvements, review.improvements)
     Bullets(c.tips, review.tips)
@@ -423,27 +521,44 @@ private fun Result(
         SectionTitle(c.nextSession)
         review.nextSession.note?.let { Text(it, tone = Tone.Muted); Spacer(Modifier.height(Space.s)) }
         val diff = plan?.diff
-        when {
-            plan == null -> Text("…", tone = Tone.Muted)
-            plan.template == null -> {
-                Text(c.planNoTemplate, tone = Tone.Muted)
-                review.nextSession.exercises.forEach { e ->
-                    Text("${e.exerciseId} · ${e.sets.size}", style = Theme.type.caption, tone = Tone.Muted)
-                }
-            }
-            diff == null || diff.isEmpty -> Text(c.planNoChanges, tone = Tone.Muted)
-            else -> {
-                Panel {
-                    diff.changes.forEach { change ->
-                        ChangeRow(change, unit, language, checked = change.key in selected, enabled = planOpen) {
-                            onSelect(if (change.key in selected) selected - change.key else selected + change.key)
+        val planKind = when {
+            plan == null -> PlanKind.Loading
+            plan.template == null -> PlanKind.NoTemplate
+            diff == null || diff.isEmpty -> PlanKind.NoChanges
+            else -> PlanKind.Changes
+        }
+        Swap(planKind, Modifier.fillMaxWidth()) { kind ->
+            Column(Modifier.fillMaxWidth()) {
+                when (kind) {
+                    PlanKind.Loading -> Text("…", tone = Tone.Muted)
+                    PlanKind.NoTemplate -> {
+                        Text(c.planNoTemplate, tone = Tone.Muted)
+                        // Names and sets like the change rows; the names come from this workout's exercises.
+                        val known = comparisons.associateBy { it.exerciseId }
+                        review.nextSession.exercises.forEach { e ->
+                            val ex = known[e.exerciseId]
+                            val sets = e.sets.map { PlannedSet(it.weightKg, it.reps, it.durationSec) }
+                            val summary = PlanDiffs.summary(sets, ex?.type ?: TrackingType.WEIGHT_REPS, unit, language)
+                            Text("${ex?.name ?: e.exerciseId} · $summary", style = Theme.type.caption, tone = Tone.Muted)
                         }
                     }
-                }
-                diff.unknownIds.forEach { Text(c.planUnknown(it), style = Theme.type.caption, tone = Tone.Muted) }
-                if (planOpen) {
-                    Spacer(Modifier.height(Space.s))
-                    SmallButton(c.planReject, onClick = onReject)
+                    PlanKind.NoChanges -> Text(c.planNoChanges, tone = Tone.Muted)
+                    PlanKind.Changes -> diff?.let { d ->
+                        Panel {
+                            d.changes.forEach { change ->
+                                ChangeRow(change, unit, language, checked = change.key in selected, enabled = planOpen) {
+                                    onSelect(if (change.key in selected) selected - change.key else selected + change.key)
+                                }
+                            }
+                        }
+                        d.unknownIds.forEach { Text(c.planUnknown(it), style = Theme.type.caption, tone = Tone.Muted) }
+                        Reveal(planOpen) {
+                            Column {
+                                Spacer(Modifier.height(Space.s))
+                                SmallButton(c.planReject, onClick = onReject)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -453,7 +568,12 @@ private fun Result(
             PlanStatus.REJECTED -> c.planRejected
             else -> null
         }
-        status?.let { Spacer(Modifier.height(Space.m)); Text(it, tone = Tone.Muted) }
+        RevealNotNull(status) {
+            Column {
+                Spacer(Modifier.height(Space.m))
+                Swap(it) { text -> Text(text, tone = Tone.Muted) }
+            }
+        }
     }
     Spacer(Modifier.height(Space.l))
     if (review.memory != null && !item.isDemo) Text(c.memoryUpdated, style = Theme.type.caption, tone = Tone.Muted)
@@ -463,6 +583,8 @@ private fun Result(
         AnswerCostLine(c, language, cost, balance, item.servedModel, item.fallbackFrom)
     }
 }
+
+private enum class PlanKind { Loading, NoTemplate, NoChanges, Changes }
 
 @Composable
 private fun Bullets(title: String, items: List<String>) {
@@ -483,6 +605,7 @@ private fun Bullets(title: String, items: List<String>) {
 @Composable
 private fun ChangeRow(change: PlanChange, unit: WeightUnit, language: Language, checked: Boolean, enabled: Boolean, onToggle: () -> Unit) {
     val c = LocalCoachStrings.current
+    val haptics = rememberHaptics()
     val type = change.exercise.trackingType
     val (title, detail) = when (change) {
         is PlanChange.Modified -> {
@@ -499,7 +622,7 @@ private fun ChangeRow(change: PlanChange, unit: WeightUnit, language: Language, 
         is PlanChange.Removed -> "${c.changeRemoved}: ${change.exercise.name}" to ""
     }
     Column(
-        Modifier.background(Theme.colors.surface).then(if (enabled) Modifier.pressableRow(onToggle) else Modifier)
+        Modifier.background(Theme.colors.surface).then(if (enabled) Modifier.pressableRow { haptics.tick(); onToggle() } else Modifier)
             .semantics { selected = checked; role = Role.Checkbox },
     ) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Space.m, vertical = Space.s), verticalAlignment = Alignment.CenterVertically) {
@@ -508,10 +631,17 @@ private fun ChangeRow(change: PlanChange, unit: WeightUnit, language: Language, 
                 if (detail.isNotEmpty()) Text(detail, tone = Tone.Muted)
                 change.reason?.let { Text(it, style = Theme.type.caption, tone = Tone.Muted) }
             }
-            if (enabled) {
-                Spacer(Modifier.width(Space.m))
-                if (checked) LineIcon(Icon.Check)
-                else Box(Modifier.size(20.dp).background(Theme.colors.surfacePressed, CircleShape))
+            // Fixed slot: the empty circle fades out under the tick instead of the row jumping by 4 dp; after taking
+            // over the plan the slot folds away sideways.
+            RevealInRow(enabled) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.width(Space.m))
+                    Box(Modifier.size(IconSize.action), contentAlignment = Alignment.Center) {
+                        val fill = motionColor(if (checked) Color.Transparent else Theme.colors.surfacePressed, "changeCircle")
+                        Box(Modifier.size(20.dp).drawBehind { drawCircle(fill.value) })
+                        Appear(checked) { LineIcon(Icon.Check) }
+                    }
+                }
             }
         }
     }
@@ -546,14 +676,24 @@ fun CoachMemoryScreen(coach: CoachService, onBack: () -> Unit) {
     val versions by coach.memoryVersions.collectAsState(initial = emptyList())
     var text by remember(current?.id) { mutableStateOf(current?.text.orEmpty()) }
     var saved by remember { mutableStateOf(false) }
+    val haptics = rememberHaptics()
+    val changed = text.trim() != current?.text.orEmpty()
     Screen(
         scroll = true,
         header = { BackHeader(t.back, onBack) },
         footer = {
-            PrimaryButton(c.memorySave, enabled = text.trim() != current?.text.orEmpty(), onClick = {
-                coach.launch { coach.saveMemory(text) }
-                saved = true
-            })
+            // The confirmation sits in the button itself ("Saved", like "Copied"), no extra line that pushes the page.
+            PrimaryButton(
+                if (saved && !changed) c.memorySaved.trimEnd('.') else c.memorySave,
+                enabled = changed || saved,
+                onClick = {
+                    if (changed) {
+                        coach.launch { coach.saveMemory(text) }
+                        saved = true
+                        haptics.confirm()
+                    }
+                },
+            )
         },
     ) {
         Title(t.coachMemory)
@@ -561,18 +701,21 @@ fun CoachMemoryScreen(coach: CoachService, onBack: () -> Unit) {
         Text(c.memoryHint, tone = Tone.Muted)
         Spacer(Modifier.height(Space.l))
         TextArea(text, { text = it; saved = false }, c.memoryPlaceholder, Modifier.testTag("coach-memory-input"))
-        if (saved) { Spacer(Modifier.height(Space.s)); Text(c.memorySaved, style = Theme.type.caption, tone = Tone.Muted) }
-        if (versions.size > 1) {
-            PanelSection(c.memoryVersions) {
-                versions.drop(1).take(20).forEach { v ->
-                    val who = if (v.source == CoachService.SOURCE_COACH) c.memoryByCoach else c.memoryByYou
-                    ListRow("${dateText(v.createdAt)} · $who", c.memoryRestore, onClick = { text = v.text; saved = false })
+        Reveal(versions.size > 1) {
+            Column(Modifier.fillMaxWidth().animateContentSize(Motion.smooth())) {
+                PanelSection(c.memoryVersions) {
+                    versions.drop(1).take(20).forEach { v ->
+                        val who = if (v.source == CoachService.SOURCE_COACH) c.memoryByCoach else c.memoryByYou
+                        ListRow("${dateText(v.createdAt)} · $who", c.memoryRestore, onClick = { text = v.text; saved = false; haptics.tick() })
+                    }
                 }
             }
         }
-        if (current != null) {
-            Spacer(Modifier.height(Space.l))
-            ConfirmButton(c.memoryDelete, onConfirm = { coach.launch { coach.clearMemory() }; text = "" })
+        Reveal(current != null) {
+            Column {
+                Spacer(Modifier.height(Space.l))
+                ConfirmButton(c.memoryDelete, onConfirm = { coach.launch { coach.clearMemory() }; text = "" })
+            }
         }
     }
 }

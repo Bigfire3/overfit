@@ -74,6 +74,19 @@ import app.overfit.coach.CoachException
 import app.overfit.domain.ExerciseSearch
 import app.overfit.i18n.LocalExerciseFormStrings
 import app.overfit.ui.components.MultilineInput
+import app.overfit.ui.components.AnimatedItems
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Stat
+import app.overfit.ui.components.StatGrid
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,6 +103,8 @@ class ExerciseViewModel(
     val exercise: StateFlow<Exercise?> = _exercise.asStateFlow()
     private val _loaded = MutableStateFlow(id == null)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+    /** A new custom exercise (no id yet). */
+    val isNew: Boolean get() = id == null
 
     init {
         if (id != null) viewModelScope.launch {
@@ -190,28 +205,59 @@ fun ExerciseDetailScreen(
     onCoach: ((exerciseId: String, name: String) -> Unit)? = null,
 ) {
     val t = LocalStrings.current
+    val haptics = rememberHaptics()
     val exercise by viewModel.exercise.collectAsStateWithLifecycle()
     val loaded by viewModel.loaded.collectAsStateWithLifecycle()
     LaunchedEffect(loaded, exercise) { if (loaded && exercise == null) onBack() }
-    val e = exercise ?: return
+    // The screen (background, back button) is there at once; the body fades in when the exercise is read.
+    val loadedExercise = exercise
 
-    var tracking by remember(e.id, e.trackingType) { mutableStateOf(e.trackingType) }
-    var rest by remember(e.id, e.defaultRestSec) { mutableStateOf(e.defaultRestSec?.toString().orEmpty()) }
+    var tracking by remember(loadedExercise?.id, loadedExercise?.trackingType) { mutableStateOf(loadedExercise?.trackingType ?: TrackingType.WEIGHT_REPS) }
+    var rest by remember(loadedExercise?.id, loadedExercise?.defaultRestSec) { mutableStateOf(loadedExercise?.defaultRestSec?.toString().orEmpty()) }
+    // "Save" only floats in when tracking or rest differ from what is stored.
+    val changed = loadedExercise != null && !loadedExercise.isCustom &&
+        (tracking != loadedExercise.trackingType || rest.toIntOrNull() != loadedExercise.defaultRestSec)
 
     Screen(
         scroll = true,
         header = {
-            BackHeader(t.back, onBack, coach = if (onCoach != null && !readOnly) ({ onCoach(e.id, e.name) }) else null) {
-                if (e.isCustom && !readOnly) {
+            val e = loadedExercise
+            BackHeader(t.back, onBack, coach = if (e != null && onCoach != null && !readOnly) ({ onCoach(e.id, e.name) }) else null) {
+                if (e != null && e.isCustom && !readOnly) {
                     HeaderIconButton(Icon.Edit, t.edit, { onEditCustom(e.id) })
-                    HeaderDeleteButton(t.delete, onConfirm = { viewModel.delete { onBack() } })
+                    HeaderDeleteButton(t.delete, onConfirm = { viewModel.delete { haptics.confirm(); onBack() } })
                 }
             }
         },
-        footer = if (e.isCustom || readOnly) null else ({
-            PrimaryButton(t.save, { viewModel.saveSettings(tracking, rest.toIntOrNull(), onBack) })
+        // Kept (empty) while nothing changed, so the layout does not switch when the button floats in.
+        footer = if (readOnly) null else ({
+            Appear(changed) {
+                PrimaryButton(t.save, { viewModel.saveSettings(tracking, rest.toIntOrNull()) { haptics.confirm(); onBack() } })
+            }
         }),
     ) {
+        Swap(loadedExercise, Modifier.fillMaxWidth(), contentKey = { it?.id }) { e ->
+            if (e != null) Column(Modifier.fillMaxWidth()) {
+                ExerciseDetailBody(e, tracking, { tracking = it }, rest, { rest = it }, readOnly, workouts, unit, language)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.ExerciseDetailBody(
+    e: Exercise,
+    tracking: TrackingType,
+    onTracking: (TrackingType) -> Unit,
+    rest: String,
+    onRest: (String) -> Unit,
+    readOnly: Boolean,
+    workouts: WorkoutRepository,
+    unit: WeightUnit,
+    language: Language,
+) {
+    val t = LocalStrings.current
+    run {
         ExerciseHero(e)
         Spacer(Modifier.height(Space.l))
         Title(e.name)
@@ -233,9 +279,9 @@ fun ExerciseDetailScreen(
                     PanelItem { Text(t.trackingName(e.trackingType)) }
                     e.defaultRestSec?.let { ListRow(t.restTime, it.toString()) }
                 } else {
-                    PanelItem { TrackingChooser(tracking) { tracking = it } }
+                    PanelItem { TrackingChooser(tracking, onTracking) }
                     ListRow(t.restTime) {
-                        RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
+                        RowInput(rest, { onRest(it.filter(Char::isDigit).take(4)) }, onCommit = {}, keyboardType = KeyboardType.Number)
                     }
                 }
             }
@@ -245,13 +291,24 @@ fun ExerciseDetailScreen(
     }
 }
 
-/** "Progress": best values and the last workouts with this exercise. */
+/** "Progress": best values and the last workouts with this exercise; slides in once the history is read. */
 @Composable
-private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepository, unit: WeightUnit, language: Language) {
+private fun ExerciseProgress(e: Exercise, workouts: WorkoutRepository, unit: WeightUnit, language: Language) {
+    val rows by remember(e.id) { workouts.exerciseSets(e.id) }.collectAsStateWithLifecycle(initialValue = null)
+    RevealNotNull(rows, Modifier.fillMaxWidth()) { list ->
+        Column(Modifier.fillMaxWidth()) { ExerciseProgressBody(e, list, unit, language) }
+    }
+}
+
+@Composable
+private fun ColumnScope.ExerciseProgressBody(
+    e: Exercise,
+    list: List<app.overfit.data.db.ExerciseSetRow>,
+    unit: WeightUnit,
+    language: Language,
+) {
     val t = LocalStrings.current
     val h = t.history
-    val rows by remember(e.id) { workouts.exerciseSets(e.id) }.collectAsStateWithLifecycle(initialValue = null)
-    val list = rows ?: return
     SectionTitle(h.progress)
     if (list.isEmpty()) {
         Text(h.progressEmpty, tone = Tone.Muted)
@@ -262,12 +319,15 @@ private fun ColumnScope.ExerciseProgress(e: Exercise, workouts: WorkoutRepositor
     val bests = WorkoutStats.bests(list.map { SetValues(it.weightKg, it.reps, it.durationSec) }, type)
     Text(h.bests, style = Theme.type.caption, tone = Tone.Muted)
     Spacer(Modifier.height(Space.s))
-    Panel {
-        bests.maxWeightKg?.let { ListRow(h.maxWeight, kg(it)) }
-        bests.bestE1rmKg?.let { ListRow(h.bestE1rm, kg(it)) }
-        bests.maxReps?.let { ListRow(h.maxReps, "$it ${t.repsUnit}") }
-        bests.maxDurationSec?.let { ListRow(h.longestTime, Numbers.formatDuration(it)) }
-    }
+    // Two tiles per row instead of one full-width row per number: half the height, the numbers come first.
+    StatGrid(
+        listOfNotNull(
+            bests.maxWeightKg?.let { Stat(h.maxWeight, kg(it)) },
+            bests.bestE1rmKg?.let { Stat(h.bestE1rm, kg(it)) },
+            bests.maxReps?.let { Stat(h.maxReps, "$it ${t.repsUnit}") },
+            bests.maxDurationSec?.let { Stat(h.longestTime, Numbers.formatDuration(it)) },
+        ),
+    )
 
     Spacer(Modifier.height(Space.l))
     Text(h.recentWorkouts, style = Theme.type.caption, tone = Tone.Muted)
@@ -331,9 +391,10 @@ fun CustomExerciseScreen(
     val t = LocalStrings.current
     val f = LocalExerciseFormStrings.current
     var coachSheet by rememberSaveable { mutableStateOf(false) }
+    val haptics = rememberHaptics()
     val existing by viewModel.exercise.collectAsStateWithLifecycle()
+    // The screen (background, ✕) is there at once; when editing, the form fades in once the exercise is read.
     val loaded by viewModel.loaded.collectAsStateWithLifecycle()
-    if (!loaded) return
 
     val e = existing
     var name by rememberSaveable(e?.id) { mutableStateOf(e?.name ?: initialName) }
@@ -356,14 +417,39 @@ fun CustomExerciseScreen(
         s.note?.let { note = it }
         viewModel.consumeSuggestion()
     }
+    // Felt once when the coach's answer arrives (not again after a recomposition with the same state).
+    var lastAutofill by remember { mutableStateOf(autofillState) }
+    LaunchedEffect(autofillState) {
+        if (lastAutofill == ExerciseViewModel.AutofillState.Loading) when (autofillState) {
+            ExerciseViewModel.AutofillState.Done -> haptics.confirm()
+            is ExerciseViewModel.AutofillState.Failed -> haptics.reject()
+            else -> Unit
+        }
+        lastAutofill = autofillState
+    }
     val index by viewModel.indexVersion.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { if (e == null) viewModel.loadIndex() }
-    val similar = remember(name, index) { viewModel.similar(name) }
+    // Debounced, so "Did you mean …?" does not breathe with every letter typed.
+    var similar by remember { mutableStateOf(emptyList<Exercise>()) }
+    LaunchedEffect(name, index) {
+        val next = viewModel.similar(name)
+        if (next.map { it.id } == similar.map { it.id }) return@LaunchedEffect
+        if (similar.isNotEmpty()) delay(SIMILAR_DEBOUNCE_MS)
+        similar = next
+    }
+    // New exercise with an empty name: the name is the only required field, so it gets the keyboard right away.
+    val nameFocus = remember { FocusRequester() }
+    LaunchedEffect(loaded) {
+        if (loaded && viewModel.isNew && name.isEmpty()) {
+            try { nameFocus.requestFocus() } catch (_: IllegalStateException) { }
+        }
+    }
 
     Screen(
         scroll = true,
         // The one way into the AI here too: the coach icon (no "Fill in with AI" row any more, Fabian 8.11.).
-        header = { BackHeader(t.back, onBack, coach = { coachSheet = true }) },
+        // The form rises from the bottom as a layer of its own (ScreenMotion): it closes with ✕.
+        header = { BackHeader(t.back, onBack, coach = { coachSheet = true }, icon = Icon.Close) },
         footer = {
             PrimaryButton(t.save, {
                 val input = CustomExerciseInput(
@@ -375,65 +461,79 @@ fun CustomExerciseScreen(
                     secondary = MuscleKeys.parse(secondary),
                     note = note,
                 )
-                viewModel.saveCustom(input, onSaved)
+                viewModel.saveCustom(input) { haptics.confirm(); onSaved(it) }
             }, enabled = name.isNotBlank())
         },
     ) {
-        Text(if (e == null) t.newCustomExercise else t.editCustomExercise, tone = Tone.Muted)
-        Spacer(Modifier.height(Space.s))
-        BigInput(name, { name = it.take(60) }, t.exerciseNamePlaceholder, Modifier.fillMaxWidth())
+        Swap(loaded, Modifier.fillMaxWidth()) { ready ->
+            if (ready) Column(Modifier.fillMaxWidth()) {
+                Text(if (e == null) t.newCustomExercise else t.editCustomExercise, tone = Tone.Muted)
+                Spacer(Modifier.height(Space.s))
+                BigInput(name, { name = it.take(60) }, t.exerciseNamePlaceholder, Modifier.fillMaxWidth().focusRequester(nameFocus))
 
-        Spacer(Modifier.height(Space.m))
-        // What the coach did (filling, done, failed); nothing until the user asked for it.
-        when (val st = autofillState) {
-            ExerciseViewModel.AutofillState.Loading -> Hint(f.aiFilling)
-            ExerciseViewModel.AutofillState.Done -> Hint(f.aiFilled)
-            is ExerciseViewModel.AutofillState.Failed -> Hint(f.aiError(st.kind))
-            else -> Unit
-        }
-
-        if (similar.isNotEmpty() && onPickExisting != null) {
-            SectionTitle(f.didYouMean)
-            Text(f.didYouMeanHint, style = Theme.type.caption, tone = Tone.Muted)
-            similar.forEach { candidate -> ExerciseRow(candidate, language, selected = null) { onPickExisting(candidate) } }
-        }
-
-        SectionTitle(t.tracking)
-        Panel { PanelItem { TrackingChooser(tracking) { tracking = it } } }
-
-        SectionTitle(f.primaryMuscles)
-        Panel {
-            PanelItem {
-                MultiChoiceChips(Muscle.entries, MuscleKeys.parse(primary), { t.muscle(it) }) { m ->
-                    val list = MuscleKeys.parse(primary)
-                    primary = MuscleKeys.of(if (m in list) list - m else list + m)
-                    if (m !in list) secondary = MuscleKeys.of(MuscleKeys.parse(secondary) - m)
+                Spacer(Modifier.height(Space.m))
+                // What the coach did (filling, done, failed); nothing until the user asked for it. One text fades into the next.
+                Swap(autofillState, Modifier.fillMaxWidth()) { st ->
+                    when (st) {
+                        ExerciseViewModel.AutofillState.Loading -> Hint(f.aiFilling)
+                        ExerciseViewModel.AutofillState.Done -> Hint(f.aiFilled)
+                        is ExerciseViewModel.AutofillState.Failed -> Hint(f.aiError(st.kind))
+                        else -> Unit
+                    }
                 }
-            }
-        }
 
-        SectionTitle(f.secondaryMuscles)
-        Panel {
-            PanelItem {
-                MultiChoiceChips(Muscle.entries.filter { it !in MuscleKeys.parse(primary) }, MuscleKeys.parse(secondary), { t.muscle(it) }) { m ->
-                    val list = MuscleKeys.parse(secondary)
-                    secondary = MuscleKeys.of(if (m in list) list - m else list + m)
+                RevealNotNull(similar.takeIf { it.isNotEmpty() && onPickExisting != null }, Modifier.fillMaxWidth()) { list ->
+                    Column(Modifier.fillMaxWidth()) {
+                        SectionTitle(f.didYouMean)
+                        Text(f.didYouMeanHint, style = Theme.type.caption, tone = Tone.Muted)
+                        AnimatedItems(list, key = { it.id }) { _, candidate ->
+                            ExerciseRow(candidate, language, selected = null) { onPickExisting?.invoke(candidate) }
+                        }
+                    }
                 }
+
+                SectionTitle(t.tracking)
+                Panel { PanelItem { TrackingChooser(tracking) { tracking = it } } }
+
+                SectionTitle(f.primaryMuscles)
+                Panel {
+                    PanelItem {
+                        MultiChoiceChips(Muscle.entries, MuscleKeys.parse(primary), { t.muscle(it) }) { m ->
+                            val list = MuscleKeys.parse(primary)
+                            primary = MuscleKeys.of(if (m in list) list - m else list + m)
+                            if (m !in list) secondary = MuscleKeys.of(MuscleKeys.parse(secondary) - m)
+                        }
+                    }
+                }
+
+                SectionTitle(f.secondaryMuscles)
+                Panel {
+                    PanelItem {
+                        // Every muscle keeps its place; a primary one is dimmed (no reflow when a primary muscle is chosen).
+                        // Tapping it anyway moves it from primary to secondary.
+                        val primaryList = MuscleKeys.parse(primary)
+                        MultiChoiceChips(Muscle.entries, MuscleKeys.parse(secondary), { t.muscle(it) }, dimmed = { it in primaryList }) { m ->
+                            val list = MuscleKeys.parse(secondary)
+                            if (m in primaryList) primary = MuscleKeys.of(primaryList - m)
+                            secondary = MuscleKeys.of(if (m in list) list - m else list + m)
+                        }
+                    }
+                }
+
+                SectionTitle(t.equipment)
+                Panel { PanelItem { ChoiceChips(Equipment.entries, equipment, { t.equipmentName(it) }) { equipment = it } } }
+
+                Spacer(Modifier.height(Space.m))
+                Panel {
+                    ListRow(t.restTime) {
+                        RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
+                    }
+                }
+
+                SectionTitle(f.note)
+                MultilineInput(note, { note = it.take(500) }, f.notePlaceholder, minHeight = 64.dp)
             }
         }
-
-        SectionTitle(t.equipment)
-        Panel { PanelItem { ChoiceChips(Equipment.entries, equipment, { t.equipmentName(it) }) { equipment = it } } }
-
-        Spacer(Modifier.height(Space.m))
-        Panel {
-            ListRow(t.restTime) {
-                RowInput(rest, { rest = it.filter(Char::isDigit).take(4) }, onCommit = {}, keyboardType = KeyboardType.Number)
-            }
-        }
-
-        SectionTitle(f.note)
-        MultilineInput(note, { note = it.take(500) }, f.notePlaceholder, minHeight = 64.dp)
     }
     CoachFillSheet(
         visible = coachSheet,
@@ -488,12 +588,17 @@ private fun CoachFillSheet(
         Title(f.aiFill)
         Spacer(Modifier.height(Space.s))
         Text(if (available) f.aiFillHint else f.aiNoAccess, tone = Tone.Muted)
-        if (available && name.isBlank()) {
-            Spacer(Modifier.height(Space.s))
-            Text(f.aiNeedName, style = Theme.type.caption, tone = Tone.Muted)
+        Reveal(available && name.isBlank()) {
+            Column {
+                Spacer(Modifier.height(Space.s))
+                Text(f.aiNeedName, style = Theme.type.caption, tone = Tone.Muted)
+            }
         }
     }
 }
+
+/** Pause before a changed "Did you mean …?" list replaces the shown one (typing debounce, not an animation). */
+private const val SIMILAR_DEBOUNCE_MS = 250L
 
 /** Muscle lists as comma-separated keys, so they survive in rememberSaveable on every platform. */
 internal object MuscleKeys {
@@ -504,11 +609,23 @@ internal object MuscleKeys {
 /** Multiple choice: tapping toggles. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun <T> MultiChoiceChips(options: List<T>, selected: List<T>, label: (T) -> String, onToggle: (T) -> Unit) {
+private fun <T> MultiChoiceChips(
+    options: List<T>,
+    selected: List<T>,
+    label: (T) -> String,
+    dimmed: (T) -> Boolean = { false },
+    onToggle: (T) -> Unit,
+) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
-        options.forEach { option -> Chip(label(option), option in selected, { onToggle(option) }) }
+        options.forEach { option ->
+            val alpha by animateFloatAsState(if (dimmed(option)) DIMMED_ALPHA else 1f, Motion.snappy(), label = "chipDim")
+            // Read while drawing: dimming never recomposes the chips.
+            Chip(label(option), option in selected, { onToggle(option) }, Modifier.graphicsLayer { this.alpha = alpha })
+        }
     }
 }
+
+private const val DIMMED_ALPHA = 0.4f
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

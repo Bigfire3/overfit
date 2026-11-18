@@ -19,7 +19,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.animation.animateContentSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.motionColor
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -56,7 +65,8 @@ const val PHOTO_ADD_LIBRARY_TAG = "photo-add-library"
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DayPhotoGrid(
-    photos: List<WorkoutPhoto>,
+    /** The day's photos; null while they are still loading (what the first loaded list holds is not "new"). */
+    photos: List<WorkoutPhoto>?,
     /** Picked or taken image, still unprocessed; the caller prepares and stores it for the day. */
     onAdd: (ByteArray) -> Unit,
     onOpen: ((photoId: String) -> Unit)?,
@@ -64,17 +74,34 @@ fun DayPhotoGrid(
     modifier: Modifier = Modifier,
 ) {
     val h = LocalStrings.current.history
-    val picker = rememberPhotoPicker(onAdd)
+    val haptics = rememberHaptics()
+    // The confirm belongs to adding (a photo was taken or picked), not to a thumbnail being composed.
+    val picker = rememberPhotoPicker { bytes -> haptics.confirm(); onAdd(bytes) }
+    // Photos that were there when the list first loaded are simply there; only later ones pop in.
+    val initial = remember { arrayOfNulls<Set<String>>(1) }
+    if (initial[0] == null && photos != null) initial[0] = photos.mapTo(HashSet()) { it.id }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val tile = (maxWidth - Space.s * (COLUMNS - 1)) / COLUMNS
         Column {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
-                photos.forEachIndexed { i, photo ->
-                    GridPhoto(
-                        photo, h.photoDescription(i + 1), tile,
-                        onOpen = onOpen?.let { { it(photo.id) } },
-                        onRemove = onRemove?.let { { it(photo.id) } },
-                    )
+            FlowRow(
+                // A new row (or one less) grows and shrinks instead of jumping.
+                Modifier.animateContentSize(Motion.smooth()),
+                horizontalArrangement = Arrangement.spacedBy(Space.s),
+                verticalArrangement = Arrangement.spacedBy(Space.s),
+            ) {
+                photos.orEmpty().forEachIndexed { i, photo ->
+                    key(photo.id) {
+                        val isNew = initial[0]?.contains(photo.id) == false
+                        var shown by remember { mutableStateOf(!isNew) }
+                        LaunchedEffect(Unit) { if (isNew) shown = true }
+                        Appear(shown) {
+                            GridPhoto(
+                                photo, h.photoDescription(i + 1), tile,
+                                onOpen = onOpen?.let { { it(photo.id) } },
+                                onRemove = onRemove?.let { { it(photo.id) } },
+                            )
+                        }
+                    }
                 }
                 if (picker.canTakePhoto) AddTile(Icon.Photos, h.takePhoto, tile, picker.takePhoto, Modifier.testTag(PHOTO_ADD_CAMERA_TAG))
                 AddTile(Icon.Plus, h.pickPhoto, tile, picker.pickFromLibrary, Modifier.testTag(PHOTO_ADD_LIBRARY_TAG))
@@ -115,7 +142,9 @@ private fun GridPhoto(photo: WorkoutPhoto, description: String, size: Dp, onOpen
     val arm = rememberConfirmArm()
     val armed = arm.armed
     val c = Theme.colors
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberHaptics()
+    // The armed "x" turns red softly and back.
+    val xColor by motionColor(if (armed) c.armed else c.foreground, "photoRemove")
     Box {
         PhotoThumb(photo, description, size = size, onClick = onOpen)
         if (onRemove != null) Box(
@@ -130,12 +159,12 @@ private fun GridPhoto(photo: WorkoutPhoto, description: String, size: Dp, onOpen
                 }
                 .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) {
                     if (armed) { arm.disarm(); onRemove() }
-                    else { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); arm.arm() }
+                    else { haptics.arm(); arm.arm() }
                 },
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.size(app.overfit.ui.theme.Sizes.badge).background(c.background, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
-                LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small, color = if (armed) c.armed else c.foreground)
+                LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.small, color = xColor)
             }
         }
     }

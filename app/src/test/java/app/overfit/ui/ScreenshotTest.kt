@@ -130,6 +130,8 @@ open class ScreenshotTest {
         // Workout detail
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
         waitFor("Starten")
+        // "Starten" is there from the first frame; the plan itself fades in once it is loaded.
+        compose.waitUntil(20_000) { compose.onAllNodes(hasContentDescription("Weitere Aktionen für Bench Press", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         shot("workout-detail")
         // Share (icon top right)
         compose.openMenuEntry("Teilen")
@@ -150,12 +152,13 @@ open class ScreenshotTest {
         click("Beenden") // popup: its own screenshot in DialogShotTest (Robolectric does not draw dialog windows)
         compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Training beendet")
-        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.waitForFinishLoaded(timeoutMillis = 20_000)
         shot("beenden")
         click("Speichern")
         compose.waitForTrainingTab()
         tab("Kalender")
-        waitFor("1 Training")
+        // The calendar's figures stand in one line ("1 Training · …").
+        compose.waitUntil(20_000) { compose.onAllNodes(hasText("1 Training", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         shot("kalender")
         compose.openCalendarDay(realToday().dayOfMonth)
         waitFor("Push")

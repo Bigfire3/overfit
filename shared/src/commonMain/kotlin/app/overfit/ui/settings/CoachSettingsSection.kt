@@ -27,6 +27,7 @@ import app.overfit.ui.components.Hint
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.Panel
 import app.overfit.ui.components.PanelSection
+import app.overfit.ui.components.Reveal
 import app.overfit.ui.components.SwitchRow
 import app.overfit.ui.theme.Space
 
@@ -80,7 +81,7 @@ internal fun CoachSettingsSection(
         FuelRow(fuelSession, fuelActive = fuel, onClick = nav.fuel)
         ListRow(s.defaultModel, modelChipLabel(state, settings, providers.fuel.available, s), onClick = nav.access)
     }
-    if (ownKey) {
+    Reveal(ownKey) {
         Hint(c.hub.accessOwnKeyPrivacy(providers.get(state.providerId).label), Modifier.testTag("coach:access-privacy"))
     }
 
@@ -90,8 +91,8 @@ internal fun CoachSettingsSection(
         ListRow(s.profile, onClick = nav.profile)
         ListRow(s.instructions, onClick = nav.instructions)
         ListRow(t.coachMemory, onClick = nav.memory)
-        if (reviews.isNotEmpty()) ListRow(s.reviews, reviews.size.toString(), onClick = nav.reviews)
-        else ListRow(s.reviews, onClick = nav.reviews)
+        // One row; the count fades in when the reviews have loaded instead of the row being replaced.
+        SwapValueRow(s.reviews, if (reviews.isNotEmpty()) reviews.size.toString() else "", onClick = nav.reviews)
         ListRow(requestLogStringsFor(language).title, onClick = nav.requestLog)
     }
 
@@ -110,7 +111,7 @@ internal fun CoachSettingsSection(
     }
     PanelSection(s.sectionPrompts) {
         ListRow(s.copyPrompts, onClick = nav.prompts)
-        ChatProvider.entries.forEach { p -> ListRow(p.displayName, connection, onClick = { nav.chatProvider(p) }) }
+        ChatProvider.entries.forEach { p -> SwapValueRow(p.displayName, connection, onClick = { nav.chatProvider(p) }) }
         ListRow(cs.notesTitle, onClick = nav.chatNotes)
     }
     Hint(s.promptsHint)

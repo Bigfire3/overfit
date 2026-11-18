@@ -1,6 +1,7 @@
 package app.overfit.ui.fuel
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -38,14 +40,19 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.RequestLogStrings
 import app.overfit.i18n.requestLogStringsFor
 import app.overfit.ui.chat.formatMillis
+import app.overfit.ui.components.AnimatedItems
 import app.overfit.ui.components.BackHeader
 import app.overfit.ui.components.FloatingCard
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RollingText
 import app.overfit.ui.components.Screen
+import app.overfit.ui.components.Swap
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
+import app.overfit.ui.theme.Motion
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.coroutines.CancellationException
@@ -91,19 +98,28 @@ internal fun RequestLogContent(entries: List<AiRequestEntity>?, offline: Boolean
     val r = requestLogStringsFor(language)
     Title(r.title)
     Text(r.intro, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-    if (offline) Text(r.offline, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+    // Offline note and 30-day sum arrive after the background sync: they grow in instead of pushing the list down.
+    Reveal(offline) { Text(r.offline, Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
     val fuel = entries.orEmpty().filter { it.providerId == ProviderId.FUEL.name }
-    if (fuel.isNotEmpty()) {
-        val since = now - 30L * 24 * 3_600_000
-        val sum = fuel.filter { it.startedAt >= since }.sumOf { it.costMicro ?: 0 }
-        Text(r.last30Days(formatRequestCost(sum, language)), Modifier.padding(top = Space.m), style = Theme.type.caption)
+    val since = now - 30L * 24 * 3_600_000
+    val sum = fuel.filter { it.startedAt >= since }.sumOf { it.costMicro ?: 0 }
+    Reveal(fuel.isNotEmpty()) {
+        RollingText(r.last30Days(formatRequestCost(sum, language)), Modifier.padding(top = Space.m), style = Theme.type.caption)
     }
     Spacer(Modifier.height(Space.l))
-    when {
-        entries == null -> Text(LocalFuelStrings.current.loading, tone = Tone.Muted)
-        entries.isEmpty() -> Text(r.empty, tone = Tone.Muted)
-        else -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.m)) {
-            entries.forEach { RequestCard(it, r, language) }
+    // Loading → empty → list fades over; synced entries grow in at their place.
+    val state = when {
+        entries == null -> 0
+        entries.isEmpty() -> 1
+        else -> 2
+    }
+    Swap(state, Modifier.fillMaxWidth()) { st ->
+        when (st) {
+            0 -> Text(LocalFuelStrings.current.loading, tone = Tone.Muted)
+            1 -> Text(r.empty, tone = Tone.Muted)
+            else -> Column(Modifier.fillMaxWidth()) {
+                AnimatedItems(entries.orEmpty(), key = { it.id }, spacing = Space.m) { _, e -> RequestCard(e, r, language) }
+            }
         }
     }
 }
@@ -122,7 +138,10 @@ private fun RequestCard(e: AiRequestEntity, r: RequestLogStrings, language: Lang
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(purposeLabel(e.purpose, r), Modifier.weight(1f), style = Theme.type.label)
                 Spacer(Modifier.width(Space.m))
-                LineIcon(if (open) Icon.ChevronUp else Icon.ChevronDown, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.muted)
+                val turn by animateFloatAsState(if (open) 180f else 0f, Motion.snappy(), label = "chevron")
+                Box(Modifier.graphicsLayer { rotationZ = turn }) {
+                    LineIcon(Icon.ChevronDown, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.muted)
+                }
             }
             // Date and time on their own line, so a long purpose never gets cut at 360 dp.
             Text(formatMillis(e.startedAt, s), Modifier.padding(top = 2.dp), style = Theme.type.caption, tone = Tone.Muted)
@@ -140,7 +159,7 @@ private fun RequestCard(e: AiRequestEntity, r: RequestLogStrings, language: Lang
             } else {
                 Text("$cost · ${r.statusOk}", style = Theme.type.caption, tone = Tone.Muted)
             }
-            if (open) {
+            Reveal(open) { Column {
                 Spacer(Modifier.height(Space.s))
                 val lines = buildList {
                     if (e.inputTokens != null || e.outputTokens != null) {
@@ -159,7 +178,7 @@ private fun RequestCard(e: AiRequestEntity, r: RequestLogStrings, language: Lang
                     add(e.serverId?.let { r.sourceServer(it) } ?: r.sourceDevice)
                 }
                 lines.forEach { Text(it, Modifier.padding(top = Space.xs), style = Theme.type.caption, tone = Tone.Muted) }
-            }
+            } }
         }
     }
 }

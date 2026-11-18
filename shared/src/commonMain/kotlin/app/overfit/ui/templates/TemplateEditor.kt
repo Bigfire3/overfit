@@ -2,7 +2,28 @@ package app.overfit.ui.templates
 
 import app.overfit.ui.components.SetColumnsHeader
 import app.overfit.ui.workout.setColumnLabels
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import app.overfit.ui.components.AnimatedItems
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.motionItem
+import app.overfit.ui.components.rememberGlide
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -359,21 +380,97 @@ fun TemplateEditorScreen(
         if (saved != null && onSaved != null) onSaved(saved) else onClose()
     }
     LaunchedEffect(backArmed) { if (backArmed) { delay(4000); backArmed = false } }
-    LaunchedEffect(state.blocked) { if (state.blocked > 0) backArmed = true }
     LaunchedEffect(undo) { if (undo != null) { delay(5000); viewModel.dismissUndo() } }
     val showUndo = undo?.after == draft && undo != null
+    val haptics = rememberHaptics()
+    val listState = rememberLazyListState()
+    val nameFocus = remember { FocusRequester() }
 
-    // "Last time" per exercise, loaded once per set of exercises (not on every typed value).
+    // "Last time" per exercise, loaded once per set of exercises (not on every typed value), all at once. The list
+    // only shows once the first batch is there, so no card grows a line a moment after the screen opened.
     val exerciseIds = if (state.loading) null else draft.allExercises.map { it.exercise.id }.distinct()
     var last by remember { mutableStateOf<Map<String, LastPerformance?>>(emptyMap()) }
+    var lastLoaded by remember { mutableStateOf(false) }
     LaunchedEffect(exerciseIds) {
-        val missing = exerciseIds.orEmpty().filter { it !in last && !it.startsWith(ShareMapper.PENDING_PREFIX) }
-        if (missing.isNotEmpty()) last = last + missing.associateWith {
-            try { loadLast(it) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { null }
+        if (exerciseIds == null) return@LaunchedEffect
+        val missing = exerciseIds.filter { it !in last && !it.startsWith(ShareMapper.PENDING_PREFIX) }
+        if (missing.isNotEmpty()) {
+            val loaded = coroutineScope {
+                missing.map { id ->
+                    async { id to try { loadLast(id) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { null } }
+                }.awaitAll()
+            }
+            last = last + loaded
+        }
+        lastLoaded = true
+    }
+    val contentReady = !state.loading && (lastLoaded || exerciseIds.isNullOrEmpty())
+
+    // A blocked leave/start/save says why (footer), buzzes and brings the cause into view: the name field (focused on
+    // "Save", where the keyboard helps; not on a blocked back, where a second back must still discard) or the exercise.
+    suspend fun showProblem(problem: TemplateDraft.Problem?, focusName: Boolean) {
+        haptics.reject()
+        when (problem) {
+            TemplateDraft.Problem.MissingName -> {
+                listState.animateScrollToItem(0)
+                if (focusName) runCatching { nameFocus.requestFocus() }
+            }
+            is TemplateDraft.Problem.InvalidValue -> {
+                val index = draft.exercises.indexOfFirst { e -> e.exercise.name == problem.exercise || e.alternatives.any { it.exercise.name == problem.exercise } }
+                if (index >= 0) listState.animateScrollToItem(1 + index)
+            }
+            null -> Unit
+        }
+    }
+    // Both react to a change, not to the editor being composed again: the view model outlives the screen (exercise
+    // picker, details, rotation), and coming back must not buzz, scroll or open the keyboard once more.
+    var handledBlocked by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(state.blocked) {
+        if (state.blocked <= handledBlocked) return@LaunchedEffect
+        handledBlocked = state.blocked
+        backArmed = true
+        showProblem(state.problem, focusName = false)
+    }
+    var handledProblem by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.problem) {
+        val p = state.problem
+        val key = p?.toString()
+        if (key == handledProblem) return@LaunchedEffect
+        handledProblem = key
+        if (!autosave && p != null) showProblem(p, focusName = true)
+    }
+
+    // A new, empty workout starts with its name: the field is focused (keyboard open) as the editor opens. Once per
+    // editor: back from the exercise picker the draft is still empty for a moment, and the keyboard must stay closed.
+    var nameFocusDone by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(contentReady) {
+        if (!contentReady || nameFocusDone) return@LaunchedEffect
+        nameFocusDone = true
+        if (!autosave && viewModel.seed == null && draft.name.isEmpty() && draft.exercises.isEmpty()) {
+            withFrameNanos { }
+            runCatching { nameFocus.requestFocus() }
         }
     }
 
-    val listState = rememberLazyListState()
+    // Exercises that were just added (picker) land below the fold: the list goes to the first new one (unfolded).
+    val exerciseKeys = if (state.loading) null else draft.exercises.map { it.key }
+    var knownExercises by rememberSaveable { mutableStateOf<List<Long>?>(null) }
+    LaunchedEffect(exerciseKeys) {
+        if (exerciseKeys == null) return@LaunchedEffect
+        val known = knownExercises
+        knownExercises = exerciseKeys
+        if (known == null) return@LaunchedEffect
+        val added = exerciseKeys.firstOrNull { it !in known }
+        if (added != null && exerciseKeys.size > known.size) {
+            collapsed = collapsed - added
+            listState.animateScrollToItem(1 + exerciseKeys.indexOf(added))
+        }
+    }
+    // While a value is typed, the keyboard takes half the screen: "Start" steps aside, "Undo" stays. Read through
+    // derivedStateOf: the inset changes on every frame of the keyboard animation, the Boolean once.
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    val typing by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
     val reorder = rememberReorderState(listState, canMove = { it is Long }) { from, to ->
         viewModel.edit { d ->
             val a = d.exercises.indexOfFirst { it.key == from }
@@ -381,6 +478,8 @@ fun TemplateEditorScreen(
             if (a < 0 || b < 0) d else d.moveExercise(from as Long, b - a)
         }
     }
+    // Cards resize themselves (fold, sets): the others only glide when the list itself changes or a card is dragged.
+    val glide = rememberGlide(draft.exercises.map { it.key }, moving = reorder.draggingKey != null)
 
     // Autosave: back stores and closes; only an invalid draft needs a second back (it cannot be stored).
     // Otherwise no leaving while saving: the save must not be cancelled half-way (new exercises, workout, chat acknowledgement).
@@ -398,13 +497,13 @@ fun TemplateEditorScreen(
     Screen(
         header = {
             // [⋮ share, delete] [coach]: sharing and deleting are rare, the corner is the coach's (UI audit 12.11.).
-            val ready = autosave && !state.loading
+            // Present from the first frame (nothing pops in once the workout is loaded); they act once it is there.
             BackHeader(
                 t.back, back,
-                coach = if (ready) onCoach else null,
-                menu = if (ready) listOf(
-                    MenuItem(t.share.shareTemplate) { viewModel.flush { if (it != null) onShare() } },
-                    MenuItem(t.deleteTemplate, destructive = true, confirm = true, onClick = viewModel::delete),
+                coach = if (autosave) onCoach else null,
+                menu = if (autosave) listOf(
+                    MenuItem(t.share.shareTemplate) { if (!state.loading) viewModel.flush { if (it != null) onShare() } },
+                    MenuItem(t.deleteTemplate, destructive = true, confirm = true) { if (!state.loading) viewModel.delete() },
                 ) else emptyList(),
             )
         },
@@ -416,31 +515,47 @@ fun TemplateEditorScreen(
                 backArmed -> t.unsavedHint
                 else -> state.problem?.describe(t)
             }
-            val u = undo
-            if (showUndo && u != null) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    val label = when (u.kind) {
-                        TemplateEditorViewModel.UndoKind.SetRemoved -> t.setDeleted
-                        TemplateEditorViewModel.UndoKind.ExerciseRemoved -> t.training.exerciseRemoved
-                        TemplateEditorViewModel.UndoKind.Replaced -> t.training.exerciseReplaced
+            // One column without gaps of its own: what comes and goes brings its gap along, so nothing jumps.
+            Column(Modifier.fillMaxWidth()) {
+                RevealNotNull(undo?.takeIf { showUndo }, from = Alignment.Bottom) { u ->
+                    Row(Modifier.fillMaxWidth().padding(bottom = Space.m), verticalAlignment = Alignment.CenterVertically) {
+                        // A second removal right after the first changes the label softly.
+                        Swap(u.kind, Modifier.weight(1f)) { kind ->
+                            val label = when (kind) {
+                                TemplateEditorViewModel.UndoKind.SetRemoved -> t.setDeleted
+                                TemplateEditorViewModel.UndoKind.ExerciseRemoved -> t.training.exerciseRemoved
+                                TemplateEditorViewModel.UndoKind.Replaced -> t.training.exerciseReplaced
+                            }
+                            Text(label, style = Theme.type.caption, tone = Tone.Muted)
+                        }
+                        SmallButton(t.undo, { haptics.tick(); viewModel.undoRemoveSet() })
                     }
-                    Text(label, Modifier.weight(1f), style = Theme.type.caption, tone = Tone.Muted)
-                    SmallButton(t.undo, viewModel::undoRemoveSet)
                 }
-            }
-            if (message != null) Text(message, style = Theme.type.caption, tone = Tone.Muted)
-            when {
-                !autosave -> PrimaryButton(t.save, viewModel::save, enabled = !state.loading, loading = state.saving)
-                state.loading -> Unit
-                workoutRunning -> RunningWorkoutChoice(onToRunning, onEndRunning)
-                // Pending changes are stored first, so the training starts from what is on screen.
-                else -> PrimaryButton(t.startThisWorkout, { viewModel.flush { saved -> saved?.let(onStart) } })
+                RevealNotNull(message, from = Alignment.Bottom) { m ->
+                    Text(m, Modifier.padding(bottom = Space.m), style = Theme.type.caption, tone = Tone.Muted)
+                }
+                // "Save" of a new workout stays above the keyboard: it is the only way to finish. "Start" (and the
+                // choice while another workout runs) step aside while typing.
+                Reveal(!autosave || !typing, from = Alignment.Bottom) {
+                    when {
+                        !autosave -> PrimaryButton(t.save, viewModel::save, enabled = !state.loading, loading = state.saving)
+                        workoutRunning -> RunningWorkoutChoice(onToRunning, onEndRunning)
+                        // There from the first frame, usable once the workout is loaded. Pending changes are stored
+                        // first, so the training starts from what is on screen.
+                        else -> PrimaryButton(
+                            t.startThisWorkout,
+                            { viewModel.flush { saved -> saved?.let(onStart) } },
+                            enabled = !state.loading,
+                        )
+                    }
+                }
             }
         },
     ) {
-        if (state.loading) return@Screen
-        LazyColumn(
-            Modifier.weight(1f).fillMaxWidth(),
+        // Loading -> loaded fades in place (no spinner; the header and the button are already there).
+        Swap(contentReady, Modifier.weight(1f).fillMaxWidth()) { ready ->
+        if (ready) LazyColumn(
+            Modifier.fillMaxSize(),
             state = listState,
             contentPadding = PaddingValues(bottom = Space.l),
             verticalArrangement = Arrangement.spacedBy(Space.s),
@@ -451,7 +566,7 @@ fun TemplateEditorScreen(
                         draft.name,
                         { v -> viewModel.edit { it.withName(v.take(60)) } },
                         t.templateNamePlaceholder,
-                        Modifier.weight(1f),
+                        Modifier.weight(1f).focusRequester(nameFocus),
                     )
                 }
                 val caption = when {
@@ -472,11 +587,11 @@ fun TemplateEditorScreen(
                 Spacer(Modifier.height(Space.m))
             }
             if (draft.exercises.isEmpty() && autosave) {
-                item(key = "empty") { Text(t.workoutPlanEmpty, Modifier.padding(vertical = Space.m), tone = Tone.Muted) }
+                item(key = "empty") { Text(t.workoutPlanEmpty, motionItem(glide).padding(vertical = Space.m), tone = Tone.Muted) }
             }
             itemsIndexed(draft.exercises, key = { _, e -> e.key }) { index, entry ->
                 ExerciseBlock(
-                    modifier = Modifier.then(reorderableItem(reorder, entry.key)),
+                    modifier = Modifier.then(reorderableItem(reorder, entry.key, glide)),
                     reorder = reorder,
                     entry = entry,
                     unit = unit,
@@ -496,9 +611,12 @@ fun TemplateEditorScreen(
                 )
             }
             item(key = "actions") {
-                Spacer(Modifier.height(Space.s))
-                BlockButton(t.addExercise, onAddExercises)
+                Column(motionItem(glide)) {
+                    Spacer(Modifier.height(Space.s))
+                    BlockButton(t.addExercise, onAddExercises)
+                }
             }
+        }
         }
     }
 }
@@ -530,14 +648,20 @@ private fun ExerciseBlock(
     onDetails: (DraftExercise) -> Unit,
 ) {
     val t = LocalStrings.current
+    val haptics = rememberHaptics()
     val key = entry.key
     Block(modifier) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(BlockShape.row).pressableRow(onToggle).dragHandle(reorder, key)
+            Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(BlockShape.row).pressableRow(onToggle)
+                .dragHandle(reorder, key, onSwap = { haptics.tick() }) { haptics.threshold() }
                 .semantics { contentDescription = t.reorder },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LineIcon(if (expanded) Icon.ChevronDown else Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
+            // One chevron that turns, instead of two icons that swap.
+            val turn by animateFloatAsState(if (expanded) 90f else 0f, Motion.snappy(), label = "chevron")
+            Box(Modifier.graphicsLayer { rotationZ = turn }) {
+                LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
+            }
             Spacer(Modifier.width(Space.s))
             ExerciseThumb(entry) { onDetails(entry) }
             Spacer(Modifier.width(Space.m))
@@ -553,10 +677,12 @@ private fun ExerciseBlock(
                 },
             )
         }
-        if (expanded) ExerciseEditor(entry, unit, onEdit) { onRemoveSet(key, it) }
-        // Alternatives (A/B): same card, each with its own sets; the training picks one of them.
-        entry.alternatives.forEach { alt ->
-            androidx.compose.runtime.key(alt.key) {
+        // Folding and unfolding moves the cards below along instead of making them jump.
+        Reveal(expanded) { ExerciseEditor(entry, unit, onEdit) { onRemoveSet(key, it) } }
+        // Alternatives (A/B): same card, each with its own sets; the training picks one of them. An added or removed
+        // alternative grows in or shrinks away.
+        AnimatedItems(entry.alternatives, key = { it.key }) { _, alt ->
+            Column {
                 Spacer(Modifier.height(Space.s))
                 Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).testTag("alternative:${alt.exercise.id}"), verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.width(20.dp + Space.s))
@@ -574,7 +700,7 @@ private fun ExerciseBlock(
                         ),
                     )
                 }
-                if (expanded) ExerciseEditor(alt, unit, onEdit) { onRemoveSet(alt.key, it) }
+                Reveal(expanded) { ExerciseEditor(alt, unit, onEdit) { onRemoveSet(alt.key, it) } }
             }
         }
     }
@@ -588,8 +714,10 @@ private fun ExerciseCaption(entry: DraftExercise, unit: WeightUnit, language: La
     Column(modifier) {
         Text(entry.exercise.name, style = Theme.type.label, maxLines = 2)
         val rest = entry.rest.toIntOrNull()?.let { t.restSummary(Numbers.formatDuration(it)) }
-        Text(listOfNotNull(t.setCount(entry.sets.size), rest).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
-        last?.sets?.takeIf { it.isNotEmpty() }?.let { sets ->
+        // Only the digits that change roll (a set added, the rest time typed).
+        RollingText(listOfNotNull(t.setCount(entry.sets.size), rest).joinToString(" · "), style = Theme.type.caption, tone = Tone.Muted)
+        // Loaded with the workout; for an exercise added later the line grows in once it is known.
+        RevealNotNull(last?.sets?.takeIf { it.isNotEmpty() }) { sets ->
             Text(t.lastTime(WorkoutFormat.lastTime(sets, type, unit, language, t)), style = Theme.type.caption, tone = Tone.Muted, maxLines = 2)
         }
     }
@@ -606,23 +734,26 @@ private fun ExerciseEditor(
     val t = LocalStrings.current
     val key = entry.key
     val type = entry.exercise.trackingType
-    Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+    val haptics = rememberHaptics()
+    // No spacing of its own: a set row brings its gap along (AnimatedItems), so nothing jumps when it comes or goes.
+    Column(Modifier.padding(top = Space.xs)) {
         SetColumnsHeader(t.setColumn, setColumnLabels(type, unit, t))
+        Spacer(Modifier.height(Space.xs))
         val focus = remember { mutableMapOf<Any, FocusRequester>() }
         fun focusOf(id: Any) = focus.getOrPut(id) { FocusRequester() }
-        entry.sets.forEachIndexed { i, set ->
-            androidx.compose.runtime.key(set.key) {
-                SetRow(
-                    i + 1, type, unit, set,
-                    onChange = { transform -> onEdit { it.updateSet(key, set.key, transform) } },
-                    focusRequester = focusOf(set.key),
-                    next = entry.sets.getOrNull(i + 1)?.let { focusOf(it.key) },
-                ) {
-                    onRemoveSet(set.key)
-                }
+        // A new set grows in, a deleted one shrinks away; the rows below slide.
+        AnimatedItems(entry.sets, key = { it.key }, spacing = Space.xs) { i, set ->
+            SetRow(
+                i + 1, type, unit, set,
+                onChange = { transform -> onEdit { it.updateSet(key, set.key, transform) } },
+                focusRequester = focusOf(set.key),
+                next = entry.sets.getOrNull(i + 1)?.let { focusOf(it.key) },
+            ) {
+                onRemoveSet(set.key)
             }
         }
-        BlockButton(t.addSet, { onEdit { it.addSet(key) } }, inBlock = true)
+        BlockButton(t.addSet, { haptics.tick(); onEdit { it.addSet(key) } }, inBlock = true)
+        Spacer(Modifier.height(Space.xs))
         // Rest time and note each on their own line: the note gets the full width (3 lines) instead of a narrow column.
         Column(Modifier.fillMaxWidth().padding(top = Space.xs)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

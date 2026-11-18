@@ -11,8 +11,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import app.overfit.ai.KeyValidation
 import app.overfit.ai.LlmProvider
@@ -20,7 +18,11 @@ import app.overfit.i18n.LocalFuelStrings
 import app.overfit.ai.ProviderId
 import app.overfit.ai.Providers
 import app.overfit.i18n.LocalStrings
-import app.overfit.ui.components.Hairline
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.KeyInput
 import app.overfit.ui.components.LineIcon
@@ -51,7 +53,7 @@ fun ConnectAiScreen(
 ) {
     val t = LocalStrings.current
     val scope = rememberCoroutineScope()
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberHaptics()
     val uriHandler = LocalUriHandler.current
     var providerId by rememberSaveable { mutableStateOf(initialProvider) }
     var key by remember { mutableStateOf("") }
@@ -71,10 +73,10 @@ fun ConnectAiScreen(
                 KeyValidation.NETWORK -> Status.NETWORK
             }
             if (status == Status.OK) {
-                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                haptics.confirm()
                 onConnected(providerId, trimmed)
             } else {
-                haptics.performHapticFeedback(HapticFeedbackType.Reject)
+                haptics.reject()
             }
         }
     }
@@ -83,13 +85,16 @@ fun ConnectAiScreen(
         scroll = true,
         header = header,
         footer = {
-            if (fuelSelected) {
-                PrimaryButton(label = fuelStrings.aiFuelOpen, onClick = { onUseFuel?.invoke() })
-            } else PrimaryButton(
-                label = if (status == Status.OK) t.aiConnected else t.aiConnect,
-                onClick = connect,
-                enabled = trimmed.isNotEmpty(),
-                loading = status == Status.CHECKING,
+            // One button whose label fades over (Fuel / connect / connected) instead of two swapped instances.
+            PrimaryButton(
+                label = when {
+                    fuelSelected -> fuelStrings.aiFuelOpen
+                    status == Status.OK -> t.aiConnected
+                    else -> t.aiConnect
+                },
+                onClick = { if (fuelSelected) onUseFuel?.invoke() else connect() },
+                enabled = fuelSelected || trimmed.isNotEmpty(),
+                loading = !fuelSelected && status == Status.CHECKING,
             )
             if (onSkip != null) {
                 SmallButton(t.aiLater, onSkip, Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally))
@@ -107,34 +112,44 @@ fun ConnectAiScreen(
                 ListRow(
                     label = p.label,
                     tone = if (active) Tone.Default else Tone.Muted,
-                    onClick = { providerId = p.id; status = Status.IDLE },
-                    trailing = if (active) ({ LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.action) }) else null,
+                    onClick = {
+                        if (p.id != providerId) haptics.tick()
+                        providerId = p.id; status = Status.IDLE
+                    },
+                    // The check fades and scales over to the chosen row instead of jumping.
+                    trailing = { Appear(active) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.action) } },
                 )
             }
         }
 
         Spacer(Modifier.height(Space.l))
-        if (fuelSelected) {
-            Text(fuelStrings.aiFuelDescription, tone = Tone.Muted)
-        } else KeyInput(
-            value = key,
-            onValueChange = { key = it; if (status != Status.CHECKING) status = Status.IDLE },
-            placeholder = "${t.aiKeyPlaceholder} (${provider.keyPlaceholder})",
-            onDone = connect,
-        )
+        Swap(fuelSelected) { fuel ->
+            if (fuel) {
+                Text(fuelStrings.aiFuelDescription, tone = Tone.Muted)
+            } else KeyInput(
+                value = key,
+                onValueChange = { key = it; if (status != Status.CHECKING) status = Status.IDLE },
+                placeholder = "${t.aiKeyPlaceholder} (${provider.keyPlaceholder})",
+                onDone = connect,
+            )
+        }
         val message = when (status) {
             Status.INVALID -> t.aiInvalid
             Status.NETWORK -> t.aiNetwork
             else -> null
         }
-        if (message != null) {
-            Spacer(Modifier.height(Space.m))
-            Text(message, style = Theme.type.caption)
+        RevealNotNull(message) { m ->
+            Column {
+                Spacer(Modifier.height(Space.m))
+                Text(m, style = Theme.type.caption)
+            }
         }
 
-        if (!fuelSelected) {
-            Spacer(Modifier.height(Space.l))
-            SmallButton(t.aiHowTo, { uriHandler.openUri(provider.keyUrl) }, tone = Tone.Default)
+        Reveal(!fuelSelected) {
+            Column {
+                Spacer(Modifier.height(Space.l))
+                SmallButton(t.aiHowTo, { uriHandler.openUri(provider.keyUrl) }, tone = Tone.Default)
+            }
         }
         Spacer(Modifier.height(Space.l))
         Text(t.aiPrivacy, style = Theme.type.caption, tone = Tone.Muted)

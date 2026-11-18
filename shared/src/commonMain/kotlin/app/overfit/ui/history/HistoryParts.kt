@@ -28,7 +28,17 @@ import app.overfit.data.WorkoutPhoto
 import app.overfit.domain.Language
 import app.overfit.domain.Numbers
 import app.overfit.domain.WeightUnit
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import app.overfit.ui.components.Icon
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.motionColor
+import app.overfit.ui.components.pressScale
+import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.components.LineIcon
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.Tone
@@ -102,24 +112,44 @@ internal fun PhotoThumb(
     }
 }
 
-/** Feeling 1-5 as five boxes; the selected one is inverted, tapping it again clears the choice. */
+/**
+ * Feeling 1-5 as five boxes; the selected one is inverted, tapping it again clears the choice. Fill and digit follow
+ * the choice softly, each box gives way under the finger. [showMeaning] writes the chosen value under the boxes
+ * ("Gefühl 4 von 5"), so the scale is readable without a screen reader.
+ */
 @Composable
-internal fun FeelingPicker(value: Int?, label: (Int) -> String, onChange: (Int?) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Space.s)) {
-        (1..5).forEach { n ->
-            val active = value == n
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .background(if (active) Theme.colors.inverseBackground else Theme.colors.surfacePressed, RoundedCornerShape(8.dp))
-                    .semantics { selected = active; contentDescription = label(n) }
-                    .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.RadioButton) {
-                        onChange(if (active) null else n)
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(n.toString(), style = Theme.type.label, tone = if (active) Tone.Inverse else Tone.Muted)
+internal fun FeelingPicker(value: Int?, label: (Int) -> String, showMeaning: Boolean = false, onChange: (Int?) -> Unit) {
+    val haptics = rememberHaptics()
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Space.s)) {
+            (1..5).forEach { n ->
+                val active = value == n
+                val interaction = remember { MutableInteractionSource() }
+                val fill = motionColor(if (active) Theme.colors.inverseBackground else Theme.colors.surfacePressed, "feelingFill")
+                val digit = motionColor(if (active) Theme.colors.inverseForeground else Theme.colors.muted, "feelingDigit")
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .pressScale(interaction)
+                        .drawBehind { drawRoundRect(fill.value, cornerRadius = CornerRadius(8.dp.toPx())) }
+                        .semantics { selected = active; contentDescription = label(n) }
+                        .clickable(interaction, indication = null, role = Role.RadioButton) {
+                            haptics.tick()
+                            onChange(if (active) null else n)
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BasicText(n.toString(), style = Theme.type.label, color = { digit.value })
+                }
+            }
+        }
+        if (showMeaning) {
+            // Visible twin of the boxes' screen-reader text; hidden from it, the selected box already says it.
+            RevealNotNull(value) { v ->
+                Swap(v, Modifier.fillMaxWidth().clearAndSetSemantics { }) { shown ->
+                    Text(label(shown), Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+                }
             }
         }
     }

@@ -1,15 +1,10 @@
 package app.overfit.ui.muscles
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -25,23 +19,23 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -53,8 +47,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import app.overfit.data.KeyValueStore
 import app.overfit.domain.Muscle
 import app.overfit.domain.MuscleLoad
@@ -62,12 +54,15 @@ import app.overfit.domain.MuscleMap
 import app.overfit.domain.MusclePeriod
 import app.overfit.domain.MuscleSetRow
 import app.overfit.i18n.LocalStrings
+import app.overfit.ui.components.BottomSheet
 import app.overfit.ui.components.Chip
-import app.overfit.ui.components.HeaderIconButton
-import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LocalInPanel
+import app.overfit.ui.components.Swap
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.Tone
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.LocalReducedMotion
+import app.overfit.ui.theme.Motion
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.datetime.DayOfWeek
@@ -154,6 +149,7 @@ private fun BodyShape.path(layout: BodyLayout, back: Boolean): Path {
 /**
  * Front and back figure, each muscle region shaded by [levels] (missing = untrained). With [onSelect] a tap on a
  * region selects it (again = deselect); the others then fade a little so the selection stands out without an outline.
+ * New levels (another period) and a new selection blend over softly: one value each, read while drawing.
  */
 @Composable
 fun BodyMap(
@@ -166,17 +162,44 @@ fun BodyMap(
     val m = LocalStrings.current.muscles
     val base = if (LocalInPanel.current) Theme.colors.surface else Theme.colors.surfacePressed
     val labelHeight = 20.dp
+    val haptics = rememberHaptics()
+    val reduced = LocalReducedMotion.current
+    // Levels and selection blend from the last shown state to the new one; the canvas reads the progress.
+    val levelsShown = remember { arrayOf(levels, levels) }
+    val levelBlend = remember { Animatable(1f) }
+    LaunchedEffect(levels) {
+        if (levels == levelsShown[1]) return@LaunchedEffect
+        levelsShown[0] = levelsShown[1]; levelsShown[1] = levels
+        levelBlend.snapTo(0f)
+        if (reduced) levelBlend.snapTo(1f) else levelBlend.animateTo(1f, Motion.smooth())
+    }
+    val selectionShown = remember { arrayOf(selected, selected) }
+    val selectionBlend = remember { Animatable(1f) }
+    LaunchedEffect(selected) {
+        if (selected == selectionShown[1]) return@LaunchedEffect
+        selectionShown[0] = selectionShown[1]; selectionShown[1] = selected
+        selectionBlend.snapTo(0f)
+        if (reduced) selectionBlend.snapTo(1f) else selectionBlend.animateTo(1f, Motion.snappy())
+    }
     BoxWithConstraints(modifier) {
         val density = LocalDensity.current
         val size = with(density) { Size(maxWidth.toPx(), (maxHeight - labelHeight).toPx().coerceAtLeast(1f)) }
         val layout = remember(size) { BodyLayout(size) }
+        // Paths only change with the size, not per frame.
+        val paths = remember(layout) {
+            listOf(false to BodyShapes.front, true to BodyShapes.back).flatMap { (back, shapes) ->
+                shapes.map { it.muscle to it.path(layout, back) }
+            }
+        }
         // Latest selection/callback without restarting the gesture detector on every recomposition.
-        val current by androidx.compose.runtime.rememberUpdatedState(selected)
-        val select by androidx.compose.runtime.rememberUpdatedState(onSelect)
+        val current by rememberUpdatedState(selected)
+        val select by rememberUpdatedState(onSelect)
         val tap = if (onSelect == null) Modifier else Modifier.pointerInput(layout) {
             detectTapGestures { c ->
                 val (back, p) = layout.toFigure(c)
                 val hit = BodyShapes.hit(if (back) BodyShapes.back else BodyShapes.front, p)
+                // A tick when a muscle is picked; a tap into the empty area only clears, silently.
+                if (hit != null && hit != current) haptics.tick()
                 select?.invoke(if (hit == current) null else hit)
             }
         }
@@ -184,13 +207,19 @@ fun BodyMap(
             Modifier.fillMaxWidth().height(maxHeight - labelHeight).testTag("body-map")
                 .semantics { contentDescription = description }.then(tap),
         ) {
-            listOf(false to BodyShapes.front, true to BodyShapes.back).forEach { (back, shapes) ->
-                shapes.forEach { shape ->
-                    val muscle = shape.muscle
-                    val color = if (muscle == null) base else LevelColors[levels[muscle] ?: 0]
-                    val faded = selected != null && muscle != selected
-                    drawPath(shape.path(layout, back), color, alpha = if (faded) 0.45f else 1f)
-                }
+            val lt = levelBlend.value
+            val st = selectionBlend.value
+            val fromLevels = levelsShown[0]
+            val toLevels = levelsShown[1]
+            val fromSel = selectionShown[0]
+            val toSel = selectionShown[1]
+            fun alphaOf(sel: Muscle?, muscle: Muscle?) = if (sel != null && muscle != sel) FADED else 1f
+            paths.forEach { (muscle, path) ->
+                val color = if (muscle == null) base else lerp(
+                    LevelColors[fromLevels[muscle] ?: 0], LevelColors[toLevels[muscle] ?: 0], lt,
+                )
+                val a0 = alphaOf(fromSel, muscle)
+                drawPath(path, color, alpha = a0 + (alphaOf(toSel, muscle) - a0) * st)
             }
         }
         // Labels under each figure.
@@ -208,6 +237,9 @@ fun BodyMap(
     }
 }
 
+/** Alpha of the muscles that are not selected while one is. */
+private const val FADED = 0.45f
+
 /** "Viel ▬▬▬▬▬ Wenig": the five shades, brightest first. */
 @Composable
 fun MuscleLegend(modifier: Modifier = Modifier) {
@@ -223,11 +255,20 @@ fun MuscleLegend(modifier: Modifier = Modifier) {
     }
 }
 
-/** Figure, legend and the line for the tapped muscle; shared by the calendar sheet and the training detail. */
+/**
+ * Figure, legend and the line for the tapped muscle; shared by the calendar sheet and the training detail.
+ * [resetKey] (the period) clears the selection when it changes; the figure itself stays and blends to the new shades.
+ */
 @Composable
-fun MuscleMapBody(loads: Map<Muscle, MuscleLoad>, figureHeight: Dp, modifier: Modifier = Modifier, emptyText: String? = null) {
+fun MuscleMapBody(
+    loads: Map<Muscle, MuscleLoad>,
+    figureHeight: Dp,
+    modifier: Modifier = Modifier,
+    emptyText: String? = null,
+    resetKey: Any? = null,
+) {
     val m = LocalStrings.current.muscles
-    var selected by remember { mutableStateOf<Muscle?>(null) }
+    var selected by remember(resetKey) { mutableStateOf<Muscle?>(null) }
     val levels = remember(loads) { MuscleMap.levels(loads) }
     val trained = remember(loads) {
         loads.filterValues { it.score > 0 }.entries.sortedByDescending { it.value.score }.map { m.muscle(it.key) }
@@ -243,22 +284,22 @@ fun MuscleMapBody(loads: Map<Muscle, MuscleLoad>, figureHeight: Dp, modifier: Mo
         Spacer(Modifier.height(Space.m))
         MuscleLegend()
         Spacer(Modifier.height(Space.s))
-        val s = selected
-        val line = if (s == null) (if (loads.isEmpty() && emptyText != null) emptyText else m.tapHint) else (loads[s] ?: MuscleLoad()).let { m.load(m.muscle(s), it.primary, it.secondary) }
-        Text(
-            line,
-            Modifier.fillMaxWidth().testTag("muscle-line"),
-            style = if (s == null) Theme.type.caption else Theme.type.body,
-            tone = if (s == null) Tone.Muted else Tone.Default,
-            align = androidx.compose.ui.text.style.TextAlign.Center,
-        )
+        // Hint <-> sets of the tapped muscle: cross-fade on a fixed minimum height, so the sheet does not twitch.
+        val lineHeight = with(LocalDensity.current) { Theme.type.body.lineHeight.toDp() }
+        Swap(selected, Modifier.fillMaxWidth().heightIn(min = lineHeight), contentAlignment = Alignment.TopCenter) { s ->
+            val line = if (s == null) (if (loads.isEmpty() && emptyText != null) emptyText else m.tapHint) else (loads[s] ?: MuscleLoad()).let { m.load(m.muscle(s), it.primary, it.secondary) }
+            Text(
+                line,
+                Modifier.fillMaxWidth().testTag("muscle-line"),
+                style = if (s == null) Theme.type.caption else Theme.type.body,
+                tone = if (s == null) Tone.Muted else Tone.Default,
+                align = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
     }
 }
 
-/**
- * Content of the calendar's muscle sheet: title with close button, period chips, the figure for that period.
- * [rows] null = still loading.
- */
+/** Content of the calendar's muscle sheet: title, period chips, the figure for that period. [rows] null = still loading. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MuscleMapSheetContent(
@@ -267,59 +308,29 @@ fun MuscleMapSheetContent(
     today: LocalDate,
     weekStart: DayOfWeek,
     onPeriod: (MusclePeriod) -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val m = LocalStrings.current.muscles
     val loads = remember(rows, period, today, weekStart) {
         rows?.let { MuscleMap.forPeriod(it, period, today, weekStart) }
     }
-    var dragged by remember { mutableFloatStateOf(0f) }
-    val closeAfter = with(LocalDensity.current) { 96.dp.toPx() }
-    Column(
-        modifier
-            .fillMaxWidth()
-            .offset { IntOffset(0, dragged.coerceAtLeast(0f).roundToInt()) }
-            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(Theme.colors.surface)
-            // Swallows taps on the sheet so only the dimmed area above closes it.
-            .pointerInput(Unit) { detectTapGestures { } }
-            .testTag("muscle-sheet"),
-    ) {
-        // Handle + title: dragging down closes the sheet.
-        Column(
-            Modifier.fillMaxWidth().draggable(
-                rememberDraggableState { dragged += it },
-                Orientation.Vertical,
-                onDragStopped = { if (dragged > closeAfter) onClose() else dragged = 0f },
-            ),
-        ) {
-            Box(
-                Modifier.padding(top = Space.s).size(36.dp, 4.dp).align(Alignment.CenterHorizontally)
-                    .background(Theme.colors.faint, RoundedCornerShape(2.dp)),
-            )
-            Row(
-                Modifier.fillMaxWidth().padding(start = Space.l, end = Space.s, top = Space.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    m.title,
-                    Modifier.weight(1f).semantics { heading() },
-                    style = Theme.type.label.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
-                )
-                HeaderIconButton(Icon.Close, m.close, onClose)
+    Column(Modifier.fillMaxWidth().padding(start = Space.s, end = Space.s, bottom = Space.s)) {
+        Text(
+            m.title,
+            Modifier.fillMaxWidth().padding(bottom = Space.s).semantics { heading() },
+            style = Theme.type.label.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+        )
+        CompositionLocalProvider(LocalInPanel provides true) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                MusclePeriod.entries.forEach { p -> Chip(m.period(p), p == period, onClick = { onPeriod(p) }) }
             }
         }
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(start = Space.l, end = Space.l, bottom = Space.l)) {
-            CompositionLocalProvider(LocalInPanel provides true) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-                    MusclePeriod.entries.forEach { p -> Chip(m.period(p), p == period, onClick = { onPeriod(p) }) }
-                }
-            }
-            Spacer(Modifier.height(Space.m))
-            if (loads != null) {
+        Spacer(Modifier.height(Space.m))
+        // Loading -> figure: fades in on the reserved height instead of popping.
+        Swap(loads != null, Modifier.fillMaxWidth()) { loaded ->
+            val shown = loads
+            if (loaded && shown != null) {
                 // A new period starts without a selection; "nothing yet" replaces the tap hint (no layout jump).
-                androidx.compose.runtime.key(period) { MuscleMapBody(loads, figureHeight = 320.dp, emptyText = m.emptyPeriod(period)) }
+                MuscleMapBody(shown, figureHeight = 320.dp, emptyText = m.emptyPeriod(period), resetKey = period)
             } else {
                 Spacer(Modifier.height(360.dp))
             }
@@ -327,7 +338,10 @@ fun MuscleMapSheetContent(
     }
 }
 
-/** The calendar's muscle sheet: slides up from the bottom; back, a tap above it, ✕ or dragging it down closes it. */
+/**
+ * The calendar's muscle sheet on the shared [BottomSheet]: springs up, follows the finger, closes on a pull down,
+ * back or a tap on the dimmed area. [onDismiss] runs once the sheet has slid out, so the caller may drop it then.
+ */
 @Composable
 fun MuscleMapSheet(
     rows: List<MuscleSetRow>?,
@@ -337,16 +351,12 @@ fun MuscleMapSheet(
     onPeriod: (MusclePeriod) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        val shown = remember { MutableTransitionState(false).apply { targetState = true } }
-        BoxWithConstraints(
-            Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } },
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            val maxSheet = maxHeight * 0.92f
-            AnimatedVisibility(shown, enter = slideInVertically { it }) {
-                MuscleMapSheetContent(rows, period, today, weekStart, onPeriod, onDismiss, Modifier.heightIn(max = maxSheet))
-            }
-        }
+    val m = LocalStrings.current.muscles
+    var open by remember { mutableStateOf(true) }
+    val dismiss by rememberUpdatedState(onDismiss)
+    BottomSheet(visible = open, onDismiss = { open = false }, closeLabel = m.close, modifier = Modifier.testTag("muscle-sheet")) {
+        // The sheet's content leaves the composition only after it has slid out: then the caller may remove it.
+        DisposableEffect(Unit) { onDispose { if (!open) dismiss() } }
+        MuscleMapSheetContent(rows, period, today, weekStart, onPeriod)
     }
 }

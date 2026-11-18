@@ -79,7 +79,7 @@ class ResumeTapTest {
         compose.setContent { OverfitApp(deps) }
         compose.waitUntil(10_000) { shown("Push") }
         compose.onNodeWithText("Push").performClick()
-        compose.waitUntil(10_000) { shown("Starten") }
+        compose.waitForPlanLoaded()
         compose.onNodeWithText("Starten").performClick()
         compose.waitUntil(10_000) { shown("0/2 erledigt") }
     }

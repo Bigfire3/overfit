@@ -8,12 +8,64 @@
 | 2 | Workout-Modus, Pausentimer | erledigt |
 | 4 | KI-Coach | erledigt (Session G): Auswertung, Plan-Diff, Gedächtnis, Fortschritt, Warteschlange, Demo |
 | 3 | Beenden-Flow, Foto, Verlauf, Backup | erledigt (Session F) |
-| 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); UI/UX-Audit mit Design-Skills (12.11.); Feinschliff laufend |
+| 5 | Feinschliff | Gesamttest „Ein Tag mit Overfit“ (Robolectric) und Morgen-Testliste fertig (Session I); UI/UX-Audit mit Design-Skills (12.11.); Bewegung/Animationen überall (16.11.); Feinschliff laufend |
 | 6 | Store-Release (App Store, Play Store) | offen |
 | 7 | Credits-System (Coach-Guthaben) | Backend + API-Vertrag fertig; App-Anbindung (Guthaben, Demo) fertig; Modelle Gemini, Claude, Workers AI über AI Gateway (Session X), echte Modellnamen und volle Kostentransparenz (Session Y); Web-Kauf mit Guthaben-Codes im Testmodus (Session Z, seit Session AB über Stripe, Web 1:1, Store-Aufpreis offen, Aufschlag 28 %); Store-Kauf und echter Web-Kauf offen (braucht Konten, Rechtstexte) |
 | 8 | Trainings teilen (Link, Share-Sheet, QR, Import) | erledigt (Vorlagen: Session B, abgeschlossene Trainings: Session F) |
 | 9 | ~~Einladen per QR mit Startguthaben~~ | entfernt (7.11.2026, Fabian): kein Empfehlungsprogramm, kein Startguthaben, Guthaben verfällt nie; aus App, Backend, Webseite und Doku entfernt |
 | 10 | KI-Chat-Verbindungen (Claude, ChatGPT, Gemini per MCP) | 10a Backend + Konzept fertig (Nacht 3.11.), 10b App-Seite fertig (Session H, ohne Foto-Upload und Coach-Gedächtnis – kommen nach Phase 3/4); Deployment des Backends offen |
+
+## Bewegung: Animationen überall, Workout-Dock, „Jetzt“-Farbe (Session BL, 16./17.11.)
+**Erledigt:**
+- **Nichts springt mehr.** Ein Bewegungssystem für die ganze App (`Motion.kt`, `MotionKit.kt`, DESIGN.md „Motion“): Federn statt
+  fester Zeiten, alles in höchstens ~0,3 s, Eingabe wird nie gesperrt. Knöpfe, Chips, Schalter, Segmente, Sheets, Menüs und Listen
+  folgen weich; ein schneller Tipp gibt immer sichtbar Rückmeldung.
+- **Screens haben Orte.** Tiefer = von der Seite, zurück = dorthin zurück, und die Zurück-Geste führt den Screen mit dem Finger.
+  Das Training steigt von unten und sinkt in die Mini-Leiste. Die Tab-Leiste wandert mit ihrem Screen, ihre graue Marke gleitet.
+- **Workout-Modus neu aufgeteilt.** „Pause groß anzeigen“ ist weg. Stattdessen eine Pausen-Insel: Countdown groß in Gelb, −15, +15,
+  Überspringen; sie füllt sich, wie die Pause vergeht. Der Hauptknopf sagt, welchen Satz er loggt. Abhaken breitet sich grün aus.
+  Fertige Übung klappt zu, die Liste rückt weiter. „Duplizieren“ entfällt (tat dasselbe wie „Satz hinzufügen“).
+- **Eine neue Farbe: Kreidegelb = „läuft gerade jetzt“** (Pausen-Countdown, der Satz, der dran ist). Grün bleibt „erledigt“, Rot „löschen“.
+- **Platz:** Abschluss zeigt die vier Kennzahlen als Kacheln (halbe Höhe), im Trainingsdetail stehen die Übungen oben, im Kalender
+  scrollen Gewichtskarte und Statistik weg, Kopfzeile im Training ist eine Zeile.
+- **Alle Bereiche** (Workouts, Editor, Übungen, Kalender, Tag, Abschluss, Verlauf, Coach, Chat, Profil, Guthaben, Teilen): Inhalte,
+  Hinweise, Lade- und Leerzustände kommen und gehen weich.
+- **Vorschläge zur Bedienung:** `docs/VORSCHLAEGE.md`, 55 Stück, die zehn wirksamsten oben. Nicht umgesetzt, weil sie Verhalten oder
+  Daten ändern: deine Entscheidung.
+- Details und Begründungen: DECISIONS „Bewegung, ‚Jetzt‘-Farbe und Workout-Dock“. Bilder: `docs/screenshots/bewegung/vorher|nachher`.
+
+- **Gegencheck behoben (18.11.):** Sheet beim Schließen, Menü-Doppeltipp, abgebrochenes Wischen, Karten überdecken sich beim
+  Aufklappen nicht mehr, Tastatur ruckelt nicht, abgeschnittene Kacheln/Guthaben/Knopfzeile, Pausen-Insel über 10:00, Kalender ohne
+  Lade-Animation bei jedem Öffnen, iOS-UI-Test (Doppeltipp im Testmodus 30 s scharf). Details: DECISIONS „iOS-UI-Tests …(18.11.)“.
+
+**Offen:**
+- Auf einem Gerät prüfen (im Test nicht sichtbar): Abstände an der Tab-Leiste und über der Tastatur (Punkt 12), Gefühl der Zurück-Geste.
+- Nach „Zurück“ zu einem Tab nimmt die Tab-Leiste die ersten 0,3 s keinen Tipp an (bewusst, sonst trifft man den Knopf des gehenden Screens).
+- Sheets liegen weiter innerhalb ihres Screens: über einem Tab-Screen bleibt die Tab-Leiste sichtbar.
+- Foto antippen → Vollbild wächst noch nicht aus der Kachel heraus (Vorschlag 29).
+
+### Bitte auf dem Handy testen (Bewegung)
+1. Workouts → ein Workout antippen: Der Screen kommt von rechts, der alte rückt nach links und wird dunkler. Vom linken Rand
+   langsam wischen: Der Screen folgt dem Finger; früh loslassen → er kommt zurück, weit ziehen → er geht.
+2. Tab wechseln: Die graue Marke in der Tab-Leiste gleitet zum neuen Tab.
+3. Training starten: Es steigt von unten. ⌄ oben links (oder Kopfzeile nach unten ziehen): Es sinkt in die Mini-Leiste über den Tabs.
+   Mini-Leiste antippen: Es steigt wieder.
+4. Satz abhaken: Das Grün breitet sich vom Haken über die Zeile aus. Die Pausen-Insel erscheint über dem Hauptknopf: gelber
+   Countdown, Ziffern rollen, die Insel füllt sich von links. „−15“, „+15“, „Überspringen“ ausprobieren. Tipp auf den Countdown
+   scrollt zum nächsten Satz.
+5. Hauptknopf: Unter „Nächsten Satz loggen“ steht, welcher Satz das ist. Dieser Satz hat in der Liste eine gelbe Nummer.
+6. Letzten Satz einer Übung abhaken: Die Übung klappt zu, die Liste rückt zur nächsten. Tipp auf den Kopf klappt sie wieder auf.
+7. In ein Gewichtsfeld tippen: Der Hauptknopf weicht der Tastatur, die Pausen-Insel bleibt.
+8. Satz nach links wischen: Er folgt dem Finger, ab knapp der Hälfte spürst du einen Tick, loslassen löscht; „Rückgängig“ erscheint weich.
+   Übung lange drücken und ziehen: Die Karte hebt sich und gleitet beim Loslassen an ihren Platz.
+9. ⋮ einer Übung → „Entfernen“: erster Tipp färbt rot, erst der zweite entfernt.
+10. Alle Sätze erledigen → „Training beenden“ (grün, Doppeltipp): Die Kennzahlen stehen als vier Kacheln da und zählen hoch.
+11. Kalender → Muskel-Icon: Das Sheet federt herein und lässt sich nach unten wegziehen. Profil: Schalter und „kg / lb“ gleiten.
+12. Über der Tab-Leiste ist kein leerer Streifen. Coach-Tab, ins Textfeld tippen: Das Feld sitzt direkt auf der Tastatur.
+13. Übung auf- und zuklappen, Satz hinzufügen: Die Karten darunter rücken mit, nichts überlappt. Pause auf über 10:00 drücken
+    (mehrmals „+15“): Die Knöpfe bleiben, wo sie sind. Neues Workout: Name tippen, „Speichern“ bleibt über der Tastatur.
+14. Android: Entwickleroptionen → Animationen aus. iPhone: Bedienungshilfen → Bewegung → „Bewegung reduzieren“. Die App schaltet
+    dann hart bzw. blendet nur über, nichts hängt.
 
 ## Einheitlich: Größen, Kopfzeilen, Menüs (UI-Audit, 12.11.)
 **Erledigt:** Alle Icons in vier Größen (`IconSize`), alles Tippbare mindestens 48 dp (`TouchTarget`), Chips 40 dp als Pille, runde

@@ -94,7 +94,7 @@ class WorkoutFlowTest {
         // Training tab → open the saved workout → "Starten"
         waitFor("Push", substring = true)
         compose.onNodeWithText("Push", substring = true).performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         compose.onNodeWithText("Starten").performClick()
         waitFor("0/2 erledigt", substring = true)
         assertEquals(1, alerts.permissionRequests)
@@ -105,7 +105,10 @@ class WorkoutFlowTest {
         assertTrue(HapticPattern.Tick in haptics.played)
         val alert = requireNotNull(alerts.pending)
         assertEquals(60_000L, alert.endsAt - alert.startedAt)
-        compose.onNodeWithText("Nächste: Bench Press · Satz 2", substring = true).assertExists()
+        // What comes next stands in the main button ("Nächsten Satz loggen" / "Bench Press · Satz 2 · …") and the
+        // countdown names it for screen readers.
+        compose.onNodeWithText("Bench Press · Satz 2", substring = true).assertExists()
+        compose.onNode(hasContentDescription("Nächste: Bench Press · Satz 2", substring = true)).assertExists()
 
         // Skip the rest, log the last set with the footer button
         compose.onNodeWithText("Überspringen").performClick()
@@ -122,7 +125,7 @@ class WorkoutFlowTest {
         waitFor("Wie war das Training?")
         compose.waitUntilState(5_000) { runBlocking { data.workouts.status(id) } == SessionStatus.FINISHED }
         // The name field comes first, the note field second.
-        compose.waitUntil(5_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.waitForFinishLoaded(timeoutMillis = 20_000)
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("Stark heute")
         // "Sauna" checkbox: off by default, checked here.
         compose.onNodeWithText("Sauna").performScrollTo().assertIsOff().performClick()

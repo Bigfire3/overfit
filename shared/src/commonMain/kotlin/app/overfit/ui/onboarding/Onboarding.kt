@@ -34,6 +34,7 @@ import app.overfit.ui.components.Icon
 import app.overfit.ui.components.IconButton
 import app.overfit.ui.components.PrimaryButton
 import app.overfit.ui.components.Progress
+import app.overfit.ui.components.Reveal
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Segmented
 import app.overfit.ui.components.Text
@@ -52,7 +53,11 @@ fun OnboardingHeader(step: Int, onBack: (() -> Unit)?) {
             if (onBack != null && step > 1) IconButton(Icon.Back, LocalStrings.current.back, { onBack() })
         }
         Spacer(Modifier.height(Space.m))
-        Progress(step, ONBOARDING_STEPS)
+        // Each step is its own destination, so the header is new each time: start at the previous step and move
+        // to this one right away, so the step's segment fills while the screen comes in.
+        var shown by remember { mutableStateOf((step - 1).coerceAtLeast(0)) }
+        LaunchedEffect(step) { shown = step }
+        Progress(shown, ONBOARDING_STEPS)
     }
 }
 
@@ -116,7 +121,7 @@ fun AgeStep(birthYear: Int?, today: LocalDate, onBack: () -> Unit, onNext: (Int)
             modifier = Modifier.focusRequester(rememberAutoFocus()),
             onDone = next,
         )
-        if (input.length >= 2 && age == null) Hint(t.ageError)
+        Reveal(input.length >= 2 && age == null) { Hint(t.ageError) }
     }
 }
 
@@ -151,12 +156,14 @@ fun WeightStep(
             kg?.let { input = formatNumber(displayWeight(it, newUnit), language) }
             onUnitChange(newUnit)
         }
-        if (input.length >= 2 && kg == null) Hint(t.weightError)
+        Reveal(input.length >= 2 && kg == null) { Hint(t.weightError) }
     }
 }
 
 @Composable
 private fun Hint(text: String) {
-    Spacer(Modifier.height(Space.m))
-    Text(text, style = Theme.type.caption, tone = Tone.Muted)
+    Column {
+        Spacer(Modifier.height(Space.m))
+        Text(text, style = Theme.type.caption, tone = Tone.Muted)
+    }
 }

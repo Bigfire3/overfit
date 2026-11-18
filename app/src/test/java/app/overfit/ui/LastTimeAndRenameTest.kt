@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasAnySibling
+import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.performScrollToNode
@@ -122,7 +123,9 @@ class LastTimeAndRenameTest {
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
         waitFor("Starten")
         waitFor(first)
-        val firstCaption = hasText("Letztes Mal: 62,5 kg × 8, 65 × 6") and hasAnySibling(hasText(first))
+        // The line can grow in (an exercise added later), so it sits in a wrapper of its own: that wrapper is what
+        // stands next to the name.
+        val firstCaption = hasText("Letztes Mal: 62,5 kg × 8, 65 × 6") and hasParent(hasAnySibling(hasText(first)))
         compose.waitUntil(20_000) { compose.onAllNodes(firstCaption, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         shot("workout-letzte-werte")
         // The second exercise was not trained yet: no "last time" line on its card.
@@ -139,8 +142,12 @@ class LastTimeAndRenameTest {
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performClick()
         compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("Training bearbeiten").fetchSemanticsNodes().isNotEmpty() }
+        // The pencil is there from the first frame; the name (tap = rename) only once the training is loaded and the
+        // day screen has slid away: wait for exactly that one tappable name.
+        val tappableName = hasText("Push") and hasClickAction()
+        compose.waitUntilState { compose.onAllNodes(tappableName).fetchSemanticsNodes().size == 1 }
         shot("training-detail")
-        compose.onNode(hasText("Push") and hasClickAction()).performClick()
+        compose.onNode(tappableName).performClick()
         waitFor("Statistiken und Bestwerte", substring = true)
         compose.onNode(hasSetTextAction() and hasText("Push")).performTextReplacement("Brust Montag")
         shot("training-umbenennen")

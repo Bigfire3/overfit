@@ -1,5 +1,6 @@
 package app.overfit.ui.coach
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +62,13 @@ import app.overfit.ui.fuel.formatRequestCost
 import app.overfit.ui.fuel.purposeLabel
 import app.overfit.ui.fuel.rememberLoaded
 import app.overfit.ui.fuel.reservedNote
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealInRow
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import app.overfit.ui.components.ChipShape
@@ -80,11 +89,21 @@ private const val RECENT_REQUESTS = 5
 fun CreditChip(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val demo by session.demo.collectAsStateWithLifecycle()
     val service = remember(demo) { session.current() }
-    if (service == null || !(fuelActive || demo)) return
+    val visible = service != null && (fuelActive || demo)
+    // Switching the AI access: the chip grows in and shrinks away sideways; while it goes it keeps its last service.
+    val last = remember { Holder<app.overfit.fuel.FuelService>() }
+    if (visible) last.v = service
+    RevealInRow(visible, modifier) { last.v?.let { CreditChipPill(it, onClick) } }
+}
+
+@Composable
+private fun CreditChipPill(service: app.overfit.fuel.FuelService, onClick: () -> Unit) {
     val f = LocalFuelStrings.current
     val language = f.language
     val s = coachSettingsStringsFor(language)
-    val (account, _) = rememberLoaded(service) { service.account() }
+    val (loaded, _) = rememberLoaded(service) { service.account() }
+    // A reload keeps the old amount standing until the new one rolls in.
+    val account = keepReady(loaded)
     val text = when (val a = account) {
         is Loaded.Ready -> formatEuro(a.value.balanceMicro, language)
         is Loaded.Failed -> "– €"
@@ -94,21 +113,36 @@ fun CreditChip(session: FuelSession, fuelActive: Boolean, onClick: () -> Unit, m
     val reserved = (account as? Loaded.Ready)?.value?.let { reservedNote(it.reservedMicro, f) }
     val interaction = remember { MutableInteractionSource() }
     Box(
-        modifier
+        Modifier
             .pressScale(interaction)
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = s.creditChip(text) + (reserved?.let { " $it" } ?: "") }
             .testTag("coach:credit")
             // 48 dp to tap around the 40 dp pill, like every chip (UI audit 12.11.).
             .padding(vertical = (app.overfit.ui.theme.TouchTarget.min - app.overfit.ui.theme.Sizes.chip) / 2)
+            // The pill follows a wider or narrower amount instead of pushing the header icons in one frame.
+            .animateContentSize(Motion.smooth())
             .heightIn(min = app.overfit.ui.theme.Sizes.chip)
             .clip(ChipShape)
             .background(Theme.colors.surface)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = Theme.type.label)
+        // "…" → amount fades in; afterwards only the digits that change roll.
+        Swap(account is Loaded.Loading) { loading ->
+            if (loading) Text("…", style = Theme.type.label) else RollingText(text, style = Theme.type.label)
+        }
     }
+}
+
+private class Holder<T>(var v: T? = null)
+
+/** [loaded], but while it loads again after having been ready it stays at the last ready value. */
+@Composable
+private fun <T> keepReady(loaded: Loaded<T>): Loaded<T> {
+    val last = remember { Holder<Loaded.Ready<T>>() }
+    if (loaded is Loaded.Ready) last.v = loaded
+    return if (loaded is Loaded.Loading) last.v ?: loaded else loaded
 }
 
 /**
@@ -131,7 +165,17 @@ fun CreditPopupContent(
     val s = coachSettingsStringsFor(language)
     val demo by session.demo.collectAsStateWithLifecycle()
     val service = remember(demo) { session.current() }
-    val (account, reload) = rememberLoaded(service) { service?.account() }
+    val (loadedAccount, reload) = rememberLoaded(service) { service?.account() }
+    // Back from the purchase: the old balance stays until the new one rolls in (no fall back to "…").
+    val account = keepReady(loadedAccount)
+    val haptics = rememberHaptics()
+    val balanceMicro = ((account as? Loaded.Ready)?.value)?.balanceMicro
+    val lastBalance = remember { Holder<Long>() }
+    LaunchedEffect(balanceMicro) {
+        val before = lastBalance.v
+        if (balanceMicro != null && before != null && balanceMicro > before) haptics.confirm()
+        if (balanceMicro != null) lastBalance.v = balanceMicro
+    }
     val (config, _) = rememberLoaded(service) { service?.config() }
     // Back from the purchase page in the browser: show the new balance.
     var resumes by remember { mutableIntStateOf(0) }
@@ -141,7 +185,8 @@ fun CreditPopupContent(
     }
     val recent by remember(dao) { dao.observeRecent(RECENT_REQUESTS) }.collectAsStateWithLifecycle(null)
 
-    Column(modifier.fillMaxWidth().padding(Space.l)) {
+    // No own padding: the centred popup already pads its content.
+    Column(modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(s.creditTitle, Modifier.weight(1f), style = Theme.type.label, tone = Tone.Muted)
             val closeInteraction = remember { MutableInteractionSource() }
@@ -153,19 +198,24 @@ fun CreditPopupContent(
                 contentAlignment = Alignment.Center,
             ) { LineIcon(Icon.Close, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted) }
         }
-        when (val a = account) {
-            is Loaded.Ready -> {
-                Text(a.value?.let { formatEuro(it.balanceMicro, language) } ?: "–", Modifier.testTag("credit:balance"), style = Theme.type.title)
-                a.value?.let { reservedNote(it.reservedMicro, f) }?.let {
-                    Text(it, Modifier.testTag("credit:reserved"), style = Theme.type.caption, tone = Tone.Muted)
+        // First load fades in; a new balance rolls its changed digits.
+        Swap(account, Modifier.fillMaxWidth(), contentKey = { it::class }) { a ->
+            Column(Modifier.fillMaxWidth()) {
+                when (a) {
+                    is Loaded.Ready -> {
+                        RollingText(a.value?.let { formatEuro(it.balanceMicro, language) } ?: "–", Modifier.testTag("credit:balance"), style = Theme.type.title)
+                        RevealNotNull(a.value?.let { reservedNote(it.reservedMicro, f) }) {
+                            Text(it, Modifier.testTag("credit:reserved"), style = Theme.type.caption, tone = Tone.Muted)
+                        }
+                    }
+                    is Loaded.Failed -> {
+                        Text(f.unreachable, tone = Tone.Muted)
+                        Spacer(Modifier.height(Space.s))
+                        app.overfit.ui.components.SmallButton(f.retry, { reload() })
+                    }
+                    Loaded.Loading -> Text("…", style = Theme.type.title, tone = Tone.Muted)
                 }
             }
-            is Loaded.Failed -> {
-                Text(f.unreachable, tone = Tone.Muted)
-                Spacer(Modifier.height(Space.s))
-                app.overfit.ui.components.SmallButton(f.retry, { reload() })
-            }
-            Loaded.Loading -> Text("…", style = Theme.type.title, tone = Tone.Muted)
         }
         Text(if (demo) "${s.neverExpires} · ${f.fuelRowDemo}" else s.neverExpires, style = Theme.type.caption, tone = Tone.Muted)
 
@@ -180,10 +230,15 @@ fun CreditPopupContent(
         Spacer(Modifier.height(Space.xs))
         val r = requestLogStringsFor(language)
         val list = recent
-        when {
-            list == null -> Text(f.loading, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-            list.isEmpty() -> Text(s.billingEmpty, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-            else -> list.take(RECENT_REQUESTS).forEach { BillingLine(it, r, language) }
+        // Loading → empty or lines: fades over and the popup grows smoothly.
+        Swap(list, Modifier.fillMaxWidth(), contentKey = { when { it == null -> 0; it.isEmpty() -> 1; else -> 2 } }) { l ->
+            Column(Modifier.fillMaxWidth()) {
+                when {
+                    l == null -> Text(f.loading, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+                    l.isEmpty() -> Text(s.billingEmpty, Modifier.padding(vertical = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+                    else -> l.take(RECENT_REQUESTS).forEach { BillingLine(it, r, language) }
+                }
+            }
         }
         Row(
             Modifier.fillMaxWidth().pressableRow(onAllRequests).heightIn(min = 48.dp).testTag("credit:all-requests"),
@@ -221,8 +276,10 @@ private fun TopUp(
     val scope = rememberCoroutineScope()
     var opening by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    val haptics = rememberHaptics()
     val amounts = config!!.webPurchase.packages.map { it.creditMicro }.ifEmpty { DEFAULT_TOP_UPS }
-    PopupPill(s.topUpOpen, Modifier.fillMaxWidth().testTag("credit:topup")) {
+    // While the purchase link is fetched the pill says "…".
+    PopupPill(if (opening) "…" else s.topUpOpen, Modifier.fillMaxWidth().testTag("credit:topup")) {
         if (opening) return@PopupPill
         opening = true
         failed = false
@@ -233,6 +290,7 @@ private fun TopUp(
                 throw e
             } catch (_: Exception) {
                 failed = true
+                haptics.reject()
             }
             opening = false
         }
@@ -242,7 +300,9 @@ private fun TopUp(
         s.topUpChooseAmount(euro(amounts.min()), euro(amounts.max())),
         Modifier.padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted,
     )
-    if (failed) Text(app.overfit.i18n.webCreditStringsFor(language).webTopUpFailed, Modifier.padding(top = Space.xs), style = Theme.type.caption)
+    Reveal(failed) {
+        Text(app.overfit.i18n.webCreditStringsFor(language).webTopUpFailed, Modifier.padding(top = Space.xs), style = Theme.type.caption)
+    }
 }
 
 /** Button inside the popup (which sits on the surface colour): the nested surface fill, no border. */
@@ -258,7 +318,7 @@ private fun PopupPill(label: String, modifier: Modifier = Modifier, onClick: () 
             .background(Theme.colors.surfacePressed)
             .padding(horizontal = Space.s),
         contentAlignment = Alignment.Center,
-    ) { Text(label, style = Theme.type.label, maxLines = 1) }
+    ) { Swap(label) { Text(it, style = Theme.type.label, maxLines = 1) } }
 }
 
 /** "Chat · Claude Sonnet 5.5" left, cost right (same wording as the request log). */

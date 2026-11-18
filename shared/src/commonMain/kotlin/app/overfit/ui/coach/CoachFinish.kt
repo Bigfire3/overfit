@@ -64,9 +64,14 @@ fun CoachFinishSection(env: app.overfit.ui.coach.chat.CoachChatEnv, workoutId: S
             LineIcon(Icon.Coach)
             Spacer(Modifier.width(Space.m))
             Text(s.reviewCard, Modifier.weight(1f))
-            if (price != null) {
-                Spacer(Modifier.width(Space.s))
-                Text(price, style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
+            // The estimate arrives a moment later: it fades in at its place instead of popping in.
+            val shownPrice = remember { arrayOfNulls<String>(1) }
+            if (price != null) shownPrice[0] = price
+            app.overfit.ui.components.Appear(price != null) {
+                Row {
+                    Spacer(Modifier.width(Space.s))
+                    Text(shownPrice[0].orEmpty(), style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
+                }
             }
         }
     }

@@ -41,6 +41,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.platform.LocalFocusManager
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealInRow
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.motionItem
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.LocalReducedMotion
+import app.overfit.ui.theme.Motion
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.SolidColor
@@ -170,6 +182,8 @@ fun CoachChatTabScreen(
         } catch (_: Exception) { }
     }
     val language = LocalFuelStrings.current.language
+    val focus = LocalFocusManager.current
+    val haptics = rememberHaptics()
     val price = sendPriceLabel(pricing, baseTokens?.plusText(input), s, language)
 
     fun newChat() {
@@ -183,6 +197,8 @@ fun CoachChatTabScreen(
         chatId = id
         input = ""
         pending = emptyList()
+        // The keyboard goes, so the answer is not hidden behind it.
+        focus.clearFocus()
     }
 
     fun setProfile(included: Boolean) {
@@ -225,11 +241,14 @@ fun CoachChatTabScreen(
                 openedChatId != null -> OpenedChatHeader(chatRow?.title.orEmpty(), onBack)
                 else -> ChatHeader(s, onStory, onHistory, ::newChat, creditChip)
             }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (chatId.isEmpty() && messages.isEmpty()) {
-                    Suggestions(s.suggestions) { input = it }
-                } else {
-                    Conversation(messages, photos, templateNames, s, onApplyWorkout, proposals) { env.chat.retry(it) }
+            // Empty chat <-> conversation fade through (first question, "New chat"); keyed only on empty / not empty.
+            Swap(chatId.isEmpty() && messages.isEmpty(), Modifier.weight(1f).fillMaxWidth()) { empty ->
+                Box(Modifier.fillMaxSize()) {
+                    if (empty) {
+                        Suggestions(s.suggestions) { input = it }
+                    } else {
+                        Conversation(messages, photos, templateNames, s, onApplyWorkout, proposals) { env.chat.retry(it) }
+                    }
                 }
             }
             ContextChips(
@@ -250,7 +269,7 @@ fun CoachChatTabScreen(
                 price = price,
                 onPlus = { sheet = true },
                 onModelChip = onModelChip,
-                onSend = { send(input, chips) },
+                onSend = { haptics.press(); send(input, chips) },
             )
             Spacer(Modifier.height(Space.s))
         }
@@ -353,7 +372,8 @@ private fun OpenedChatHeader(title: String, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         HeaderIcon(Icon.Back, LocalStrings.current.back, "chat:back", onBack)
         Spacer(Modifier.width(Space.xs))
-        Text(title, Modifier.weight(1f), style = Theme.type.label, maxLines = 1)
+        // The chat row loads a moment later: the title fades in instead of popping.
+        Swap(title, Modifier.weight(1f)) { Text(it, style = Theme.type.label, maxLines = 1) }
     }
 }
 
@@ -374,12 +394,15 @@ private fun HeaderIcon(icon: Icon, label: String, tag: String, onClick: () -> Un
 // ---------------------------------------------------------------------------------------------
 // Empty chat
 
-/** Exactly three grey, centred text buttons in the middle; a tap puts the text into the input (does not send). */
+/**
+ * Exactly three grey, centred text buttons at the bottom, right above chips and input (where their text goes); a tap
+ * puts the text into the input (does not send).
+ */
 @Composable
 private fun Suggestions(items: List<String>, onPick: (String) -> Unit) {
     Column(
         Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(Space.s, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(Space.s, Alignment.Bottom),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         items.forEachIndexed { i, text ->
@@ -415,13 +438,20 @@ private fun Conversation(
     onRetry: (String) -> Unit,
 ) {
     val list = rememberLazyListState()
-    // New message or an answer that arrived: show the end of the chat.
-    // Index: leading spacer + messages + trailing spacer, so the last item is the very end.
-    LaunchedEffect(messages.size, messages.lastOrNull()?.status) { if (messages.isNotEmpty()) list.animateScrollToItem(messages.size + 1) }
+    val reducedMotion = LocalReducedMotion.current
+    // Own question (or a retry): show the very end of the chat. An answer that arrived: its beginning at the top, so a
+    // long answer is read from the start. Index: leading spacer + messages + trailing spacer. Reduced motion: jump.
+    LaunchedEffect(messages.size, messages.lastOrNull()?.status) {
+        val lastMessage = messages.lastOrNull() ?: return@LaunchedEffect
+        val index = if (!lastMessage.fromUser && lastMessage.status != ChatMessageStatus.SENDING) messages.size else messages.size + 1
+        if (reducedMotion) list.scrollToItem(index) else list.animateScrollToItem(index)
+    }
     LazyColumn(Modifier.fillMaxSize(), state = list, verticalArrangement = Arrangement.spacedBy(Space.m)) {
         item { Spacer(Modifier.height(Space.xs)) }
         items(messages, key = { it.id }) { m ->
-            if (m.fromUser) UserMessage(m, photos) else CoachMessage(m, templateNames, s, onApply, proposals, onRetry)
+            Box(motionItem()) {
+                if (m.fromUser) UserMessage(m, photos) else CoachMessage(m, templateNames, s, onApply, proposals, onRetry)
+            }
         }
         item { Spacer(Modifier.height(Space.s)) }
     }
@@ -504,9 +534,23 @@ private fun CoachMessage(
     onRetry: (String) -> Unit,
 ) {
     val language = LocalFuelStrings.current.language
+    val haptics = rememberHaptics()
+    // Felt once when an answer fails while the user waits (not when an old failed chat is opened).
+    var seenStatus by remember(m.id) { mutableStateOf(m.status) }
+    LaunchedEffect(m.status) {
+        if (seenStatus == ChatMessageStatus.SENDING && m.status == ChatMessageStatus.FAILED) haptics.reject()
+        seenStatus = m.status
+    }
+    // "Thinking ..." fades over into the answer (or error), the height follows downwards.
+    Swap(m.status, Modifier.fillMaxWidth()) { status ->
     Column(Modifier.fillMaxWidth().testTag("chat:coach")) {
-        when (m.status) {
-            ChatMessageStatus.SENDING -> Text(s.thinking, tone = Tone.Muted)
+        when (status) {
+            ChatMessageStatus.SENDING -> Row(verticalAlignment = Alignment.CenterVertically) {
+                // Static marker in the "now" colour: something is running (no pulsing, nothing loops).
+                Box(Modifier.size(app.overfit.ui.theme.Sizes.marker).clip(CircleShape).background(Theme.colors.accent))
+                Spacer(Modifier.width(Space.s))
+                Text(s.thinking, tone = Tone.Muted)
+            }
             ChatMessageStatus.FAILED -> {
                 Text(s.failed, tone = Tone.Muted)
                 // Why: key, model / rejected request, credit, connection, provider (same wording as the request log).
@@ -531,6 +575,7 @@ private fun CoachMessage(
                 }
             }
         }
+    }
     }
 }
 
@@ -562,6 +607,9 @@ private fun WorkoutCard(w: SharedTraining, isChange: Boolean, s: CoachChatString
 
 private const val MAX_CARD_EXERCISES = 5
 
+/** What the bottom of a [ChangeCard] shows: apply button, applied (+ undo), failed, or undo too late. */
+private data class ApplyState(val done: AppliedChange?, val tooLate: Boolean)
+
 /**
  * Proposal in a coach opened from a screen: what changes for exactly that workout (diff lines), "Apply" changes it
  * (running workout: right away, with "Undo"; saved workout: opens its editor with the proposal).
@@ -587,33 +635,49 @@ private fun ChangeCard(messageId: String, json: String, proposals: ProposalHandl
     ) {
         Text(proposals.title, style = Theme.type.label)
         Spacer(Modifier.height(Space.s))
-        val lines = diff
-        when {
-            lines == null -> Unit
-            lines.isEmpty() -> Text(s.changeNone, style = Theme.type.caption, tone = Tone.Muted)
-            else -> lines.forEach { Text(it, Modifier.padding(vertical = 2.dp).testTag("chat:diff"), style = Theme.type.caption, tone = Tone.Muted) }
+        // The diff lines load a moment later: they fade in and the card grows smoothly.
+        Swap(diff, Modifier.fillMaxWidth(), contentKey = { it == null }) { lines ->
+            Column(Modifier.fillMaxWidth()) {
+                when {
+                    lines == null -> Unit
+                    lines.isEmpty() -> Text(s.changeNone, style = Theme.type.caption, tone = Tone.Muted)
+                    else -> lines.forEach { Text(it, Modifier.padding(vertical = 2.dp).testTag("chat:diff"), style = Theme.type.caption, tone = Tone.Muted) }
+                }
+            }
         }
         Spacer(Modifier.height(Space.m))
-        val done = applied
-        if (done == null) {
-            PrimaryButton(s.apply, {
-                if (!busy) {
-                    busy = true
-                    scope.launch {
-                        try { proposals.apply(json)?.let { proposals.applied[messageId] = it } } finally { busy = false }
+        val haptics = rememberHaptics()
+        // Apply -> applied + undo (or error, or "too late"): replaced in place, the height follows.
+        Swap(ApplyState(applied, undoFailed), Modifier.fillMaxWidth(), contentKey = { Triple(it.done == null, it.done?.failed, it.tooLate) }) { st ->
+            val done = st.done
+            Column(Modifier.fillMaxWidth()) {
+                if (done == null) {
+                    PrimaryButton(s.apply, {
+                        if (!busy) {
+                            busy = true
+                            scope.launch {
+                                try {
+                                    proposals.apply(json)?.let {
+                                        proposals.applied[messageId] = it
+                                        if (it.failed) haptics.reject() else haptics.confirm()
+                                    }
+                                } finally { busy = false }
+                            }
+                        }
+                    }, modifier = Modifier.testTag("chat:apply"), compact = true, loading = busy)
+                } else {
+                    done.note?.let { Text(it, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
+                    if (done.failed) {
+                        SmallButton(s.apply, { proposals.applied.remove(messageId) }, modifier = Modifier.testTag("chat:retry-apply"))
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (st.tooLate) s.undoTooLate else s.applied, Modifier.weight(1f).testTag("chat:applied"))
+                            if (!st.tooLate) SmallButton(LocalStrings.current.undo, {
+                                if (done.undo?.invoke() == true) { haptics.tick(); proposals.applied.remove(messageId) }
+                                else { haptics.reject(); undoFailed = true }
+                            }, modifier = Modifier.testTag("chat:undo"))
+                        }
                     }
-                }
-            }, modifier = Modifier.testTag("chat:apply"), compact = true, loading = busy)
-        } else {
-            done.note?.let { Text(it, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted) }
-            if (done.failed) {
-                SmallButton(s.apply, { proposals.applied.remove(messageId) }, modifier = Modifier.testTag("chat:retry-apply"))
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (undoFailed) s.undoTooLate else s.applied, Modifier.weight(1f).testTag("chat:applied"))
-                    if (!undoFailed) SmallButton(LocalStrings.current.undo, {
-                        if (done.undo?.invoke() == true) proposals.applied.remove(messageId) else undoFailed = true
-                    }, modifier = Modifier.testTag("chat:undo"))
                 }
             }
         }
@@ -632,13 +696,25 @@ private fun ContextChips(
     onRemoveProfile: () -> Unit,
     onRemove: (ChatAttachment) -> Unit,
 ) {
-    if (!profile && chips.isEmpty()) return
+    val haptics = rememberHaptics()
+    val row = rememberLazyListState()
+    // Chips added (from the sheet): the newest one comes into view.
+    var shownCount by remember { mutableStateOf(chips.size) }
+    val reducedMotion = LocalReducedMotion.current
+    LaunchedEffect(chips.size) {
+        val newest = (if (profile) 1 else 0) + chips.size - 1
+        if (chips.size > shownCount) { if (reducedMotion) row.scrollToItem(newest) else row.animateScrollToItem(newest) }
+        shownCount = chips.size
+    }
+    // The row opens and closes softly when the first chip comes or the last one goes; conversation and input slide.
+    Reveal(profile || chips.isNotEmpty(), from = Alignment.Bottom) {
     LazyRow(
         Modifier.fillMaxWidth().padding(top = Space.s, bottom = Space.s),
+        state = row,
         horizontalArrangement = Arrangement.spacedBy(Space.s),
     ) {
         if (profile) item(key = "profile") {
-            ContextChip(s.chipProfile, Icon.Profile, s.remove(s.chipProfile), "chip:profile", onProfile, onRemoveProfile)
+            ContextChip(s.chipProfile, Icon.Profile, s.remove(s.chipProfile), "chip:profile", onProfile, { haptics.tick(); onRemoveProfile() }, motionItem())
         }
         items(chips, key = { it.key() }) { a ->
             val tag = when (a) {
@@ -651,19 +727,20 @@ private fun ContextChips(
                 is ChatAttachment.Day -> "chip:day"
             }
             val text = attachmentText(a)
-            ContextChip(text, a.icon(), s.remove(text), tag, onClick = null, onRemove = { onRemove(a) })
+            ContextChip(text, a.icon(), s.remove(text), tag, onClick = null, onRemove = { haptics.tick(); onRemove(a) }, modifier = motionItem())
         }
+    }
     }
 }
 
 /** Removable chip: surface fill, 16 dp corners, label (tappable when [onClick] is set) and its own × target. */
 @Composable
-private fun ContextChip(label: String, icon: Icon, removeLabel: String, tag: String, onClick: (() -> Unit)?, onRemove: () -> Unit) {
+private fun ContextChip(label: String, icon: Icon, removeLabel: String, tag: String, onClick: (() -> Unit)?, onRemove: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     // A 40 dp pill like every chip, drawn inside a 48 dp row so the chip and its ✕ are full touch targets.
     val fill = Theme.colors.surface
     Row(
-        Modifier
+        modifier
             .heightIn(min = app.overfit.ui.theme.TouchTarget.min)
             .drawBehind {
                 val inset = (app.overfit.ui.theme.TouchTarget.min - app.overfit.ui.theme.Sizes.chip).toPx() / 2
@@ -715,7 +792,8 @@ private fun Composer(
 ) {
     val c = Theme.colors
     val style = Theme.type.body.copy(color = c.foreground)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c.surface).padding(Space.s)) {
+    // Grows and shrinks with its lines (and back to one line after sending) instead of jumping.
+    Column(Modifier.fillMaxWidth().animateContentSize(Motion.smooth()).clip(RoundedCornerShape(24.dp)).background(c.surface).padding(Space.s)) {
         Box(Modifier.fillMaxWidth().testTag("coach:input")) {
             BasicTextField(
                 value = value,
@@ -756,10 +834,10 @@ private fun ModelChip(label: String, s: CoachChatStrings, onClick: () -> Unit, m
             .padding(horizontal = Space.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BasicText(
-            label, Modifier.weight(1f, fill = false),
-            style = Theme.type.caption.copy(color = Theme.colors.muted), maxLines = 1, overflow = TextOverflow.Ellipsis,
-        )
+        // A new model fades over, the chip's width follows.
+        Swap(label, Modifier.weight(1f, fill = false)) {
+            BasicText(it, style = Theme.type.caption.copy(color = Theme.colors.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
         Spacer(Modifier.width(2.dp))
         LineIcon(Icon.ChevronDown, size = app.overfit.ui.theme.IconSize.small, color = Theme.colors.muted)
     }
@@ -773,6 +851,11 @@ private fun ModelChip(label: String, s: CoachChatStrings, onClick: () -> Unit, m
 private fun SendButton(price: String?, s: CoachChatStrings, enabled: Boolean, onClick: () -> Unit) {
     val c = Theme.colors
     val interaction = remember { MutableInteractionSource() }
+    // Dimmed while there is nothing to send; fades instead of flipping (read while drawing).
+    val alpha by animateFloatAsState(if (enabled) 1f else 0.3f, Motion.snappy(), label = "sendAlpha")
+    // The last price stays while it slides out.
+    val lastPrice = remember { arrayOfNulls<String>(1) }
+    if (price != null) lastPrice[0] = price
     Box(
         Modifier
             .heightIn(min = 48.dp)
@@ -785,19 +868,23 @@ private fun SendButton(price: String?, s: CoachChatStrings, enabled: Boolean, on
         Row(
             Modifier
                 .heightIn(min = 40.dp)
-                .alpha(if (enabled) 1f else 0.3f)
+                .graphicsLayer { this.alpha = alpha }
                 .clip(RoundedCornerShape(20.dp))
                 .background(c.foreground)
-                .padding(start = if (price != null) 14.dp else 9.dp, end = 9.dp),
+                .padding(start = 9.dp, end = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (price != null) {
-                BasicText(
-                    price, Modifier.widthIn(max = 150.dp).testTag("coach:price"),
-                    style = Theme.type.caption.copy(color = c.background, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.width(6.dp))
+            // The first estimate slides the pill open; while typing only the changed digits roll.
+            RevealInRow(price != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.width(5.dp))
+                    RollingText(
+                        lastPrice[0].orEmpty(), Modifier.widthIn(max = 150.dp).testTag("coach:price"),
+                        style = Theme.type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                        color = c.background,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
             }
             LineIcon(Icon.ArrowUp, size = app.overfit.ui.theme.IconSize.inline, color = c.background)
         }

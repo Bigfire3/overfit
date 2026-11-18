@@ -1,6 +1,5 @@
 package app.overfit.ui.coach.chat
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,7 +19,10 @@ import androidx.compose.ui.unit.dp
 import app.overfit.coach.CoachChatService
 import app.overfit.data.db.CoachChatEntity
 import app.overfit.i18n.LocalStrings
+import app.overfit.ui.components.AnimatedItems
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.components.FloatingCard
 import app.overfit.ui.components.HeaderDeleteButton
 import app.overfit.ui.components.Screen
@@ -42,12 +44,18 @@ fun CoachHistoryScreen(chat: CoachChatService, onOpen: (String) -> Unit, onBack:
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         Title(s.historyTitle)
         Spacer(Modifier.height(Space.l))
-        val list = chats
-        when {
-            list == null -> Unit
-            list.isEmpty() -> Text(s.historyEmpty, tone = Tone.Muted)
-            else -> Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
-                list.forEach { c -> ChatCard(c, s.deleteChat, onOpen = { onOpen(c.id) }, onDelete = { chat.delete(c.id) }) }
+        val haptics = rememberHaptics()
+        // Loaded a moment later: the cards (or the empty text) fade in; the last deleted chat fades over to the empty text.
+        Swap(chats, Modifier.fillMaxWidth(), contentKey = { if (it == null) 0 else if (it.isEmpty()) 1 else 2 }) { list ->
+            when {
+                list == null -> Unit
+                list.isEmpty() -> Text(s.historyEmpty, tone = Tone.Muted)
+                // A deleted card shrinks away and the others move up.
+                else -> Column {
+                    AnimatedItems(list, key = { it.id }, spacing = Space.m) { _, c ->
+                        ChatCard(c, s.deleteChat, onOpen = { onOpen(c.id) }, onDelete = { haptics.confirm(); chat.delete(c.id) })
+                    }
+                }
             }
         }
     }

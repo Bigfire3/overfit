@@ -106,6 +106,13 @@ jobs:
           xcrun simctl list devices | grep "$UDID"
           # Clean status bar for the screenshots.
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+          # Warm-up (infrastructure, no test retry): right after the boot the system is still busy, and the first app
+          # launch from XCUITest sometimes times out ("Failed to get background assertion … Timed out", 17.11.).
+          # Launch a system app once and give the device a moment to settle.
+          with_timeout 60 xcrun simctl launch "$UDID" com.apple.Preferences || true
+          sleep 20
+          xcrun simctl terminate "$UDID" com.apple.Preferences || true
+          sleep 5
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
       # XCUITest: smoke flow (start, tick a set, minimize, finish, relaunch) and screenshots in light/dark.

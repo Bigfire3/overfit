@@ -170,7 +170,7 @@ class UiUniformTest {
 
         // Workout (view = editor): [⋮ share, delete] [coach].
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         checkHeader("Workout", coach = true)
         // Delete in the ⋮ keeps its two taps: the first one only arms it, the menu stays open.
         compose.onNodeWithContentDescription("Weitere Optionen").performClick()
@@ -180,7 +180,7 @@ class UiUniformTest {
         compose.onNodeWithText("Teilen", substring = true).performClick()
         waitFor("Link kopieren")
         back()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
 
         // Running workout: [finish] [coach].
         click("Starten")
@@ -200,7 +200,7 @@ class UiUniformTest {
         click("Beenden")
         compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Training beendet")
-        compose.waitUntil(20_000) { compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.waitForFinishLoaded(timeoutMillis = 20_000)
         click("Speichern")
         compose.waitForTrainingTab()
 

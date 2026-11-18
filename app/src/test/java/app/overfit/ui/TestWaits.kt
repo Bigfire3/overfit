@@ -71,3 +71,26 @@ fun startEarlierToday(): Long {
 
 /** End of a training started at [start]: half an hour later, but never in the future. */
 fun endOf(start: Long): Long = maxOf(start + 2_000L, minOf(start + 1_800_000L, System.currentTimeMillis()))
+
+/**
+ * Finish screen: waits until the finished training is stored and loaded. The screen itself (title, name and note
+ * field) is there from the first frame; "Speichern" is the part that only becomes active with the loaded training.
+ */
+fun ComposeTestRule.waitForFinishLoaded(saveLabel: String = "Speichern", timeoutMillis: Long = 20_000) = waitUntil(timeoutMillis) {
+    onAllNodes(hasText(saveLabel) and androidx.compose.ui.test.isEnabled()).fetchSemanticsNodes().isNotEmpty()
+}
+
+/**
+ * Plan screen (saved workout): waits until the plan is really loaded. "Starten" and the header are there from the
+ * first frame, but "Starten" only takes taps once the workout is loaded (disabled before), and the exercises fade in
+ * a moment later. So: [startLabel] enabled and the first exercise card there (its ⋮, [exerciseMenu]). Use it before
+ * tapping "Starten", typing into a set or opening a menu entry of the plan.
+ */
+fun ComposeTestRule.waitForPlanLoaded(
+    startLabel: String = "Starten",
+    exerciseMenu: String = "Weitere Aktionen für",
+    timeoutMillis: Long = 20_000,
+) = waitUntil(timeoutMillis) {
+    onAllNodes(hasText(startLabel) and androidx.compose.ui.test.isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
+        onAllNodes(androidx.compose.ui.test.hasContentDescription(exerciseMenu, substring = true)).fetchSemanticsNodes().isNotEmpty()
+}

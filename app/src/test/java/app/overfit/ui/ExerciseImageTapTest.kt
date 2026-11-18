@@ -129,7 +129,7 @@ class ExerciseImageTapTest {
     fun runningWorkout_iconOpensReadOnlyDetails_backReturns_workoutKeepsRunning() {
         launch()
         compose.onNodeWithText("Push").performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         compose.onNodeWithText("Starten").performClick()
         waitFor("0/2 erledigt")
         compose.onNodeWithContentDescription("Satz 1 abhaken").performClick()
@@ -154,7 +154,7 @@ class ExerciseImageTapTest {
     fun workoutScreen_editSurvivesDetails_backReturnsToWorkout() {
         launch()
         compose.onNodeWithText("Push").performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         // Edited in place (no pencil); the change must survive a trip to the exercise details.
         compose.onNodeWithContentDescription("Gewicht Satz 1").performTextReplacement("62,5")
         compose.onNodeWithContentDescription("Details zu Bench Press").performClick()

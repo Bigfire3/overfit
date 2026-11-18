@@ -11,6 +11,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.overfit.ui.components.pressScale
+import app.overfit.ui.components.AnimatedItems
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.Swap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.platform.testTag
@@ -72,7 +78,8 @@ import kotlin.time.Instant
 @Composable
 fun StartScreen(
     templates: List<TemplateSummary>?,
-    lastDone: Map<Long, Long>,
+    /** Start of the last training per workout; null while it is still loading (the line then stays empty). */
+    lastDone: Map<Long, Long>?,
     today: LocalDate,
     running: Workout?,
     onOpenRunning: () -> Unit,
@@ -90,11 +97,19 @@ fun StartScreen(
     val t = LocalStrings.current
     Screen(
         scroll = true,
-        footer = when {
-            running != null -> { { RunningWorkoutChoice(onOpenRunning, onEndRunning) } }
-            // Empty state leads to the next step: the same chooser as "+" (create a workout or start empty).
-            templates != null && templates.isEmpty() -> { { PrimaryButton(t.newWorkout, onNew, icon = Icon.Plus) } }
-            else -> null
+        // The footer slot stays in place, so its contents can come and go softly instead of the layout switching.
+        footer = {
+            Column(Modifier.fillMaxWidth()) {
+                Reveal(running != null, from = Alignment.Bottom) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.m)) {
+                        RunningWorkoutChoice(onOpenRunning, onEndRunning)
+                    }
+                }
+                // Empty state leads to the next step: the same chooser as "+" (create a workout or start empty).
+                Appear(running == null && templates != null && templates.isEmpty()) {
+                    PrimaryButton(t.newWorkout, onNew, icon = Icon.Plus)
+                }
+            }
         },
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -107,27 +122,41 @@ fun StartScreen(
         }
         Spacer(Modifier.height(Space.l))
 
-        if (running != null) {
-            Text(t.runningNow, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
-            Panel { ListRow(running.name, t.setsDone(running.completedSets, running.totalSets), onClick = onOpenRunning) }
-            Spacer(Modifier.height(Space.l))
+        RevealNotNull(running) { workout ->
+            Column(Modifier.fillMaxWidth().padding(bottom = Space.l)) {
+                Text(t.runningNow, Modifier.padding(bottom = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+                Panel {
+                    ListRow(workout.name, onClick = onOpenRunning) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Sets done roll instead of jumping when one is checked off.
+                            RollingText(t.setsDone(workout.completedSets, workout.totalSets), tone = Tone.Muted)
+                            Spacer(Modifier.width(Space.xs))
+                            LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
+                        }
+                    }
+                }
+            }
         }
 
-        if (chatInboxCount > 0) {
+        // Arrives a moment later: it grows in and the cards below slide down instead of jumping.
+        RevealNotNull(chatInboxCount.takeIf { it > 0 }) { count ->
             val chatText = app.overfit.i18n.LocalChatStrings.current
-            Panel { ListRow(chatText.inboxStart(chatInboxCount), onClick = onChatInbox) { LineIcon(Icon.Plus) } }
-            if (chatInboxFull) Hint(chatText.inboxFull)
-            Spacer(Modifier.height(Space.l))
+            Column(Modifier.fillMaxWidth().padding(bottom = Space.l)) {
+                Panel { ListRow(chatText.inboxStart(count), onClick = onChatInbox) { LineIcon(Icon.Plus) } }
+                Reveal(chatInboxFull) { Hint(chatText.inboxFull) }
+            }
         }
 
-        if (templates != null && templates.isEmpty()) {
-            Text(t.templatesEmpty, tone = Tone.Muted)
-        }
-        if (templates != null && templates.isNotEmpty()) {
-            Column(Modifier.fillMaxWidth().padding(bottom = Space.l), verticalArrangement = Arrangement.spacedBy(Space.m)) {
-                val start = onStartWorkout.takeIf { running == null }
-                templates.forEach { w ->
-                    WorkoutRow(w, lastDoneText(t, lastDone[w.id], today), onStart = start?.let { { it(w.id) } }) { onOpenWorkout(w.id) }
+        // Loading -> empty -> list fades through; inside the list, cards that come and go grow and shrink.
+        Swap(templates, contentKey = { list -> if (list == null) 0 else if (list.isEmpty()) 1 else 2 }) { list ->
+            when {
+                list == null -> Spacer(Modifier.fillMaxWidth())
+                list.isEmpty() -> Text(t.templatesEmpty, Modifier.fillMaxWidth(), tone = Tone.Muted)
+                else -> Column(Modifier.fillMaxWidth().padding(bottom = Space.l - Space.m)) {
+                    val start = onStartWorkout.takeIf { running == null }
+                    AnimatedItems(list, key = { it.id }, spacing = Space.m) { _, w ->
+                        WorkoutRow(w, lastDone?.let { lastDoneText(t, it[w.id], today) }.orEmpty(), onStart = start?.let { { it(w.id) } }) { onOpenWorkout(w.id) }
+                    }
                 }
             }
         }
@@ -144,11 +173,17 @@ fun WorkoutRow(workout: TemplateSummary, lastDone: String, onStart: (() -> Unit)
                 Text(workout.name, style = Theme.type.label)
                 Spacer(Modifier.height(2.dp))
                 Text(t.templateSummary(workout.exerciseNames.size, workout.exerciseNames), style = Theme.type.caption, tone = Tone.Muted, maxLines = 2)
-                Text(lastDone, style = Theme.type.caption, tone = Tone.Muted)
+                // "not done yet" -> "last done 3 days ago" once the dates have loaded: fades instead of flipping.
+                Swap(lastDone) { Text(it, style = Theme.type.caption, tone = Tone.Muted) }
             }
             Spacer(Modifier.width(Space.m))
-            if (onStart != null && workout.exerciseNames.isNotEmpty()) StartCircle(t.training.startNamed(workout.name), onStart)
-            else LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
+            // Play circle and chevron trade places softly (a workout starts or ends) in one fixed 48 dp box.
+            Box(Modifier.size(app.overfit.ui.theme.TouchTarget.min), contentAlignment = Alignment.CenterEnd) {
+                Swap(onStart != null && workout.exerciseNames.isNotEmpty(), contentAlignment = Alignment.CenterEnd) { startable ->
+                    if (startable) StartCircle(t.training.startNamed(workout.name)) { onStart?.invoke() }
+                    else LineIcon(Icon.ChevronRight, size = app.overfit.ui.theme.IconSize.inline, color = Theme.colors.muted)
+                }
+            }
         }
     }
 }

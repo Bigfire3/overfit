@@ -39,6 +39,20 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.motionColor
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.Motion
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import app.overfit.coach.AthleteProfile
 import app.overfit.coach.CoachChatPrefsStore
@@ -123,10 +137,15 @@ fun CoachProfileForm(
     var equipment by rememberSaveable(profile) { mutableStateOf(profile.equipment) }
     var limitations by rememberSaveable(profile) { mutableStateOf(profile.limitations) }
     var saved by remember { mutableStateOf(false) }
+    // The height field was left: from then on an invalid value shows its hint even if digits could still follow.
+    var heightLeft by remember { mutableStateOf(false) }
+    val haptics = rememberHaptics()
     val heightCm = height.toIntOrNull()
     val heightValid = height.isEmpty() || (heightCm != null && heightCm in AthleteProfile.HEIGHT_MIN..AthleteProfile.HEIGHT_MAX)
+    // While typing "182" the hint does not flash after "1": it shows once no further digit can make the value valid.
+    val showHeightHint = !heightValid && (heightLeft || !heightCompletable(height))
     val edited = AthleteProfile(goal, experience, days, heightCm, equipment.trim(), limitations.trim())
-    val onHeight: (String) -> Unit = { height = it.filter(Char::isDigit).take(3); saved = false }
+    val onHeight: (String) -> Unit = { height = it.filter(Char::isDigit).take(3); saved = false; heightLeft = false }
 
     Column(modifier.fillMaxWidth()) {
         if (popup) {
@@ -150,8 +169,8 @@ fun CoachProfileForm(
                 }
             }
             FieldLabel(cs.height)
-            PopupField(height, onHeight, "175", "profile:height", KeyboardType.Number, suffix = cs.heightUnit)
-            if (!heightValid) HeightHint(s.heightRange, Modifier.padding(top = Space.xs))
+            PopupField(height, onHeight, "175", "profile:height", KeyboardType.Number, suffix = cs.heightUnit, onLeave = { heightLeft = true })
+            Reveal(showHeightHint) { HeightHint(s.heightRange, Modifier.padding(top = Space.xs)) }
             FieldLabel(cs.weight)
             Text(latestWeight ?: cs.weightMissing, tone = if (latestWeight == null) Tone.Muted else Tone.Default)
             FieldLabel(cs.equipment)
@@ -175,11 +194,11 @@ fun CoachProfileForm(
             Spacer(Modifier.height(Space.l))
             Panel {
                 ListRow(s.height) {
-                    RowInput(height, onHeight, onCommit = {}, keyboardType = KeyboardType.Number)
+                    RowInput(height, onHeight, onCommit = { heightLeft = true }, keyboardType = KeyboardType.Number)
                 }
                 ListRow(s.weight, latestWeight ?: s.weightNone)
             }
-            if (!heightValid) HeightHint(s.heightRange, Modifier.padding(start = Space.m, top = Space.s))
+            Reveal(showHeightHint) { HeightHint(s.heightRange, Modifier.padding(start = Space.m, top = Space.s)) }
             Hint(s.weightHint)
 
             SectionTitle(s.equipment)
@@ -189,16 +208,20 @@ fun CoachProfileForm(
         }
 
         Spacer(Modifier.height(Space.l))
-        // The popup closes on "Save", so it may save unchanged; the page only saves a change.
+        // The popup closes on "Save", so it may save unchanged; the page only saves a change. On the page the button
+        // itself confirms ("Saved") until the next edit, instead of an extra line popping in below it.
         PrimaryButton(
-            s.save,
-            onClick = { onSave(edited); saved = true },
+            if (saved && !popup) s.saved else s.save,
+            onClick = { onSave(edited); saved = true; haptics.confirm() },
             enabled = heightValid && (popup || edited != profile),
             modifier = Modifier.fillMaxWidth().testTag("profile:save"),
         )
-        if (saved && !popup) Text(s.saved, Modifier.padding(top = Space.s).fillMaxWidth(), style = Theme.type.caption, tone = Tone.Muted)
     }
 }
+
+/** True while more digits could still turn [height] into a valid value ("1" or "18" on the way to "182"). */
+private fun heightCompletable(height: String): Boolean =
+    height.length < 3 && (AthleteProfile.HEIGHT_MIN..AthleteProfile.HEIGHT_MAX).any { it.toString().startsWith(height) }
 
 /** Hint at the height field while its value is outside 100–250 cm. */
 @Composable
@@ -216,20 +239,24 @@ private fun FieldLabel(text: String) {
 private fun SelectChip(label: String, selected: Boolean, tag: String, modifier: Modifier = Modifier, compact: Boolean = false, onClick: () -> Unit) {
     val c = Theme.colors
     val interaction = remember { MutableInteractionSource() }
+    val haptics = rememberHaptics()
+    // Same soft fill as the central Chip.
+    val fill by motionColor(if (selected) c.foreground else c.surfacePressed, "selectChipFill")
+    val tone by motionColor(if (selected) c.inverseForeground else c.foreground, "selectChipLabel")
     Box(
         modifier
             .pressScale(interaction)
-            .clickable(interaction, indication = null, role = Role.RadioButton, onClick = onClick)
+            .clickable(interaction, indication = null, role = Role.RadioButton) { haptics.tick(); onClick() }
             .semantics { this.selected = selected }
             .testTag(tag)
             .padding(vertical = (app.overfit.ui.theme.TouchTarget.min - app.overfit.ui.theme.Sizes.chip) / 2)
             .heightIn(min = app.overfit.ui.theme.Sizes.chip)
             .clip(app.overfit.ui.components.ChipShape)
-            .background(if (selected) c.foreground else c.surfacePressed)
+            .drawBehind { drawRect(fill) }
             .padding(horizontal = if (compact) 0.dp else 14.dp, vertical = Space.s),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = Theme.type.caption, tone = if (selected) Tone.Inverse else Tone.Default, maxLines = 1)
+        BasicText(label, style = Theme.type.caption, color = { tone }, maxLines = 1)
     }
 }
 
@@ -242,11 +269,14 @@ private fun PopupField(
     tag: String,
     keyboardType: KeyboardType = KeyboardType.Text,
     suffix: String? = null,
+    onLeave: () -> Unit = {},
 ) {
     val c = Theme.colors
     val style = Theme.type.body.copy(color = c.foreground)
+    val focused = remember { booleanArrayOf(false) }
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surfacePressed).testTag(tag),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surfacePressed).testTag(tag)
+            .onFocusChanged { if (focused[0] && !it.hasFocus) onLeave(); focused[0] = it.hasFocus },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BasicTextField(
@@ -269,20 +299,45 @@ private fun PopupField(
     }
 }
 
-/** 1–7 as one segmented row (fits 360 dp); tapping the selected day clears it. */
+/**
+ * 1–7 as one segmented row (fits 360 dp); tapping the selected day clears it. Like [app.overfit.ui.components.Segmented]
+ * one white thumb slides to the chosen day; clearing fades it out in place instead of sliding.
+ */
 @Composable
 private fun DaysPicker(value: Int?, onChange: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Theme.colors.surface).padding(3.dp)) {
+    val c = Theme.colors
+    val haptics = rememberHaptics()
+    val count = AthleteProfile.DAYS_MAX - AthleteProfile.DAYS_MIN + 1
+    val index = value?.let { it - AthleteProfile.DAYS_MIN }
+    // Thumb position in segments and its opacity (0 = no day chosen); both read while drawing.
+    val thumb = remember { Animatable((index ?: 0).toFloat()) }
+    val thumbAlpha = remember { Animatable(if (index != null) 1f else 0f) }
+    LaunchedEffect(index) {
+        if (index == null) { thumbAlpha.animateTo(0f, Motion.snappy()); return@LaunchedEffect }
+        // From "nothing chosen" the thumb appears at its day instead of sliding there from the last one.
+        if (thumbAlpha.value == 0f) thumb.snapTo(index.toFloat())
+        launch { thumbAlpha.animateTo(1f, Motion.snappy()) }
+        thumb.animateTo(index.toFloat(), Motion.snappy())
+    }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(c.surface).padding(3.dp)
+            .drawBehind {
+                val w = size.width / count
+                if (thumbAlpha.value > 0f) {
+                    drawRoundRect(c.inverseBackground, Offset(thumb.value * w, 0f), Size(w, size.height), CornerRadius(size.height / 2), alpha = thumbAlpha.value)
+                }
+            },
+    ) {
         (AthleteProfile.DAYS_MIN..AthleteProfile.DAYS_MAX).forEach { d ->
             val active = d == value
+            val tone by motionColor(if (active) c.inverseForeground else c.muted, "daysLabel")
             Box(
                 Modifier.weight(1f).heightIn(min = 40.dp).clip(RoundedCornerShape(50))
-                    .background(if (active) Theme.colors.inverseBackground else Color.Transparent)
                     .semantics { selected = active }
-                    .pressableRow { onChange(d) }
+                    .pressableRow { haptics.tick(); onChange(d) }
                     .testTag("profile:days:$d"),
                 contentAlignment = Alignment.Center,
-            ) { Text(d.toString(), style = Theme.type.label, tone = if (active) Tone.Inverse else Tone.Muted) }
+            ) { BasicText(d.toString(), style = Theme.type.label, color = { tone }) }
         }
     }
 }
@@ -302,13 +357,15 @@ fun CoachInstructionsScreen(coach: CoachService, prefs: CoachChatPrefsStore, onB
     var text by remember(current.addition) { mutableStateOf(current.addition) }
     var saved by remember { mutableStateOf(false) }
     var expanded by rememberSaveable { mutableStateOf(false) }
+    val haptics = rememberHaptics()
     val base = remember(language) { coach.baseInstructions(language).trim() }
     val long = base.lines().size > 3 || base.length > 400
     Screen(scroll = true, header = { BackHeader(LocalStrings.current.back, onBack) }) {
         Title(breakableTitle(s.instructions))
 
         SectionTitle(s.baseTitle)
-        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Theme.colors.surface).padding(Space.m).testTag("coach:base")) {
+        // Expanding grows the box smoothly (it only clips) instead of in one frame.
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Theme.colors.surface).animateContentSize(Motion.smooth()).padding(Space.m).testTag("coach:base")) {
             Text(base, style = Theme.type.caption, tone = Tone.Muted, maxLines = if (expanded || !long) Int.MAX_VALUE else BASE_PREVIEW_LINES)
         }
         Hint(s.baseHint)
@@ -323,8 +380,13 @@ fun CoachInstructionsScreen(coach: CoachService, prefs: CoachChatPrefsStore, onB
 
         // Save right under the field (no floating footer that could cover the reset below it).
         Spacer(Modifier.height(Space.l))
-        PrimaryButton(s.save, onClick = { prefs.setAddition(text); saved = true }, enabled = text.trim() != current.addition, modifier = Modifier.fillMaxWidth().testTag("coach:addition-save"))
-        if (saved) Text(s.saved, Modifier.fillMaxWidth().padding(top = Space.s), style = Theme.type.caption, tone = Tone.Muted)
+        // The button itself confirms ("Saved") until the next edit, instead of a line popping in and pushing the reset.
+        PrimaryButton(
+            if (saved) s.saved else s.save,
+            onClick = { prefs.setAddition(text); saved = true; haptics.confirm() },
+            enabled = text.trim() != current.addition,
+            modifier = Modifier.fillMaxWidth().testTag("coach:addition-save"),
+        )
         Spacer(Modifier.height(Space.m))
         ConfirmButton(s.resetDefault, onConfirm = {
             prefs.setAddition("")
@@ -354,15 +416,20 @@ fun CoachPromptsScreen(
         Spacer(Modifier.height(Space.s))
         Text(s.promptsIntro, tone = Tone.Muted)
         Spacer(Modifier.height(Space.m))
-        if (list == null) Text(h.promptLoading, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
-        list?.forEach { p ->
-            PromptView(
-                title = p.title,
-                hint = p.hint,
-                text = p.text,
-                onCopy = copy,
-                onUseInChat = p.chatAsk?.let { ask -> { onUseInChat(ask) } },
-            )
+        // Loading → prompts fades over instead of the list popping in.
+        Swap(list, Modifier.fillMaxWidth(), contentKey = { it == null }) { loaded ->
+            Column(Modifier.fillMaxWidth()) {
+                if (loaded == null) Text(h.promptLoading, Modifier.padding(vertical = Space.m), tone = Tone.Muted)
+                loaded?.forEach { p ->
+                    PromptView(
+                        title = p.title,
+                        hint = p.hint,
+                        text = p.text,
+                        onCopy = copy,
+                        onUseInChat = p.chatAsk?.let { ask -> { onUseInChat(ask) } },
+                    )
+                }
+            }
         }
     }
 }

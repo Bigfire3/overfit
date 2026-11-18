@@ -86,8 +86,9 @@ class DiaryScreenTest {
         }
         compose.onNodeWithText("Kalender").assertIsDisplayed()
         compose.onNodeWithText("November 2026").assertIsDisplayed()
-        compose.onNodeWithText("3 Trainings").assertIsDisplayed()
-        compose.onNodeWithText("3 Fotos").assertIsDisplayed()
+        // Stats: one caption line ("3 Trainings · 3 Fotos · …").
+        compose.onNodeWithText("3 Trainings", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("3 Fotos", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Mo").assertIsDisplayed()
         // Every day up to today opens the day view: with photos, training only, and empty (to add a photo).
         compose.onNodeWithContentDescription("Tag 2, 2 Fotos").performClick()
@@ -158,7 +159,9 @@ class DiaryScreenTest {
         compose.onAllNodesWithTag("diary-list-row").assertCountEquals(2)
         compose.onNodeWithText("Push, Core").assertIsDisplayed()
         compose.onNodeWithText("2:00:00 · 18 Sätze · 8.400 kg", substring = true).assertIsDisplayed()
-        compose.onAllNodesWithText("1 Foto").assertCountEquals(2)
+        // The photo-only day's title; the stats line says it as part of one caption line.
+        compose.onAllNodesWithText("1 Foto").assertCountEquals(1)
+        compose.onNodeWithText("2 Trainings · 1 Foto", substring = true).assertIsDisplayed()
     }
 
     @Test fun emptyListIsFriendly() {
@@ -237,7 +240,7 @@ class DiaryScreenTest {
         compose.onNode(hasContentDescription("Tag 2, 2 Fotos, Sauna") and ring, useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasContentDescription("Tag 1, Training") and !ring, useUnmergedTree = true).assertIsDisplayed()
         // October is the next month in the list (square tiles: it is below the screen until scrolled to).
-        compose.onNodeWithTag(app.overfit.ui.photos.DIARY_GRID_TAG).performScrollToIndex(app.overfit.domain.DiaryCalendar.MONTHS_AHEAD + 1)
+        compose.onNodeWithTag(app.overfit.ui.photos.DIARY_GRID_TAG).performScrollToIndex(app.overfit.domain.DiaryCalendar.MONTHS_AHEAD + 3) // + weight card, stats, November
         compose.onNode(hasContentDescription("Tag 30, Training, Sauna") and ring, useUnmergedTree = true).assertIsDisplayed()
     }
 

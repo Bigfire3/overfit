@@ -69,6 +69,10 @@ import app.overfit.ui.components.Text
 import app.overfit.ui.components.Title
 import app.overfit.ui.components.Tone
 import app.overfit.ui.components.pressableRow
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import app.overfit.workout.WorkoutFormat
@@ -106,7 +110,8 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
             Spacer(Modifier.height(2.dp))
             Text(meta, style = Theme.type.caption, tone = Tone.Muted)
             val exercises = workout?.exercises.orEmpty()
-            if (exercises.isNotEmpty()) {
+            // Loaded a moment later: the lines grow in and the cards below slide instead of jumping.
+            Reveal(exercises.isNotEmpty()) { Column {
                 Spacer(Modifier.height(Space.s))
                 exercises.forEach { e ->
                     val done = e.sets.filter { it.completed }
@@ -128,12 +133,40 @@ internal fun TrainingRow(row: HistoryRow, unit: WeightUnit, language: Language, 
                         Text(right, style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
                     }
                 }
-            }
+            } }
         }
     }
 }
 
 private data class DetailData(val finished: FinishedWorkout, val summary: WorkoutSummary)
+
+/**
+ * Last loaded details of the few most recently opened trainings (main thread only). Coming back from edit, share,
+ * photo or exercise details recreates the screen: with this it is there at once (and keeps its scroll position)
+ * instead of starting empty; `changes` then refreshes it as before.
+ */
+private val detailCache = DetailCache()
+
+/**
+ * The six trainings opened last, most recent last. Written by hand: an access-ordered map with a size limit exists
+ * on the JVM only, this is shared code (iOS).
+ */
+private class DetailCache {
+    private val entries = LinkedHashMap<String, DetailData>()
+
+    /** Reading an entry makes it the most recent one. */
+    operator fun get(id: String): DetailData? = entries.remove(id)?.also { entries[id] = it }
+
+    operator fun set(id: String, data: DetailData) {
+        entries.remove(id)
+        entries[id] = data
+        while (entries.size > MAX) entries.remove(entries.keys.first())
+    }
+
+    fun remove(id: String) { entries.remove(id) }
+
+    private companion object { const val MAX = 6 }
+}
 
 /**
  * One finished training (opened from its calendar day): numbers, all sets, photos and actions
@@ -162,134 +195,154 @@ fun WorkoutDetailScreen(
 ) {
     val t = LocalStrings.current
     val h = t.history
-    val data by produceState<DetailData?>(null, workoutId) {
+    val data by produceState(detailCache[workoutId], workoutId) {
         // `changes` emits right away and after every write, so an edit shows up when coming back.
         workouts.changes.collect {
             val finished = workouts.getFinished(workoutId)
             val summary = workouts.summary(workoutId)
             if (finished == null || summary == null) {
+                detailCache.remove(workoutId)
                 if (value == null) onBack()
             } else {
-                value = DetailData(finished, summary)
+                value = DetailData(finished, summary).also { d -> detailCache[workoutId] = d }
             }
         }
     }
+    val haptics = rememberHaptics()
+    var savingTemplate by remember { mutableStateOf(false) }
     // Photos belong to the training's day (v14): the detail shows them all and adds new ones to that day.
     val day = data?.finished?.workout?.startedAt?.let { localDateTime(it).date }
-    val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
-        .collectAsStateWithLifecycle(emptyList())
+    // Null until the day's photos are loaded: the grid then knows which ones were simply there.
+    val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(null) }
+        .collectAsStateWithLifecycle<List<app.overfit.data.WorkoutPhoto>?>(null)
 
     Screen(scroll = true, header = {
         // [edit] [⋮ share, delete] [coach] (UI audit 12.11.: four icons were too many; delete keeps its two taps).
-        val loaded = data != null
+        // All of them act on the id only, so they are there from the start instead of popping in after loading.
         BackHeader(
             t.back, onBack,
-            coach = if (loaded) onCoach else null,
-            menu = if (loaded) listOf(
+            coach = onCoach,
+            menu = listOf(
                 MenuItem(h.shareWorkout, onClick = onShare),
                 MenuItem(t.delete, destructive = true, confirm = true) {
+                    detailCache.remove(workoutId)
                     appScope.launch { workouts.deleteWorkout(workoutId) }
                     onBack()
                 },
-            ) else emptyList(),
+            ),
         ) {
-            if (loaded && onEdit != null) HeaderIconButton(Icon.Edit, h.editWorkout, onEdit)
+            if (onEdit != null) HeaderIconButton(Icon.Edit, h.editWorkout, onEdit)
         }
     }) {
-        val d = data ?: return@Screen
-        val w = d.finished.workout
-        Text("${t.date(localDateTime(w.startedAt).date)} · ${clockTime(w.startedAt)}", tone = Tone.Muted)
-        Spacer(Modifier.height(Space.s))
-        // Tapping the name opens the edit mode with the name field (rename this training only).
-        val titleInteraction = remember { MutableInteractionSource() }
-        Title(
-            w.name,
-            if (onEdit == null) Modifier else Modifier.pressScale(titleInteraction)
-                .clickable(titleInteraction, indication = null, onClickLabel = h.renameWorkout, role = Role.Button, onClick = onEdit),
-        )
-        Spacer(Modifier.height(Space.l))
-        SummaryRows(d.summary, unit, language, t) {
-            d.finished.feeling?.let { ListRow(h.feeling, "$it / 5") }
-            // Changed afterwards via "Edit" (pencil top right).
-            if (d.finished.sauna) ListRow(h.sauna) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline) }
-        }
-        d.finished.note?.let {
-            PanelSection(h.note) { PanelItem { Text(it) } }
-        }
-        if (chatNotes.isNotEmpty()) {
-            PanelSection(h.chatNotes) {
-                chatNotes.forEach { n ->
-                    PanelItem {
-                        n.title?.let { Text(it, style = Theme.type.label) }
-                        Text(n.text)
-                        if (n.clientName.isNotBlank()) Text(n.clientName, style = Theme.type.caption, tone = Tone.Muted)
-                    }
+        // Loaded a moment later on the first open: the content fades in instead of popping.
+        Swap(data, contentKey = { it != null }) { loaded ->
+            val d = loaded ?: return@Swap
+            Column(Modifier.fillMaxWidth()) {
+                val w = d.finished.workout
+                Text("${t.date(localDateTime(w.startedAt).date)} · ${clockTime(w.startedAt)}", tone = Tone.Muted)
+                Spacer(Modifier.height(Space.s))
+                // Tapping the name opens the edit mode with the name field (rename this training only).
+                val titleInteraction = remember { MutableInteractionSource() }
+                Title(
+                    w.name,
+                    if (onEdit == null) Modifier else Modifier.pressScale(titleInteraction)
+                        .clickable(titleInteraction, indication = null, onClickLabel = h.renameWorkout, role = Role.Button, onClick = onEdit),
+                )
+                Spacer(Modifier.height(Space.l))
+                SummaryRows(d.summary, unit, language, t) {
+                    d.finished.feeling?.let { ListRow(h.feeling, "$it / 5") }
+                    // Changed afterwards via "Edit" (pencil top right).
+                    if (d.finished.sauna) ListRow(h.sauna) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline) }
                 }
-            }
-        }
-
-        if (day != null) {
-            SectionTitle(h.dayPhotos)
-            DayPhotoGrid(
-                photos,
-                onAdd = { bytes -> addDayPhoto(workouts, appScope, day, bytes) },
-                onOpen = onOpenPhoto,
-                onRemove = { id -> appScope.launch { workouts.deletePhoto(id) } },
-            )
-            Hint(h.dayPhotosHint)
-        }
-
-        // Muscles of exactly this training (completed sets), small version of the calendar's body map.
-        val loads = remember(w) { app.overfit.domain.MuscleMap.ofWorkout(w) }
-        if (loads.isNotEmpty()) {
-            SectionTitle(t.muscles.title)
-            Block(Modifier.testTag("workout-muscles")) {
-                app.overfit.ui.muscles.MuscleMapBody(loads, figureHeight = 240.dp, Modifier.padding(vertical = Space.s))
-            }
-        }
-
-        // One card per exercise, as in the running workout (image left, name, sets), only without input.
-        if (w.exercises.isNotEmpty()) Spacer(Modifier.height(Space.l))
-        Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
-            w.exercises.forEach { e ->
-                val marker = if (e.skipped) t.training.skipped else when (e.origin) {
-                    ExerciseOrigin.ADDED -> h.markerAdded
-                    ExerciseOrigin.REPLACED -> h.markerReplaced
-                    ExerciseOrigin.PLANNED -> null
-                }
-                Block {
-                    ExerciseCardHeader(
-                        e.exercise,
-                        listOfNotNull(listOfNotNull(t.setsDone(e.sets.count { it.completed }, e.sets.size), marker).joinToString(" · ")),
-                        onDetails = { onExerciseDetails(e.exercise.id) },
-                    )
-                    // A skipped exercise shows only what was done before it was skipped.
-                    e.sets.forEachIndexed { i, s ->
-                        if (e.skipped && !s.completed) return@forEachIndexed
-                        val v = if (s.completed || s.actual != SetValues()) s.actual else s.target
-                        val text = WorkoutFormat.values(v, e.exercise.trackingType, unit, language, t).ifEmpty { "–" }
-                        val tone = if (s.completed) Tone.Default else Tone.Muted
-                        Row(
-                            Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = Space.s),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("${i + 1}", Modifier.width(32.dp), tone = Tone.Muted)
-                            Text(text, Modifier.weight(1f), tone = tone)
-                            if (s.completed) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small) else Text(h.notDone, style = Theme.type.caption, tone = Tone.Muted)
+                // One card per exercise, as in the running workout (image left, name, sets), only without input.
+                // What you look up comes first (audit 17.11.): right below the numbers.
+                if (w.exercises.isNotEmpty()) Spacer(Modifier.height(Space.l))
+                Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+                    w.exercises.forEach { e ->
+                        val marker = if (e.skipped) t.training.skipped else when (e.origin) {
+                            ExerciseOrigin.ADDED -> h.markerAdded
+                            ExerciseOrigin.REPLACED -> h.markerReplaced
+                            ExerciseOrigin.PLANNED -> null
+                        }
+                        Block {
+                            ExerciseCardHeader(
+                                e.exercise,
+                                listOfNotNull(listOfNotNull(t.setsDone(e.sets.count { it.completed }, e.sets.size), marker).joinToString(" · ")),
+                                onDetails = { onExerciseDetails(e.exercise.id) },
+                            )
+                            // A skipped exercise shows only what was done before it was skipped.
+                            e.sets.forEachIndexed { i, s ->
+                                if (e.skipped && !s.completed) return@forEachIndexed
+                                val v = if (s.completed || s.actual != SetValues()) s.actual else s.target
+                                val text = WorkoutFormat.values(v, e.exercise.trackingType, unit, language, t).ifEmpty { "–" }
+                                val tone = if (s.completed) Tone.Default else Tone.Muted
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = Space.s),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text("${i + 1}", Modifier.width(32.dp), tone = Tone.Muted)
+                                    Text(text, Modifier.weight(1f), tone = tone)
+                                    if (s.completed) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.small) else Text(h.notDone, style = Theme.type.caption, tone = Tone.Muted)
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
 
-        Spacer(Modifier.height(Space.xl))
-        Panel {
-            ListRow(h.useAsTemplate, onClick = {
-                appScope.launch {
-                    val id = templates.save(w.toTemplate())
-                    withContext(Dispatchers.Main) { onTemplateCreated(id) }
+
+                // Note and coach notes come and go after an edit: they grow in / shrink away instead of jumping.
+                RevealNotNull(d.finished.note) { note ->
+                    PanelSection(h.note) { PanelItem { Text(note) } }
                 }
-            })
+                Reveal(chatNotes.isNotEmpty()) {
+                    PanelSection(h.chatNotes) {
+                        chatNotes.forEach { n ->
+                            PanelItem {
+                                n.title?.let { Text(it, style = Theme.type.label) }
+                                Text(n.text)
+                                if (n.clientName.isNotBlank()) Text(n.clientName, style = Theme.type.caption, tone = Tone.Muted)
+                            }
+                        }
+                    }
+                }
+
+                // Muscles of exactly this training (completed sets), small version of the calendar's body map.
+                val loads = remember(w) { app.overfit.domain.MuscleMap.ofWorkout(w) }
+                if (loads.isNotEmpty()) {
+                    SectionTitle(t.muscles.title)
+                    Block(Modifier.testTag("workout-muscles")) {
+                        app.overfit.ui.muscles.MuscleMapBody(loads, figureHeight = 240.dp, Modifier.padding(vertical = Space.s))
+                    }
+                }
+
+                if (day != null) {
+                    SectionTitle(h.dayPhotos)
+                    DayPhotoGrid(
+                        photos,
+                        onAdd = { bytes -> addDayPhoto(workouts, appScope, day, bytes) },
+                        onOpen = onOpenPhoto,
+                        onRemove = { id -> appScope.launch { workouts.deletePhoto(id) } },
+                    )
+                    Hint(h.dayPhotosHint)
+                }
+
+                Spacer(Modifier.height(Space.xl))
+                Panel {
+                    ListRow(h.useAsTemplate, onClick = {
+                        // A second quick tap must not create a second workout.
+                        if (!savingTemplate) {
+                            savingTemplate = true
+                            haptics.confirm()
+                            appScope.launch {
+                                val id = runCatching { templates.save(w.toTemplate()) }.getOrNull()
+                                withContext(Dispatchers.Main) {
+                                    if (id != null) onTemplateCreated(id) else savingTemplate = false
+                                }
+                            }
+                        }
+                    })
+                }
+            }
         }
     }
 }

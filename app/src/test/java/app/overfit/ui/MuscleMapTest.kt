@@ -159,8 +159,9 @@ class MuscleMapTest {
         tapMuscle(Muscle.CALVES, back = true)
         assertEquals(m.load(m.muscle(Muscle.CALVES), 3, 0), line())
 
-        // 4. ✕ closes; reopening keeps "Gesamt".
-        compose.onNodeWithContentDescription(m.close).performClick()
+        // 4. The dimmed area ("Schließen") closes the sheet; reopening keeps "Gesamt". Tapped near its top: the
+        // middle of the scrim lies under the sheet.
+        compose.onNodeWithContentDescription(m.close).performTouchInput { click(androidx.compose.ui.geometry.Offset(width / 2f, 10f)) }
         compose.waitUntilState { !sheetOpen() }
         compose.onNodeWithContentDescription(m.open).performClick()
         compose.waitUntilState { sheetOpen() }

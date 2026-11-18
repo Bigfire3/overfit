@@ -1,6 +1,28 @@
 package app.overfit.ui
 
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.runtime.Stable
+import androidx.navigation.NavBackStackEntry
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.flow.Flow
+import androidx.compose.runtime.State
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.theme.LocalReducedMotion
+import app.overfit.ui.theme.Motion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -542,17 +564,30 @@ fun OverfitApp(deps: AppDependencies) {
             ConfirmArea(Modifier.fillMaxSize()) {
             // While the coach lies over the screen, TalkBack/VoiceOver only reach the coach (UI audit 12.11.).
             val coachOpen = deps.coachOverlay.request.collectAsStateWithLifecycle().value != null
-            AppScaffold(nav, workoutState.workout, deps.clock, onOpenWorkout = { nav.openWorkout() }, hiddenFromAccessibility = coachOpen) {
+            // The four main screens carry the bars themselves (mini workout bar, tab bar): the bars travel with their
+            // screen when another one is pushed over it, instead of vanishing in one frame.
+            val tabSwitch = remember { TabSwitch() }
+            val currentEntry by nav.currentBackStackEntryAsState()
+            // A tab screen on its way out (under the rising workout, under a pushed screen) keeps what it showed: the mini
+            // bar, "running now" and the play buttons change when the user comes back, not underneath the new screen.
+            val tabScreen: @Composable (Tab, NavBackStackEntry, @Composable (running: Workout?) -> Unit) -> Unit = { tab, entry, content ->
+                val running = heldUnlessCurrent(currentEntry?.id == entry.id, workoutState.workout)
+                TabScreen(tab, tabSwitch, running, deps.clock, onOpenWorkout = { nav.openWorkout() }, onSelect = { nav.selectTab(it) }) { content(running) }
+            }
+            val reducedMotion = LocalReducedMotion.current
+            AppScaffold(nav, hiddenFromAccessibility = coachOpen, barsHeight = { tabSwitch.barsHeight }) {
                 NavHost(
                     nav,
                     startDestination = start,
                     modifier = Modifier.fillMaxSize(),
-                    // One calm transition for the whole app (see DECISIONS "Übergänge"): tab switches are instant,
-                    // everything else a short fade-through. The default (700 ms crossfade) looked buggy.
-                    enterTransition = { ScreenMotion.enter(initialState.destination, targetState.destination) },
-                    exitTransition = { ScreenMotion.exit(initialState.destination, targetState.destination) },
-                    popEnterTransition = { ScreenMotion.enter(initialState.destination, targetState.destination) },
-                    popExitTransition = { ScreenMotion.exit(initialState.destination, targetState.destination) },
+                    // One motion for the whole app (ScreenMotion, DECISIONS "Bewegung"): deeper = in from the side, the
+                    // workout = up from the bottom, tabs swap at once; the back gesture moves the screen with the finger.
+                    enterTransition = { ScreenMotion.enter(this, reducedMotion) },
+                    exitTransition = { ScreenMotion.exit(this, reducedMotion) },
+                    popEnterTransition = { ScreenMotion.popEnter(this, reducedMotion) },
+                    popExitTransition = { ScreenMotion.popExit(this, reducedMotion) },
+                    predictivePopEnterTransition = { edge -> ScreenMotion.predictivePopEnter(this, edge, reducedMotion) },
+                    predictivePopExitTransition = { edge -> ScreenMotion.predictivePopExit(this, edge, reducedMotion) },
                     sizeTransform = null,
                 ) {
                     composable<NameRoute> {
@@ -593,35 +628,39 @@ fun OverfitApp(deps: AppDependencies) {
                         )
                     }
 
-                    composable<StartRoute> {
-                        val startScope = rememberCoroutineScope()
-                        val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = emptyMap())
-                        StartScreen(
-                            templates = templates,
-                            lastDone = lastDone,
-                            today = deps.today(),
-                            running = workoutState.workout,
-                            onOpenRunning = { nav.openWorkout() },
-                            onEndRunning = {
-                                // Ends the running workout (saved, finish flow): the workout screen takes it from there. Runs in the app scope.
-                                deps.data.scope.launch { deps.workout.finish() }
-                                nav.openWorkout()
-                            },
-                            onNew = { nav.navigate(StartWorkoutRoute) },
-                            onExercises = { nav.navigate(ExercisesRoute) },
-                            onOpenWorkout = { nav.navigate(WorkoutPlanRoute(it)) },
-                            onStartWorkout = { id ->
-                                // Start right from the list (one tap). Main thread: the controller and navigation live there.
-                                startScope.launch {
-                                    val template = deps.data.templates.get(id) ?: return@launch
-                                    if (deps.workout.startFromTemplate(template)) nav.navigate(WorkoutRoute)
-                                }
-                            },
-                            share = share,
-                            chatInboxCount = chatInbox.items.size,
-                            chatInboxFull = chatInbox.full,
-                            onChatInbox = { nav.navigate(ChatInboxRoute) },
-                        )
+                    composable<StartRoute> { entry ->
+                        tabScreen(Tab.START, entry) { running ->
+                            val startScope = rememberCoroutineScope()
+                            // null until loaded: the cards then leave their "last done" line empty instead of showing
+                            // "never trained" for a frame. Cached across entries, so it is there in the first frame.
+                            val lastDone by deps.data.templates.lastDone.collectCached(tabSwitch, "lastDone")
+                            StartScreen(
+                                templates = templates,
+                                lastDone = lastDone,
+                                today = deps.today(),
+                                running = running,
+                                onOpenRunning = { nav.openWorkout() },
+                                onEndRunning = {
+                                    // Ends the running workout (saved, finish flow): the workout screen takes it from there. Runs in the app scope.
+                                    deps.data.scope.launch { deps.workout.finish() }
+                                    nav.openWorkout()
+                                },
+                                onNew = { nav.navigate(StartWorkoutRoute) },
+                                onExercises = { nav.navigate(ExercisesRoute) },
+                                onOpenWorkout = { nav.navigate(WorkoutPlanRoute(it)) },
+                                onStartWorkout = { id ->
+                                    // Start right from the list (one tap). Main thread: the controller and navigation live there.
+                                    startScope.launch {
+                                        val template = deps.data.templates.get(id) ?: return@launch
+                                        if (deps.workout.startFromTemplate(template)) nav.navigate(WorkoutRoute)
+                                    }
+                                },
+                                share = share,
+                                chatInboxCount = chatInbox.items.size,
+                                chatInboxFull = chatInbox.full,
+                                onChatInbox = { nav.navigate(ChatInboxRoute) },
+                            )
+                        }
                     }
                     composable<StartWorkoutRoute> {
                         NewWorkoutScreen(
@@ -642,7 +681,7 @@ fun OverfitApp(deps: AppDependencies) {
                         // A saved workout: shown and edited in one screen (autosave), "Start" at the bottom.
                         val id = entry.toRoute<WorkoutPlanRoute>().templateId
                         val scope = rememberCoroutineScope()
-                        val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = emptyMap())
+                        val lastDone by deps.data.templates.lastDone.collectAsStateWithLifecycle(initialValue = null)
                         val editor = viewModel(key = "plan-$id") {
                             TemplateEditorViewModel(id, deps.data.templates, deps.data.exercises, state.profile.unit, state.language)
                         }
@@ -654,7 +693,7 @@ fun OverfitApp(deps: AppDependencies) {
                             viewModel = editor,
                             unit = state.profile.unit,
                             language = state.language,
-                            lastDone = lastDoneText(LocalStrings.current, lastDone[id], deps.today()),
+                            lastDone = lastDone?.let { lastDoneText(LocalStrings.current, it[id], deps.today()) }.orEmpty(),
                             workoutRunning = workoutState.workout != null,
                             onClose = nav::popBackStack,
                             // A replace whose picker was left with back must not turn the next add into a replace.
@@ -897,38 +936,42 @@ fun OverfitApp(deps: AppDependencies) {
                             onCreatedConsumed = { picked.created.value = null },
                         )
                     }
-                    composable<PhotosRoute> {
-                        val photos by deps.data.workouts.photos.collectAsStateWithLifecycle(initialValue = null)
-                        val history by deps.data.workouts.history.collectAsStateWithLifecycle(initialValue = null)
-                        val viewPref = remember { app.overfit.ui.photos.DiaryViewPref(deps.kv) }
-                        val weights by deps.data.bodyWeights.entries.collectAsStateWithLifecycle(initialValue = null)
-                        var showMuscles by rememberSaveable { mutableStateOf(false) }
-                        PhotosScreen(
-                            weights = weights,
-                            onWeightToday = { nav.navigate(DayRoute(deps.today().toString(), focusWeight = true)) },
-                            photos = photos,
-                            history = history,
-                            language = state.language,
-                            today = deps.today(),
-                            onDay = { nav.navigate(DayRoute(it.toString())) },
-                            onCompare = { a, b -> nav.navigate(PhotoCompareRoute(a, b)) },
-                            unit = state.profile.unit,
-                            listView = viewPref.list,
-                            onListViewChange = { viewPref.list = it },
-                            onMuscles = { showMuscles = true },
-                        )
-                        if (showMuscles) {
-                            val muscleSets by deps.data.workouts.muscleSets.collectAsStateWithLifecycle(initialValue = null)
-                            val periodPref = remember { app.overfit.ui.muscles.MusclePeriodPref(deps.kv) }
-                            var period by remember { mutableStateOf(periodPref.period) }
-                            app.overfit.ui.muscles.MuscleMapSheet(
-                                rows = muscleSets,
-                                period = period,
+                    composable<PhotosRoute> { entry ->
+                        tabScreen(Tab.PHOTOS, entry) { _ ->
+                            // Cached across entries: the calendar opens with its days in the first frame instead of
+                            // fading in from empty on every tab switch.
+                            val photos by deps.data.workouts.photos.collectCached(tabSwitch, "photos")
+                            val history by deps.data.workouts.history.collectCached(tabSwitch, "history")
+                            val viewPref = remember { app.overfit.ui.photos.DiaryViewPref(deps.kv) }
+                            val weights by deps.data.bodyWeights.entries.collectCached(tabSwitch, "weights")
+                            var showMuscles by rememberSaveable { mutableStateOf(false) }
+                            PhotosScreen(
+                                weights = weights,
+                                onWeightToday = { nav.navigate(DayRoute(deps.today().toString(), focusWeight = true)) },
+                                photos = photos,
+                                history = history,
+                                language = state.language,
                                 today = deps.today(),
-                                weekStart = app.overfit.domain.DiaryCalendar.weekStart(state.language),
-                                onPeriod = { period = it; periodPref.period = it },
-                                onDismiss = { showMuscles = false },
+                                onDay = { nav.navigate(DayRoute(it.toString())) },
+                                onCompare = { a, b -> nav.navigate(PhotoCompareRoute(a, b)) },
+                                unit = state.profile.unit,
+                                listView = viewPref.list,
+                                onListViewChange = { viewPref.list = it },
+                                onMuscles = { showMuscles = true },
                             )
+                            if (showMuscles) {
+                                val muscleSets by deps.data.workouts.muscleSets.collectAsStateWithLifecycle(initialValue = null)
+                                val periodPref = remember { app.overfit.ui.muscles.MusclePeriodPref(deps.kv) }
+                                var period by remember { mutableStateOf(periodPref.period) }
+                                app.overfit.ui.muscles.MuscleMapSheet(
+                                    rows = muscleSets,
+                                    period = period,
+                                    today = deps.today(),
+                                    weekStart = app.overfit.domain.DiaryCalendar.weekStart(state.language),
+                                    onPeriod = { period = it; periodPref.period = it },
+                                    onDismiss = { showMuscles = false },
+                                )
+                            }
                         }
                     }
                     composable<PhotoViewerRoute> { entry ->
@@ -969,60 +1012,62 @@ fun OverfitApp(deps: AppDependencies) {
                             onRestored = { nav.navigate(StartRoute) { popUpTo(0) { inclusive = true } } },
                         )
                     }
-                    composable<SettingsRoute> {
-                        var exportingBackup by remember { mutableStateOf(false) }
-                        var backupExportFailed by remember { mutableStateOf(false) }
-                        val pickBackup = rememberFilePicker { bytes ->
-                            deps.pendingBackup.value = bytes
-                            nav.navigate(BackupImportRoute)
-                        }
-                        SettingsScreen(
-                            state = state,
-                            store = deps.store,
-                            providers = deps.providers,
-                            today = deps.today(),
-                            onAbout = { nav.navigate(AboutRoute) },
-                            fuelSession = deps.fuelSession,
-                            coach = deps.coach,
-                            coachPrefs = deps.data.coachChatPrefs,
-                            chatFeature = deps.chat,
-                            coachNav = app.overfit.ui.settings.CoachSettingsNav(
-                                access = { nav.navigate(CoachAccessRoute) },
-                                fuel = { nav.navigate(FuelRoute) },
-                                profile = { nav.navigate(CoachProfileRoute) },
-                                instructions = { nav.navigate(CoachInstructionsRoute) },
-                                memory = { nav.navigate(CoachMemoryRoute) },
-                                reviews = { nav.navigate(CoachReviewsRoute) },
-                                requestLog = { nav.navigate(RequestLogRoute) },
-                                prompts = { nav.navigate(CoachPromptsRoute) },
-                                chatProvider = { nav.navigate(ChatProviderRoute(it.name)) },
-                                chatNotes = { nav.navigate(ChatNotesRoute) },
-                                story = { nav.navigate(CoachStoryRoute) },
-                            ),
-                            restAlerts = deps.restAlerts,
-                            share = share,
-                            exportingBackup = exportingBackup,
-                            backupExportFailed = backupExportFailed,
-                            onExportBackup = {
-                                exportingBackup = true
-                                backupExportFailed = false
-                                deps.data.scope.launch {
-                                    val bytes = try { deps.backup.export() } catch (e: Exception) { null }
-                                    withContext(Dispatchers.Main) {
-                                        exportingBackup = false
-                                        backupExportFailed = bytes == null
-                                        if (bytes != null) deps.share.shareBytes(BackupService.fileName(deps.today().toString()), bytes, BackupService.MIME_TYPE)
+                    composable<SettingsRoute> { entry ->
+                        tabScreen(Tab.PROFILE, entry) { _ ->
+                            var exportingBackup by remember { mutableStateOf(false) }
+                            var backupExportFailed by remember { mutableStateOf(false) }
+                            val pickBackup = rememberFilePicker { bytes ->
+                                deps.pendingBackup.value = bytes
+                                nav.navigate(BackupImportRoute)
+                            }
+                            SettingsScreen(
+                                state = state,
+                                store = deps.store,
+                                providers = deps.providers,
+                                today = deps.today(),
+                                onAbout = { nav.navigate(AboutRoute) },
+                                fuelSession = deps.fuelSession,
+                                coach = deps.coach,
+                                coachPrefs = deps.data.coachChatPrefs,
+                                chatFeature = deps.chat,
+                                coachNav = app.overfit.ui.settings.CoachSettingsNav(
+                                    access = { nav.navigate(CoachAccessRoute) },
+                                    fuel = { nav.navigate(FuelRoute) },
+                                    profile = { nav.navigate(CoachProfileRoute) },
+                                    instructions = { nav.navigate(CoachInstructionsRoute) },
+                                    memory = { nav.navigate(CoachMemoryRoute) },
+                                    reviews = { nav.navigate(CoachReviewsRoute) },
+                                    requestLog = { nav.navigate(RequestLogRoute) },
+                                    prompts = { nav.navigate(CoachPromptsRoute) },
+                                    chatProvider = { nav.navigate(ChatProviderRoute(it.name)) },
+                                    chatNotes = { nav.navigate(ChatNotesRoute) },
+                                    story = { nav.navigate(CoachStoryRoute) },
+                                ),
+                                restAlerts = deps.restAlerts,
+                                share = share,
+                                exportingBackup = exportingBackup,
+                                backupExportFailed = backupExportFailed,
+                                onExportBackup = {
+                                    exportingBackup = true
+                                    backupExportFailed = false
+                                    deps.data.scope.launch {
+                                        val bytes = try { deps.backup.export() } catch (e: Exception) { null }
+                                        withContext(Dispatchers.Main) {
+                                            exportingBackup = false
+                                            backupExportFailed = bytes == null
+                                            if (bytes != null) deps.share.shareBytes(BackupService.fileName(deps.today().toString()), bytes, BackupService.MIME_TYPE)
+                                        }
                                     }
-                                }
-                            },
-                            onImportBackup = pickBackup,
-                            onReset = {
-                                deps.store.resetAll()
-                                deps.providers.fuel.resetAll()
-                                deps.data.scope.launch { deps.workout.discard(keepStructure = false); deps.data.resetAll() }
-                                nav.navigate(NameRoute) { popUpTo(0) { inclusive = true } }
-                            },
-                        )
+                                },
+                                onImportBackup = pickBackup,
+                                onReset = {
+                                    deps.store.resetAll()
+                                    deps.providers.fuel.resetAll()
+                                    deps.data.scope.launch { deps.workout.discard(keepStructure = false); deps.data.resetAll() }
+                                    nav.navigate(NameRoute) { popUpTo(0) { inclusive = true } }
+                                },
+                            )
+                        }
                     }
                     composable<ConnectRoute> {
                         ConnectAiScreen(
@@ -1107,15 +1152,17 @@ fun OverfitApp(deps: AppDependencies) {
                             },
                         )
                     }
-                    composable<CoachRoute> {
-                        // First visit: the story opens once by itself; afterwards only via the title.
-                        LaunchedEffect(Unit) {
-                            if (!deps.store.coachStorySeen()) {
-                                deps.store.markCoachStorySeen()
-                                nav.navigate(CoachStoryRoute)
+                    composable<CoachRoute> { entry ->
+                        tabScreen(Tab.COACH, entry) { _ ->
+                            // First visit: the story opens once by itself; afterwards only via the title.
+                            LaunchedEffect(Unit) {
+                                if (!deps.store.coachStorySeen()) {
+                                    deps.store.markCoachStorySeen()
+                                    nav.navigate(CoachStoryRoute)
+                                }
                             }
+                            CoachChatHost(deps, state, nav, openedChatId = null)
                         }
-                        CoachChatHost(deps, state, nav, openedChatId = null)
                     }
                     composable<CoachOpenChatRoute> { entry ->
                         // An earlier chat, opened from the list: the same chat screen with a back arrow.
@@ -1218,65 +1265,183 @@ internal fun NavHostController.openWorkout() {
     if (!popBackStack(WorkoutRoute, inclusive = false)) navigate(WorkoutRoute) { launchSingleTop = true }
 }
 
-/** Shows the bottom tab bar only on the four top-level screens. */
+/** Holds the navigation host and swallows taps for a moment while one screen replaces another. */
 @Composable
 private fun AppScaffold(
     nav: NavHostController,
-    runningWorkout: Workout?,
-    clock: () -> Long,
-    onOpenWorkout: () -> Unit,
     /** True while a layer (the coach) lies over everything: the screen below is left out of the accessibility tree. */
     hiddenFromAccessibility: Boolean = false,
+    /** Height of the bars of the tab screens ([TabSwitch.barsHeight]); read in layout only. */
+    barsHeight: () -> Dp = { 0.dp },
     content: @Composable () -> Unit,
 ) {
-    val entry by nav.currentBackStackEntryAsState()
-    val destination = entry?.destination
-    val current = Tab.entries.firstOrNull { tab -> destination?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
-
     // While a screen change runs, taps are swallowed: a double tap no longer opens a screen twice or pops two screens.
     val visible by nav.visibleEntries.collectAsStateWithLifecycle()
-    // Tab switches have no transition (ScreenMotion), so they never block: only a fade between other screens does.
+    // Tab switches have no transition (ScreenMotion), so they never block: only a change between other screens does.
     val screens = visible.filter { it.destination !is androidx.navigation.NavGraph }
     val transitioning = screens.size > 1 && !screens.all { e -> Tab.entries.any { e.destination.hasRoute(it.routeClass) } }
-    // ...but only as long as a fade can take. A back gesture that is started and then cancelled (edge swipe, app
-    // switch with gesture navigation) leaves the previous screen "visible" for good: navigation prepares it for
-    // the predictive back animation and never marks it finished. Without this limit every tap was swallowed until
-    // Back was pressed (owner: "nach App-Wechsel stuck, erst Zurück, dann geht es wieder").
+    // ...but only for the first moment, not for the whole tail of the spring: by then the new screen is in place and
+    // should react. The limit also saves us from a back gesture that is started and then cancelled (edge swipe, app
+    // switch with gesture navigation): navigation prepares the previous screen for the back animation and never marks
+    // it finished, so without the limit every tap was swallowed until Back was pressed (owner: "nach App-Wechsel
+    // stuck, erst Zurück, dann geht es wieder").
     val screenKey = screens.map { it.id }
     var blockExpired by remember(screenKey) { mutableStateOf(false) }
+    // The bars of a tab screen (mini bar, tab bar) stay usable during the change when that tab screen is the new
+    // current one and lies on top: going forward into a tab (finish saved, workout discarded, onboarding done). Not on
+    // the way back to a tab (back, minimize): the leaving screen lies above it until it has slid away, and a tap on the
+    // bars would land on its bottom button ("Starten", "Nächsten Satz loggen"). That stays blocked for at most 300 ms.
+    val current by nav.currentBackStackEntryAsState()
+    val seen = remember { mutableSetOf<String>() }
+    val currentId = current?.id
+    val returning = remember(currentId) { currentId != null && currentId in seen }
+    SideEffect { currentId?.let(seen::add) }
+    val barsFree = !returning && current?.destination?.let { d -> Tab.entries.any { d.hasRoute(it.routeClass) } } == true
     LaunchedEffect(screenKey, transitioning) {
         if (transitioning) { delay(ScreenMotion.MAX_BLOCK_MS); blockExpired = true }
     }
-    Column(
+    Box(
         Modifier.fillMaxSize().background(Theme.colors.background)
             .then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier),
     ) {
-        Box(Modifier.weight(1f)) {
-            content()
-            if (transitioning && !blockExpired) Box(Modifier.matchParentSize().testTag("nav-transition").pointerInput(Unit) {
-                awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
-            })
-        }
-        // A running workout that is not on screen (minimized) sits above the tab bar on every main screen.
-        // While the story is still on screen (last frames of closing), the bars stay hidden: they appear in the same
-        // frame the story disappears, never underneath it first.
-        val storyOnScreen = screens.any { it.destination.hasRoute(CoachStoryRoute::class) }
-        if (current != null && !storyOnScreen && runningWorkout != null) MiniWorkoutBar(runningWorkout, clock, onOpenWorkout)
-        if (current != null && !storyOnScreen) {
-            TabBar(current) { tab -> nav.selectTab(tab) }
+        content()
+        if (transitioning && !blockExpired) Box(
+            Modifier.matchParentSize()
+                // Leaves the bars at the bottom out when they are free (see above); the height is read in layout.
+                .layout { measurable, constraints ->
+                    val free = if (barsFree) barsHeight().roundToPx().coerceIn(0, constraints.maxHeight) else 0
+                    val height = constraints.maxHeight - free
+                    val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
+                }
+                .testTag("nav-transition")
+                .pointerInput(Unit) {
+                    awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
+                },
+        )
+    }
+}
+
+/**
+ * Which tab was on screen last. A tab screen that appears compares itself with it: another tab means the user switched
+ * tabs (the content settles in softly and the marker in the bar slides over from there); the same tab means it returns
+ * from a screen above it and simply is there.
+ */
+@Stable
+internal class TabSwitch {
+    var last: Tab? = null
+    /**
+     * Height of the bars (mini bar + tab bar) as last measured. The next tab screen starts from it, so its first frame
+     * is laid out with the right room at the bottom (it is recreated on every entry); [AppScaffold] keeps it free of
+     * the tap blocker.
+     */
+    var barsHeight by mutableStateOf(0.dp)
+    /** Last value of each flow a tab screen shows ([collectCached]), so the tab opens with it instead of loading again. */
+    val cache = mutableMapOf<String, Any?>()
+}
+
+/**
+ * Collects a flow of a tab screen and remembers its last value in [switch]: on the next entry the screen starts with
+ * that value in its first frame (and only animates what really changed since), instead of null → loaded with a
+ * loading animation on every tab switch. Null until the first value ever.
+ */
+@Composable
+internal fun <T> Flow<T>.collectCached(switch: TabSwitch, key: String): State<T?> {
+    @Suppress("UNCHECKED_CAST")
+    val state = collectAsStateWithLifecycle(initialValue = switch.cache[key] as T?)
+    SideEffect { state.value?.let { switch.cache[key] = it } }
+    return state
+}
+
+/** [value] while [current]; the value it had when it stopped being current otherwise (a screen on its way out). */
+@Composable
+internal fun <T> heldUnlessCurrent(current: Boolean, value: T): T {
+    val held = remember { arrayOfNulls<Any?>(1).also { it[0] = value } }
+    if (current) held[0] = value
+    @Suppress("UNCHECKED_CAST")
+    return held[0] as T
+}
+
+/**
+ * One of the four main screens together with its bars: the mini bar of a running, minimized workout and the tab bar.
+ * The bars are part of the screen, so they move with it when another screen is pushed over it or the workout rises
+ * from the mini bar, and nothing above them jumps.
+ */
+@Composable
+private fun TabScreen(
+    tab: Tab,
+    switch: TabSwitch,
+    runningWorkout: Workout?,
+    clock: () -> Long,
+    onOpenWorkout: () -> Unit,
+    onSelect: (Tab) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val from = remember { switch.last?.takeIf { it != tab } }
+    // After a tab switch the content comes up from slightly dimmed and slightly small; otherwise it is there at once.
+    val settled = remember { Animatable(if (from != null) 0f else 1f) }
+    LaunchedEffect(Unit) { settled.animateTo(1f, Motion.snappy()) }
+    // "Last tab" is only the one that really became the current screen: a tab composed underneath a back gesture that
+    // is then cancelled (preview of the screen below) does not count.
+    LifecycleResumeEffect(tab) {
+        switch.last = tab
+        onPauseOrDispose { }
+    }
+    val density = LocalDensity.current
+    Column(Modifier.fillMaxSize().background(Theme.colors.background)) {
+        Box(
+            Modifier.weight(1f)
+                // The bars keep clear of the system bar themselves and take their own room: the screen above them must
+                // not add that again at its bottom, and an open keyboard only needs what the bars do not cover. Starts
+                // from the last measured height, so the first frame is already right.
+                .consumeWindowInsets(PaddingValues(bottom = switch.barsHeight))
+                .graphicsLayer {
+                    alpha = 0.5f + 0.5f * settled.value
+                    val scale = 0.985f + 0.015f * settled.value
+                    scaleX = scale; scaleY = scale
+                },
+        ) { content() }
+        Column(Modifier.onSizeChanged { switch.barsHeight = with(density) { it.height.toDp() } }) {
+            // A workout that ends while its bar is shown: the bar sinks away, the screen takes the room.
+            RevealNotNull(runningWorkout) { MiniWorkoutBar(it, clock, onOpenWorkout) }
+            TabBar(tab, from, onSelect)
         }
     }
 }
 
+/**
+ * The tab bar. A grey marker lies behind the current tab; after a switch it slides over from the tab the user came
+ * from ([from]) and the icons change colour as it passes, so the bar shows where you went.
+ */
 @Composable
-private fun TabBar(current: Tab, onSelect: (Tab) -> Unit) {
+private fun TabBar(current: Tab, from: Tab?, onSelect: (Tab) -> Unit) {
     val strings = LocalStrings.current
-    Column(Modifier.fillMaxWidth().background(Theme.colors.background).windowInsetsPadding(WindowInsets.navigationBars)) {
+    val c = Theme.colors
+    val position = remember { Animatable((from ?: current).ordinal.toFloat()) }
+    LaunchedEffect(current) { position.animateTo(current.ordinal.toFloat(), Motion.smooth()) }
+    Column(Modifier.fillMaxWidth().background(c.background).windowInsetsPadding(WindowInsets.navigationBars)) {
         Hairline()
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Row(
+            Modifier.fillMaxWidth().drawBehind {
+                val slot = size.width / Tab.entries.size
+                val width = minOf(slot - 16.dp.toPx(), 96.dp.toPx())
+                val height = size.height - 12.dp.toPx()
+                drawRoundRect(
+                    c.surface,
+                    topLeft = Offset(slot * position.value + (slot - width) / 2, (size.height - height) / 2),
+                    size = Size(width, height),
+                    cornerRadius = CornerRadius(height / 2),
+                )
+            },
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
             Tab.entries.forEach { tab ->
                 val active = tab == current
-                val color = if (active) Theme.colors.foreground else Theme.colors.muted
+                // White under the marker, grey away from it. Read while drawing: the bar does not recompose while the
+                // marker slides, only the icons and labels redraw.
+                val tint = remember(tab, c) {
+                    { lerp(c.muted, c.foreground, (1f - kotlin.math.abs(position.value - tab.ordinal)).coerceIn(0f, 1f)) }
+                }
                 Column(
                     Modifier
                         .weight(1f)
@@ -1287,9 +1452,9 @@ private fun TabBar(current: Tab, onSelect: (Tab) -> Unit) {
                         .padding(vertical = Space.s),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    LineIcon(tab.icon, color = color)
+                    LineIcon(tab.icon, color = tint)
                     Spacer(Modifier.height(2.dp))
-                    Text(tab.label(strings), style = Theme.type.caption, tone = if (active) Tone.Default else Tone.Muted)
+                    BasicText(tab.label(strings), style = Theme.type.caption, color = tint)
                 }
             }
         }

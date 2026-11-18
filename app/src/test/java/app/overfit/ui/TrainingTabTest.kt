@@ -138,7 +138,7 @@ class TrainingTabTest {
         val deps = launch()
         waitFor("noch nie trainiert")
         compose.onNodeWithText("Push").performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         compose.onNodeWithText("Starten").performClick()
         compose.waitUntilState(20_000) { deps.workout.state.value.workout != null }
 

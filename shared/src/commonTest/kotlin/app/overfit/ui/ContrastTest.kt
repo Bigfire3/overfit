@@ -57,6 +57,34 @@ class ContrastTest {
 
     @Test fun whiteOnSwipeToDelete() = check("white/armedFill", Color.White, c.armedFill, 4.5f)
 
+    @Test fun accentOnEverySurface() {
+        // "Now" colour: countdown on the rest island (surface, also over its filled part), set number on a row,
+        // marks on black.
+        check("accent/background", c.accent, c.background, 4.5f)
+        check("accent/surface", c.accent, c.surface, 4.5f)
+        check("accent/surfacePressed", c.accent, c.surfacePressed, 4.5f)
+        check("accent/accentSubtle", c.accent, c.accentSubtle, 4.5f)
+        // Buttons on the filled part of the rest island keep their white label readable.
+        check("white/surfacePressed", c.foreground, c.surfacePressed, 4.5f)
+    }
+
+    @Test fun accentIsNeitherGreenNorRed() {
+        // Three meanings, three hues: done (green), now (yellow), delete (red) must not be mistaken for each other.
+        fun hue(x: Color): Float {
+            val max = maxOf(x.red, x.green, x.blue); val min = minOf(x.red, x.green, x.blue)
+            val d = (max - min).takeIf { it > 0f } ?: return 0f
+            val h = when (max) {
+                x.red -> ((x.green - x.blue) / d) % 6f
+                x.green -> (x.blue - x.red) / d + 2f
+                else -> (x.red - x.green) / d + 4f
+            } * 60f
+            return (h + 360f) % 360f
+        }
+        fun apart(a: Color, b: Color) = kotlin.math.abs(hue(a) - hue(b)).let { minOf(it, 360f - it) }
+        assertTrue(apart(c.accent, c.positive) >= 40f, "accent too close to green")
+        assertTrue(apart(c.accent, c.armed) >= 40f, "accent too close to red")
+    }
+
     @Test fun numberFieldOnRows() {
         // Set field: translucent white over the grey row and over the green (checked-off) row.
         // The digits are large text (20 sp semibold ≥ 14 pt bold): 3:1 is the WCAG floor, the grey row clears 4.5:1 anyway.

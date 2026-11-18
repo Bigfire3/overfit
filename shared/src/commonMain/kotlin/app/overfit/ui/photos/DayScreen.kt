@@ -69,6 +69,13 @@ import app.overfit.domain.parseDecimal
 import app.overfit.domain.lbToKg
 import app.overfit.ui.components.HeaderDeleteButton
 import app.overfit.ui.components.SetField
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.PopIn
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
+import app.overfit.ui.theme.IconSize
+import app.overfit.ui.theme.Motion
+import androidx.compose.animation.animateContentSize
 
 /**
  * One calendar day (tap on a day in the calendar): its photos (view, add with camera or library,
@@ -109,19 +116,38 @@ fun DayScreen(
     Screen(scroll = true, header = { BackHeader(t.back, onBack, coach = onCoach) }) {
         Title(t.date(date))
 
-        if (weights != null) DayWeight(date, weights, unit, language, focusWeight, onSetWeight, onDeleteWeight)
+        // Always there (an empty field while the log loads), so nothing below is pushed down during the push.
+        DayWeight(date, weights.orEmpty(), unit, language, focusWeight, onSetWeight, onDeleteWeight)
 
         SectionTitle(p.dayTrainings)
-        if (history != null && trainings.isEmpty()) Text(p.dayNoTraining, tone = Tone.Muted)
-        if (trainings.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
-            trainings.forEach { TrainingRow(it, unit, language, onOpenWorkout, workouts[it.id]) }
+        // Loading -> "no training" / cards: fades in instead of popping.
+        val trainingState = when {
+            history == null -> TrainingsState.Loading
+            trainings.isEmpty() -> TrainingsState.Empty
+            else -> TrainingsState.List
+        }
+        Swap(trainingState, Modifier.fillMaxWidth()) { state ->
+            when (state) {
+                TrainingsState.Loading -> Spacer(Modifier.fillMaxWidth())
+                TrainingsState.Empty -> Text(p.dayNoTraining, tone = Tone.Muted)
+                TrainingsState.List -> Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
+                    trainings.forEach {
+                        // The card grows softly when its exercises arrive a moment later.
+                        Box(Modifier.fillMaxWidth().animateContentSize(Motion.smooth())) {
+                            TrainingRow(it, unit, language, onOpenWorkout, workouts[it.id])
+                        }
+                    }
+                }
+            }
         }
 
         SectionTitle(p.dayPhotos)
-        DayPhotoGrid(dayPhotos.map { it.photo }, onAdd = onAddPhoto, onOpen = onOpenPhoto, onRemove = onRemovePhoto)
+        DayPhotoGrid(photos?.let { dayPhotos.map { it.photo } }, onAdd = onAddPhoto, onOpen = onOpenPhoto, onRemove = onRemovePhoto)
         Hint(h.photosPrivate)
     }
 }
+
+private enum class TrainingsState { Loading, Empty, List }
 
 /**
  * Body weight of the day: number field like the set fields (saved on every valid input, a new value replaces the old),
@@ -147,8 +173,13 @@ private fun DayWeight(
     // overwrite what is being typed (lb: "180" is stored as kg and would come back as "179,9").
     var focused by remember { mutableStateOf(false) }
     var text by remember(key) { mutableStateOf(entry?.let { shown(it.kg) } ?: "") }
-    LaunchedEffect(key, entry?.kg, unit) { if (!focused) text = entry?.let { shown(it.kg) } ?: "" }
+    // Also while focused but still empty: the field may get the focus before the log has loaded.
+    LaunchedEffect(key, entry?.kg, unit) { if (!focused || text.isEmpty()) text = entry?.let { shown(it.kg) } ?: "" }
     var error by remember(key) { mutableStateOf(false) }
+    // A value was saved while the field had the focus: a tick next to the unit, one confirm when the field is left.
+    var saved by remember(key) { mutableStateOf(false) }
+    val haptics = rememberHaptics()
+    LaunchedEffect(error) { if (error) haptics.reject() }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(focus) { if (focus) runCatching { focusRequester.requestFocus() } }
 
@@ -162,11 +193,13 @@ private fun DayWeight(
                 val kg = bodyWeightKg(clean, unit)
                 // Too low is normal while typing ("8" on the way to "82"); only a value above the maximum is flagged.
                 error = kg == null && (parseDecimal(clean)?.let { if (unit == WeightUnit.KG) it else lbToKg(it) } ?: 0.0) > WEIGHT_KG_MAX
-                if (kg != null && kg != entry?.kg) onSet(kg)
+                if (kg != null && kg != entry?.kg) { onSet(kg); saved = true }
             },
             description = w.fieldDescription(unit.symbol),
             modifier = Modifier.width(120.dp).testTag(WEIGHT_FIELD_TAG).onFocusChanged { state ->
                 // Leaving an empty or invalid field shows the stored value again (deleting is the trash's job).
+                if (state.isFocused && !focused) saved = false
+                if (!state.isFocused && focused && saved) haptics.confirm()
                 focused = state.isFocused
                 if (!state.isFocused) {
                     text = entry?.let { shown(it.kg) } ?: if (bodyWeightKg(text, unit) == null) "" else text
@@ -179,15 +212,24 @@ private fun DayWeight(
         )
         Spacer(Modifier.width(Space.s))
         Text(unit.symbol, tone = Tone.Muted)
+        Spacer(Modifier.width(Space.s))
+        // Saved: a small tick pops in next to the unit (only while what is shown is what is stored).
+        PopIn(saved && entry != null && (!focused || bodyWeightKg(text, unit) == entry.kg)) {
+            LineIcon(Icon.Check, size = IconSize.inline, color = Theme.colors.muted)
+        }
         Spacer(Modifier.weight(1f))
-        if (entry != null) HeaderDeleteButton(w.deleteEntry, onConfirm = { text = ""; onDelete() })
+        Appear(entry != null) {
+            HeaderDeleteButton(w.deleteEntry, onConfirm = { text = ""; saved = false; onDelete() })
+        }
     }
-    if (error) {
-        val min = formatWeight(WEIGHT_KG_MIN, unit, language)
-        val max = formatWeight(WEIGHT_KG_MAX, unit, language)
-        Hint(w.invalid(min, max))
-    } else {
-        Hint(w.dayHint)
+    Swap(error, Modifier.fillMaxWidth()) { isError ->
+        if (isError) {
+            val min = formatWeight(WEIGHT_KG_MIN, unit, language)
+            val max = formatWeight(WEIGHT_KG_MAX, unit, language)
+            Hint(w.invalid(min, max))
+        } else {
+            Hint(w.dayHint)
+        }
     }
 }
 

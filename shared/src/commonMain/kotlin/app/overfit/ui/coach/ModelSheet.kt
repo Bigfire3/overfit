@@ -89,6 +89,13 @@ import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import kotlinx.coroutines.launch
 
+import app.overfit.ui.components.Appear
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.RevealNotNull
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.motionColor
+import app.overfit.ui.components.rememberHaptics
+
 /** Providers that work with an own key, in the order of the chips. Google = [ProviderId.GEMINI]. */
 internal val OWN_KEY_PROVIDERS = listOf(ProviderId.ANTHROPIC, ProviderId.OPENAI, ProviderId.GEMINI, ProviderId.OPENROUTER)
 
@@ -184,6 +191,7 @@ private fun ModelPickerContent(
     var result by remember(provider) { mutableStateOf<KeyTestResult?>(null) }
     val scope = rememberCoroutineScope()
     val tester = remember(providers) { KeyTester(providers.http) }
+    val haptics = rememberHaptics()
 
     fun runTest() {
         if (testing) return
@@ -193,7 +201,10 @@ private fun ModelPickerContent(
         val p = provider
         scope.launch {
             val r = tester.test(p, k)
-            if (p == provider) { result = r; testing = false }
+            if (p == provider) {
+                result = r; testing = false
+                if (r is KeyTestResult.Ok) haptics.confirm() else haptics.reject()
+            }
         }
     }
 
@@ -204,49 +215,56 @@ private fun ModelPickerContent(
         }
         Spacer(Modifier.height(Space.l))
 
-        if (credit) {
-            CreditModels(coach, providers.fuel.available, creditAsked, tier, language, s, fieldFill) { tier = it }
-        } else {
-            Text(s.provider, style = Theme.type.caption, tone = Tone.Muted)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-                OWN_KEY_PROVIDERS.forEach { p ->
-                    Chip(ownKeyProviderLabel(p), selected = p == provider, onClick = { provider = p }, modifier = Modifier.testTag("provider:${p.name}"))
-                }
-            }
-            Spacer(Modifier.height(Space.m))
-            Text(s.apiKey, style = Theme.type.caption, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.xs))
-            FilledField(
-                key, { key = it.trim(); result = null },
-                placeholder = savedKey?.let { s.savedKey(it.takeLast(4)) } ?: s.keyPlaceholder,
-                modifier = Modifier.fillMaxWidth().testTag("key:input"),
-                fill = fieldFill,
-                secret = true,
-                onDone = ::runTest,
-            )
-            Spacer(Modifier.height(Space.s))
-            SmallButton(if (testing) s.testing else s.test, ::runTest, Modifier.testTag("key:test"))
-            result?.let { r -> KeyResultLine(r, s) }
-            if (!testing && result == null && key.isEmpty() && savedKey == null) Hint(s.needKey)
+        // Switching the segment fades the content over and the sheet grows or shrinks with it instead of jumping.
+        Swap(credit, Modifier.fillMaxWidth()) { showCredit ->
+            Column(Modifier.fillMaxWidth()) {
+                if (showCredit) {
+                    CreditModels(coach, providers.fuel.available, creditAsked, tier, language, s, fieldFill) { tier = it }
+                } else {
+                    Text(s.provider, style = Theme.type.caption, tone = Tone.Muted)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                        OWN_KEY_PROVIDERS.forEach { p ->
+                            Chip(ownKeyProviderLabel(p), selected = p == provider, onClick = { provider = p }, modifier = Modifier.testTag("provider:${p.name}"))
+                        }
+                    }
+                    Spacer(Modifier.height(Space.m))
+                    Text(s.apiKey, style = Theme.type.caption, tone = Tone.Muted)
+                    Spacer(Modifier.height(Space.xs))
+                    FilledField(
+                        key, { key = it.trim(); result = null },
+                        placeholder = savedKey?.let { s.savedKey(it.takeLast(4)) } ?: s.keyPlaceholder,
+                        modifier = Modifier.fillMaxWidth().testTag("key:input"),
+                        fill = fieldFill,
+                        secret = true,
+                        onDone = ::runTest,
+                    )
+                    Spacer(Modifier.height(Space.s))
+                    SmallButton(if (testing) s.testing else s.test, ::runTest, Modifier.testTag("key:test"))
+                    RevealNotNull(result) { r -> KeyResultLine(r, s) }
+                    Reveal(!testing && result == null && key.isEmpty() && savedKey == null) { Hint(s.needKey) }
 
-            Spacer(Modifier.height(Space.m))
-            Text(s.model, style = Theme.type.caption, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.xs))
-            FilledField(
-                model, { model = it.trim().take(100) },
-                placeholder = CoachModels.default(provider),
-                modifier = Modifier.fillMaxWidth().testTag("model:input"),
-                fill = fieldFill,
-            )
-            val suggestions = (result as? KeyTestResult.Ok)?.models.orEmpty().take(MAX_SUGGESTIONS)
-            if (suggestions.isNotEmpty()) {
-                Spacer(Modifier.height(Space.s))
-                Text(s.suggestions, style = Theme.type.caption, tone = Tone.Muted)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-                    suggestions.forEach { id -> Chip(id, selected = id == model, onClick = { model = id }, modifier = Modifier.testTag("model:suggestion:$id")) }
+                    Spacer(Modifier.height(Space.m))
+                    Text(s.model, style = Theme.type.caption, tone = Tone.Muted)
+                    Spacer(Modifier.height(Space.xs))
+                    FilledField(
+                        model, { model = it.trim().take(100) },
+                        placeholder = CoachModels.default(provider),
+                        modifier = Modifier.fillMaxWidth().testTag("model:input"),
+                        fill = fieldFill,
+                    )
+                    val suggestions = (result as? KeyTestResult.Ok)?.models.orEmpty().take(MAX_SUGGESTIONS)
+                    RevealNotNull(suggestions.takeIf { it.isNotEmpty() }) { shown ->
+                        Column(Modifier.fillMaxWidth()) {
+                            Spacer(Modifier.height(Space.s))
+                            Text(s.suggestions, style = Theme.type.caption, tone = Tone.Muted)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                                shown.forEach { id -> Chip(id, selected = id == model, onClick = { model = id }, modifier = Modifier.testTag("model:suggestion:$id")) }
+                            }
+                        }
+                    }
+                    Hint(s.runsDirect(ownKeyProviderLabel(provider)))
                 }
             }
-            Hint(s.runsDirect(ownKeyProviderLabel(provider)))
         }
 
         Spacer(Modifier.height(Space.l))
@@ -291,44 +309,53 @@ private fun CreditModels(
     }
     if (!asked) return
     val (config, reload) = rememberLoaded(coach) { coach.fuelConfig() }
-    when (val c = config) {
-        is Loaded.Loading -> Text(f.loading, tone = Tone.Muted)
-        is Loaded.Failed -> { Text(f.unreachable, tone = Tone.Muted); SmallButton(f.retry, reload) }
-        is Loaded.Ready -> {
-            val cfg = c.value
-            if (cfg == null) { Text(f.unreachable, tone = Tone.Muted); SmallButton(f.retry, reload); return }
-            val offered = TIERS.mapNotNull { id -> cfg.tiers[id]?.takeIf { it.available }?.let { id to it } }
-            if (offered.isEmpty()) { Text(f.unreachable, tone = Tone.Muted); return }
-            val selected = offered.firstOrNull { it.first == tier }?.first ?: offered.firstOrNull { it.first == TIER_STANDARD }?.first ?: offered.first().first
-            // The stored tier is no longer offered: the marked fallback is what "Apply" saves.
-            LaunchedEffect(selected) { if (selected != tier) onSelect(selected) }
-            Text(s.creditModels, style = Theme.type.caption, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.xs))
-            Panel {
-                offered.forEach { (id, info) ->
-                    TierRow(info, CostEstimate.micro(info, cfg.markupBp, FuelTask.CHAT, cfg.usageProfiles), id == selected, language, s, rowFill) { onSelect(id) }
+    // Loading → prices fades over and the sheet grows with it instead of in one frame.
+    Swap(config, Modifier.fillMaxWidth(), contentKey = { it::class }) { c ->
+      Column(Modifier.fillMaxWidth()) {
+        when (c) {
+            is Loaded.Loading -> Text(f.loading, tone = Tone.Muted)
+            is Loaded.Failed -> { Text(f.unreachable, tone = Tone.Muted); SmallButton(f.retry, reload) }
+            is Loaded.Ready -> {
+                val cfg = c.value
+                val offered = cfg?.let { TIERS.mapNotNull { id -> cfg.tiers[id]?.takeIf { it.available }?.let { id to it } } }.orEmpty()
+                if (cfg == null) { Text(f.unreachable, tone = Tone.Muted); SmallButton(f.retry, reload) }
+                else if (offered.isEmpty()) Text(f.unreachable, tone = Tone.Muted)
+                else {
+                    val selected = offered.firstOrNull { it.first == tier }?.first ?: offered.firstOrNull { it.first == TIER_STANDARD }?.first ?: offered.first().first
+                    // The stored tier is no longer offered: the marked fallback is what "Apply" saves.
+                    LaunchedEffect(selected) { if (selected != tier) onSelect(selected) }
+                    Text(s.creditModels, style = Theme.type.caption, tone = Tone.Muted)
+                    Spacer(Modifier.height(Space.xs))
+                    Panel {
+                        offered.forEach { (id, info) ->
+                            TierRow(info, CostEstimate.micro(info, cfg.markupBp, FuelTask.CHAT, cfg.usageProfiles), id == selected, language, s, rowFill) { onSelect(id) }
+                        }
+                    }
+                    Hint(s.creditNote)
                 }
             }
-            Hint(s.creditNote)
         }
+      }
     }
 }
 
 @Composable
 private fun TierRow(info: FuelTierInfo, perMessage: Long, selected: Boolean, language: Language, s: CoachSettingsStrings, fill: Color, onClick: () -> Unit) {
     val name = info.displayName.ifEmpty { modelShortName(info.model) }
+    val haptics = rememberHaptics()
+    val nameColor by motionColor(if (selected) Theme.colors.foreground else Theme.colors.muted, "tierName")
     Row(
-        Modifier.fillMaxWidth().background(fill).pressableRow(onClick)
+        Modifier.fillMaxWidth().background(fill).pressableRow { if (!selected) haptics.tick(); onClick() }
             .semantics { this.selected = selected }
             .testTag("tier:${info.model}")
             .heightIn(min = 64.dp).padding(horizontal = Space.m, vertical = Space.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(name, tone = if (selected) Tone.Default else Tone.Muted)
+            BasicText(name, style = Theme.type.body, color = { nameColor })
             Text(s.perMessage(formatCents(perMessage, language)), style = Theme.type.caption, tone = Tone.Muted)
         }
-        if (selected) LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline)
+        Appear(selected) { LineIcon(Icon.Check, size = app.overfit.ui.theme.IconSize.inline) }
     }
 }
 

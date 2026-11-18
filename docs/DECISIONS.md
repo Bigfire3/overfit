@@ -1205,7 +1205,7 @@ docs/monetization.md „Rechnung (Session AB)“; Schwellen: „Kleinunternehmer
 - **Rot = Token `Colors.armed`** (`#FF453A` wie `negative`, nur dunkel, da es keinen Hell-Modus mehr gibt; Kontrast auf Schwarz 5,5 : 1): bewusst die einzige Akzentfarbe im Bedienrahmen, nur für scharf geschaltete Bestätigungen. Auch „Beenden“ wird rot (nicht grün): ein einziges, sofort lernbares Signal „gleich passiert etwas, das man nicht zurücknehmen kann“.
 - **Barrierefreiheit:** Scharf bekommt der Knopf `stateDescription` „zum Bestätigen erneut tippen“ / „tap again to confirm“; Icon-Knöpfe zusätzlich die Beschreibung „Löschen – zum Bestätigen erneut tippen“, damit TalkBack/VoiceOver es beim Fokus ansagen. Test-Tag (iOS: accessibilityIdentifier) `confirm:armed` nur im scharfen Zustand.
 - **Entfernt:** `Dialogs.kt` (`OverfitDialog`, `ConfirmDialog`), `Confirm`-Enum, `DialogShotTest`, die Popup-Texte (Fragen wie „Workout löschen?“, „Abbrechen“ bleibt für Editoren). Die Zusatzinfos aus den Popups entfallen: „Trainings bleiben im Kalender“ (Löschen eines Workouts) war nur ein Beruhigungssatz; „KI-Chat trennen“ hat darunter schon den Hinweis `disableHint`.
-- **Tests:** `UiFeedbackTest` (erster Tipp scharf mit Tag und Zustandsbeschreibung, Tipp woanders, gegenseitiges Entschärfen, zweiter Tipp führt genau einmal aus, Icon-Beschreibung, Timeout knapp davor/danach, Scrollen). Alle Flows tippen zweimal (zweiter Tipp auf `confirm:armed`). iOS-XCUITest: wartet nach dem ersten Tipp auf das Element `confirm:armed` und tippt genau dieses an (kein Koordinaten-Doppeltipp); war die Zeit inzwischen abgelaufen (langsamer Screenshot), ist es danach wieder scharf und bekommt einen weiteren Tipp.
+- **Tests:** `UiFeedbackTest` (erster Tipp scharf mit Tag und Zustandsbeschreibung, Tipp woanders, gegenseitiges Entschärfen, zweiter Tipp führt genau einmal aus, Icon-Beschreibung, Timeout knapp davor/danach, Scrollen). Alle Flows tippen zweimal (zweiter Tipp auf `confirm:armed`). iOS-XCUITest: wartet nach dem ersten Tipp auf das Element `confirm:armed` und tippt genau dieses an (kein Koordinaten-Doppeltipp). Seit 18.11. bleibt der Knopf im UI-Test-Modus (`-overfitUITest`) 30 s scharf statt 3 s, siehe „iOS-UI-Tests: Doppeltipp“ unten.
 
 ## Karten in Listen (Session AQ, 4.11.)
 - **Auftrag (Fabian):** „Diese schwebenden Karten sollen größtenteils in die Listen übernommen werden … wenn man ein Training anschaut, dann sollen auch die Übungen einzelne Karten sein mit den Bildern links, so wie das auch während dem Training dargestellt wird.“
@@ -1887,3 +1887,140 @@ jetzt hilf mir mal hier und die KI dann wirklich was ändern kann am Workout.“
   44 dp, Badge-Position aus #108 mit `Sizes.badge`; Tab-Suche im ScreenshotTest aus #108 (Rolle Tab).
 - **Zeitabhängiger Testfehler behoben:** `CoachFlowTest`/`CoachOverlayTest` legten ein Training „vor einer Stunde“ an und öffneten
   heute im Kalender. Zwischen 0 und 1 Uhr war das gestern (fiel um 00:55 auf). Jetzt `startEarlierToday()` in `TestWaits.kt`.
+
+## Bewegung, „Jetzt“-Farbe und Workout-Dock (Session BL, 16.11.)
+- **Auftrag (Fabian):** „Baue in der App überall Animationen ein. Die App soll aber schnell und reaktiv bleiben. Schlage Verbesserungen
+  vor, welche die Bedienung vereinfachen. Du kannst auch eine weitere Farbe einbauen. Der Screenspace soll sinnvoll aufgeteilt und
+  genutzt werden. Im Workoutmodus gibt es zum Beispiel noch die Funktionen, nur die Pausenzeit etwas größer zu machen, was absolut
+  nutzlos ist. […] sehr generisch, starr und abgehackt […]. Es fehlt der typische Apple Flow.“ Dazu: „Nutze Ultracode.“ Das hebt für
+  diese Aufgabe „Kein Ultracode“ aus CLAUDE.md auf; Umsetzungs-Subagents blieben `kmp-worker` (Opus 5.5, medium), Gegencheck Sonnet.
+- **Vorgehen:** Workflow 1: neun Lese-Audits (je UI-Bereich plus ein Durchgang durch die Abläufe), rund 300 Befunde. Fundament,
+  Navigation und Workout-Modus in der Hauptsession (Architektur bleibt dort). Workflow 2: je Dateigruppe ein `kmp-worker` im eigenen
+  Worktree mit den Befunden seines Bereichs. Workflow 3: Gegencheck. Was die Audits an Bedienungs-Ideen brachten und nicht hierher
+  gehört, steht in `docs/VORSCHLAEGE.md`.
+- **Was „Apple Flow“ hier heißt (und was nicht):** (1) Rückmeldung beim Aufsetzen des Fingers, auch bei einem schnellen Tipp. (2) Federn
+  statt fester Zeiten: eine Feder lässt sich mitten in der Bewegung umlenken, ein zweiter Tipp oder ein umkehrender Finger erzeugt
+  keinen Sprung. (3) Dinge haben Orte: tiefer = von der Seite, das Training = von unten, ein Sheet = von unten, das Menü = aus dem ⋮.
+  (4) Flächen folgen dem Finger (Zurück-Geste, Sheet, Satz wischen, Karte ziehen) und laufen mit dessen Geschwindigkeit aus.
+  (5) Layout springt nicht. Nicht übernommen: Unschärfe-Materialien (auf Schwarz wirkungslos, in Compose teuer), gestaffelt
+  einfliegende Listen (macht jeden Screen langsamer), Endlos-Animationen.
+- **Ein System statt vieler Werte:** `ui/theme/Motion.kt` hat vier Federn (`snappy` ~180 ms für Zustände, `smooth` ~300 ms für Layout,
+  `screen` für Screens, `bouncy` für den seltenen Moment „geschafft“), zwei Blenden und `tick`. Screens schreiben keine Dauern mehr;
+  sie nutzen die Bausteine in `ui/components/MotionKit.kt` (`Reveal`, `Appear`, `Swap`, `AnimatedItems`, `motionItem`, `RollingText`,
+  `ProgressLine`, `motionColor`, `rememberHaptics`). Regeln in DESIGN.md „Motion“.
+- **Schnell bleiben:** Alles, was pro Frame läuft, wird beim Zeichnen gelesen (`graphicsLayer`, `drawBehind`, `color = { }`); eine
+  Animation setzt keine Liste neu zusammen. Die Uhr des Trainings tickt weiter alle 250 ms, aber Fuß und Pausen-Insel hängen nur noch
+  an abgeleiteten Werten (Text einmal pro Sekunde, „Pause läuft“ nur beim Wechsel); der Fortschritt läuft außerhalb der Komposition.
+  Taps werden beim Screen-Wechsel nur noch 300 ms geschluckt (Doppeltipp), nicht bis die Feder ausgeschwungen ist.
+- **Keine Endlos-Animation, keine, die sich selbst anstößt (`Motion.tick`):** Compose-UI-Tests warten, bis nichts mehr animiert. Eine
+  Animation, die am 250-ms-Takt hängt und selbst 250 ms dauert, wird nie fertig. Deshalb 200 ms linear: auf dem Balken nicht zu sehen
+  (unter 1 px pro Frame), und die Oberfläche kommt zur Ruhe (Akku).
+- **Druck-Rückmeldung verliert keinen Tipp mehr:** `pressScale` hing an „ist gedrückt“. Bei einem schnellen Tipp fallen Drücken und
+  Loslassen in denselben Frame, es war nichts zu sehen. Jetzt läuft der Weg nach unten immer zu Ende (70 ms), dann federt der Knopf
+  zurück. Zeilen (`pressableRow`) sind beim Aufsetzen sofort grau und blenden nach dem Loslassen aus.
+- **Navigation (`ScreenMotion.kt`):** Vorher ein Fade-through für alles (3.11., weil die 700-ms-Standardblende „verbuggt“ wirkte).
+  Jetzt: tiefer/zurück als Schieben mit Parallaxe (der untere Screen rückt ein Viertel und dunkelt ab); Training, Übungsauswahl und
+  Übungsformular als eigene Ebene von unten (ihre Kopfzeile schließt mit ⌄ bzw. ✕ statt mit dem Zurück-Pfeil); Foto-Vollbild und Story
+  wachsen heraus; Tabs wechseln weiter ohne Übergang (Test „instant“ bleibt), der neue Inhalt kommt nur kurz aus leichter Abdunklung.
+  Story schließt weiter sofort (Entscheidung 7.11.). „Speichern“ eines neuen Workouts blendet in die Plan-Ansicht über statt sie
+  hereinzuschieben (fast derselbe Screen).
+- **Zurück-Geste führt den Screen:** navigation-compose 2.10 hat eigene Übergänge für die Geste (`predictivePop…`). Dort dieselben
+  Bilder, aber linear in der Zeit, weil der Fortschritt der Geste darauf abgebildet wird: mit einer Feder liefe der Screen dem Finger
+  davon (nach 30 % Geste schon 80 % Weg). Vom rechten Rand gewischt geht der Screen nach links, dem Finger nach.
+- **Tab-Leiste gehört zum Tab-Screen (`TabScreen`):** Sie lag neben dem `NavHost` und verschwand in einem Frame, sobald ein Screen
+  darüber kam; der Tab-Screen sprang dabei um ihre Höhe. Beim Fade fiel das nicht auf, beim Schieben schon. Jetzt wandern Mini-Leiste
+  und Tab-Leiste mit ihrem Screen. Die graue Marke hinter dem aktiven Tab gleitet beim Wechsel vom alten zum neuen Tab; dafür merkt
+  sich `TabSwitch`, welcher Tab zuletzt zu sehen war. Nebenbei behoben: Der Screen über den Leisten zog den Abstand zur Systemleiste
+  noch einmal ab (toter Streifen über der Tab-Leiste auf Geräten mit Gestenleiste, Lücke zwischen Eingabefeld und Tastatur im
+  Coach-Tab). `consumeWindowInsets` in `TabScreen`. Auf dem Gerät zu prüfen, im Robolectric-Bild nicht sichtbar (Insets 0).
+- **Sheets:** federn herein, der Scrim dunkelt mit. Sie folgen dem Finger am Griff, am Fuß und am Inhalt, sobald der am Anfang steht
+  (verschachteltes Scrollen); ab 30 % der Höhe oder bei einem Schnipp schließen sie, sonst federn sie zurück, jeweils mit der
+  Geschwindigkeit des Fingers. Ein Haptik-Tick markiert den Punkt, ab dem Loslassen schließt.
+- **Neue Farbe: Kreidegelb `accent` #FFD60A = „jetzt“.** Erlaubt war „eine weitere Farbe“. Gewählt nach der Regel, die schon galt
+  (Farbe ist Bedeutung, nie Deko): grün = erledigt, rot = löschen, gelb = läuft gerade. Gelb, weil es zur Leitidee passt (gelbe Kreide
+  auf der Tafel hebt hervor, was gerade dran ist), auf Schwarz den höchsten Kontrast hat und im Farbton zwischen Rot und Grün klar
+  abgesetzt ist (Test `accentIsNeitherGreenNorRed`). Verworfen: Blau (sieht nach System-Standard aus, genau das „Generische“),
+  Orange (zu nah am Rot scharf geschalteter Knöpfe). Einsatz bewusst eng: Countdown der Pause (Insel und Mini-Leiste), gefüllter
+  Teil der Insel (`accentSubtle`), Nummer des Satzes, der dran ist, Fortschritt der Pause an der Mini-Leiste. Nicht: Auswahl (bleibt
+  weiß), Knöpfe, „Heute“ im Kalender (bleibt weiß; sonst stünde Gelb auf jedem Kalender-Screen und verlöre das „läuft gerade“).
+- **Workout-Modus, unten:** „Tipp auf die Zeit macht sie groß“ entfällt (Fabian: nutzlos), samt Texten. Stattdessen eine Insel:
+  `−15` · Countdown groß in Gelb, Ziffern rollen · `+15` · „Überspringen“ über die restliche Breite; die Insel füllt sich, wie die
+  Pause vergeht. Der Hauptknopf trägt als zweite Zeile, welchen Satz er loggt („Bench Press · Satz 2 · 60 kg × 8“), auch ohne Pause;
+  dafür entfällt die „Nächste: …“-Zeile. Ein Tipp auf den Countdown scrollt zum Satz. Höhe unten in der Pause vorher rund 172 dp, jetzt rund 150 dp, bei deutlich größerer Zeit.
+  „±15 s“ heißen sichtbar „−15“/„+15“ (für Screenreader weiter „−15 s“/„+15 s“), sonst passt „Überspringen“ auf 360 dp nicht in
+  lesbarer Größe. Bei großer Schrift (ab 1,15) oder Pausen ab 10 min rutscht „Überspringen“ in eine eigene Zeile, statt abgeschnitten
+  zu werden (`RestBarTest`).
+- **Workout-Modus, Liste:** Abhaken: das Grün breitet sich vom Haken über die Zeile aus, der Haken landet mit kleinem Überschwinger
+  (die eine Stelle, an der die App jubeln darf). Offene Sätze zeigen einen blassen Haken im Kreis („hier tippen“). Der Satz, der dran
+  ist, hat eine gelbe Nummer. Sätze und Übungen klappen, kommen und gehen weich. **Fertige Übung klappt zu und die Liste rückt zur
+  nächsten** (nur in dem Moment; von Hand geöffnet bleibt sie offen): der Screen zeigt, was zu tun ist. **„Duplizieren“ entfällt:**
+  `addSet` übernimmt die Werte des letzten Satzes, `duplicateSet(letzter)` tat dasselbe. **„Entfernen“ einer Übung braucht den
+  Doppeltipp** (nahm bisher mit einem Tipp alle geloggten Sätze mit, ohne Rückgängig). Nach „Übung hinzufügen“ scrollt die Liste zur
+  neuen Übung. Solange die Tastatur offen ist, weicht der Hauptknopf (abgehakt wird an der Zeile), es bleiben mehr Zeilen sichtbar.
+  Kopfzeile: „12:05 · 3/20“ in einer Zeile (vorgelesen weiter „… 3/20 erledigt“), darunter ein Balken über alle Sätze statt der Linie.
+- **„Training beenden“ nimmt erst nach 0,45 s Taps an:** Der Knopf ersetzt „Nächsten Satz loggen“ an derselben Stelle. Wer die letzten
+  Sätze schnell durchtippt, hätte ihn sonst mit den nächsten zwei Tipps scharf geschaltet und ausgelöst.
+- **Beim Beenden bleibt das Training stehen, bis der Screen weg ist:** Vorher wurde der Screen in dem Moment schwarz, in dem der
+  Controller kein Training mehr hatte. Mit einem Übergang, der den alten Screen zeigt, sähe man das.
+- **Haptik nach Bedeutung (`rememberHaptics`):** `tick` Auswahl wandert, `toggle` Schalter, `press` Hauptaktion, `arm` Doppeltipp
+  scharf, `confirm` erledigt, `threshold` Ziehen überschreitet den Punkt, ab dem Loslassen wirkt. Ob man sie spürt, entscheidet die
+  Systemeinstellung; das Vibrieren von Satz und Pausenende (eigene Einstellung im Profil) bleibt, wie es war.
+- **„Bewegung reduzieren“:** iOS-Einstellung bzw. abgeschaltete Animationen auf Android werden gelesen (`systemReducedMotion`,
+  `expect/actual`): Screen-Wechsel werden zur alten kurzen Überblendung, Ziffern wechseln ohne Rollen. Der Punkt stand seit 3.11. offen.
+
+## iOS-UI-Tests: Doppeltipp, Tab-Leiste beim Screen-Wechsel, Review-Befunde (18.11.)
+- **Rote iOS-CI (testScreensDark, „Beenden wurde nicht scharf geschaltet“):** Das Video zeigt den Kopfzeilen-Knopf nach dem Tipp
+  gut 3 s grün (scharf), danach wieder grau; XCUITest hat in diesen 3 s das Element `confirm:armed` nie gesehen. Ein Blick in den
+  Accessibility-Baum kostet XCUITest auf dem CI-Runner gut 1 s (ein `tap()` mit fünf Abfragen dauerte 6 s), und Compose gibt einen
+  geänderten Baum nur verzögert an iOS weiter (Abgleich-Schleife, `AccessibilityMediator`). 3 s reichten deshalb nur manchmal; der
+  frühere Fehler auf main („snapshot of confirm:armed not found“: gefunden, dann vor dem Tipp schon wieder weg) ist dasselbe Rennen.
+  **Lösung:** Im UI-Test-Modus bleibt ein Doppeltipp-Knopf 30 s scharf (`LaunchOptions.confirmArmedMillis` →
+  `LocalConfirmArmedMillis`), die App behält 3 s. `confirm()` wartet bis 15 s auf `confirm:armed` oder (zweites Zeichen) den Wert
+  „zum Bestätigen erneut tippen“ (die Zustandsbeschreibung, auf iOS `accessibilityValue`), tippt genau dieses Element und prüft,
+  dass es danach weg ist (sonst ein zweiter Tipp auf dasselbe Element). Kein Koordinaten-Doppeltipp, kein abgeschalteter Test.
+- **Start-Timeout „Failed to get background assertion“:** Infrastruktur, kein Test-Retry: nach dem Booten startet der Workflow
+  einmal die Einstellungen-App und wartet 25 s, bevor XCUITest die App startet.
+- **Swift-Helfer:** `waitFor` fragt die ganze Wartezeit „Label gleich ODER beginnt mit“ ab (zusammengeführte Labels wie
+  „Nächsten Satz loggen“ + zweite Zeile oder „1 Training · 1 Woche in Folge“ kosteten sonst je 20 s); „Starten“ wird erst getippt,
+  wenn es aktiv ist (`tapWhenEnabled`); `tab()` prüft, dass der Tab danach gewählt ist (oder die Leiste weg, Coach-Story), und tippt
+  sonst erneut.
+- **Tab-Leiste und Mini-Leiste während eines Screen-Wechsels:** Der Tipp-Blocker (`AppScaffold`, 300 ms) lässt die Leisten frei,
+  wenn der neue Screen ein Tab ist und *vorwärts* kommt (gespeichertes Training → Training-Tab): Dann liegt er oben, ein Tipp auf die
+  Leiste ist gemeint. Auf dem Weg *zurück* zu einem Tab (Zurück, Minimieren) bleibt die Leiste die ersten 300 ms gesperrt: der
+  gehende Screen liegt bis zum Wegrutschen darüber, ein Tipp landete sonst auf seinem unteren Knopf („Starten“, „Nächsten Satz
+  loggen“). Abgewogen gegen den Review-Wunsch „Leisten nie sperren“: ein versehentlich gestartetes Training oder geloggter Satz wiegt
+  schwerer als ein verschluckter Tab-Tipp in den ersten 300 ms (`UiFeedbackTest`).
+- **Tab-Screens (Review C8/C9/P3–P7):** Höhe der Leisten bleibt in `TabSwitch` (State), jeder Tab-Screen startet damit, das erste
+  Bild ist schon richtig. „Letzter Tab“ wird erst gesetzt, wenn der Tab wirklich aktiv ist (Lifecycle RESUMED), nicht bei der
+  Vorschau unter einer abgebrochenen Zurück-Geste. Kalender und Start-Tab behalten ihre letzten Daten über Tab-Wechsel
+  (`collectCached`): kein Laden→Geladen-Überblenden bei jedem Öffnen, animiert wird nur, was sich seitdem geändert hat. Ein Tab-Screen
+  auf dem Weg nach draußen (unter dem aufsteigenden Training) behält das laufende Training, wie es war (`heldUnlessCurrent`), statt
+  darunter Mini-Leiste und „Läuft gerade“ aufzuklappen. Tab-Leiste, Mini-Leiste, Kalenderzellen und Coach-Story lesen Bewegtes nur
+  noch beim Zeichnen (Farb-Lambda an `LineIcon`, `ProgressLine` mit Lambda, Schleier statt Alpha-Ebene je Kalendertag, Druck-Feedback
+  nur auf tippbaren Tagen, Zieh-Versatz der Story als Float-State).
+- **„Bewegung reduzieren“ (DA-6):** `BottomSheet` blendet dann an Ort und Stelle ein und aus, statt über die volle Höhe zu fahren
+  (nur der Finger bewegt es noch); Sprünge in Listen (Kalender „Heute“, Coach-Chat zur neuesten Nachricht, Anhang-Chips) springen
+  direkt statt zu gleiten. Laut Review stellt Compose Multiplatform auf iOS die Animationsdauer bei „Bewegung reduzieren“ womöglich
+  ohnehin herunter; das ist ungeprüft, die App verlässt sich nicht darauf.
+- **Workout und Editor (Review P1/P2/P12/C3/C5/DA-4/DA-5/DA-7/F2):** Die Tastatur zählt nur als Ja/Nein (`derivedStateOf`), der
+  Screen baut sich beim Ein-/Ausfahren nicht mehr pro Bild neu auf. Übungskarten gleiten nur, wenn sich die Liste selbst ändert
+  (hinzu, weg, verschoben, `rememberGlide`); klappt eine Karte nur auf oder zu, sitzen die Karten darunter Bild für Bild an ihrer
+  Kante, statt auf einer zweiten Feder hinterherzulaufen und sie zu überdecken. Der Schutz von „Training beenden“ (450 ms) greift nur,
+  wenn der Knopf gerade aus „Nächsten Satz loggen“ wird, und ignoriert Tipps, ohne den Knopf abzudunkeln. „Speichern“ eines neuen
+  Workouts bleibt über der Tastatur (einziger Weg zum Abschluss); nur „Starten“ weicht ihr. Der Namensfokus eines neuen Workouts kommt
+  einmal pro Editor, Fehlerhinweis und Brummen nur bei einem neuen Fehler, nicht bei jeder Rückkehr aus der Übungsauswahl. Die
+  Pausen-Insel legt ihr Layout einmal pro Pause fest; wächst der Countdown über 10:00, wird er etwas kleiner gezeichnet, −15/+15/
+  Überspringen bleiben unter dem Finger. Die zweite Zeile des Hauptknopfs schrumpft zuerst und kürzt dann den Übungsnamen, nie
+  „Satz 2 · 22,5 kg × 12“.
+- **Texte ohne Abschneiden (DA-2/DA-3):** Kachel-Beschriftungen dürfen zweizeilig werden (ganze Wörter, gleich hohe Kacheln je
+  Reihe; `StatGridTest` 360 dp, Schrift 1,0/1,3, DE/EN). Beim Guthaben rollt nur der Betrag, „Guthaben“ ist normaler Text und bricht um.
+- **Hochzählen und Fotos (P8/DA-1):** Die Kennzahlen im Abschluss lesen den Zählwert nur in ihrer Zahl; die Schriftgröße wird einmal
+  für den Endwert bestimmt. Fotos, die beim Öffnen eines Tages schon da sind, sind nicht „neu“ (kein Auftauchen, kein Brummen); die
+  Bestätigung gehört zum Hinzufügen.
+- **„Jetzt“-Farbe (DA-8):** Regel ist „eine Bedeutung, nicht eine Stelle“: während einer Pause sind Countdown, Inselfüllung und
+  Nummer des nächsten Satzes gelb, weil sie dasselbe meinen. Weitere Stellen: Ablauf des Kopplungscodes, Punkt „denkt nach“. Nie
+  für „heute“. Neue Tokens statt Einzelwerten: `Motion.press/pressRelease/rowRelease`, `Sizes.stepButton`, `Sizes.statTile` (DA-9).
+- **Android-Tests (T1):** „Starten“ steht ab dem ersten Bild da (deaktiviert, bis geladen); Tests warten mit `waitForPlanLoaded()`
+  auf den aktiven Knopf und die erste Übung, nicht auf den Text allein.
+- **Gegencheck (Sonnet + vier Linsen mit Gegenprüfung):** 44 Befunde, alle bestätigten behoben; I2 bewusst nur teilweise (siehe
+  oben), DA-6 (vom Prüfer als „unklar“ eingestuft) trotzdem umgesetzt.

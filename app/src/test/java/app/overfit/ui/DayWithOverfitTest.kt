@@ -181,7 +181,7 @@ class DayWithOverfitTest {
             tab("Workouts")
             waitFor(name)
             compose.onAllNodes(hasText(name))[0].performScrollTo().performClick()
-            waitFor("Starten") // the workout plan screen
+            compose.waitForPlanLoaded() // the workout plan screen
             // Share is in the ⋮ top right.
             compose.openMenuEntry("Teilen")
             waitFor("Das wird geteilt") // preview of what the recipient gets, above the compact QR code
@@ -207,7 +207,7 @@ class DayWithOverfitTest {
         tab("Workouts")
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         click("Starten")
         waitFor("erledigt", substring = true)
         assertEquals(1, alerts.permissionRequests)
@@ -218,9 +218,10 @@ class DayWithOverfitTest {
         assertTrue(HapticPattern.Tick in haptics.played)
         assertNotNull(alerts.pending)
         val before = alerts.pending!!
-        click("+15 s")
+        // The round ±15 buttons beside the countdown show "+15" / "−15" and are named "+15 s" / "−15 s".
+        compose.onNodeWithContentDescription("+15 s").performClick()
         compose.waitUntilState(5_000) { alerts.pending?.endsAt == before.endsAt + 15_000 }
-        click("−15 s")
+        compose.onNodeWithContentDescription("−15 s").performClick()
         compose.waitUntilState(5_000) { alerts.pending?.endsAt == before.endsAt }
         click("Überspringen")
         waitGone("Überspringen")
@@ -283,10 +284,10 @@ class DayWithOverfitTest {
         click("Beenden")
         compose.onNodeWithTag("confirm:armed").performClick()
         waitFor("Training beendet")
-        // Wait via the UI first (the name field appears once the finished workout is stored): the saved
+        // Wait via the UI first ("Speichern" becomes active once the finished workout is stored and loaded): the saved
         // workout is updated in a DB transaction at the same time, which a blocking query polled on the
         // test's main thread would stall.
-        compose.waitUntil(20_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
+        compose.waitForFinishLoaded(timeoutMillis = 20_000)
         assertEquals(SessionStatus.FINISHED, runBlocking { data.workouts.status(workoutId) })
         compose.onNodeWithContentDescription("Gefühl 4 von 5").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Gefühl 4 von 5").assertIsSelected()
@@ -408,7 +409,8 @@ class DayWithOverfitTest {
         tab("Workouts")
         compose.waitForTrainingTab("New workout")
         tab("Calendar")
-        waitFor("1 workout")
+        // The calendar's figures stand in one line ("1 workout · 1 photo · …").
+        waitFor("1 workout", substring = true)
         tab("Profile")
         click("Deutsch")
         waitFor("ÜBER DICH")

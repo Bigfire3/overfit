@@ -25,7 +25,7 @@ import app.overfit.domain.MusclePeriod
 import app.overfit.domain.MuscleSetRow
 import app.overfit.i18n.LocalStrings
 import app.overfit.i18n.stringsFor
-import app.overfit.ui.muscles.MuscleMapSheetContent
+import app.overfit.ui.muscles.MuscleMapSheet
 import app.overfit.ui.photos.PhotosScreen
 import app.overfit.ui.theme.OverfitTheme
 import app.overfit.ui.theme.Theme
@@ -43,7 +43,7 @@ import java.io.File
 
 /**
  * Evidence screenshots (360 dp, dark) of the calendar's muscle sheet: with a week of training and empty. The sheet
- * normally sits in a dialog window; here it is drawn over the calendar with the same dimming. Runs only with `SCREENSHOT_DIR`.
+ * is the shared bottom sheet over the calendar. Runs only with `SCREENSHOT_DIR`.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -91,9 +91,7 @@ class MuscleMapShotTest {
     @Composable
     private fun SheetOverCalendar(rows: List<MuscleSetRow>, history: List<HistoryRow>) {
         PhotosScreen(emptyList(), history, Language.DE, today, {}, { _, _ -> }, onMuscles = {})
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.BottomCenter) {
-            MuscleMapSheetContent(rows, MusclePeriod.WEEK, today, DiaryCalendar.weekStart(Language.DE), {}, {}, Modifier.heightIn(max = 718.dp))
-        }
+        MuscleMapSheet(rows, MusclePeriod.WEEK, today, DiaryCalendar.weekStart(Language.DE), {}, {})
     }
 
     @Test fun calendarTitle() = shot("00-kalender-titel-dunkel-360") {

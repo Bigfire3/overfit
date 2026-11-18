@@ -21,9 +21,17 @@ import app.overfit.ui.theme.Theme
 enum class Icon { Back, Check, Home, Exercises, Photos, Calendar, Workouts, Profile, Settings, Plus, Close, Search, ChevronDown, ChevronUp, ChevronRight, Drag, Coach, Share, Delete, Edit, More, Info, Sparkle, Key, Wallet, Link, List, Body, Today, Compare, ArrowUp, Play }
 
 @Composable
-fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) {
+fun LineIcon(icon: Icon, size: Dp = 24.dp, color: Color = Theme.colors.foreground) = LineIcon(icon, size) { color }
+
+/**
+ * [LineIcon] whose [color] changes every frame (a tint following a sliding marker): read while drawing, so only the
+ * icon redraws and nothing recomposes.
+ */
+@Composable
+fun LineIcon(icon: Icon, size: Dp = 24.dp, color: () -> Color) {
     val background = Theme.colors.background
     Canvas(Modifier.size(size)) {
+        val color = color()
         val u = this.size.width / 24f
         val stroke = Stroke(width = 1.5f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
         fun p(x: Float, y: Float) = Offset(x * u, y * u)

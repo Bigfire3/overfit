@@ -1,6 +1,8 @@
 package app.overfit.ui.chat
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,7 +14,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.chat.ChatFeature
 import app.overfit.chat.ChatNote
@@ -25,11 +29,16 @@ import app.overfit.domain.Language
 import app.overfit.domain.WeightUnit
 import app.overfit.i18n.LocalChatStrings
 import app.overfit.i18n.LocalStrings
+import app.overfit.ui.components.AnimatedItems
 import app.overfit.ui.components.BackHeader
+import app.overfit.ui.components.ConfirmButton
 import app.overfit.ui.components.Hairline
 import app.overfit.ui.components.ListRow
 import app.overfit.ui.components.Panel
 import app.overfit.ui.components.PanelItem
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.Swap
+import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.components.Screen
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.SmallButton
@@ -53,6 +62,9 @@ internal fun NoteBody(text: String) {
     }
 }
 
+/** What the inbox shows when it has no entries. */
+private enum class InboxEmpty { Loading, Failed, Nothing }
+
 /** What the chat left for the user: template proposals (with the import preview) and notes. */
 @Composable
 fun ChatInboxScreen(
@@ -65,38 +77,65 @@ fun ChatInboxScreen(
     val t = LocalStrings.current
     val c = LocalChatStrings.current
     val inbox by chat.inbox.state.collectAsStateWithLifecycle()
+    // The proposal being read: the inbox stays where it is, its row shows "loading", then the editor is pushed.
     var open by remember { mutableStateOf<InboxTemplate?>(null) }
+    var invalidId by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     // Until the first refresh on this screen has answered, an empty list means "loading", not "nothing new".
     var refreshed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { chat.inbox.refresh(); refreshed = true }
 
-    val current = open
-    if (current != null) {
-        TemplateProposalLoader(chat, current, unit, language, onBack = { open = null }, onEdit = { seed -> open = null; onEdit(seed) })
-        return
+    open?.let { current ->
+        TemplateProposalLoader(
+            chat, current, unit, language,
+            onInvalid = { invalidId = current.id; open = null },
+            onEdit = { seed -> open = null; onEdit(seed) },
+        )
     }
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         Title(c.inboxTitle)
         Spacer(Modifier.height(Space.m))
-        if (inbox.full) Text(c.inboxFull, Modifier.padding(bottom = Space.m), style = Theme.type.caption)
+        Reveal(inbox.full) { Text(c.inboxFull, Modifier.padding(bottom = Space.m), style = Theme.type.caption) }
         // Loading and failure are their own states: "Nothing new" only once the server really said so.
-        if (inbox.items.isEmpty()) when {
-            inbox.loading || !refreshed -> Text(c.inboxLoading, tone = Tone.Muted)
-            inbox.failed -> {
-                Text(c.inboxFailed, tone = Tone.Muted)
-                Spacer(Modifier.height(Space.m))
-                SmallButton(c.inboxRetry, { scope.launch { chat.inbox.refresh() } })
-            }
-            else -> Text(c.inboxEmpty, tone = Tone.Muted)
+        val empty = when {
+            inbox.items.isNotEmpty() -> null
+            inbox.loading || !refreshed -> InboxEmpty.Loading
+            inbox.failed -> InboxEmpty.Failed
+            else -> InboxEmpty.Nothing
         }
-        if (inbox.items.isNotEmpty()) Panel {
-            inbox.items.forEach { item ->
+        Swap(empty) { state ->
+            when (state) {
+                null -> Unit
+                InboxEmpty.Loading -> Text(c.inboxLoading, tone = Tone.Muted)
+                InboxEmpty.Failed -> Column {
+                    Text(c.inboxFailed, tone = Tone.Muted)
+                    Spacer(Modifier.height(Space.m))
+                    SmallButton(c.inboxRetry, { scope.launch { chat.inbox.refresh() } })
+                }
+                InboxEmpty.Nothing -> Text(c.inboxEmpty, tone = Tone.Muted)
+            }
+        }
+        Panel {
+            AnimatedItems(inbox.items, key = { it.id }) { _, item ->
                 when (item) {
-                    is InboxTemplate -> ListRow(
-                        item.clientName.takeIf { it.isNotBlank() }?.let(c.inboxFrom) ?: c.inboxTitle,
-                        onClick = { open = item },
-                    ) { Text(templateTitle(item), style = Theme.type.caption, tone = Tone.Muted, maxLines = 1) }
+                    is InboxTemplate -> Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        ListRow(
+                            item.clientName.takeIf { it.isNotBlank() }?.let(c.inboxFrom) ?: c.inboxTitle,
+                            onClick = { invalidId = null; open = item },
+                        ) {
+                            Swap(open?.id == item.id, contentAlignment = Alignment.CenterEnd) { loading ->
+                                Text(if (loading) c.inboxLoading else templateTitle(item), style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
+                            }
+                        }
+                        Reveal(invalidId == item.id) {
+                            PanelItem {
+                                Text(c.inboxInvalid, tone = Tone.Muted)
+                                Spacer(Modifier.height(Space.m))
+                                // App scope: discarding must not be cancelled when this screen leaves.
+                                ConfirmButton(c.inboxDiscard, onConfirm = { chat.scope.launch { chat.inbox.discard(item) } }, modifier = Modifier, compact = true)
+                            }
+                        }
+                    }
                     is InboxNote -> NoteCard(chat, item)
                 }
             }
@@ -111,6 +150,7 @@ private fun templateTitle(item: InboxTemplate): String =
 private fun NoteCard(chat: ChatFeature, item: InboxNote) {
     val c = LocalChatStrings.current
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
     PanelItem {
         Text(item.title ?: c.noteForWorkout.takeIf { item.workoutId != null } ?: c.notesTitle, style = Theme.type.label)
         Text(
@@ -121,31 +161,30 @@ private fun NoteCard(chat: ChatFeature, item: InboxNote) {
         Spacer(Modifier.height(Space.s))
         NoteBody(item.text)
         Spacer(Modifier.height(Space.s))
-        androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Space.l)) {
-            SmallButton(c.inboxAccept, tone = Tone.Default, onClick = { scope.launch { chat.inbox.acceptNote(item) } })
-            SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item) } })
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.l), verticalAlignment = Alignment.CenterVertically) {
+            SmallButton(c.inboxAccept, tone = Tone.Default, onClick = { haptics.confirm(); scope.launch { chat.inbox.acceptNote(item) } })
+            ConfirmButton(c.inboxDiscard, onConfirm = { scope.launch { chat.inbox.discard(item) } }, modifier = Modifier, compact = true)
         }
     }
 }
 
-/** The chat's template proposal opens in the normal workout editor (message and diff as hints, "Discard" at the top). */
+/**
+ * Reads the chat's template proposal and opens it in the normal workout editor (message and diff as hints, "Discard"
+ * at the top). No screen of its own: the inbox row shows the loading, [onInvalid] when it cannot be read.
+ */
 @Composable
 private fun TemplateProposalLoader(
     chat: ChatFeature,
     item: InboxTemplate,
     unit: WeightUnit,
     language: Language,
-    onBack: () -> Unit,
+    onInvalid: () -> Unit,
     onEdit: (EditorSeed) -> Unit,
 ) {
     val c = LocalChatStrings.current
-    val t = LocalStrings.current
-    var invalid by remember(item.id) { mutableStateOf(false) }
-    // App scope: acknowledging must not be cancelled when this screen leaves the composition.
-    val scope = chat.scope
     LaunchedEffect(item.id) {
         val p = chat.inbox.proposal(item)
-        if (p == null) { invalid = true; return@LaunchedEffect }
+        if (p == null) { onInvalid(); return@LaunchedEffect }
         val replaces = p.replaces
         val hints = buildList {
             add(c.inboxFrom(item.clientName.ifBlank { "Chat" }))
@@ -165,13 +204,6 @@ private fun TemplateProposalLoader(
             onSaved = { chat.inbox.discard(item) },
         ))
     }
-    Screen(header = { BackHeader(t.back, onBack) }) {
-        if (invalid) {
-            Text(c.inboxInvalid, tone = Tone.Muted)
-            Spacer(Modifier.height(Space.m))
-            SmallButton(c.inboxDiscard, onClick = { scope.launch { chat.inbox.discard(item); onBack() } })
-        }
-    }
 }
 
 /** Accepted notes without a workout (or all of them): "Notes from the chat". */
@@ -183,8 +215,8 @@ fun ChatNotesScreen(chat: ChatFeature, onBack: () -> Unit) {
     Screen(scroll = true, header = { BackHeader(t.back, onBack) }) {
         Title(c.notesTitle)
         Spacer(Modifier.height(Space.m))
-        if (notes.isEmpty()) Text(c.notesEmpty, tone = Tone.Muted)
-        if (notes.isNotEmpty()) Panel { notes.forEach { note -> SavedNote(note) { chat.notes.remove(note.id) } } }
+        Swap(notes.isEmpty()) { empty -> if (empty) Text(c.notesEmpty, tone = Tone.Muted) }
+        Panel { AnimatedItems(notes, key = { it.id }) { _, note -> SavedNote(note) { chat.notes.remove(note.id) } } }
     }
 }
 
@@ -200,6 +232,6 @@ private fun SavedNote(note: ChatNote, onDelete: () -> Unit) {
         )
         Spacer(Modifier.height(Space.s))
         NoteBody(note.text)
-        SmallButton(c.notesDelete, onClick = onDelete, modifier = Modifier.padding(top = Space.s))
+        ConfirmButton(c.notesDelete, onConfirm = onDelete, modifier = Modifier.padding(top = Space.s), compact = true)
     }
 }

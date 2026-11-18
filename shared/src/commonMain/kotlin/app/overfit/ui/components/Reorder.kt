@@ -1,6 +1,10 @@
 package app.overfit.ui.components
 
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import app.overfit.ui.theme.Motion
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
@@ -40,7 +44,15 @@ class ReorderState internal constructor(
     var dragOffset by mutableFloatStateOf(0f)
         private set
 
+    /** Counts drags, so the settling of an earlier drop cannot end a drag that began meanwhile. */
+    private var generation = 0
+
+    /** How often the dragged item has taken another item's place (the handle gives a tick for each). */
+    internal var swaps = 0
+        private set
+
     internal fun start(key: Any) {
+        generation++
         draggingKey = key
         dragOffset = 0f
     }
@@ -48,6 +60,16 @@ class ReorderState internal constructor(
     internal fun end() {
         draggingKey = null
         dragOffset = 0f
+    }
+
+    /** Dropped: the card glides the last bit into its slot instead of snapping there, then lets go. */
+    internal suspend fun settle() {
+        val mine = generation
+        try {
+            animate(dragOffset, 0f, animationSpec = Motion.snappy()) { value, _ -> if (generation == mine) dragOffset = value }
+        } finally {
+            if (generation == mine) end()
+        }
     }
 
     internal fun drag(dy: Float) {
@@ -71,6 +93,7 @@ class ReorderState internal constructor(
         // Where the dragged item will sit after the move; the finger position must not jump.
         val newOffset = if (down) target.offset + target.size - current.size else target.offset
         dragOffset = visualTop - newOffset
+        swaps++
         onMove(current.key, target.key)
     }
 
@@ -107,25 +130,36 @@ fun rememberReorderState(
     return remember(listState) { ReorderState(listState, { currentCanMove(it) }, { a, b -> currentOnMove(a, b) }) }
 }
 
-/** Lifts the dragged item above the others and lets the rest animate into place. */
+/**
+ * Lifts the dragged item above the others (a touch larger and lighter, like a card picked up) and lets the rest glide
+ * into place; items that are added or removed fade in and out ([motionItem]). [glide]: see [rememberGlide] (lists
+ * whose cards resize themselves).
+ */
 @Composable
-fun LazyItemScope.reorderableItem(state: ReorderState, key: Any): Modifier =
+fun LazyItemScope.reorderableItem(state: ReorderState, key: Any, glide: Boolean = true): Modifier =
     if (state.draggingKey == key) {
-        Modifier.zIndex(1f).graphicsLayer { translationY = state.dragOffset; alpha = 0.9f }
+        Modifier.zIndex(1f).graphicsLayer { translationY = state.dragOffset; alpha = 0.92f; scaleX = 1.02f; scaleY = 1.02f }
     } else {
-        Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+        motionItem(glide)
     }
 
-/** Long press on this element starts dragging the item with [key]. */
-fun Modifier.dragHandle(state: ReorderState, key: Any, onStart: () -> Unit = {}): Modifier =
+/**
+ * Long press on this element starts dragging the item with [key]. [onStart] is the moment it is picked up, [onSwap]
+ * every time it takes another item's place (both for haptics).
+ */
+fun Modifier.dragHandle(state: ReorderState, key: Any, onSwap: () -> Unit = {}, onStart: () -> Unit = {}): Modifier =
     pointerInput(state, key) {
-        detectDragGesturesAfterLongPress(
-            onDragStart = { state.start(key); onStart() },
-            onDragEnd = { state.end() },
-            onDragCancel = { state.end() },
-            onDrag = { change, amount ->
-                change.consume()
-                state.drag(amount.y)
-            },
-        )
+        coroutineScope {
+            detectDragGesturesAfterLongPress(
+                onDragStart = { state.start(key); onStart() },
+                onDragEnd = { launch { state.settle() } },
+                onDragCancel = { launch { state.settle() } },
+                onDrag = { change, amount ->
+                    change.consume()
+                    val before = state.swaps
+                    state.drag(amount.y)
+                    if (state.swaps != before) onSwap()
+                },
+            )
+        }
     }

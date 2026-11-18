@@ -10,6 +10,9 @@ import app.overfit.ui.components.RowDivider
 import app.overfit.ui.components.panelRow
 import app.overfit.ui.components.Panel
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import app.overfit.ui.components.Reveal
+import app.overfit.ui.components.Swap
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -50,18 +53,24 @@ fun NewWorkoutScreen(
     Screen(
         scroll = true,
         header = { BackHeader(t.back, onBack) },
-        footer = if (workoutRunning) {
-            { RunningWorkoutChoice(onOpenRunning, onEndRunning) }
-        } else {
-            null
+        // The footer slot stays in place, so the running-workout choice comes and goes softly.
+        footer = {
+            Reveal(workoutRunning, from = Alignment.Bottom) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.m)) {
+                    RunningWorkoutChoice(onOpenRunning, onEndRunning)
+                }
+            }
         },
     ) {
         Title(t.newWorkout)
         Panel(Modifier.padding(top = Space.l)) {
             ChoiceRow(t.createWorkout, t.createWorkoutHint, onCreate)
             // Only one workout at a time: while one runs, "start empty" says so instead of starting.
-            if (workoutRunning) ChoiceRow(t.emptyWorkout, t.otherWorkoutRunning, null)
-            else ChoiceRow(t.emptyWorkout, t.startEmptyHint, onStartEmpty)
+            // The row cross-fades between both states instead of flipping.
+            Swap(workoutRunning) { running ->
+                if (running) ChoiceRow(t.emptyWorkout, t.otherWorkoutRunning, null)
+                else ChoiceRow(t.emptyWorkout, t.startEmptyHint, onStartEmpty)
+            }
         }
         SectionTitle(t.moreWays)
         TemplateImportRows(share, onImport)

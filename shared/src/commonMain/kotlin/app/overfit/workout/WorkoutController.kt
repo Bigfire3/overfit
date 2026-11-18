@@ -269,13 +269,10 @@ class WorkoutController(
     /** Checks off the next open set (button "Log next set"). False if all sets are done. */
     fun logNextSet(): Boolean {
         val w = workout ?: return false
-        val next = w.nextOpenSet(w.rest?.afterSetId ?: lastCompletedSetId(w)) ?: return false
+        val next = w.nextToLog() ?: return false
         complete(w, next.set.id)
         return true
     }
-
-    private fun lastCompletedSetId(w: Workout): String? =
-        w.exercises.flatMap { it.sets }.filter { it.completed }.maxByOrNull { it.completedAt ?: 0 }?.id
 
     private fun complete(w: Workout, setId: String) {
         val now = clock()
@@ -401,7 +398,7 @@ class WorkoutController(
     private fun noticeFor(w: Workout, note: String? = null): WorkoutNotice {
         val p = prefs()
         val t = stringsFor(p.language)
-        val next = w.nextOpenSet(lastCompletedSetId(w))
+        val next = w.nextOpenSet(w.lastCompletedSetId)
         return WorkoutNotice(
             title = next?.exercise?.exercise?.name ?: w.name,
             // Empty workout (no exercise yet): just its name.

@@ -95,7 +95,7 @@ class MinimizeWorkoutTest {
         // Start the workout, check off a set (rest starts), minimize with the button
         waitFor("Push")
         compose.onNodeWithText("Push").performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         compose.onNodeWithText("Starten").performClick()
         waitFor("0/2 erledigt", substring = true)
         compose.onNodeWithContentDescription("Satz 1 abhaken").performClick()

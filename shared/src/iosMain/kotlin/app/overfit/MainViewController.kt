@@ -28,6 +28,8 @@ import platform.Foundation.NSBundle
 import platform.Foundation.NSUserDefaults
 import app.overfit.data.db.OverfitDatabase
 import platform.UIKit.UIViewController
+import androidx.compose.runtime.CompositionLocalProvider
+import app.overfit.ui.components.LocalConfirmArmedMillis
 
 /** Entry point for the iOS app (called from Swift). */
 @Suppress("unused", "FunctionName")
@@ -73,6 +75,7 @@ fun MainViewController(): UIViewController {
     return ComposeUIViewController {
         // The window exists once Compose is shown; force the dark interface style on it.
         LaunchedEffect(Unit) { IosAppearance.applyToWindows() }
-        OverfitApp(deps)
+        // UI tests: confirm buttons stay armed longer, so XCUITest reliably sees the armed state (LocalConfirmArmedMillis).
+        CompositionLocalProvider(LocalConfirmArmedMillis provides launch.confirmArmedMillis) { OverfitApp(deps) }
     }
 }

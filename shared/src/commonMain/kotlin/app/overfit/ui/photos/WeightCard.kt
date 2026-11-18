@@ -34,6 +34,8 @@ import app.overfit.i18n.LocalStrings
 import app.overfit.ui.components.FloatingCard
 import app.overfit.ui.components.Icon
 import app.overfit.ui.components.LineIcon
+import app.overfit.ui.components.RollingText
+import app.overfit.ui.components.Swap
 import app.overfit.ui.components.Text
 import app.overfit.ui.components.Tone
 import app.overfit.ui.theme.Space
@@ -56,7 +58,17 @@ fun WeightCard(entries: List<WeightEntry>, today: LocalDate, unit: WeightUnit, l
     val latest = remember(past) { BodyWeightStats.sorted(past).lastOrNull() }
     val change = remember(past) { BodyWeightStats.weekChange(past) }
     val points = remember(past, today) { BodyWeightStats.sparkline(past, today) }
-    if (latest == null) {
+    // Empty card <-> value card: cross-fade, the height follows softly.
+    Swap(latest == null, Modifier.fillMaxWidth()) { empty ->
+        val shown = latest
+        if (empty || shown == null) EmptyWeightCard(onClick) else ValueWeightCard(shown, change, points, today, unit, language, onClick)
+    }
+}
+
+@Composable
+private fun EmptyWeightCard(onClick: () -> Unit) {
+    val w = LocalStrings.current.bodyWeight
+    run {
         FloatingCard(Modifier.testTag(WEIGHT_CARD_TAG).semantics(mergeDescendants = true) {}, onClick = onClick) {
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = Space.m, vertical = Space.s),
@@ -69,8 +81,21 @@ fun WeightCard(entries: List<WeightEntry>, today: LocalDate, unit: WeightUnit, l
                 LineIcon(Icon.Plus, size = app.overfit.ui.theme.IconSize.inline)
             }
         }
-        return
     }
+}
+
+@Composable
+private fun ValueWeightCard(
+    latest: WeightEntry,
+    change: Double?,
+    points: List<WeightEntry>,
+    today: LocalDate,
+    unit: WeightUnit,
+    language: Language,
+    onClick: () -> Unit,
+) {
+    val t = LocalStrings.current
+    val w = t.bodyWeight
     val value = formatWeight(latest.kg, unit, language)
     val latestDate = LocalDate.parse(latest.date)
     val detail = when {
@@ -88,7 +113,8 @@ fun WeightCard(entries: List<WeightEntry>, today: LocalDate, unit: WeightUnit, l
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("${w.title} · $stamp", style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
-                Text(value, style = Theme.type.title, maxLines = 1)
+                // A new value rolls its changed digits instead of flipping.
+                RollingText(value, style = Theme.type.title)
                 Text(detail, style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
             }
             if (points.size >= 2) {

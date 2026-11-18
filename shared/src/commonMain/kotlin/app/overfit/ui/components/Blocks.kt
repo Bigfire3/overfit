@@ -1,6 +1,17 @@
 package app.overfit.ui.components
 
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import app.overfit.ui.theme.Motion
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlin.math.hypot
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
@@ -160,44 +171,68 @@ fun BlockButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
     }
 }
 
+/** Share of its width a set row has to be swiped so that letting go deletes it; a quick flick deletes earlier. */
+private const val SWIPE_DELETE_FRACTION = 0.4f
+
 /**
  * One set as its own rounded row inside a [Block]. Swiping it to the left deletes it ([onDelete]); a red
  * area with [deleteLabel] shows behind the row while swiping. Screen readers get [deleteLabel] as an action.
+ *
+ * Motion: the row follows the finger; one haptic tick marks the point from which letting go deletes; released, it
+ * flies out or springs back with the finger's speed. [spreadFill] is a second fill that spreads over the row as a
+ * circle from the check button ([spreadOriginFromEnd]) while [spread] runs 0 → 1: a set being checked off.
  */
 @Composable
 fun SetRowSurface(
     deleteLabel: String,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    /** Row fill: grey by default, [app.overfit.ui.theme.Colors.confirmFill] for a checked-off set in the running workout. */
+    /** Row fill: grey by default. */
     fill: Color = Theme.colors.surfacePressed,
+    /** Fill of a checked-off set ([app.overfit.ui.theme.Colors.confirmFill]) that covers the row as far as [spread] says. */
+    spreadFill: Color = Color.Unspecified,
+    /** 0 = only [fill], 1 = fully [spreadFill]; read while drawing. */
+    spread: () -> Float = { 0f },
+    spreadOriginFromEnd: Dp = 32.dp,
     content: @Composable RowScope.() -> Unit,
 ) {
     val c = Theme.colors
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
     var dx by remember { mutableFloatStateOf(0f) }
     var width by remember { mutableIntStateOf(0) }
     val currentDelete by rememberUpdatedState(onDelete)
+    val flick = with(LocalDensity.current) { 700.dp.toPx() }
     val swipe = if (onDelete == null) Modifier else Modifier
         .semantics { customActions = listOf(CustomAccessibilityAction(deleteLabel) { onDelete(); true }) }
         .pointerInput(Unit) {
-            val settle: () -> Unit = {
-                val past = dx < -width * 0.4f
-                scope.launch {
-                    animate(dx, if (past) -width.toFloat() else 0f, animationSpec = tween(if (past) 120 else 160)) { v, _ -> dx = v }
-                    if (past) {
+            var settling: Job? = null
+            val tracker = VelocityTracker()
+            fun settle(velocity: Float, cancelled: Boolean = false) {
+                // A gesture the system took away (back gesture, notification shade) never deletes: the row comes back.
+                val away = !cancelled && (velocity < -flick || (dx < -width * SWIPE_DELETE_FRACTION && velocity < flick))
+                settling = scope.launch {
+                    animate(dx, if (away) -width.toFloat() else 0f, initialVelocity = velocity, animationSpec = Motion.snappy()) { v, _ -> dx = v.coerceIn(-width.toFloat(), 0f) }
+                    if (away) {
                         currentDelete?.invoke()
-                        // Callers key rows by set; reset anyway so a reused slot never stays swiped away.
-                        dx = 0f
+                        // The caller removes the row (it then shrinks away as it is: swiped out). Should the row still be
+                        // here after that (delete refused, set restored at once), it comes back instead of staying away.
+                        delay(600)
+                        animate(dx, 0f, animationSpec = Motion.snappy()) { v, _ -> dx = v }
                     }
                 }
             }
             detectHorizontalDragGestures(
-                onDragEnd = settle,
-                onDragCancel = { scope.launch { animate(dx, 0f, animationSpec = tween(160)) { v, _ -> dx = v } } },
+                onDragStart = { settling?.cancel(); tracker.resetTracking() },
+                onDragEnd = { settle(tracker.calculateVelocity().x) },
+                onDragCancel = { settle(0f, cancelled = true) },
             ) { change, amount ->
                 change.consume()
+                tracker.addPosition(change.uptimeMillis, change.position)
+                val limit = -width * SWIPE_DELETE_FRACTION
+                val before = dx
                 dx = (dx + amount).coerceIn(-width.toFloat(), 0f)
+                if (before > limit && dx <= limit) haptics.threshold()
             }
         }
     // The drag sits on the outer box, which does not move: on the sliding row the deltas would shrink with it.
@@ -219,7 +254,18 @@ fun SetRowSurface(
                 .offset { IntOffset(dx.roundToInt(), 0) }
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .background(fill)
+                .drawBehind {
+                    drawRect(fill)
+                    val s = spread()
+                    if (spreadFill.isSpecified && s > 0f) {
+                        if (s >= 1f) drawRect(spreadFill) else {
+                            val origin = Offset(size.width - spreadOriginFromEnd.toPx(), size.height / 2)
+                            // Far enough to reach the row's far corners.
+                            val reach = hypot(origin.x, size.height / 2)
+                            clipRect { drawCircle(spreadFill, radius = reach * s, center = origin) }
+                        }
+                    }
+                }
                 .padding(horizontal = Space.s, vertical = Space.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.s),
@@ -326,38 +372,43 @@ class MenuItem(val label: String, val destructive: Boolean = false, val confirm:
 const val MORE_MENU_TAG = "menu:items"
 
 /**
- * ⋮ button with a small menu of [items] below it (replace, move, remove …). The menu grows out of the ⋮ corner
- * (scale 0.96 → 1 plus fade, 150 ms ease-out) so it reads as coming from the button; a pressed entry gets a lighter fill.
+ * ⋮ button with a small menu of [items] below it (replace, move, remove …). The menu grows out of the ⋮ corner on a
+ * spring and shrinks back into it when it closes, so it reads as belonging to the button; a pressed entry gets a
+ * lighter fill, an armed one fills red softly.
  */
 @Composable
 fun MoreMenu(label: String, items: List<MenuItem>, modifier: Modifier = Modifier) {
-    var open by remember { mutableStateOf(false) }
+    // Target = open or closed; the popup stays in the composition until the closing animation is through.
+    val shown = remember { MutableTransitionState(false) }
     var armed by remember { mutableStateOf<Int?>(null) }
     val c = Theme.colors
     val again = LocalStrings.current.tapAgainToConfirm
     val below = with(LocalDensity.current) { 44.dp.roundToPx() }
+    val close = { shown.targetState = false; armed = null }
     LaunchedEffect(armed) { if (armed != null) { kotlinx.coroutines.delay(3_000); armed = null } }
     Box(modifier) {
-        HeaderIconButton(Icon.More, label, { armed = null; open = true })
-        if (open) {
+        HeaderIconButton(Icon.More, label, { armed = null; shown.targetState = true })
+        if (shown.currentState || shown.targetState) {
             Popup(
                 alignment = Alignment.TopEnd,
                 offset = IntOffset(0, below),
-                onDismissRequest = { open = false; armed = null },
+                onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
-                val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+                val corner = TransformOrigin(1f, 0f)
                 AnimatedVisibility(
                     shown,
-                    enter = fadeIn(tween(MENU_IN_MS, easing = LinearOutSlowInEasing)) +
-                        scaleIn(tween(MENU_IN_MS, easing = LinearOutSlowInEasing), initialScale = 0.96f, transformOrigin = TransformOrigin(1f, 0f)),
+                    enter = fadeIn(Motion.fadeIn()) + scaleIn(Motion.snappy(), initialScale = 0.85f, transformOrigin = corner),
+                    exit = fadeOut(Motion.fadeOut()) + scaleOut(Motion.snappy(), targetScale = 0.9f, transformOrigin = corner),
                 ) {
                     Column(Modifier.width(220.dp).clip(BlockShape.row).background(c.surfacePressed).padding(vertical = Space.xs).testTag(MORE_MENU_TAG)) {
                         items.forEachIndexed { i, item ->
                             val isArmed = armed == i
                             MenuEntry(item, isArmed, again) {
+                                // Already closing (the menu shrinks for a moment): a second tap must not run the entry again.
+                                if (!shown.targetState) return@MenuEntry
                                 if (item.confirm && !isArmed) armed = i
-                                else { open = false; armed = null; item.onClick() }
+                                else { close(); item.onClick() }
                             }
                         }
                     }
@@ -367,7 +418,6 @@ fun MoreMenu(label: String, items: List<MenuItem>, modifier: Modifier = Modifier
     }
 }
 
-private const val MENU_IN_MS = 150
 
 /** One entry of a [MoreMenu]; [armed] = first tap of a confirm entry done (red fill, "– tap again to confirm"). */
 @Composable
@@ -375,17 +425,15 @@ private fun MenuEntry(item: MenuItem, armed: Boolean, again: String, onClick: ()
     val c = Theme.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val haptics = rememberHaptics()
+    // Armed fills red softly; the pressed tint is there at once.
+    val armedFill by motionColor(if (armed) c.armedFill else c.armedFill.copy(alpha = 0f), "menuArmed")
+    LaunchedEffect(armed) { if (armed) haptics.arm() }
     Box(
         Modifier
             .fillMaxWidth()
             .heightIn(min = TouchTarget.min)
-            .background(
-                when {
-                    armed -> c.armedFill
-                    pressed -> c.foreground.copy(alpha = 0.08f)
-                    else -> Color.Transparent
-                },
-            )
+            .background(if (pressed && !armed) c.foreground.copy(alpha = 0.08f) else armedFill)
             .then(if (armed) Modifier.testTag(ConfirmTags.armed) else Modifier)
             .semantics { if (armed) stateDescription = again }
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
