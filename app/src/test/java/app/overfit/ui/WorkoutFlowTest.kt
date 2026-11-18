@@ -94,7 +94,7 @@ class WorkoutFlowTest {
         // Training tab → open the saved workout → "Starten"
         waitFor("Push", substring = true)
         compose.onNodeWithText("Push", substring = true).performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         compose.onNodeWithText("Starten").performClick()
         waitFor("0/2 erledigt", substring = true)
         assertEquals(1, alerts.permissionRequests)

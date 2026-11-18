@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.pointer.pointerInput
 import app.overfit.ui.components.motionItem
+import app.overfit.ui.components.rememberGlide
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -189,7 +190,7 @@ fun WorkoutScreen(
     // The set that is next right now (what the main button logs): marked in the list, named in the button.
     val upNext = workout.nextToLog()
     val showExercise: (String) -> Unit = { id ->
-        collapsed = collapsed - id
+        collapsed = collapsed.filter { it != id }
         val index = workout.exercises.indexOfFirst { it.id == id }
         if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
     }
@@ -203,7 +204,8 @@ fun WorkoutScreen(
         val next = upNext?.exercise?.id
         // Nothing open any more: stay, the button below now finishes the training.
         if (fresh.isEmpty() || next == null) return@LaunchedEffect
-        collapsed = collapsed + fresh - next
+        // An exercise folded by hand before its last set was logged is in the list already: once is enough.
+        collapsed = (collapsed + fresh).distinct().filter { it != next }
         val index = workout.exercises.indexOfFirst { it.id == next }
         if (index >= 0) listState.animateScrollToItem(index)
     }
@@ -219,7 +221,12 @@ fun WorkoutScreen(
     }
     // While a number is typed, the keyboard takes half the screen: the main button steps aside (the set is checked
     // off at its row), only the rest timer stays.
-    val typing = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    // Read through derivedStateOf: the inset changes on every frame of the keyboard animation, the Boolean once.
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    val typing by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
+    // Cards resize themselves (fold, sets, skip): the others only glide when the list itself changes or a card is dragged.
+    val glide = rememberGlide(exerciseIds, moving = reorder.draggingKey != null)
     val background = Theme.colors.background
 
     Screen(
@@ -290,11 +297,11 @@ fun WorkoutScreen(
             verticalArrangement = Arrangement.spacedBy(Space.s),
         ) {
             if (workout.exercises.isEmpty()) {
-                item(key = "empty") { Text(t.workoutEmpty, Modifier.then(motionItem()).padding(vertical = Space.m), tone = Tone.Muted) }
+                item(key = "empty") { Text(t.workoutEmpty, Modifier.then(motionItem(glide)).padding(vertical = Space.m), tone = Tone.Muted) }
             }
             items(workout.exercises, key = { it.id }) { e ->
                 ExerciseSection(
-                    modifier = Modifier.then(reorderableItem(reorder, e.id)),
+                    modifier = Modifier.then(reorderableItem(reorder, e.id, glide)),
                     reorder = reorder,
                     entry = e,
                     lastTime = state.lastTime[e.exercise.id].orEmpty(),
@@ -302,7 +309,7 @@ fun WorkoutScreen(
                     language = language,
                     expanded = e.id !in collapsed,
                     upNextSetId = upNext?.set?.id,
-                    onToggle = { collapsed = if (e.id in collapsed) collapsed - e.id else collapsed + e.id },
+                    onToggle = { collapsed = if (e.id in collapsed) collapsed.filter { it != e.id } else collapsed + e.id },
                     controller = controller,
                     onRemoveSet = removeSet,
                     onReplace = { onReplaceExercise(e.id) },
@@ -311,7 +318,7 @@ fun WorkoutScreen(
             }
             item(key = "actions") {
                 // Moves along when an exercise is added, removed or folded, like the cards above it.
-                Column(motionItem()) {
+                Column(motionItem(glide)) {
                     BlockButton(t.addExercise, onAddExercises)
                     Spacer(Modifier.height(Space.l))
                     ConfirmButton(t.discardWorkout, onConfirm = { scope.launch { controller.discard() } })
@@ -367,9 +374,22 @@ private fun WorkoutFooter(
     val t = LocalStrings.current
     val finishScope = rememberCoroutineScope()
     val nextText = upNext?.let { WorkoutFormat.next(it, unit, language, t) }
+    // The button's second line: the name may be cut on a narrow phone, the set and its values not.
+    val nextParts = upNext?.let { WorkoutFormat.nextParts(it, unit, language, t) }
     // The clock ticks four times a second; this only changes when a rest begins or ends.
     val rest = workout.rest
     val resting by remember(rest) { derivedStateOf { rest != null && !rest.isOver(now.value) } }
+    // "Log next set" turns into "finish" under a finger that may still be tapping: for a moment the new button ignores
+    // taps (without dimming). Only when the last set was just logged here, not when the workout is opened with
+    // everything done or the keyboard closes (the button below comes back then).
+    val allDone = workout.allDone
+    var seenDone by remember { mutableStateOf(allDone) }
+    LaunchedEffect(allDone) {
+        if (allDone && !seenDone) delay(FINISH_GUARD_MS)
+        seenDone = allDone
+    }
+    // From the very frame the finish button appears (not only once an effect has run).
+    val guarded = allDone && !seenDone
     RevealNotNull(rest.takeIf { resting }, from = Alignment.Bottom) { running ->
         Column {
             RestBar(
@@ -386,28 +406,29 @@ private fun WorkoutFooter(
     Reveal(!typing, from = Alignment.Bottom) {
         // Nothing open any more (every set done or its exercise skipped): the button finishes the training, green on
         // the first tap, saved on the second (same double tap as "Finish" at the top). "Log" and "finish" change
-        // softly, and the finish button only takes taps after a moment: tapping "log" quickly must not finish.
-        Swap(workout.allDone, contentAlignment = Alignment.BottomCenter) { allDone ->
-            if (allDone) {
-                var ready by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { delay(FINISH_GUARD_MS); ready = true }
+        // softly; tapping "log" quickly must not finish (see [guarded] above).
+        Swap(allDone, contentAlignment = Alignment.BottomCenter) { done ->
+            if (done) {
                 ConfirmButton(
                     t.training.finishTraining,
                     onConfirm = { finishScope.launch { controller.finish() } },
                     modifier = Modifier.fillMaxWidth().testTag(FINISH_BUTTON_TAG),
-                    enabled = ready,
                     primary = true,
                     kind = ConfirmKind.Complete,
+                    ignoreTaps = guarded,
                 )
             } else {
-                PrimaryButton(t.logNextSet, onClick = { controller.logNextSet() }, enabled = workout.totalSets > 0, caption = nextText)
+                PrimaryButton(
+                    t.logNextSet, onClick = { controller.logNextSet() }, enabled = workout.totalSets > 0,
+                    caption = nextParts?.first, captionEnd = nextParts?.second,
+                )
             }
         }
     }
 }
 
 /** How long the "finish training" button ignores taps after it replaced "log next set". */
-private const val FINISH_GUARD_MS = 450L
+internal const val FINISH_GUARD_MS = 450L
 
 /** Test tag of the floating "Finish workout" button (shown once nothing is open). */
 const val FINISH_BUTTON_TAG = "workout-finish-bottom"

@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -77,9 +78,11 @@ class RestBarTest {
                 CompositionLocalProvider(LocalStrings provides t) {
                     // Same width as in the workout: 360 dp screen, 24 dp gutter on both sides.
                     Column(Modifier.width(360.dp).background(Theme.colors.background).padding(horizontal = Space.l, vertical = Space.s).testTag("shot")) {
-                        val now = androidx.compose.runtime.remember(current) { mutableLongStateOf(current.elapsedSec * 1000L) }
+                        // Every case is a rest of its own (the island decides its layout once per rest, by its start).
+                        val start = current.totalSec * 10_000L
+                        val now = androidx.compose.runtime.remember(current) { mutableLongStateOf(start + current.elapsedSec * 1000L) }
                         RestBar(
-                            rest = RestTimer(startedAt = 0, endsAt = current.totalSec * 1000L, afterSetId = "s1"),
+                            rest = RestTimer(startedAt = start, endsAt = start + current.totalSec * 1000L, afterSetId = "s1"),
                             now = now,
                             nextLine = t.nextUp("Bench Press · ${t.setNumber(2)} · 60 kg × 8"),
                             onAdjust = { adjusted += it },
@@ -129,6 +132,60 @@ class RestBarTest {
                 }
             }
         }
+    }
+
+    /**
+     * A countdown that crosses 10:00 while the rest runs (+15 tapped twice at 9:50, or −15 at 10:10) keeps the layout
+     * the rest began with: the buttons stay under the finger (a second tap must not land on "skip" or the list), and
+     * "skip" is still not cut off.
+     */
+    @Test
+    fun crossingTenMinutes_keepsEveryButtonInPlace() {
+        var language by mutableStateOf(Language.DE)
+        var rest by mutableStateOf(RestTimer(startedAt = 0, endsAt = 590_000L))
+        compose.setContent {
+            val t = stringsFor(language)
+            OverfitTheme {
+                CompositionLocalProvider(LocalStrings provides t) {
+                    Column(Modifier.width(360.dp).background(Theme.colors.background).padding(horizontal = Space.l, vertical = Space.s).testTag("shot")) {
+                        val now = androidx.compose.runtime.remember { mutableLongStateOf(0L) }
+                        RestBar(
+                            rest = rest, now = now, nextLine = null,
+                            onAdjust = { rest = rest.adjust(it * 1000L) }, onSkip = { skipped++ }, onShowNext = null,
+                        )
+                    }
+                }
+            }
+        }
+        for (l in listOf(Language.DE, Language.EN)) {
+            language = l
+            val t = stringsFor(l)
+            for ((start, delta) in listOf(590 to 15, 610 to -15)) {
+                rest = RestTimer(startedAt = start.toLong(), endsAt = start + start * 1000L)
+                compose.waitForIdle()
+                val island = compose.onNodeWithTag(REST_BAR_TAG).getBoundsInRoot()
+                val plus = compose.onNodeWithContentDescription(t.restPlus).getBoundsInRoot()
+                val minus = compose.onNodeWithContentDescription(t.restMinus).getBoundsInRoot()
+                val skip = compose.onNodeWithText(t.restSkip).getBoundsInRoot()
+                repeat(2) {
+                    compose.onNodeWithContentDescription(if (delta > 0) t.restPlus else t.restMinus).performClick()
+                    compose.waitForIdle()
+                    // Same layout (no second line coming or going), every button where it was.
+                    assertEquals("$l $start: the island changed its size", island, compose.onNodeWithTag(REST_BAR_TAG).getBoundsInRoot())
+                    assertEquals("$l $start: +15 moved", plus, compose.onNodeWithContentDescription(t.restPlus).getBoundsInRoot())
+                    assertEquals("$l $start: −15 moved", minus, compose.onNodeWithContentDescription(t.restMinus).getBoundsInRoot())
+                    assertEquals("$l $start: skip moved", skip, compose.onNodeWithText(t.restSkip).getBoundsInRoot())
+                    System.getenv("SCREENSHOT_DIR")?.let { d ->
+                        File(d, "pause-ueber-10-${l.name.lowercase()}-$start-$it.png").outputStream().use { o ->
+                            compose.onNodeWithTag("shot").captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, o)
+                        }
+                    }
+                    val layout = skipLabelLayout()
+                    assertFalse("$l $start: \"${t.restSkip}\" is cut off", layout.hasVisualOverflow || layout.isLineEllipsized(0))
+                }
+            }
+        }
+        assertEquals(0, skipped)
     }
 
     @Test

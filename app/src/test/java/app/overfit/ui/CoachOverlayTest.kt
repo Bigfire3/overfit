@@ -132,7 +132,7 @@ class CoachOverlayTest {
         // System back closes the coach (wins over the editor's own back handler) and returns to the workout.
         back()
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("coach:close")).fetchSemanticsNodes().isEmpty() }
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         compose.onNodeWithTag("coach:open").performClick()
         waitForTag("chip:plan")
         compose.waitForIdle()

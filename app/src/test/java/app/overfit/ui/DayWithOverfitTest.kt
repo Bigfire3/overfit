@@ -181,7 +181,7 @@ class DayWithOverfitTest {
             tab("Workouts")
             waitFor(name)
             compose.onAllNodes(hasText(name))[0].performScrollTo().performClick()
-            waitFor("Starten") // the workout plan screen
+            compose.waitForPlanLoaded() // the workout plan screen
             // Share is in the ⋮ top right.
             compose.openMenuEntry("Teilen")
             waitFor("Das wird geteilt") // preview of what the recipient gets, above the compact QR code
@@ -207,7 +207,7 @@ class DayWithOverfitTest {
         tab("Workouts")
         waitFor("Push")
         compose.onAllNodes(hasText("Push"))[0].performScrollTo().performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         click("Starten")
         waitFor("erledigt", substring = true)
         assertEquals(1, alerts.permissionRequests)

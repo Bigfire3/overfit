@@ -259,7 +259,8 @@ class UiFeedbackTest {
         compose.onNodeWithText("Teilen").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Link kopieren").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Zurück").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Starten").fetchSemanticsNodes().isNotEmpty() }
+        // Back on the plan: it shows its exercises again once they are loaded (the button is there before).
+        compose.waitForPlanLoaded()
         compose.onAllNodes(hasContentDescription("Bearbeiten")).assertCountEquals(0)
 
         val pushId = runBlocking { deps.data.templates.templates.first().first { it.name == "Push" }.id }

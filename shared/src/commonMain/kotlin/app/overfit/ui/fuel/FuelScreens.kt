@@ -22,6 +22,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overfit.domain.Language
 import app.overfit.fuel.FuelAccount
@@ -262,11 +265,32 @@ private fun Balance(account: FuelAccount, language: Language, t: FuelStrings) {
     Panel {
         PanelItem {
             Text(t.balanceLabel, style = Theme.type.caption, tone = Tone.Muted)
-            RollingText(t.creditAmount(formatEuro(account.balanceMicro, language)), style = Theme.type.title)
+            BalanceLine(formatEuro(account.balanceMicro, language), t)
             RevealNotNull(reservedNote(account.reservedMicro, t)) {
                 Text(it, Modifier.padding(top = Space.xs).testTag("fuel:reserved"), style = Theme.type.caption, tone = Tone.Muted)
             }
         }
+    }
+}
+
+/**
+ * "4,20 € Guthaben" in the title size: only the amount rolls (one line, like every [RollingText]); the word is a normal
+ * text that moves to its own line when both do not fit (large type, a three-digit balance on a 360 dp phone). Read out
+ * as one text.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun BalanceLine(amount: String, t: FuelStrings) {
+    val full = t.creditAmount(amount)
+    val before = full.substringBefore(amount, missingDelimiterValue = "").trim()
+    val after = full.substringAfter(amount, missingDelimiterValue = "").trim()
+    androidx.compose.foundation.layout.FlowRow(
+        Modifier.clearAndSetSemantics { text = AnnotatedString(full) },
+        horizontalArrangement = Arrangement.spacedBy(Space.s),
+    ) {
+        if (before.isNotEmpty()) Text(before, style = Theme.type.title)
+        RollingText(amount, style = Theme.type.title)
+        if (after.isNotEmpty()) Text(after, style = Theme.type.title)
     }
 }
 

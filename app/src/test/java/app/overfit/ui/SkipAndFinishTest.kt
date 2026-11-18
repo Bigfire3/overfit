@@ -4,6 +4,9 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertCountEquals
+import app.overfit.ui.components.ConfirmTags
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -94,7 +97,7 @@ class SkipAndFinishTest {
         val squatName = w0.exercises[0].exercise.name
         waitFor("Push", substring = true)
         compose.onNodeWithText("Push", substring = true).performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         compose.onNodeWithText("Starten").performClick()
         waitFor("0/5 erledigt", substring = true)
 
@@ -118,12 +121,20 @@ class SkipAndFinishTest {
         // Log both bench sets with the floating button; then it says "Training beenden".
         compose.onNodeWithText("Nächsten Satz loggen").performClick()
         waitFor("1/2 erledigt", substring = true)
+        // The button that just replaced "log next set" ignores taps for a moment: tapping "log" quickly must not arm
+        // (and then finish) the training by accident. It is not dimmed meanwhile (enabled, full opacity).
+        compose.mainClock.autoAdvance = false
         compose.onNodeWithText("Nächsten Satz loggen").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(FINISH_BUTTON_TAG)).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Training beenden").assertExists()
-        // The button that just replaced "log next set" takes taps only after a moment: tapping "log" quickly must
-        // not arm (and then finish) the training by accident.
+        repeat(3) { compose.mainClock.advanceTimeByFrame() }
+        compose.onNodeWithTag(FINISH_BUTTON_TAG).assertIsEnabled().performClick()
+        repeat(3) { compose.mainClock.advanceTimeByFrame() }
+        compose.onAllNodes(hasTestTag(ConfirmTags.armed)).assertCountEquals(0)
+        // After the guard (450 ms) it takes taps; virtual and real time both pass it, whichever the delay follows.
+        compose.mainClock.advanceTimeBy(700)
+        Thread.sleep(700)
+        compose.mainClock.autoAdvance = true
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(FINISH_BUTTON_TAG) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Training beenden").assertExists()
         shot("training-beenden")
 
         // Double tap finishes and saves; the training keeps the exercise as skipped, the workout keeps it unchanged.
@@ -140,6 +151,53 @@ class SkipAndFinishTest {
         assertEquals(2, saved.completedSets)
         assertEquals(3, runBlocking { data.templates.get(templateId)!! }.exercises[0].sets.size)
         waitFor("1 Übung ausgelassen", substring = true)
+    }
+
+    /**
+     * An exercise folded by hand whose last set is then logged with the main button is folded once, not twice: one tap
+     * on its header opens it again (it used to stand in the folded list twice, so the first tap did nothing).
+     */
+    @Test
+    fun foldedByHandThenFinished_oneTapOpensItAgain() {
+        store.setName("Fabi")
+        store.completeOnboarding()
+        runBlocking {
+            data.seedCatalog()
+            val bench = requireNotNull(data.exercises.get("wg:bench-press"))
+            val squat = requireNotNull(data.exercises.get("wg:belt-squat"))
+            data.templates.save(
+                Template(0, "Push", null, listOf(
+                    TemplateExercise(squat, restSec = 0, note = null, sets = List(1) { PlannedSet(80.0, 5) }),
+                    TemplateExercise(bench, restSec = 0, note = null, sets = List(1) { PlannedSet(60.0, 8) }),
+                )),
+            )
+        }
+        val deps = AppDependencies(
+            store, Providers(HttpClient(MockEngine { respond("{}") })), data, versionName = "0.1.test",
+            today = { realToday() }, haptics = RecordingHaptics(), restAlerts = RecordingRestAlerts(),
+        )
+        compose.setContent { OverfitApp(deps) }
+        compose.waitForTrainingTab()
+        waitFor("Push", substring = true)
+        compose.onNodeWithText("Push", substring = true).performClick()
+        compose.waitForPlanLoaded()
+        compose.onNodeWithText("Starten").performClick()
+        waitFor("0/2 erledigt", substring = true)
+        fun openSetRows() = compose.onAllNodes(hasTestTag("set-row:1"), useUnmergedTree = true).fetchSemanticsNodes().size
+        compose.waitUntil(10_000) { openSetRows() == 2 }
+        val header = hasContentDescription("Halten und ziehen zum Verschieben")
+
+        // Fold the first exercise by hand, then log its only set with the main button.
+        compose.onAllNodes(header)[0].performClick()
+        compose.waitUntil(10_000) { openSetRows() == 1 }
+        compose.onNodeWithText("Nächsten Satz loggen").performClick()
+        waitFor("1/2 erledigt", substring = true)
+        compose.waitForIdle()
+        assertEquals(1, openSetRows())
+
+        // One tap opens it again.
+        compose.onAllNodes(header)[0].performClick()
+        compose.waitUntil(10_000) { openSetRows() == 2 }
     }
 
     private fun shot(name: String) {

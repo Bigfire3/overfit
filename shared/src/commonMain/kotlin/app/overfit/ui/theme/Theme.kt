@@ -41,7 +41,8 @@ import org.jetbrains.compose.resources.Font
  *   Also the fill of a checked-off set row in the running workout (the whole row turns green).
  * - [inputFill]: translucent white of a number field, so it stands slightly lighter on any row (grey or green).
  * - [accent] ("Kreidegelb", DECISIONS "Jetzt-Farbe"): the one colour that is not a judgement. It marks what is live
- *   right now: the running rest timer, the running workout, the set that is next, today. Never decoration, never
+ *   right now: the running rest countdown (rest island, mini bar), the set that is next, a countdown or a "thinking"
+ *   marker of something that runs. One meaning, not one place per view. Never decoration, never
  *   selection (selected stays white), never a button fill. Green = done, yellow = now, red = delete.
  */
 @Immutable
@@ -72,7 +73,7 @@ data class Colors(
     val confirmFill: Color,
     /** Fill of a set row's number field: translucent white, slightly lighter than the row below (grey or green). */
     val inputFill: Color,
-    /** "Now": what is live at this moment (rest countdown, running workout, next set, today). Text and marks. */
+    /** "Now": what is live at this moment (rest countdown, next set, pairing countdown, "thinking"). Text and marks. */
     val accent: Color,
     /** Low-contrast fill behind [accent] content (the filled part of the rest timer). */
     val accentSubtle: Color,
@@ -157,6 +158,10 @@ object Sizes {
     val chip = 40.dp
     /** Round filled icon button (start ▶, send, add to chat). */
     val roundButton = 40.dp
+    /** Round −15 / +15 step button beside the rest countdown (in a [TouchTarget.min] area). */
+    val stepButton = 44.dp
+    /** Smallest height of a number tile ([app.overfit.ui.components.StatGrid]). */
+    val statTile = 72.dp
     /** Round check button of a set row (running workout). */
     val checkCircle = 36.dp
     /** Small round badge on a photo or a choice (✕ to remove, tick, count). */

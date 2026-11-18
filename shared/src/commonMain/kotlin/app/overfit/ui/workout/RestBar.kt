@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
@@ -47,6 +50,7 @@ import app.overfit.ui.components.RollingText
 import app.overfit.ui.components.pressScale
 import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.theme.Motion
+import app.overfit.ui.theme.Sizes
 import app.overfit.ui.theme.Space
 import app.overfit.ui.theme.Theme
 import app.overfit.ui.theme.TouchTarget
@@ -58,6 +62,10 @@ const val REST_SKIP_LABEL_TAG = "rest-bar:skip-label"
 
 /** From this font scale on "skip" moves below the countdown: side by side it would be cut off on a 360 dp phone. */
 private const val STACKED_FONT_SCALE = 1.15f
+
+/** The widest countdowns the island makes room for (tabular digits: every digit is as wide as a 0). */
+private const val COUNTDOWN_SHORT = "0:00"
+private const val COUNTDOWN_LONG = "00:00"
 
 /**
  * Rest timer of the running workout: one compact island above the main button, never full screen, the list above
@@ -89,8 +97,24 @@ fun RestBar(
         snapshotFlow { rest.progress(now.value) }.collect { progress.animateTo(it, Motion.tick()) }
     }
     // Side by side as long as it fits: with large type, or a rest of ten minutes and more (a fifth character), "skip"
-    // gets its own line instead of being cut off.
-    val stacked = LocalDensity.current.fontScale >= STACKED_FONT_SCALE || countdown.length > 4
+    // gets its own line instead of being cut off. Decided once per rest (as it begins): a countdown that crosses
+    // 10:00 (+15 tapped twice at 9:50) must not move the buttons under the finger.
+    val fontScale = LocalDensity.current.fontScale
+    val stacked = remember(rest.startedAt, fontScale) {
+        fontScale >= STACKED_FONT_SCALE || WorkoutFormat.countdown(rest.totalMs).length > 4
+    }
+
+    // The countdown has a fixed width for the whole rest, so −15 / +15 never move: stacked it has room for "10:00";
+    // side by side "skip" needs that room, and a countdown that grows past 10:00 there (+15 tapped at 9:50) is drawn a
+    // little smaller instead.
+    val titleStyle = Theme.type.tabular(Theme.type.title)
+    val measurer = rememberTextMeasurer(cacheSize = 2)
+    val density = LocalDensity.current
+    val countdownWidth = remember(titleStyle, density, stacked) {
+        // Piece by piece, as [RollingText] sets it (every digit and every run between digits is a text of its own).
+        val widest = if (stacked) COUNTDOWN_LONG else COUNTDOWN_SHORT
+        with(density) { widest.sumOf { measurer.measure(it.toString(), titleStyle, maxLines = 1, softWrap = false).size.width }.toDp() }
+    }
 
     @Composable
     fun RowScope.Stepper() {
@@ -100,6 +124,7 @@ fun RestBar(
         Box(
             Modifier
                 .heightIn(min = TouchTarget.min)
+                .width(countdownWidth + 4.dp)
                 .then(
                     if (onShowNext != null) Modifier.pressScale(interaction, PressScale.button)
                         .clickable(interaction, indication = null, role = Role.Button, onClick = onShowNext)
@@ -110,7 +135,7 @@ fun RestBar(
             contentAlignment = Alignment.Center,
         ) {
             // Rolls down second by second; tabular digits keep the buttons beside it in place.
-            RollingText(countdown, style = Theme.type.title, color = c.accent, countsDown = true)
+            RollingText(countdown, Modifier.scaleDownToFit(), style = Theme.type.title, color = c.accent, countsDown = true)
         }
         StepButton(t.restPlusShort, t.restPlus) { onAdjust(15) }
     }
@@ -140,7 +165,21 @@ fun RestBar(
     }
 }
 
-/** Round −15 / +15 button beside the countdown: 44 dp circle in a 48 dp touch area. */
+/**
+ * Content wider than the room it gets is drawn smaller as a whole (centred) instead of pushing its neighbours aside or
+ * being cut; content that fits is left as it is.
+ */
+private fun Modifier.scaleDownToFit(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+    val width = (if (constraints.hasBoundedWidth) minOf(placeable.width, constraints.maxWidth) else placeable.width)
+        .coerceAtLeast(constraints.minWidth)
+    val scale = if (placeable.width > width) width.toFloat() / placeable.width else 1f
+    layout(width, placeable.height) {
+        placeable.placeWithLayer((width - placeable.width) / 2, 0) { scaleX = scale; scaleY = scale }
+    }
+}
+
+/** Round −15 / +15 button beside the countdown: [Sizes.stepButton] circle in a 48 dp touch area. */
 @Composable
 private fun StepButton(label: String, description: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
@@ -153,7 +192,7 @@ private fun StepButton(label: String, description: String, onClick: () -> Unit) 
             .clickable(interaction, indication = null, role = Role.Button) { haptics.tick(); onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(44.dp).background(Theme.colors.surfacePressed, CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(Sizes.stepButton).background(Theme.colors.surfacePressed, CircleShape), contentAlignment = Alignment.Center) {
             BasicText(
                 label,
                 style = Theme.type.caption.copy(color = Theme.colors.foreground, fontWeight = FontWeight.SemiBold, fontSize = 15.sp),

@@ -5,12 +5,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.snap
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.text.modifiers.TextAutoSizeLayoutScope
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.unit.offset
@@ -55,8 +65,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.spring
 import app.overfit.i18n.LocalStrings
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.unit.sp
@@ -351,7 +359,7 @@ private fun Modifier.pressable(
 fun Modifier.pressableRow(onClick: () -> Unit): Modifier {
     val interaction = remember { MutableInteractionSource() }
     val pressedFill = if (LocalInPanel.current) Theme.colors.surfacePressed else Theme.colors.surface
-    val pressed = rememberPressProgress(interaction, press = snap(), release = tween(260, easing = LinearOutSlowInEasing))
+    val pressed = rememberPressProgress(interaction, press = snap(), release = Motion.rowRelease())
     return this
         .drawBehind { if (pressed.value > 0f) drawRect(pressedFill, alpha = pressed.value.coerceIn(0f, 1f)) }
         .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
@@ -374,8 +382,8 @@ object PressScale {
 fun Modifier.pressScale(interaction: InteractionSource, scale: Float = PressScale.button): Modifier {
     val pressed = rememberPressProgress(
         interaction,
-        press = tween(Motion.MIN_PRESS_MS, easing = LinearOutSlowInEasing),
-        release = spring(dampingRatio = 0.55f, stiffness = 600f),
+        press = Motion.press(),
+        release = Motion.pressRelease(),
     )
     return graphicsLayer {
         val value = 1f - (1f - scale) * pressed.value
@@ -404,6 +412,7 @@ private fun PillButton(
     contentTone: Color,
     icon: Icon? = null,
     caption: String? = null,
+    captionEnd: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val haptics = rememberHaptics()
@@ -444,13 +453,10 @@ private fun PillButton(
                     autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = textStyle.fontSize),
                 )
             }
-            // Second line: what exactly the button will do (the set it logs). Changes softly with the workout.
-            if (caption != null) Swap(caption, contentAlignment = Alignment.Center) { line ->
-                BasicText(
-                    line,
-                    style = Theme.type.caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = { contentTone.copy(alpha = BUTTON_CAPTION_ALPHA) },
-                )
+            // Second line: what exactly the button will do (the set it logs). Changes softly with the workout. Like the
+            // label it shrinks before it is cut, and then the name goes, not the values ([captionEnd]).
+            if (caption != null) Swap(caption to captionEnd, contentAlignment = Alignment.Center) { (lead, end) ->
+                FittedLine(lead, end, Theme.type.caption, color = { contentTone.copy(alpha = BUTTON_CAPTION_ALPHA) })
             }
         }
         if (icon != null) { Spacer(Modifier.width(Space.s)); LineIcon(icon, color = contentTone) }
@@ -460,10 +466,65 @@ private fun PillButton(
 /** How strong the second line of a button stands against its label (black on white: still ≥ 4.5:1, ButtonContrastTest). */
 const val BUTTON_CAPTION_ALPHA = 0.64f
 
+/** Smallest size a [FittedLine] shrinks to before it cuts (the caption is 13 sp), and the step on the way there. */
+private val FITTED_LINE_MIN = 11.sp
+private const val FITTED_LINE_STEP = 0.5f
+
+/** Between [FittedLine]'s lead and end, as in [app.overfit.workout.WorkoutFormat.next]. */
+const val FITTED_LINE_SEPARATOR = " · "
+
+/**
+ * One line of small text that first shrinks (down to [FITTED_LINE_MIN]) and only then is cut, and that cuts [lead]
+ * (an exercise name) instead of [end] (the set and its values, what the line is for):
+ * "Incline Dumbbell Pr… · Satz 2 · 22,5 kg × 12". Measured and drawn in one layout pass (no subcomposition, so it is
+ * safe inside intrinsic measurement), read out as the whole line.
+ */
+@Composable
+internal fun FittedLine(lead: String, end: String?, style: TextStyle, color: () -> Color, modifier: Modifier = Modifier) {
+    val measurer = rememberTextMeasurer(cacheSize = 8)
+    val full = if (end == null) lead else lead + FITTED_LINE_SEPARATOR + end
+    // Written while measuring, read while drawing: a new layout only redraws.
+    val drawn = remember { mutableStateOf<Pair<TextLayoutResult, TextLayoutResult?>?>(null) }
+    Layout(
+        modifier
+            .semantics { text = AnnotatedString(full) }
+            .drawBehind {
+                val (head, tail) = drawn.value ?: return@drawBehind
+                val c = color()
+                drawText(head, color = c)
+                if (tail != null) drawText(tail, color = c, topLeft = Offset(head.size.width.toFloat(), 0f))
+            },
+    ) { _, constraints ->
+        fun measure(text: String, size: TextUnit, maxWidth: Int = Constraints.Infinity) = measurer.measure(
+            text, style.copy(fontSize = size), overflow = TextOverflow.Ellipsis, softWrap = false, maxLines = 1,
+            constraints = Constraints(maxWidth = maxWidth),
+        )
+        val max = constraints.maxWidth
+        var size = style.fontSize
+        var whole = measure(full, size)
+        while (whole.size.width > max && size.value - FITTED_LINE_STEP >= FITTED_LINE_MIN.value) {
+            size = (size.value - FITTED_LINE_STEP).sp
+            whole = measure(full, size)
+        }
+        val result = when {
+            whole.size.width <= max -> whole to null
+            end == null -> measure(full, size, max) to null
+            else -> {
+                val tail = measure(FITTED_LINE_SEPARATOR + end, size, max)
+                measure(lead, size, (max - tail.size.width).coerceAtLeast(0)) to tail
+            }
+        }
+        drawn.value = result
+        val width = (result.first.size.width + (result.second?.size?.width ?: 0)).coerceIn(constraints.minWidth, max)
+        val height = maxOf(result.first.size.height, result.second?.size?.height ?: 0).coerceIn(constraints.minHeight, constraints.maxHeight)
+        layout(width, height) {}
+    }
+}
+
 /**
  * The one primary action on a screen: white fill without border, black bold label, optional [icon] right, 64 dp,
  * large corners. [caption] = a small second line under the label that says what exactly the tap does (the running
- * workout: which set "log next set" logs).
+ * workout: which set "log next set" logs), [captionEnd] the part of it that is never cut.
  */
 @Composable
 fun PrimaryButton(
@@ -475,11 +536,13 @@ fun PrimaryButton(
     compact: Boolean = false,
     icon: Icon? = null,
     caption: String? = null,
+    /** End of [caption] that must stay readable (the values of the set): if the line is too long, [caption] is cut. */
+    captionEnd: String? = null,
 ) {
     val c = Theme.colors
     PillButton(
         if (loading) "…" else label, onClick, modifier, enabled && !loading, compact, haptic = true,
-        fill = c.inverseBackground, contentTone = c.inverseForeground, icon = icon, caption = caption,
+        fill = c.inverseBackground, contentTone = c.inverseForeground, icon = icon, caption = caption, captionEnd = captionEnd,
     )
 }
 
@@ -530,6 +593,11 @@ fun ConfirmButton(
     loading: Boolean = false,
     /** [ConfirmKind.Destructive] (default) arms red, [ConfirmKind.Complete] green. */
     kind: ConfirmKind = ConfirmKind.Destructive,
+    /**
+     * Taps do nothing for now (neither arm nor confirm), without the dimmed look of [enabled] = false: a button that
+     * has just replaced another one under a finger that is still tapping.
+     */
+    ignoreTaps: Boolean = false,
 ) {
     val arm = rememberConfirmArm()
     val haptics = rememberHaptics()
@@ -545,8 +613,11 @@ fun ConfirmButton(
     PillButton(
         if (loading) "…" else label,
         onClick = {
-            if (armed) { arm.disarm(); haptics.confirm(); onConfirm() }
-            else { haptics.arm(); arm.arm() }
+            when {
+                ignoreTaps -> Unit
+                armed -> { arm.disarm(); haptics.confirm(); onConfirm() }
+                else -> { haptics.arm(); arm.arm() }
+            }
         },
         modifier = modifier
             .then(arm.modifier)
@@ -1034,8 +1105,12 @@ private fun SwitchTrack(checked: Boolean) {
 // ---------------------------------------------------------------------------
 // Numbers
 
-/** One number of a [StatGrid]: [value] large, [label] small below it. [positive]: the value stands in green (a record). */
-class Stat(val label: String, val value: String, val positive: Boolean = false)
+/**
+ * One number of a [StatGrid]: [value] large, [label] small below it (up to two lines). [positive]: the value stands in
+ * green (a record). [counting]: while the number counts up, the text to show right now; it is read where that text is
+ * built, so only the number follows each frame, and its size is fitted once to [value], the final text.
+ */
+class Stat(val label: String, val value: String, val positive: Boolean = false, val counting: (() -> String)? = null)
 
 /**
  * A few key numbers as a compact grid of tiles (two per row) instead of one full-width row each: half the height,
@@ -1046,8 +1121,9 @@ class Stat(val label: String, val value: String, val positive: Boolean = false)
 fun StatGrid(stats: List<Stat>, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.s)) {
         stats.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-                row.forEach { stat -> StatTile(stat, Modifier.weight(1f)) }
+            // Tiles of a row stay equally tall when one label needs a second line.
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                row.forEach { stat -> StatTile(stat, Modifier.weight(1f).fillMaxHeight()) }
             }
         }
     }
@@ -1058,21 +1134,102 @@ private fun StatTile(stat: Stat, modifier: Modifier = Modifier) {
     val c = Theme.colors
     Column(
         modifier
-            .heightIn(min = 72.dp)
-            .background(c.surface, RoundedCornerShape(20.dp))
+            .heightIn(min = Sizes.statTile)
+            .background(c.surface, BlockShape.block)
             // One tile reads as one thing: "Dauer, 42:10".
             .semantics(mergeDescendants = true) {}
-            .padding(horizontal = Space.m, vertical = 12.dp),
+            .padding(horizontal = Space.m, vertical = Space.s + Space.xs),
         verticalArrangement = Arrangement.Center,
     ) {
+        StatValue(stat)
+        // Two lines rather than "Bestes geschätz…" on a narrow phone; with large type it shrinks a little before a
+        // long word ("Wiederholungen") would break in the middle.
+        val caption = Theme.type.caption
         BasicText(
-            stat.value,
-            style = Theme.type.number.copy(color = if (stat.positive) c.positive else c.foreground),
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = Theme.type.number.fontSize),
+            stat.label,
+            style = caption.copy(color = Tone.Muted.color()),
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            autoSize = remember(caption.fontSize) { WholeWords(STAT_LABEL_MIN_FONT, caption.fontSize) },
         )
-        Text(stat.label, style = Theme.type.caption, tone = Tone.Muted, maxLines = 1)
     }
+}
+
+private val STAT_LABEL_MIN_FONT = 11.sp
+
+/**
+ * Auto-size for a short label of a few lines: the largest size between [min] and [max] at which it fits its lines
+ * without an ellipsis and without breaking a word in the middle ("Höchstgewich-t").
+ */
+private class WholeWords(private val min: TextUnit, private val max: TextUnit) : TextAutoSize {
+    override fun TextAutoSizeLayoutScope.getFontSize(constraints: Constraints, text: AnnotatedString): TextUnit {
+        var size = max.value
+        while (size - FIT_STEP >= min.value) {
+            if (fitsInWholeWords(performLayout(constraints, text, size.sp), text.text)) break
+            size -= FIT_STEP
+        }
+        return size.sp
+    }
+
+    override fun equals(other: Any?): Boolean = other is WholeWords && other.min == min && other.max == max
+
+    override fun hashCode(): Int = min.hashCode() * 31 + max.hashCode()
+}
+
+private fun fitsInWholeWords(layout: TextLayoutResult, text: String): Boolean {
+    if (layout.lineCount == 0) return true
+    val last = layout.lineCount - 1
+    if (layout.didOverflowHeight || layout.getLineEnd(last, visibleEnd = true) < text.trimEnd().length) return false
+    // A line that ends inside a word: the word did not fit the width.
+    return (0 until last).all { i ->
+        val end = layout.getLineEnd(i)
+        end <= 0 || end >= text.length || text[end - 1].isWhitespace() || text[end - 1] == '-' || text[end].isWhitespace()
+    }
+}
+
+private const val FIT_STEP = 0.25f
+
+/** The number of a tile: the only part that follows a count-up frame by frame. */
+@Composable
+private fun StatValue(stat: Stat) {
+    val c = Theme.colors
+    val style = Theme.type.number
+    val fit = remember(stat.value, style.fontSize) { FitText(stat.value, STAT_MIN_FONT, style.fontSize) }
+    BasicText(
+        stat.counting?.invoke() ?: stat.value,
+        style = style.copy(color = if (stat.positive) c.positive else c.foreground),
+        maxLines = 1, overflow = TextOverflow.Ellipsis,
+        autoSize = fit,
+    )
+}
+
+private val STAT_MIN_FONT = 14.sp
+
+/**
+ * Auto-size that fits [sizedFor] (the final text of a number that counts up) between [min] and [max] and keeps that
+ * size for every text shown on the way there: the search runs once per width, not on every frame of the count-up.
+ */
+private class FitText(private val sizedFor: String, private val min: TextUnit, private val max: TextUnit) : TextAutoSize {
+    private var key: Triple<Constraints, Float, Float>? = null
+    private var size: TextUnit = max
+
+    override fun TextAutoSizeLayoutScope.getFontSize(constraints: Constraints, text: AnnotatedString): TextUnit {
+        val now = Triple(constraints, density, fontScale)
+        if (now == key) return size
+        val target = AnnotatedString(sizedFor)
+        var candidate = max.value
+        while (candidate - FIT_STEP >= min.value) {
+            if (fitsInWholeWords(performLayout(constraints, target, candidate.sp), sizedFor)) break
+            candidate -= FIT_STEP
+        }
+        key = now
+        size = candidate.sp
+        return size
+    }
+
+    override fun equals(other: Any?): Boolean =
+        other is FitText && other.sizedFor == sizedFor && other.min == min && other.max == max
+
+    override fun hashCode(): Int = (sizedFor.hashCode() * 31 + min.hashCode()) * 31 + max.hashCode()
 }
 
 // ---------------------------------------------------------------------------

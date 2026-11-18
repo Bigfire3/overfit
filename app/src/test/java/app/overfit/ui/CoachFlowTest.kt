@@ -101,7 +101,7 @@ class CoachFlowTest {
         // Training tab → "Push" → "Starten" → "Beenden" (two taps) → finish flow.
         waitFor("Push", substring = true)
         compose.onNodeWithText("Push", substring = true).performClick()
-        waitFor("Starten")
+        compose.waitForPlanLoaded()
         compose.onNodeWithText("Starten").performClick()
         waitFor("Beenden")
         compose.onNodeWithText("Beenden").performClick()

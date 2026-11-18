@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -105,8 +106,9 @@ fun FinishScreen(
     }
     // Photos belong to the training's day (v14): shown and added for that day.
     val day = data?.finished?.workout?.startedAt?.let { localDateTime(it).date }
-    val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
-        .collectAsStateWithLifecycle(emptyList())
+    // Null until the day's photos are loaded: the grid then knows which ones were simply there.
+    val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(null) }
+        .collectAsStateWithLifecycle<List<app.overfit.data.WorkoutPhoto>?>(null)
 
     var feeling by rememberSaveable { mutableStateOf<Int?>(null) }
     var sauna by rememberSaveable { mutableStateOf<Boolean?>(null) }
@@ -267,20 +269,26 @@ private fun FinishStats(s: WorkoutSummary?, unit: WeightUnit, language: Language
         StatGrid(listOf(h.duration, h.setsLabel, h.volume, h.exercisesLabel).map { Stat(it, "–") }, modifier)
         return
     }
+    // The count-up states are only read inside the tiles' number texts (Stat.counting), so a frame of the count-up
+    // redraws four numbers, not this grid.
     @Composable
-    fun count(target: Double): Double = if (celebrate) rememberCountUp(target.toFloat()).value.toDouble() else target
+    fun count(target: Double): State<Float>? = if (celebrate) rememberCountUp(target.toFloat()) else null
     val duration = count(s.durationMs.toDouble())
     val sets = count(s.completedSets.toDouble())
     val volume = count(s.volumeKg)
     val exercises = count(s.exerciseCount.toDouble())
     // Ends exactly on the real values (the float count-up may stop a hair below).
     fun int(v: Double, real: Int) = if (v >= real) real else v.roundToInt().coerceAtMost(real)
+    fun durationText(v: Double) = WorkoutFormat.elapsed(if (v >= s.durationMs) s.durationMs else v.roundToLong())
+    fun setsText(v: Double) = h.setsOf(int(v, s.completedSets), s.totalSets)
+    fun volumeText(v: Double) = formatVolume(if (v >= s.volumeKg) s.volumeKg else v, unit, language)
+    fun exercisesText(v: Double) = int(v, s.exerciseCount).toString()
     StatGrid(
         listOfNotNull(
-            Stat(h.duration, WorkoutFormat.elapsed(if (duration >= s.durationMs) s.durationMs else duration.roundToLong())),
-            Stat(h.setsLabel, h.setsOf(int(sets, s.completedSets), s.totalSets)),
-            if (s.volumeKg > 0) Stat(h.volume, formatVolume(if (volume >= s.volumeKg) s.volumeKg else volume, unit, language)) else null,
-            Stat(h.exercisesLabel, int(exercises, s.exerciseCount).toString()),
+            Stat(h.duration, durationText(s.durationMs.toDouble()), counting = duration?.let { { durationText(it.value.toDouble()) } }),
+            Stat(h.setsLabel, setsText(s.completedSets.toDouble()), counting = sets?.let { { setsText(it.value.toDouble()) } }),
+            if (s.volumeKg > 0) Stat(h.volume, volumeText(s.volumeKg), counting = volume?.let { { volumeText(it.value.toDouble()) } }) else null,
+            Stat(h.exercisesLabel, exercisesText(s.exerciseCount.toDouble()), counting = exercises?.let { { exercisesText(it.value.toDouble()) } }),
             if (s.records.isNotEmpty()) Stat(h.newRecords, s.records.size.toString(), positive = true) else null,
         ),
         modifier,

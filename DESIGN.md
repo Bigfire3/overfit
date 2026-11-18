@@ -182,7 +182,10 @@ Monochrom mit zwei Signalfarben, die nur Daten und Bestätigungen tragen.
 ### Jetzt (nur Bedeutung)
 - **Kreidegelb** (accent / accent-subtle): was in diesem Moment läuft oder dran ist. Der Countdown der Pause, der gefüllte
   Teil der Pausen-Insel (accent-subtle), die Nummer des Satzes, der als Nächstes geloggt wird, der Countdown in der
-  Mini-Leiste. Höchstens einmal pro Blick; nie Auswahl (bleibt weiß), nie Knopffläche, nie Deko.
+  Mini-Leiste, der ablaufende Kopplungscode im Chat (Countdown) und der ruhende Punkt neben „denkt nach …“ im
+  Coach-Chat. Regel: **eine Bedeutung, nicht eine Stelle** – Gelb heißt immer „jetzt“, auch wenn in einer Pause
+  Countdown und Satznummer gleichzeitig gelb sind (beide sind „jetzt“: die laufende Pause und der Satz danach). Nie
+  Auswahl (bleibt weiß), nie Knopffläche, nie Deko, nie „heute“ (der Heute-Kreis im Kalender bleibt weiß).
 
 ### Named Rules
 **The Meaning Rule.** Kein Farbton dient der Dekoration oder Marke. Drei Farben, drei Bedeutungen: grün = erledigt/besser,
@@ -308,7 +311,9 @@ Screen-Wechsel zu kurzen Überblendungen, rollende Ziffern wechseln einfach (`Lo
 - **Primary:** weiß mit schwarzem, fettem Text, 64 dp hoch, Text und optionales Icon mittig. Einer pro Screen, schwebend
   über dem Inhalt.
 - **Secondary / Small:** Grafit mit weißem Text; kompakt 44 dp sichtbar, 48 dp Tippfläche. Im Panel eine Stufe heller.
-- **Press:** `pressScale` 0,96 (Knöpfe), 0,98 (Karten), 0,88 (Icon-Knöpfe), 100 ms rein, Feder zurück. Kein Ripple.
+- **Press:** `pressScale` 0,96 (Knöpfe), 0,98 (Karten), 0,88 (Icon-Knöpfe), 70 ms rein (`Motion.press`, `MIN_PRESS_MS`), Feder
+  zurück (`Motion.pressRelease`, leicht federnd); Zeilen (`pressableRow`): graue Fläche sofort da, blendet in 260 ms aus
+  (`Motion.rowRelease`). Kein Ripple.
 - **Confirm (Doppeltipp):** erster Tipp füllt rot (`armed-fill`) bzw. grün (`confirm-fill`) mit weißem Text, zweiter Tipp in
   3 s führt aus; Tipp daneben, Scrollen oder Zeitablauf entschärfen.
 - **Disabled:** 30 % Deckkraft, kein Scale.
