@@ -142,7 +142,7 @@ fun DayScreen(
         }
 
         SectionTitle(p.dayPhotos)
-        DayPhotoGrid(dayPhotos.map { it.photo }, onAdd = onAddPhoto, onOpen = onOpenPhoto, onRemove = onRemovePhoto)
+        DayPhotoGrid(photos?.let { dayPhotos.map { it.photo } }, onAdd = onAddPhoto, onOpen = onOpenPhoto, onRemove = onRemovePhoto)
         Hint(h.photosPrivate)
     }
 }

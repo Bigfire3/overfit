@@ -65,7 +65,8 @@ const val PHOTO_ADD_LIBRARY_TAG = "photo-add-library"
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DayPhotoGrid(
-    photos: List<WorkoutPhoto>,
+    /** The day's photos; null while they are still loading (what the first loaded list holds is not "new"). */
+    photos: List<WorkoutPhoto>?,
     /** Picked or taken image, still unprocessed; the caller prepares and stores it for the day. */
     onAdd: (ByteArray) -> Unit,
     onOpen: ((photoId: String) -> Unit)?,
@@ -73,10 +74,12 @@ fun DayPhotoGrid(
     modifier: Modifier = Modifier,
 ) {
     val h = LocalStrings.current.history
-    val picker = rememberPhotoPicker(onAdd)
     val haptics = rememberHaptics()
-    // Photos that were there when the grid appeared are simply there; only later ones pop in.
-    val initial = remember { photos.map { it.id }.toSet() }
+    // The confirm belongs to adding (a photo was taken or picked), not to a thumbnail being composed.
+    val picker = rememberPhotoPicker { bytes -> haptics.confirm(); onAdd(bytes) }
+    // Photos that were there when the list first loaded are simply there; only later ones pop in.
+    val initial = remember { arrayOfNulls<Set<String>>(1) }
+    if (initial[0] == null && photos != null) initial[0] = photos.mapTo(HashSet()) { it.id }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val tile = (maxWidth - Space.s * (COLUMNS - 1)) / COLUMNS
         Column {
@@ -86,11 +89,11 @@ fun DayPhotoGrid(
                 horizontalArrangement = Arrangement.spacedBy(Space.s),
                 verticalArrangement = Arrangement.spacedBy(Space.s),
             ) {
-                photos.forEachIndexed { i, photo ->
+                photos.orEmpty().forEachIndexed { i, photo ->
                     key(photo.id) {
-                        val isNew = photo.id !in initial
+                        val isNew = initial[0]?.contains(photo.id) == false
                         var shown by remember { mutableStateOf(!isNew) }
-                        LaunchedEffect(Unit) { if (isNew) { shown = true; haptics.confirm() } }
+                        LaunchedEffect(Unit) { if (isNew) shown = true }
                         Appear(shown) {
                             GridPhoto(
                                 photo, h.photoDescription(i + 1), tile,

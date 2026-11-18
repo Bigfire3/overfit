@@ -34,9 +34,13 @@ object WorkoutFormat {
         }.filter { it.isNotEmpty() }.joinToString(", ")
 
     /** "Lateral raise · Set 3 · 30 kg × 6" */
-    fun next(ref: Workout.SetRef, unit: WeightUnit, language: Language, t: Strings): String {
+    fun next(ref: Workout.SetRef, unit: WeightUnit, language: Language, t: Strings): String =
+        nextParts(ref, unit, language, t).toList().filter { it.isNotEmpty() }.joinToString(" · ")
+
+    /** [next] in two parts: the exercise name and "Set 3 · 30 kg × 6" (what a line that is too narrow must keep). */
+    fun nextParts(ref: Workout.SetRef, unit: WeightUnit, language: Language, t: Strings): Pair<String, String> {
         val values = values(ref.set.actual.takeUnless { it == SetValues() } ?: ref.set.target, ref.exercise.exercise.trackingType, unit, language, t)
-        return listOf(ref.exercise.exercise.name, t.setNumber(ref.number), values).filter { it.isNotEmpty() }.joinToString(" · ")
+        return ref.exercise.exercise.name to listOf(t.setNumber(ref.number), values).filter { it.isNotEmpty() }.joinToString(" · ")
     }
 
     /** "Set 2/4 · 30 kg × 6": the set to do now (workout notification, the exercise is its title). */

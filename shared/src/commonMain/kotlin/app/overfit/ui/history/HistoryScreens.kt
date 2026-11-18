@@ -212,8 +212,9 @@ fun WorkoutDetailScreen(
     var savingTemplate by remember { mutableStateOf(false) }
     // Photos belong to the training's day (v14): the detail shows them all and adds new ones to that day.
     val day = data?.finished?.workout?.startedAt?.let { localDateTime(it).date }
-    val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
-        .collectAsStateWithLifecycle(emptyList())
+    // Null until the day's photos are loaded: the grid then knows which ones were simply there.
+    val photos by remember(day) { day?.let { workouts.observePhotosOfDay(it) } ?: kotlinx.coroutines.flow.flowOf(null) }
+        .collectAsStateWithLifecycle<List<app.overfit.data.WorkoutPhoto>?>(null)
 
     Screen(scroll = true, header = {
         // [edit] [⋮ share, delete] [coach] (UI audit 12.11.: four icons were too many; delete keeps its two taps).

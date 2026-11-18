@@ -56,6 +56,22 @@ object Motion {
     /** How long a pressed button stays pressed at least, so a quick tap is still seen (and felt). */
     const val MIN_PRESS_MS = 70
 
+    /** The way down of a press ([pressScale], [pressableRow]): [MIN_PRESS_MS], so even a quick tap is seen. */
+    fun <T> press(): TweenSpec<T> = tween(MIN_PRESS_MS, easing = LinearOutSlowInEasing)
+
+    /**
+     * A pressed button or card springs back to its size. The one other spring that overshoots besides [bouncy]: a
+     * little, so the release feels elastic under the finger (unchanged since the first press feedback).
+     */
+    fun <T> pressRelease(visibilityThreshold: T? = null): SpringSpec<T> =
+        spring(dampingRatio = 0.55f, stiffness = 600f, visibilityThreshold = visibilityThreshold)
+
+    /** How long the grey fill of a pressed row fades out after the finger lifts. */
+    const val ROW_RELEASE_MS = 260
+
+    /** Fade-out of a pressed row's fill ([pressableRow]): slow enough that a quick tap leaves a visible trace. */
+    fun <T> rowRelease(): TweenSpec<T> = tween(ROW_RELEASE_MS, easing = LinearOutSlowInEasing)
+
     /** Count-up of a number that has just appeared (finish summary). */
     const val COUNT_UP_MS = 700
 }

@@ -16,6 +16,9 @@ import app.overfit.ui.components.RevealNotNull
 import app.overfit.ui.components.RollingText
 import app.overfit.ui.components.Swap
 import app.overfit.ui.components.motionItem
+import app.overfit.ui.components.rememberGlide
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import app.overfit.ui.components.rememberHaptics
 import app.overfit.ui.theme.Motion
 import kotlinx.coroutines.async
@@ -419,12 +422,31 @@ fun TemplateEditorScreen(
             null -> Unit
         }
     }
-    LaunchedEffect(state.blocked) { if (state.blocked > 0) { backArmed = true; showProblem(state.problem, focusName = false) } }
-    LaunchedEffect(state.problem) { val p = state.problem; if (!autosave && p != null) showProblem(p, focusName = true) }
+    // Both react to a change, not to the editor being composed again: the view model outlives the screen (exercise
+    // picker, details, rotation), and coming back must not buzz, scroll or open the keyboard once more.
+    var handledBlocked by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(state.blocked) {
+        if (state.blocked <= handledBlocked) return@LaunchedEffect
+        handledBlocked = state.blocked
+        backArmed = true
+        showProblem(state.problem, focusName = false)
+    }
+    var handledProblem by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.problem) {
+        val p = state.problem
+        val key = p?.toString()
+        if (key == handledProblem) return@LaunchedEffect
+        handledProblem = key
+        if (!autosave && p != null) showProblem(p, focusName = true)
+    }
 
-    // A new, empty workout starts with its name: the field is focused (keyboard open) as the editor opens.
+    // A new, empty workout starts with its name: the field is focused (keyboard open) as the editor opens. Once per
+    // editor: back from the exercise picker the draft is still empty for a moment, and the keyboard must stay closed.
+    var nameFocusDone by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(contentReady) {
-        if (contentReady && !autosave && viewModel.seed == null && draft.name.isEmpty() && draft.exercises.isEmpty()) {
+        if (!contentReady || nameFocusDone) return@LaunchedEffect
+        nameFocusDone = true
+        if (!autosave && viewModel.seed == null && draft.name.isEmpty() && draft.exercises.isEmpty()) {
             withFrameNanos { }
             runCatching { nameFocus.requestFocus() }
         }
@@ -444,8 +466,11 @@ fun TemplateEditorScreen(
             listState.animateScrollToItem(1 + exerciseKeys.indexOf(added))
         }
     }
-    // While a value is typed, the keyboard takes half the screen: the main button steps aside, "Undo" stays.
-    val typing = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    // While a value is typed, the keyboard takes half the screen: "Start" steps aside, "Undo" stays. Read through
+    // derivedStateOf: the inset changes on every frame of the keyboard animation, the Boolean once.
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    val typing by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
     val reorder = rememberReorderState(listState, canMove = { it is Long }) { from, to ->
         viewModel.edit { d ->
             val a = d.exercises.indexOfFirst { it.key == from }
@@ -453,6 +478,8 @@ fun TemplateEditorScreen(
             if (a < 0 || b < 0) d else d.moveExercise(from as Long, b - a)
         }
     }
+    // Cards resize themselves (fold, sets): the others only glide when the list itself changes or a card is dragged.
+    val glide = rememberGlide(draft.exercises.map { it.key }, moving = reorder.draggingKey != null)
 
     // Autosave: back stores and closes; only an invalid draft needs a second back (it cannot be stored).
     // Otherwise no leaving while saving: the save must not be cancelled half-way (new exercises, workout, chat acknowledgement).
@@ -507,7 +534,9 @@ fun TemplateEditorScreen(
                 RevealNotNull(message, from = Alignment.Bottom) { m ->
                     Text(m, Modifier.padding(bottom = Space.m), style = Theme.type.caption, tone = Tone.Muted)
                 }
-                Reveal(!typing, from = Alignment.Bottom) {
+                // "Save" of a new workout stays above the keyboard: it is the only way to finish. "Start" (and the
+                // choice while another workout runs) step aside while typing.
+                Reveal(!autosave || !typing, from = Alignment.Bottom) {
                     when {
                         !autosave -> PrimaryButton(t.save, viewModel::save, enabled = !state.loading, loading = state.saving)
                         workoutRunning -> RunningWorkoutChoice(onToRunning, onEndRunning)
@@ -558,11 +587,11 @@ fun TemplateEditorScreen(
                 Spacer(Modifier.height(Space.m))
             }
             if (draft.exercises.isEmpty() && autosave) {
-                item(key = "empty") { Text(t.workoutPlanEmpty, motionItem().padding(vertical = Space.m), tone = Tone.Muted) }
+                item(key = "empty") { Text(t.workoutPlanEmpty, motionItem(glide).padding(vertical = Space.m), tone = Tone.Muted) }
             }
             itemsIndexed(draft.exercises, key = { _, e -> e.key }) { index, entry ->
                 ExerciseBlock(
-                    modifier = Modifier.then(reorderableItem(reorder, entry.key)),
+                    modifier = Modifier.then(reorderableItem(reorder, entry.key, glide)),
                     reorder = reorder,
                     entry = entry,
                     unit = unit,
@@ -582,7 +611,7 @@ fun TemplateEditorScreen(
                 )
             }
             item(key = "actions") {
-                Column(motionItem()) {
+                Column(motionItem(glide)) {
                     Spacer(Modifier.height(Space.s))
                     BlockButton(t.addExercise, onAddExercises)
                 }
